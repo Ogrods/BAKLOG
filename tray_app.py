@@ -285,6 +285,18 @@ def open_browser() -> None:
         pass
 
 
+def open_data_folder() -> None:
+    """Open the active profile data directory in the OS file manager."""
+    folder = data_root()
+    folder.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":
+        os.startfile(folder)  # noqa: S606 - intentional shell open on Windows
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(folder)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(folder)], check=False)
+
+
 def _run_headless(controller: ServerController) -> int:
     """Fallback when pystray/Pillow aren't installed: start server, open browser,
     block until the server exits or Ctrl+C."""
@@ -359,6 +371,12 @@ def run_tray() -> int:
                 return
         open_browser()
 
+    def _on_open_data_folder(icon, _item) -> None:  # noqa: ANN001
+        try:
+            open_data_folder()
+        except OSError as exc:
+            _tray_notify(icon, "Open folder failed", str(exc))
+
     def _on_restart(icon, _item) -> None:  # noqa: ANN001
         if not controller.restart():
             if controller.is_running() and not controller.owns_server():
@@ -379,6 +397,7 @@ def run_tray() -> int:
 
     menu_items = [
         pystray.MenuItem("Open BAKLOG", _on_open, default=True),
+        pystray.MenuItem("Open data folder", _on_open_data_folder),
         pystray.MenuItem("Restart server", _on_restart),
     ]
     if startup_supported():
@@ -401,6 +420,26 @@ def run_tray() -> int:
 
 
 def main() -> int:
+    if "--uninstall-cleanup" in sys.argv or "--uninstall-wipe-user-data" in sys.argv:
+        if not is_frozen():
+            print(
+                "[uninstall] uninstall cleanup flags require the frozen BAKLOG Tray.exe",
+                file=sys.stderr,
+                flush=True,
+            )
+            return 1
+    if "--uninstall-cleanup" in sys.argv:
+        from shared.uninstall_cleanup import cleanup_autostart
+
+        cleanup_autostart()
+        return 0
+    if "--uninstall-wipe-user-data" in sys.argv:
+        from shared.install_paths import resolved_data_dir_for_uninstall
+        from shared.uninstall_cleanup import wipe_user_data
+
+        for note in wipe_user_data(resolved_data_dir_for_uninstall()):
+            print(f"[uninstall] {note}", file=sys.stderr, flush=True)
+        return 0
     if not acquire_tray_lock():
         print("[tray] another BAKLOG tray instance is already running", file=sys.stderr, flush=True)
         return 0

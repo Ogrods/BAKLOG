@@ -55,6 +55,7 @@ hiddenimports = [
     "shared.bundled_auth_env",
     "shared.built_frontend",
     "shared.legacy_env",
+    "shared.uninstall_cleanup",
     "keyring.backends.Windows",
     "cryptography.hazmat.primitives.ciphers.aead",
     "certifi",

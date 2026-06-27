@@ -8,7 +8,7 @@ What installs where
   App folder: %LOCALAPPDATA%\BAKLOG (Start Menu shortcut and tray launcher)
   Your data: %LOCALAPPDATA%\BAKLOG-Data (library, connections, and profiles)
 
-Upgrading or reinstalling keeps your data. Uninstall removes only the app folder.
+Upgrading or reinstalling keeps your data. Uninstall removes the app; choose whether to keep or delete your library data.
 
 After install, launch BAKLOG from the Start Menu. A tray icon appears in the notification area. Right-click it for Open, Restart, or Quit. You do not need to keep a console window open.
 

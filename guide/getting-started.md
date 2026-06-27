@@ -21,7 +21,9 @@ If you received a beta invite:
 3. Launch **BAKLOG** from the Start Menu. A tray icon appears and your browser opens.
 4. Open the **Connections** tab and connect each store you use (Chrome or Edge required).
 
-Your library data (profiles, games, connections) lives in `%LOCALAPPDATA%\BAKLOG-Data`, separate from the app folder. Uninstalling BAKLOG removes only the app; your data stays until you delete that folder.
+Your library data (profiles, games, connections) lives in `%LOCALAPPDATA%\BAKLOG-Data`, separate from the app folder. Uninstalling BAKLOG removes the app and always clears login autostart; the uninstall wizard lets you keep your library or remove everything (data folder and saved sign-ins).
+
+**Maintainers testing dev and frozen on one PC:** optional `BAKLOG_DATA_DIR=%LOCALAPPDATA%\BAKLOG-Dev` in `.env` keeps `python server.py` out of the installer's data folder. The dashboard header shows a **Dev server** chip when the dev server is active. See [troubleshooting](troubleshooting.md#dev-server-vs-frozen-exe-same-browser-origin).
 
 Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.bat` or `BAKLOG Tray.exe`. Add an empty `portable.txt` beside `BAKLOG.exe` only if you want all data in the unzip folder (thumb drives). See `BETA-README.txt` in the bundle.
 

@@ -260,3 +260,19 @@ def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
         time.sleep(0.05)
     assert notified
     assert notified[0][0] == "BAKLOG server stopped"
+
+
+def test_open_data_folder_opens_data_root(monkeypatch, tmp_path):
+    opened: dict[str, str] = {}
+    monkeypatch.setattr(tray_app, "data_root", lambda: tmp_path)
+    if sys.platform == "win32":
+        monkeypatch.setattr(tray_app.os, "startfile", lambda p: opened.__setitem__("path", p))
+    else:
+        monkeypatch.setattr(
+            tray_app.subprocess,
+            "run",
+            lambda args, check=False: opened.__setitem__("path", args[-1]),
+        )
+    tray_app.open_data_folder()
+    assert Path(opened["path"]) == tmp_path
+    assert tmp_path.is_dir()

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "fetchers" / "manifest.json"
 SPEC = ROOT / "packaging" / "baklog.spec"
@@ -59,6 +61,7 @@ def _spec_resolved_hiddenimports() -> set[str]:
         "shared.bundled_auth_env",
         "shared.built_frontend",
         "shared.legacy_env",
+        "shared.uninstall_cleanup",
         "keyring.backends.Windows",
         "cryptography.hazmat.primitives.ciphers.aead",
     }
@@ -121,3 +124,55 @@ def test_inno_installer_branding_assets() -> None:
     assert baklog_ico.is_file() and baklog_ico.stat().st_size > 0
     iss_text = (packaging / "baklog.iss").read_text(encoding="utf-8")
     assert 'IconFilename: "{app}\\BAKLOG.ico"' in iss_text
+    assert 'Source: "BAKLOG.ico"; DestDir: "{app}"' in iss_text
+
+
+def test_inno_installer_uninstall_data_choice() -> None:
+    iss = (ROOT / "packaging" / "baklog.iss").read_text(encoding="utf-8")
+    assert "function InitializeUninstall(): Boolean;" in iss
+    assert "--uninstall-wipe-user-data" in iss
+    assert "--uninstall-cleanup" in iss
+    assert "WipeUserData" in iss
+    assert "taskkill.exe" in iss
+    assert "DelTree(ExpandConstant('{localappdata}\\BAKLOG-Data')" not in iss
+
+
+def test_inno_installer_finish_page_and_export_nudge() -> None:
+    iss = (ROOT / "packaging" / "baklog.iss").read_text(encoding="utf-8")
+    assert "procedure InitializeWizard();" in iss
+    assert "CreateOutputMsgPage" in iss
+    assert "Your library folder" in iss
+    assert "BAKLOG-Data" in iss
+    assert "Export bundle" in iss
+    assert "function NextButtonClick(CurPageID: Integer): Boolean;" in iss
+    assert "Export a backup first?" in iss
+
+
+def test_build_script_generates_assets_before_pyinstaller() -> None:
+    text = (ROOT / "packaging" / "build_windows.ps1").read_text(encoding="utf-8")
+    gen = text.index("generate_installer_assets.py")
+    pyi = text.index("PyInstaller packaging/baklog.spec")
+    copy_ico = text.index('Copy-Item -Force (Join-Path $Root "packaging\\BAKLOG.ico")')
+    assert gen < pyi
+    assert pyi < copy_ico
+
+
+def _installer_assets_module():
+    import importlib.util
+
+    path = ROOT / "packaging" / "generate_installer_assets.py"
+    spec = importlib.util.spec_from_file_location("generate_installer_assets", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_ico_contains_standard_sizes() -> None:
+    pytest.importorskip("PIL")
+    mod = _installer_assets_module()
+    ico_path = ROOT / "packaging" / "BAKLOG.ico"
+    assert ico_path.is_file()
+    mod.verify_ico(ico_path)
+    sizes = mod._ico_embedded_sizes(ico_path)
+    assert {16, 32, 48, 256}.issubset(sizes)

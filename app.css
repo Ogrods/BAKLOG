@@ -3318,6 +3318,44 @@ html:has(#viewLoadingOverlay.show) .app-footer { visibility: hidden; }
   /* Nudge up and to the left without shifting the header layout. */
   transform: translate(-3px, -3px);
 }
+.runtime-mode-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: min(28rem, 100%);
+  margin-left: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  line-height: 1.25;
+  color: #fde68a;
+  background: rgb(120 53 15 / 0.35);
+  border: 1px solid rgb(251 191 36 / 0.45);
+}
+.runtime-mode-banner-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.runtime-mode-banner-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
+}
+.runtime-mode-banner-dismiss {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.runtime-mode-banner-dismiss:hover { opacity: 1; }
 html[data-theme="default"] .app-header-brand h1 { color: #fff; }
 html[data-theme="dark"] .app-header-brand h1 { color: #fff; }
 html[data-theme="ember"] .app-header-brand h1 {

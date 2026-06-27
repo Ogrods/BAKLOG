@@ -3176,12 +3176,13 @@ class Handler(SimpleHTTPRequestHandler):
         config["frozen"] = is_frozen()
         config["version"] = _app_version()
         config["chromium_available"] = _chromium_available()
-        from shared.install_paths import frozen_bundle_dir, is_portable_frozen
+        from shared.install_paths import frozen_bundle_dir, is_portable_frozen, runtime_label
         from shared.server_support import is_running_from_temp_dir, redact_user_path
 
         config["running_from_temp"] = is_frozen() and is_running_from_temp_dir(frozen_bundle_dir())
+        config["data_dir_path"] = redact_user_path(ROOT)
+        config["runtime_label"] = runtime_label()
         if is_frozen():
-            config["data_dir_path"] = redact_user_path(ROOT)
             config["portable"] = is_portable_frozen()
         _send_json(self, HTTPStatus.OK, config)
 

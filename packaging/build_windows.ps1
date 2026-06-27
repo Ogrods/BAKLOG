@@ -39,6 +39,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm run check:dist-integrity
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "Generating installer branding assets..."
+& $Python (Join-Path $Root "packaging\generate_installer_assets.py")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $ReleaseDir = Join-Path $Root "release"
 if (-not (Test-Path $ReleaseDir)) {
     New-Item -ItemType Directory -Path $ReleaseDir | Out-Null
@@ -64,10 +68,7 @@ if (-not (Test-Path $FallbackJson)) {
 }
 
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
-
-Write-Host "Generating installer branding assets..."
-& $Python (Join-Path $Root "packaging\generate_installer_assets.py")
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Copy-Item -Force (Join-Path $Root "packaging\BAKLOG.ico") (Join-Path $OutDir "BAKLOG.ico")
 
 Write-Host "Writing bundled account-auth .env..."
 $urlSet = [bool]$env:BAKLOG_SUPABASE_URL

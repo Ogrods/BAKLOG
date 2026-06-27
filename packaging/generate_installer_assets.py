@@ -23,6 +23,12 @@ PILLS = ((2, 52, 46, 24), (52, 52, 46, 24), (27, 24, 46, 24))
 KNOBS = ((14, 64), (64, 64), (39, 36))
 MARK_BOX = (2, 24, 98, 76)  # viewBox 0..100 mark region inside 105% scaled group
 
+_RESAMPLE = Image.Resampling.LANCZOS
+_ICON_SUPER = 4
+_WIZARD_LARGE = (164, 314)
+_WIZARD_SMALL = 55
+ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
 
 def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     dejavu = (
@@ -44,6 +50,16 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageF
         if path.is_file():
             return ImageFont.truetype(str(path), size=size)
     return ImageFont.load_default()
+
+
+def _downscale(img: Image.Image, size: int | tuple[int, int]) -> Image.Image:
+    if isinstance(size, int):
+        target = (size, size)
+    else:
+        target = size
+    if img.size == target:
+        return img
+    return img.resize(target, _RESAMPLE)
 
 
 def _rounded_mask(size: int, radius: int) -> Image.Image:
@@ -110,8 +126,8 @@ def _draw_mark_layer(size: int, *, pad: float = 0.12) -> Image.Image:
     return mark_rgb
 
 
-def render_app_icon(size: int) -> Image.Image:
-    """Rounded app icon matching packaging/brand/app-icon.svg."""
+def _render_app_icon_raw(size: int) -> Image.Image:
+    """Render app icon at exact pixel size (no supersampling)."""
     radius = max(4, int(size * 28 / 128))
     base = _diagonal_gradient(size).convert("RGBA")
     rounded = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -129,6 +145,21 @@ def render_app_icon(size: int) -> Image.Image:
     return icon
 
 
+def render_app_icon(size: int) -> Image.Image:
+    """Rounded app icon matching packaging/brand/app-icon.svg."""
+    hi = max(size, size * _ICON_SUPER)
+    return _downscale(_render_app_icon_raw(hi), size)
+
+
+def _composite_on_bg(rgba: Image.Image, bg_color: tuple[int, int, int]) -> Image.Image:
+    bg = Image.new("RGB", rgba.size, bg_color)
+    if rgba.mode == "RGBA":
+        bg.paste(rgba, mask=rgba.split()[3])
+    else:
+        bg.paste(rgba)
+    return bg
+
+
 def _vertical_panel(size: tuple[int, int]) -> Image.Image:
     w, h = size
     img = Image.new("RGB", size)
@@ -140,52 +171,91 @@ def _vertical_panel(size: tuple[int, int]) -> Image.Image:
     return img
 
 
-def make_wizard_large() -> Image.Image:
-    """Inno WizardImageFile: 164 x 314, 24-bit BMP."""
-    img = _vertical_panel((164, 314))
-    icon = render_app_icon(96)
-    img.paste(icon, (34, 24), icon)
+def _make_wizard_large_at(w: int, h: int) -> Image.Image:
+    scale = w / _WIZARD_LARGE[0]
+    img = _vertical_panel((w, h))
+    icon_size = max(1, int(96 * scale))
+    icon = render_app_icon(icon_size)
+    icon_x = int(34 * scale)
+    icon_y = int(24 * scale)
+    icon_flat = _composite_on_bg(icon, BG_TOP)
+    img.paste(icon_flat, (icon_x, icon_y))
     draw = ImageDraw.Draw(img)
-    title_font = _load_font(20, bold=True)
-    tag_font = _load_font(10)
-    small_font = _load_font(9)
-    draw.text((82, 138), "BAKLOG", font=title_font, fill=TEXT, anchor="mm")
-    draw.line([(24, 156), (140, 156)], fill=ACCENT, width=2)
+    cx = w // 2
+    title_font = _load_font(max(8, int(20 * scale)), bold=True)
+    tag_font = _load_font(max(6, int(10 * scale)))
+    small_font = _load_font(max(6, int(9 * scale)))
+    draw.text((cx, int(138 * scale)), "BAKLOG", font=title_font, fill=TEXT, anchor="mm")
+    draw.line(
+        [(int(24 * scale), int(156 * scale)), (int(140 * scale), int(156 * scale))],
+        fill=ACCENT,
+        width=max(1, int(2 * scale)),
+    )
     draw.multiline_text(
-        (82, 176),
+        (cx, int(176 * scale)),
         "One honest backlog\nacross every store.",
         font=tag_font,
         fill=ACCENT,
         anchor="mm",
         align="center",
-        spacing=4,
+        spacing=max(2, int(4 * scale)),
     )
     draw.multiline_text(
-        (82, 252),
+        (cx, int(252 * scale)),
         "Local-only beta\nbaklog.app",
         font=small_font,
         fill=MUTED,
         anchor="mm",
         align="center",
-        spacing=3,
+        spacing=max(2, int(3 * scale)),
     )
     return img
 
 
+def make_wizard_large() -> Image.Image:
+    """Inno WizardImageFile: 164 x 314, 24-bit BMP."""
+    hi = _make_wizard_large_at(_WIZARD_LARGE[0] * 2, _WIZARD_LARGE[1] * 2)
+    return _downscale(hi, _WIZARD_LARGE)
+
+
 def make_wizard_small() -> Image.Image:
     """Inno WizardSmallImageFile: 55 x 55, 24-bit BMP."""
-    icon = render_app_icon(55)
-    bg = Image.new("RGB", (55, 55), BG_TOP)
-    bg.paste(icon, (0, 0), icon)
-    return bg
+    icon = render_app_icon(_WIZARD_SMALL)
+    return _composite_on_bg(icon, BG_TOP)
 
 
 def write_ico(path: Path, master: Image.Image) -> None:
-    master.save(
-        path,
-        format="ICO",
-        sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
-    )
+    img = _downscale(master.convert("RGBA"), 256)
+    img.save(path, format="ICO", sizes=[(size, size) for size in ICO_SIZES])
+
+
+def _ico_embedded_sizes(path: Path) -> set[int]:
+    """Read embedded dimensions from the ICO directory (works on all Pillow versions)."""
+    data = path.read_bytes()
+    if len(data) < 6 or data[:4] != b"\x00\x00\x01\x00":
+        with Image.open(path) as img:
+            return {img.size[0]} if img.size[0] == img.size[1] else set()
+    count = int.from_bytes(data[4:6], "little")
+    sizes: set[int] = set()
+    offset = 6
+    for _ in range(count):
+        if offset + 16 > len(data):
+            break
+        w = data[offset]
+        h = data[offset + 1]
+        sizes.add(256 if w == 0 else w)
+        sizes.add(256 if h == 0 else h)
+        offset += 16
+    return sizes
+
+
+def verify_ico(path: Path) -> None:
+    """Fail fast when ICO frames are missing expected Windows sizes."""
+    found = _ico_embedded_sizes(path)
+    required = {16, 32, 48, 256}
+    missing = required - found
+    if missing:
+        raise ValueError(f"{path}: missing ICO sizes {sorted(missing)} (found {sorted(found)})")
 
 
 def write_assets() -> list[Path]:
@@ -207,6 +277,7 @@ def write_assets() -> list[Path]:
     for name in ("installer-icon.ico", "BAKLOG.ico"):
         ico_path = OUT_DIR / name
         write_ico(ico_path, icon_master)
+        verify_ico(ico_path)
         written.append(ico_path)
 
     tray_png = render_app_icon(64)

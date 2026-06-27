@@ -32,6 +32,29 @@ def test_data_dir_override(monkeypatch, tmp_path):
     assert install_paths.data_root() == tmp_path.resolve()
 
 
+def test_runtime_label_dev(monkeypatch):
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
+    assert install_paths.runtime_label() == "dev"
+
+
+def test_runtime_label_installed(monkeypatch, tmp_path):
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths, "is_portable_frozen", lambda: False)
+    assert install_paths.runtime_label() == "installed"
+
+
+def test_runtime_label_portable(monkeypatch, tmp_path):
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths, "is_portable_frozen", lambda: True)
+    assert install_paths.runtime_label() == "portable"
+
+
 def test_serve_built_false_without_manifest(monkeypatch, tmp_path):
     monkeypatch.delenv("BAKLOG_SERVE_BUILT", raising=False)
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
@@ -117,6 +140,20 @@ def test_frozen_portable_marker_uses_install_dir(monkeypatch, tmp_path):
     monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
     monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
     assert install_paths.data_root() == app_dir.resolve()
+    assert install_paths.resolved_data_dir_for_uninstall() == app_dir.resolve()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows LOCALAPPDATA frozen data dir")
+def test_resolved_data_dir_for_uninstall_default_windows(monkeypatch, tmp_path):
+    monkeypatch.delenv("BAKLOG_DATA_DIR", raising=False)
+    monkeypatch.delenv("BAKLOG_PORTABLE", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    app_dir = tmp_path / "app"
+    app_dir.mkdir()
+    (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
+    monkeypatch.setattr(install_paths, "is_frozen", lambda: True)
+    monkeypatch.setattr(install_paths.sys, "executable", str(app_dir / "BAKLOG.exe"))
+    assert install_paths.resolved_data_dir_for_uninstall() == (tmp_path / "BAKLOG-Data").resolve()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows LOCALAPPDATA frozen data dir")

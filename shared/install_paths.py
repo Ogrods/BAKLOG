@@ -59,6 +59,25 @@ def default_frozen_data_dir() -> Path:
     return (Path.home() / ".local" / "share" / "baklog").resolve()
 
 
+def resolved_data_dir_for_uninstall() -> Path:
+    """Writable data root targeted by frozen uninstall wipe (portable-aware)."""
+    override = os.environ.get("BAKLOG_DATA_DIR", "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    if is_portable_frozen():
+        return legacy_frozen_data_dir()
+    return default_frozen_data_dir()
+
+
+def runtime_label() -> str:
+    """UI-facing runtime mode: dev, installed, or portable."""
+    if not is_frozen():
+        return "dev"
+    if is_portable_frozen():
+        return "portable"
+    return "installed"
+
+
 def _maybe_migrate_legacy_to(target: Path) -> None:
     """Move co-located install-dir data into *target* when frozen and not portable."""
     if is_portable_frozen():

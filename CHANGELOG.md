@@ -22,6 +22,22 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Uninstall wizard choice: keep library data or remove everything (including `%LOCALAPPDATA%\BAKLOG-Data`, OS keyring master key, and login autostart).
+- Header **Dev server** chip when `python server.py` is active; warns when persisted errors mix dev and installed sessions on shared localhost storage.
+- `resolved_data_dir_for_uninstall()` so portable installs wipe co-located data beside `BAKLOG.exe`.
+- `/api/config` `runtime_label` (`dev` / `installed` / `portable`) for UI runtime detection; `frozen` kept for compatibility.
+- Tray menu **Open data folder** opens the active profile data directory in Explorer.
+- Installer finish page shows library vs app paths; full uninstall nudges Connections **Export bundle** before wipe.
+
+### Fixed
+
+- Installer shortcuts and Add/Remove Programs icon: `BAKLOG.ico` now installed at `{app}\BAKLOG.ico` (was missing from the bundle root).
+- Supersampled installer wizard images and multi-size `.ico` assets for smoother branding on HiDPI displays.
+- Uninstall cleanup stops running BAKLOG processes before wiping data; tray uninstall flags require the frozen exe (dev `tray_app.py` cannot wipe install data).
+- `/api/config` exposes `data_dir_path` for dev sessions (redacted), not only frozen builds.
+
 ## [0.8.25] - 2026-06-26
 
 ### Fixed

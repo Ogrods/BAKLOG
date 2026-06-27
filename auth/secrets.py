@@ -194,6 +194,22 @@ def _save_keyring_key(key: bytes) -> bool:
     return True
 
 
+def delete_keyring_master_key() -> bool:
+    """Remove the master encryption key from the OS keyring. Return True if deleted."""
+    try:
+        import keyring
+        from keyring.errors import KeyringError, PasswordDeleteError
+    except ImportError:
+        return False
+    try:
+        keyring.delete_password(SERVICE_NAME, KEYRING_ACCOUNT)
+    except PasswordDeleteError:
+        return False
+    except KeyringError:
+        return False
+    return True
+
+
 # Marker prefix for a DPAPI-protected master key on disk (Windows). A file
 # without this prefix is a legacy plaintext key written before DPAPI support.
 _DPAPI_MAGIC = b"BAKLOG-DPAPI1\n"

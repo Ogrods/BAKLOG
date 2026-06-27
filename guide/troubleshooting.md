@@ -125,7 +125,9 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 **Cause (older builds):** Library data lived in the same folder as `BAKLOG.exe`. Uninstall removed everything.
 
-**Fix (current builds):** Data is in `%LOCALAPPDATA%\BAKLOG-Data` on Windows (separate from the app). If you still have that folder, reinstall BAKLOG and launch normally - first boot migrates any leftover data from the old install folder once. If you deleted `BAKLOG-Data`, restore from backup or a portable bundle export from Connections.
+**Fix (current builds):** Data is in `%LOCALAPPDATA%\BAKLOG-Data` on Windows (separate from the app). Uninstalling via **BAKLOG-Setup** asks whether to keep that folder or remove everything (library, saved sign-ins, and login autostart). Choose **Keep my library** to reinstall later without re-connecting stores. Choose **Remove everything** for a clean slate (also clears the OS keyring master key used to decrypt Connections credentials).
+
+If you still have `BAKLOG-Data`, reinstall BAKLOG and launch normally - first boot migrates any leftover data from the old install folder once. If you deleted `BAKLOG-Data` during a full wipe, restore from backup or re-connect stores in Connections.
 
 **Portable zip:** Add an empty `portable.txt` beside `BAKLOG.exe` only if you want all data in the unzip folder (thumb drives). Otherwise data goes to `BAKLOG-Data` automatically. If you used the default data folder first and later add `portable.txt`, the app will look beside the exe (which looks empty). Remove `portable.txt` to return to `BAKLOG-Data`, or copy your `BAKLOG-Data` folder beside the exe before enabling portable mode.
 
@@ -147,6 +149,10 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 | `true` | `~/AppData/Local/BAKLOG-Data` | Frozen install data dir |
 
 **Fix (library):** With BAKLOG closed, copy `profiles/` from your dev checkout into `%LOCALAPPDATA%\BAKLOG-Data`, or connect stores and refresh in the frozen app. Missing store files return an empty catalog (HTTP 200, zero games) - not your dev repo.
+
+**Split dev from frozen (recommended on one PC):** Set `BAKLOG_DATA_DIR=%LOCALAPPDATA%\BAKLOG-Dev` in `.env` before running `python server.py`. Dev library files stay in `BAKLOG-Dev`; the installed app keeps using `BAKLOG-Data`. The header shows a **Dev server** chip when `python server.py` is active.
+
+**Keyring caveat:** Connections encryption uses one OS keyring entry (`steam-backlog`) per Windows user. A full uninstall wipe removes it for both dev and frozen - you will need to sign in to stores again everywhere on that account.
 
 **Fix (UI prefs / stale bug-report errors):** Edge or Chrome → site data for `127.0.0.1` → clear **localStorage**, or test the frozen build in an InPrivate window. Clearing site data does not delete `BAKLOG-Data`.
 

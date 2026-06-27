@@ -9,6 +9,7 @@ import { state } from './state.js';
 // before any module emits row HTML that references them inline.
 import './covers.js';
 import { installGlobalErrorHandler, registerBugBundleContext, reportError, noteServerRuntime } from './error-boundary.js';
+import { syncRuntimeModeBanner } from './runtime-mode-banner.js';
 import { initScrollLock } from './scroll-lock.js';
 
 // Install the global error + unhandled-rejection listeners as early as
@@ -258,6 +259,7 @@ async function bootstrap() {
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
         if (typeof cfg.frozen === 'boolean') noteServerRuntime({ frozen: cfg.frozen });
+        syncRuntimeModeBanner(cfg);
         if (cfg.running_from_temp) {
           const banner = document.getElementById('bootErrorBanner');
           if (banner) {

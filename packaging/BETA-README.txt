@@ -15,8 +15,9 @@ Recommended: run BAKLOG-Setup.exe from your invite link.
 5. After connecting, fetcher chips import your libraries automatically.
 
 Your library data (profiles, games, connections) is stored separately at
-%LOCALAPPDATA%\BAKLOG-Data. In-place upgrades and uninstalling the app
-leave that folder on disk. Reinstalling BAKLOG picks your data back up.
+%LOCALAPPDATA%\BAKLOG-Data. In-place upgrades keep that folder. Uninstall
+offers a choice: keep your library for a future reinstall, or remove everything
+(including saved sign-ins and login autostart).
 
 Portable zip fallback:
 - Unzip to a normal folder (Desktop or Documents), not from the zip temp folder.

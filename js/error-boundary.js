@@ -177,6 +177,11 @@ export function noteServerRuntime({ frozen } = {}) {
   if (typeof frozen === 'boolean') _serverFrozenHint = frozen;
 }
 
+/** True when persisted error ring tags both dev and frozen sessions. */
+export function hasPersistedMixedRuntimeErrors(currentFrozen) {
+  return persistedErrorsMixedRuntime(currentFrozen);
+}
+
 function persistedErrorsMixedRuntime(currentFrozen) {
   if (typeof currentFrozen !== 'boolean' || !_persistedRing.length) return false;
   const tagged = _persistedRing.filter((e) => typeof e.server_frozen === 'boolean');

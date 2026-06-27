@@ -31,7 +31,7 @@ function stubLayoutRect(el, { w = 120, h = 48, left = 100, top = 200 } = {}) {
   });
 }
 
-function mountDashHeroSurface() {
+function mountDashHeroSurface({ w = 220, h = 84, left = 100, top = 200 } = {}) {
   document.body.innerHTML = `
     <div class="dash-mega dash-mega--has-spotlight">
       <div class="dash-mega-hero">
@@ -42,8 +42,28 @@ function mountDashHeroSurface() {
       </div>
     </div>`;
   const hero = document.getElementById('dashHeroCount');
-  stubLayoutRect(hero);
+  stubLayoutRect(hero, { w, h, left, top });
   return hero;
+}
+
+function rafSync() {
+  const pending = [];
+  vi.stubGlobal('requestAnimationFrame', (cb) => {
+    pending.push(cb);
+    return pending.length;
+  });
+  return function flushRaf(untilMs = 6000, stepMs = 16) {
+    const t0 = performance.now();
+    let step = 0;
+    const maxStep = Math.max(Math.ceil(untilMs / stepMs) + 8, 320);
+    while (pending.length && step < maxStep) {
+      const batch = pending.splice(0);
+      for (const cb of batch) {
+        step += 1;
+        cb(t0 + step * stepMs);
+      }
+    }
+  };
 }
 
 describe('library-count hero visibility CSS contract', () => {
@@ -77,9 +97,30 @@ describe('library-count hero visibility CSS contract', () => {
     expect(APP_CSS).toMatch(/@keyframes baklog-libcount-pop\b/);
     expect(APP_CSS).toMatch(/@keyframes baklog-libcount-pop-hero/);
   });
+
+  it('anchors hero floats from left top (spawn point matches fixed top/left)', () => {
+    const heroFloat = extractRuleBlock(
+      APP_CSS,
+      '.library-count-popup--floated:not(.library-count-popup--floated-chip)',
+    );
+    const floated = extractRuleBlock(APP_CSS, '.library-count-popup--floated');
+    const origin = heroFloat || floated;
+    expect(origin).toMatch(/transform-origin:\s*left\s+top/);
+  });
+
+  it('does not start hero keyframes below the anchor (no positive 0% Y offset)', () => {
+    const heroKeyframes = APP_CSS.match(
+      /@keyframes baklog-libcount-pop-hero\s*\{([\s\S]*?)\n\}/,
+    )?.[1] ?? '';
+    const frame0 = heroKeyframes.match(/0%\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(frame0).not.toMatch(/translate\([^)]*,\s*0\.15em\)/);
+    expect(frame0).toMatch(/,\s*0em\)\s*scale/);
+  });
 });
 
 describe('library-count hero popup mount (happy-dom + app.css)', () => {
+  let flushRaf;
+
   function popupCssFixture() {
     const start = APP_CSS.indexOf('.dash-hero,\n.dash-mega {');
     const popStart = APP_CSS.indexOf('.library-count-host {');
@@ -92,10 +133,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     document.head.innerHTML = `<style id="app-css-fixture">${popupCssFixture()}
 .library-count-popup--floated { font-size: 28px; }</style>`;
     vi.useFakeTimers();
-    vi.stubGlobal('requestAnimationFrame', (cb) => {
-      cb(performance.now() + 2000);
-      return 1;
-    });
+    flushRaf = rafSync();
     vi.stubGlobal('matchMedia', (q) => ({
       matches: false,
       media: q,
@@ -120,6 +158,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
   it('floats dash-mega popups on document.body with hero-readable font-size', () => {
     const hero = mountDashHeroSurface();
     flashCountUp(hero, 1946, 1947, (n) => String(Math.round(n)), { popups: true });
+    flushRaf(countUpDurationForDelta(1) + 50);
     vi.advanceTimersByTime(countUpDurationForDelta(1));
     const popup = document.querySelector('.library-count-popup');
     expect(popup, 'popup element').toBeTruthy();
@@ -133,6 +172,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
   it('mid-flight floated popup stays mounted with hero font-size', () => {
     const hero = mountDashHeroSurface();
     flashCountUp(hero, 1946, 1947, (n) => String(Math.round(n)), { popups: true });
+    flushRaf(countUpDurationForDelta(1) + 50);
     vi.advanceTimersByTime(countUpDurationForDelta(1));
     const popup = document.querySelector('.library-count-popup--floated');
     expect(popup?.isConnected).toBe(true);
@@ -140,7 +180,40 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     expect(parseFloat(getComputedStyle(popup).fontSize)).toBeGreaterThanOrEqual(20);
   });
 
-  it('chip popups float on body sequentially (+1 each)', () => {
+  it('anchors single +1 at the hero top-right (not bottom-right of digits)', () => {
+    const heroTop = 200;
+    const heroHeight = 84;
+    const hero = mountDashHeroSurface({ top: heroTop, h: heroHeight });
+    flashCountUp(hero, 1946, 1947, (n) => String(Math.round(n)), { popups: true });
+    flushRaf(countUpDurationForDelta(1) + 50);
+    vi.advanceTimersByTime(countUpDurationForDelta(1));
+    const popup = document.querySelector('.library-count-popup--floated:not(.library-count-popup--floated-chip)');
+    expect(popup, 'hero popup').toBeTruthy();
+    const popupTop = parseFloat(popup.style.top);
+    const rect = hero.getBoundingClientRect();
+    expect(popupTop, 'spawn near hero top edge').toBeLessThanOrEqual(rect.top + 4);
+    expect(popupTop, 'not middle/bottom anchored').toBeLessThan(rect.top + rect.height * 0.35);
+    const popupLeft = parseFloat(popup.style.left);
+    expect(popupLeft, 'spawn to the right of digits').toBeGreaterThanOrEqual(rect.right);
+  });
+
+  it('stacks hero +1 popups upward on strict-sync bursts', () => {
+    const hero = mountDashHeroSurface();
+    flashCountUp(hero, 1946, 1949, (n) => String(Math.round(n)), { popups: true });
+    const dur = strictSyncRollMs(3, 3);
+    flushRaf(dur + 50);
+    if (dur < 900) vi.advanceTimersByTime(Math.ceil(dur));
+    const popups = [...document.querySelectorAll(
+      '.library-count-popup--floated:not(.library-count-popup--floated-chip)',
+    )];
+    expect(popups.length).toBe(3);
+    const tops = popups.map(el => parseFloat(el.style.top));
+    expect(new Set(tops).size).toBe(3);
+    expect(tops[1], 'second popup stacks above first').toBeLessThan(tops[0]);
+    expect(tops[2], 'third popup stacks above second').toBeLessThan(tops[1]);
+  });
+
+  it('chip popups still stack downward (unchanged chip behavior)', () => {
     document.body.innerHTML = `
       <span class="library-count-host" data-libcount-host>
         <span data-count-target="library">10</span>
@@ -148,7 +221,9 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     const chip = document.querySelector('[data-count-target="library"]');
     stubLayoutRect(chip, { w: 40, h: 20, left: 50, top: 60 });
     flashCountUp(chip, 10, 12, (n) => String(Math.round(n)), { popups: true });
-    vi.advanceTimersByTime(strictSyncRollMs(2, 2));
+    const dur = strictSyncRollMs(2, 2);
+    flushRaf(dur + 50);
+    vi.advanceTimersByTime(Math.ceil(dur));
     const popups = document.querySelectorAll('.library-count-popup');
     expect(popups.length).toBe(2);
     for (const el of popups) {
@@ -157,5 +232,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
       expect(el.parentElement).toBe(document.body);
       expect(el.textContent).toBe('+1');
     }
+    const tops = [...popups].map(el => parseFloat(el.style.top));
+    expect(tops[1]).toBeGreaterThan(tops[0]);
   });
 });

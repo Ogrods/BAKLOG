@@ -8560,17 +8560,19 @@ html[data-theme="ember"] .conn-primary:hover { color: #2a1500; }
   margin-left: 0;
   z-index: 120;
   font-size: clamp(28px, 4.5vw, 48px);
+  transform-origin: left top;
   animation: baklog-libcount-pop-hero 700ms ease-out forwards;
 }
 /* Summary chip + row count: smaller than hero, still clearly readable. */
 .library-count-popup--floated-chip {
   font-size: clamp(20px, 2.4vw, 32px);
+  transform-origin: left center;
   animation: baklog-libcount-pop 820ms ease-out forwards;
 }
 @keyframes baklog-libcount-pop-hero {
   0% {
     opacity: 0;
-    transform: translate(var(--baklog-dx, 0), 0.15em) scale(0.85);
+    transform: translate(var(--baklog-dx, 0), 0em) scale(0.85);
   }
   18% {
     opacity: 1;

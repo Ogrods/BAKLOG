@@ -59,7 +59,6 @@ Filename: "{app}\BAKLOG Tray.exe"; Description: "Launch {#MyAppName}"; Flags: no
 
 [Code]
 var
-  UninstallDataPage: TInputOptionWizardPage;
   DataDirFinishPage: TWizardPage;
   WipeUserData: Boolean;
   CleanupRan: Boolean;
@@ -86,6 +85,7 @@ end;
 function InitializeUninstall(): Boolean;
 var
   DataDir: string;
+  Choice: Integer;
 begin
   Result := True;
   WipeUserData := False;
@@ -94,36 +94,24 @@ begin
     DataDir := ExpandConstant('{app}')
   else
     DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
-  UninstallDataPage := CreateInputOptionPage(
-    uwUninstall,
-    'Library data',
-    'Choose what to remove',
+  Choice := MsgBox(
     'The BAKLOG app will be removed from your PC.' + #13#10 + #13#10 +
     'Your library, profiles, and saved connections live in:' + #13#10 +
     DataDir + #13#10 + #13#10 +
-    'To back up sign-ins first: open BAKLOG, Connections, Export bundle.',
-    True,
-    False);
-  UninstallDataPage.Add('Keep my library and connections (remove the app only)');
-  UninstallDataPage.Add('Remove everything, including library data and saved sign-ins');
-  UninstallDataPage.SelectedValueIndex := 0;
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if CurPageID = UninstallDataPage.ID then
+    'To back up sign-ins first: open BAKLOG, Connections, Export bundle.' + #13#10 + #13#10 +
+    'Click Yes to keep your library (remove the app only).' + #13#10 +
+    'Click No to remove everything, including library data.',
+    mbConfirmation, MB_YESNO);
+  if Choice = IDNO then
   begin
-    WipeUserData := (UninstallDataPage.SelectedValueIndex = 1);
-    if WipeUserData then
-    begin
-      if MsgBox(
-        'Export a backup first? In BAKLOG open Connections, then Export bundle. ' +
-        'That saves your store sign-ins to an encrypted file.' + #13#10 + #13#10 +
-        'Remove everything anyway?',
-        mbConfirmation, MB_YESNO) = IDNO then
-        Result := False;
-    end;
+    if MsgBox(
+      'Export a backup first? In BAKLOG open Connections, then Export bundle. ' +
+      'That saves your store sign-ins to an encrypted file.' + #13#10 + #13#10 +
+      'Remove everything anyway?',
+      mbConfirmation, MB_YESNO) = IDYES then
+      WipeUserData := True
+    else
+      Result := False;
   end;
 end;
 

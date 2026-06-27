@@ -150,7 +150,6 @@ def test_inno_installer_finish_page_and_export_nudge() -> None:
     assert "BAKLOG-Data" in iss
     assert "portable.txt" in iss
     assert "Export bundle" in iss
-    assert "function NextButtonClick(CurPageID: Integer): Boolean;" in iss
     assert "Export a backup first?" in iss
 
 

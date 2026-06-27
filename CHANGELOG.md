@@ -22,6 +22,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.29] - 2026-06-27
+
+### Fixed
+
+- Inno Setup uninstall flow: replace invalid `CreateInputOptionPage(uwUninstall)` with MsgBox prompts (Inno has no uninstall wizard pages).
+
 ## [0.8.28] - 2026-06-27
 
 ### Fixed

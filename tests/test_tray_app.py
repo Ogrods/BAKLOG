@@ -8,6 +8,7 @@ status/lifecycle guards without spawning a real server.
 from __future__ import annotations
 
 import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -268,8 +269,13 @@ def test_open_data_folder_opens_data_root(monkeypatch, tmp_path):
     if sys.platform == "win32":
         monkeypatch.setattr(tray_app.os, "startfile", lambda p: opened.__setitem__("path", p))
     else:
-        def fake_run(args, **kwargs):
-            opened["path"] = args[-1]
+        real_run = subprocess.run
+
+        def fake_run(args, *run_args, **kwargs):
+            if args and args[0] in ("xdg-open", "open"):
+                opened["path"] = args[-1]
+                return subprocess.CompletedProcess(args, 0)
+            return real_run(args, *run_args, **kwargs)
 
         monkeypatch.setattr(tray_app.subprocess, "run", fake_run)
     tray_app.open_data_folder()

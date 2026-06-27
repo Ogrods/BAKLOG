@@ -26,6 +26,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 - `sql/bug_reports.sql` — one-time Supabase table for durable bug-report logging.
 - `sql/cloud_mirror.sql` — one-time Supabase Storage bucket + RLS for Pro cloud read-only mirror (run before enabling uploads).
 - `api/mirror.js` — Vercel serverless read API for Pro cloud mirror (`GET /api/mirror` list, `GET /api/mirror?path=games_steam.json` download). Requires `BAKLOG_SUPABASE_URL` + `BAKLOG_SUPABASE_ANON_KEY` (or `SUPABASE_*` aliases). Bearer must be a signed-in Pro user; RLS scopes objects to `{auth.uid()}/{profile_id}/…`.
+- `mirror.html` + `mirror.js` — Pro read-only cloud library viewer at `/mirror` (sign in with Supabase, browse mirrored catalogs from any browser). Uses `/api/mirror` + `/api/auth-config`.
 - `assets/og.png` — 1200×630 social share image (rendered from the real logo by `../tools/make_og_image.py`).
 - `assets/store-logos/*.svg` — copy of repo-root `assets/store-logos/` for the hero trust strip (CSS mask). Re-sync when app logos change: `cp ../assets/store-logos/*.svg assets/store-logos/`.
 - `favicon.svg` — white BAKLOG mark.

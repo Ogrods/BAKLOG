@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BAKLOG - cloud library</title>
+  <meta name="robots" content="noindex" />
+  <meta name="description" content="Read-only view of your BAKLOG cloud mirror (Pro)." />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/mirror.css" />
+</head>
+<body>
+  <div class="mirror-shell">
+    <header class="mirror-header">
+      <div>
+        <h1>BAKLOG</h1>
+        <p id="mirrorLead">Browse your cloud library from any browser.</p>
+        <span class="mirror-badge">Read-only · Pro cloud mirror</span>
+      </div>
+      <div class="mirror-actions hidden" id="mirrorSignedInActions">
+        <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorRefreshBtn">Refresh</button>
+        <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorSignOutBtn">Sign out</button>
+      </div>
+    </header>
+
+    <div id="mirrorAlert" class="mirror-alert hidden" role="alert"></div>
+
+    <section class="mirror-panel mirror-panel--narrow" id="mirrorSignInPanel">
+      <h2 style="margin:0 0 0.75rem;font-size:1.1rem;">Sign in</h2>
+      <p class="mirror-empty" style="margin:0 0 1rem;">Use the same BAKLOG account as your desktop app. Pro plan required.</p>
+      <form id="mirrorSignInForm">
+        <label for="mirrorEmail">Email</label>
+        <input type="email" id="mirrorEmail" name="email" autocomplete="username" required />
+        <label for="mirrorPassword">Password</label>
+        <input type="password" id="mirrorPassword" name="password" autocomplete="current-password" required />
+        <button type="submit" class="mirror-btn mirror-btn--primary" id="mirrorSignInBtn">Sign in</button>
+      </form>
+      <p style="margin:1rem 0 0;font-size:0.9rem;">
+        <a href="/">Back to baklog.app</a>
+      </p>
+    </section>
+
+    <section class="hidden" id="mirrorLibraryPanel">
+      <div class="mirror-stats" id="mirrorStats" aria-live="polite"></div>
+      <div class="mirror-toolbar">
+        <input type="search" id="mirrorSearch" placeholder="Search title or notes" aria-label="Search library" />
+        <select id="mirrorStatusFilter" aria-label="Filter by status">
+          <option value="">All statuses</option>
+        </select>
+        <select id="mirrorStoreFilter" aria-label="Filter by store">
+          <option value="">All stores</option>
+        </select>
+      </div>
+      <div class="mirror-table-wrap">
+        <table class="mirror-table">
+          <thead>
+            <tr>
+              <th scope="col">Title</th>
+              <th scope="col">Store</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="col-num">Playtime</th>
+              <th scope="col" class="col-num">HLTB</th>
+            </tr>
+          </thead>
+          <tbody id="mirrorTableBody"></tbody>
+        </table>
+      </div>
+      <p class="mirror-empty hidden" id="mirrorEmptyFiltered">No games match your filters.</p>
+    </section>
+
+    <section class="mirror-panel hidden" id="mirrorSetupPanel">
+      <div class="mirror-empty">
+        <p><strong>No cloud mirror yet.</strong> Your account is signed in, but nothing has been uploaded.</p>
+        <ol>
+          <li>Open BAKLOG on your home PC and sign in with this account.</li>
+          <li>Upgrade to Pro and enable cloud mirror on your home PC (Pro settings; Connections toggle UI is M4).</li>
+          <li>Run a store refresh or edit your library so catalog JSON uploads.</li>
+        </ol>
+        <p style="margin-top:1rem;"><a href="/">Back to baklog.app</a></p>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/mirror.js"></script>
+</body>
+</html>

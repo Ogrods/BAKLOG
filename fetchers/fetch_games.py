@@ -27,7 +27,7 @@ from fetchers._base import (
     row_key_by_appid,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 
 GAMES_STEAM_JSON = Path("games_steam.json")
 HLTB_DELAY_SEC = 1.0
@@ -239,9 +239,9 @@ def main() -> int:
     hltb_client = HltbClient()
     existing = load_existing()
 
-    print("Fetching owned games from Steam...")
+    print("Fetching owned games from Steam...", flush=True)
     try:
-        owned_games = steam.get_owned_games()
+        owned_games = run_with_heartbeat(steam.get_owned_games, "Steam owned-games API")
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code in (401, 403):
             mark_invalid("steam", error=STEAM_CREDENTIALS_HINT)
@@ -249,7 +249,7 @@ def main() -> int:
             return stats.finish("fetch_games", t0, exit_code=EXIT_CODE_AUTH)
         stats.error(f"Steam API error: {e}")
         return stats.finish("fetch_games", t0, exit_code=1)
-    print(f"Found {len(owned_games)} entries in library.")
+    print(f"Found {len(owned_games)} entries in library.", flush=True)
 
     if not args.appid:
         if not owned_games:
@@ -281,17 +281,29 @@ def main() -> int:
         if args.refresh or cached_row is None or args.appid:
             store_prefetch.append(appid)
     if store_prefetch:
-        steam.get_app_details_batch(store_prefetch, refresh=args.refresh)
+        print(
+            f"Prefetching store metadata for {len(store_prefetch)} games...",
+            flush=True,
+        )
+        prefetch_hb = HeartbeatTimer(interval=25.0)
+        for j, appid in enumerate(store_prefetch, 1):
+            prefetch_hb.tick_progress(
+                j, len(store_prefetch), "Steam store metadata", str(appid)
+            )
+            steam.get_app_details(appid, refresh=args.refresh)
 
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, owned in enumerate(owned_games, 1):
         appid = owned["appid"]
         name = owned.get("name", str(appid))
 
         if args.only_new and appid in existing and not args.refresh and not args.appid:
             games_out.append(_finalize_steam_row(dict(existing[appid])))
+            loop_hb.tick_progress(i, len(owned_games), "Steam library", "cached")
             continue
 
-        print(f"[{i}/{len(owned_games)}] {name} ({appid})")
+        print(f"[{i}/{len(owned_games)}] {name} ({appid})", flush=True)
+        loop_hb.reset()
 
         cached_row = existing.get(appid)
         need_store = args.refresh or cached_row is None or args.appid
@@ -323,7 +335,7 @@ def main() -> int:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(name)
             except Exception as e:
-                print(f"  HLTB warning: {e}")
+                print(f"  HLTB warning: {e}", flush=True)
         elif cached_row:
             hltb = {
                 "hltb_main_hours": cached_row.get("hltb_main_hours"),
@@ -346,13 +358,16 @@ def main() -> int:
                     }
                 )
             games_out.append(row)
+            loop_hb.tick_progress(i, len(owned_games), "Steam library", name[:40])
             continue
 
         row = _build_game_row(owned, details_data, reviews, hltb)
         if row is None:
             skipped += 1
+            loop_hb.tick_progress(i, len(owned_games), "Steam library", "skipped")
             continue
         games_out.append(row)
+        loop_hb.tick_progress(i, len(owned_games), "Steam library", name[:40])
 
     empty_exit = refuse_empty_result(
         games_out,

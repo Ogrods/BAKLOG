@@ -36,7 +36,7 @@ from fetchers._base import (
     merge_cached_row,
     write_catalog_guarded,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_AMAZON_JSON = Path("games_amazon.json")
@@ -411,9 +411,15 @@ def main() -> int:
             if sys.platform != "win32":
                 stats.error("Launcher source requires Windows (DPAPI). Use --source web.")
                 return stats.finish("fetch_amazon", t0, exit_code=1)
-            records = _load_launcher_records(sql_dir)
+            records = run_with_heartbeat(
+                lambda: _load_launcher_records(sql_dir),
+                "Amazon launcher library",
+            )
         else:
-            records, web_outcome_kind = _load_web_records(dump_raw=args.dump_raw)
+            records, web_outcome_kind = run_with_heartbeat(
+                lambda: _load_web_records(dump_raw=args.dump_raw),
+                "Amazon web library",
+            )
     except ImportError as e:
         stats.error(str(e))
         return stats.finish("fetch_amazon", t0, exit_code=1)
@@ -451,10 +457,12 @@ def main() -> int:
 
     current_rows: list[dict] = []
 
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, rec in enumerate(records, 1):
         pid = rec["amazon_product_id"]
         name = rec["name"]
         print(f"[{i}/{len(records)}] {name}", flush=True)
+        loop_hb.reset()
 
         cached = existing.get(pid)
         if cached is not None and _effective_row_source(cached) != source:
@@ -488,6 +496,7 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+        loop_hb.tick_progress(i, len(records), "Amazon library", name[:40])
 
     drift_exit = None
     if not (source == "web" and web_outcome_kind == "signed_in_empty"):

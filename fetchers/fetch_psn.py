@@ -27,7 +27,7 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 from shared.library_noise import catalog_game_count, maybe_tag_library_noise_row
 
 GAMES_PSN_JSON = Path("games_psn.json")
@@ -191,7 +191,7 @@ def main() -> int:
         except json.JSONDecodeError:
             prev_meta = {}
 
-    print(f"Fetching PSN library for {online_id}...")
+    print(f"Fetching PSN library for {online_id}...", flush=True)
     library: list | None = None
     if (
         args.only_new
@@ -218,7 +218,7 @@ def main() -> int:
 
     if library is None:
         try:
-            library = psn.collect_library()
+            library = run_with_heartbeat(psn.collect_library, "PSN library capture")
         except PsnAuthError as exc:
             mark_invalid("psn", error=str(exc))
             stats.error(str(exc))
@@ -264,16 +264,19 @@ def main() -> int:
     if filtered:
         parts.append(f"tagged {filtered} library noise")
     suffix = f" ({', '.join(parts)})" if parts else ""
-    print(f"Found {len(library)} titles{suffix}.")
+    print(f"Found {len(library)} titles{suffix}.", flush=True)
 
     games_out: list[dict] = []
 
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, entry in enumerate(library, 1):
         if args.only_new and entry.id in existing and not args.refresh and not args.psn_id:
             games_out.append(existing[entry.id])
+            loop_hb.tick_progress(i, len(library), "PSN library", "cached")
             continue
 
-        print(f"[{i}/{len(library)}] {entry.name} ({entry.id})")
+        print(f"[{i}/{len(library)}] {entry.name} ({entry.id})", flush=True)
+        loop_hb.reset()
 
         cached_row = existing.get(entry.id)
 
@@ -287,7 +290,7 @@ def main() -> int:
                 hltb = hltb_client.lookup(entry.name)
                 hltb_updated = bool(hltb)
             except Exception as exc:
-                print(f"  HLTB warning: {exc}")
+                print(f"  HLTB warning: {exc}", flush=True)
         elif cached_row:
             hltb = {
                 "hltb_main_hours": cached_row.get("hltb_main_hours"),
@@ -305,6 +308,7 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+        loop_hb.tick_progress(i, len(library), "PSN library", entry.name[:40])
 
     for row in games_out:
         maybe_tag_library_noise_row(row, "psn")

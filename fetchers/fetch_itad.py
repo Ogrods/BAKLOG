@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from auth import mark_invalid, resolve_env
 from clients.itad_client import ItadClient, ItadError
 from fetchers._base import add_allow_empty_arg, configure_stdout, refuse_empty_result
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
 from shared.fx import ensure_fx_rates
 from shared.money import country_to_currency
 from shared.profile_paths import catalog_path, itad_path
@@ -155,7 +155,7 @@ def main() -> int:
         print(f"No {scope} titles to look up - skipping ITAD price fetch.", flush=True)
         return stats.finish("fetch_itad", t0, exit_code=0, extra="0 titles to price")
 
-    print(f"Looking up ITAD prices for {len(titles)} {scope} titles...")
+    print(f"Looking up ITAD prices for {len(titles)} {scope} titles...", flush=True)
 
     try:
         client = ItadClient(api_key, country=args.country)
@@ -165,10 +165,13 @@ def main() -> int:
         return stats.finish("fetch_itad", t0, exit_code=EXIT_CODE_AUTH)
 
     plain_by_key: dict[str, str] = {}
+    lookup_hb = HeartbeatTimer(interval=25.0)
     try:
         for i, (key, title) in enumerate(titles, 1):
+            lookup_hb.tick_progress(i, len(titles), "ITAD lookup", title[:40])
             if i % 10 == 0 or i == 1:
                 print(f"[{i}/{len(titles)}] {title[:50]}", flush=True)
+                lookup_hb.reset()
             appid = None
             if key.startswith("steam:") or key.startswith("wishlist:"):
                 try:

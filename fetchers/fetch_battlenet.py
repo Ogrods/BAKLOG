@@ -31,7 +31,7 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
@@ -222,7 +222,7 @@ def main() -> int:
 
     raw = None
     try:
-        raw = client.get_raw_account()
+        raw = run_with_heartbeat(client.get_raw_account, "Battle.net library API")
     except BattleNetAuthError as e:
         err = str(e)
         if (
@@ -271,7 +271,7 @@ def main() -> int:
         if key not in seen:
             seen[key] = item
     deduped = list(seen.values())
-    print(f"Found {len(deduped)} unique Battle.net entries (from {len(raw_games)} raw).")
+    print(f"Found {len(deduped)} unique Battle.net entries (from {len(raw_games)} raw).", flush=True)
 
     empty_exit = refuse_empty_result(
         deduped,
@@ -289,14 +289,17 @@ def main() -> int:
     hltb_client = HltbClient()
     existing = load_existing()
     games_out: list[dict] = []
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(deduped, 1):
         name = _name(item)
         row_id = _id(item, name or "")
         cached = existing.get(row_id)
         if args.only_new and cached:
             games_out.append(cached)
+            loop_hb.tick_progress(i, len(deduped), "Battle.net library", "cached")
             continue
-        print(f"[{i}/{len(deduped)}] {name}")
+        print(f"[{i}/{len(deduped)}] {name}", flush=True)
+        loop_hb.reset()
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:
@@ -305,7 +308,7 @@ def main() -> int:
                 hltb = hltb_client.lookup(name)
                 hltb_updated = bool(hltb)
             except Exception as e:
-                print(f"  HLTB warning: {e}")
+                print(f"  HLTB warning: {e}", flush=True)
         row = _build_row(item, hltb)
         games_out.append(
             merge_cached_row(
@@ -315,6 +318,7 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+        loop_hb.tick_progress(i, len(deduped), "Battle.net library", (name or "")[:40])
 
     drift_exit = refuse_drift_result(
         games_out,

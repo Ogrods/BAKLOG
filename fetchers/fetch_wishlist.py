@@ -23,7 +23,7 @@ from fetchers._base import (
     refuse_empty_result,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 from shared.money import format_price, normalize_currency_code
 
 GAMES_WISHLIST_JSON = Path("games_wishlist.json")
@@ -59,9 +59,12 @@ def main() -> int:
         stats.error(STEAM_CREDENTIALS_HINT)
         return stats.finish("fetch_wishlist", t0, exit_code=1)
 
-    print("Fetching Steam wishlist...")
+    print("Fetching Steam wishlist...", flush=True)
     try:
-        items = fetch_wishlist_items(api_key, steam_id)
+        items = run_with_heartbeat(
+            lambda: fetch_wishlist_items(api_key, steam_id),
+            "Steam wishlist API",
+        )
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code in (401, 403):
             mark_invalid("steam", error=STEAM_CREDENTIALS_HINT)
@@ -80,30 +83,35 @@ def main() -> int:
     if empty_exit is not None:
         return stats.finish("fetch_wishlist", t0, exit_code=empty_exit)
 
-    print(f"Found {len(items)} wishlist items.")
+    print(f"Found {len(items)} wishlist items.", flush=True)
     steam = SteamClient(api_key, steam_id)
     hltb = HltbClient()
     existing = load_existing_games(GAMES_WISHLIST_JSON)
     games_out: list[dict] = []
 
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(items, 1):
         appid = int(item.get("appid") or item.get("app_id") or 0)
         if not appid:
+            loop_hb.tick_progress(i, len(items), "Steam wishlist", "skip")
             continue
         if args.only_new and str(appid) in existing:
             games_out.append(existing[str(appid)])
+            loop_hb.tick_progress(i, len(items), "Steam wishlist", "cached")
             continue
-        print(f"[{i}/{len(items)}] appid {appid}")
+        print(f"[{i}/{len(items)}] appid {appid}", flush=True)
+        loop_hb.reset()
 
         details = None
         try:
             details = steam.get_app_details(appid)
         except Exception as e:
-            print(f"  details warning: {e}")
+            print(f"  details warning: {e}", flush=True)
 
         data = (details or {}).get("data") if details else None
         name = (data or {}).get("name") or f"Steam {appid}"
         if data and data.get("type") != "game":
+            loop_hb.tick_progress(i, len(items), "Steam wishlist", "non-game")
             continue
 
         reviews = None
@@ -118,7 +126,7 @@ def main() -> int:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb_data = hltb.lookup(name)
             except Exception as e:
-                print(f"  HLTB warning: {e}")
+                print(f"  HLTB warning: {e}", flush=True)
 
         price_block = (data or {}).get("price_overview") or {}
         categories = (data or {}).get("categories") or []
@@ -165,6 +173,7 @@ def main() -> int:
             "currency": normalize_currency_code(price_block.get("currency")),
         }
         games_out.append(row)
+        loop_hb.tick_progress(i, len(items), "Steam wishlist", name[:40])
 
     empty_exit = refuse_empty_result(
         games_out,

@@ -29,7 +29,7 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
@@ -301,13 +301,13 @@ def main() -> int:
 
     try:
         client = UbisoftClient(auth, session_id, app_id=app_id)
-        raw, endpoint = client.get_library()
+        raw, endpoint = run_with_heartbeat(client.get_library, "Ubisoft library API")
     except UbisoftAuthError as e:
         mark_invalid("ubisoft", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_ubisoft", t0, exit_code=EXIT_CODE_AUTH)
 
-    print(f"Hit Ubisoft endpoint: {endpoint}")
+    print(f"Hit Ubisoft endpoint: {endpoint}", flush=True)
 
     if args.dump_raw:
         UBISOFT_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
@@ -326,7 +326,7 @@ def main() -> int:
         if key not in seen:
             seen[key] = item
     deduped = list(seen.values())
-    print(f"Found {len(deduped)} unique Ubisoft entries (from {len(raw_games)} raw).")
+    print(f"Found {len(deduped)} unique Ubisoft entries (from {len(raw_games)} raw).", flush=True)
 
     empty_exit = refuse_empty_result(
         deduped,
@@ -344,14 +344,17 @@ def main() -> int:
     hltb_client = HltbClient()
     existing = load_existing()
     games_out: list[dict] = []
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(deduped, 1):
         name = _name_of(item)
         row_id = _id_of(item, name or "")
         cached = existing.get(row_id)
         if args.only_new and cached:
             games_out.append(cached)
+            loop_hb.tick_progress(i, len(deduped), "Ubisoft library", "cached")
             continue
-        print(f"[{i}/{len(deduped)}] {name}")
+        print(f"[{i}/{len(deduped)}] {name}", flush=True)
+        loop_hb.reset()
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:
@@ -360,7 +363,7 @@ def main() -> int:
                 hltb = hltb_client.lookup(name)
                 hltb_updated = bool(hltb)
             except Exception as e:
-                print(f"  HLTB warning: {e}")
+                print(f"  HLTB warning: {e}", flush=True)
         games_out.append(
             merge_cached_row(
                 _build_row(item, hltb),
@@ -369,6 +372,7 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+        loop_hb.tick_progress(i, len(deduped), "Ubisoft library", (name or "")[:40])
 
     drift_exit = refuse_drift_result(
         games_out,

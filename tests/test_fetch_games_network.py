@@ -13,6 +13,14 @@ import fetchers.fetch_games as fetch_games
 from fetchers._base import STEAM_CREDENTIALS_HINT
 
 
+def test_fetch_games_prefetch_uses_heartbeat_guard() -> None:
+    """Regression: silent store-metadata prefetch must not trip the 180s stall watchdog."""
+    src = Path(fetch_games.__file__).read_text(encoding="utf-8")
+    assert "Prefetching store metadata" in src
+    assert "HeartbeatTimer" in src
+    assert "run_with_heartbeat" in src
+
+
 def test_missing_credentials_message_mentions_connections(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fetch_games, "resolve_env", lambda key, **_: "")
     with patch.object(fetch_games, "load_dotenv"):

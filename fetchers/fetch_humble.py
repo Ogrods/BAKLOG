@@ -41,7 +41,7 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 
 GAMES_HUMBLE_JSON = Path("games_humble.json")
 ORDERS_URL = "https://www.humblebundle.com/api/v1/user/order"
@@ -347,7 +347,10 @@ def main() -> int:
 
     print("Fetching Humble library via API...", flush=True)
     try:
-        items = fetch_library_items(include_nongames=args.include_nongames, dump=args.dump)
+        items = run_with_heartbeat(
+            lambda: fetch_library_items(include_nongames=args.include_nongames, dump=args.dump),
+            "Humble library API",
+        )
     except Exception as exc:  # noqa: BLE001
         msg = str(exc)
         if "expired" in msg.lower() or "401" in msg or "403" in msg:
@@ -382,12 +385,15 @@ def main() -> int:
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing_by_machine()
     rows: list[dict] = []
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(items, 1):
         cached = existing.get(item.machine_name)
         if args.only_new and cached:
             rows.append(cached)
+            loop_hb.tick_progress(i, len(items), "Humble library", "cached")
             continue
         print(f"[{i}/{len(items)}] {item.name}", flush=True)
+        loop_hb.reset()
         hltb = None
         hltb_updated = False
         if hltb_client and item.name:
@@ -414,6 +420,7 @@ def main() -> int:
                 hltb_updated=hltb_updated,
             )
         )
+        loop_hb.tick_progress(i, len(items), "Humble library", item.name[:40])
 
     rows = apply_carry_forward(
         rows,

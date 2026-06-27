@@ -29,7 +29,7 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 
 GAMES_XBOX_JSON = Path("games_xbox.json")
 HLTB_DELAY_SEC = 1.0
@@ -134,7 +134,7 @@ def main() -> int:
         client = XboxClient(api_key)
         gt = client.get_gamertag()
         print(f"OpenXBL account: {gt or '(unknown gamertag)'}", flush=True)
-        titles = client.get_title_history()
+        titles = run_with_heartbeat(client.get_title_history, "Xbox title history")
     except XboxRateLimitError as e:
         # Throttling is transient and key-agnostic — do NOT mark_invalid (that
         # wrongly flips the connection to "expired", prompts a reconnect, and
@@ -171,6 +171,7 @@ def main() -> int:
     existing = load_existing()
     games_out: list[dict] = []
 
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, title in enumerate(games, 1):
         name = title.get("name") or tid_placeholder(title)
         tid = str(title.get("titleId") or title.get("modernTitleId") or "")
@@ -178,8 +179,10 @@ def main() -> int:
         if args.only_new and cached:
             games_out.append(cached)
             stats.ok += 1
+            loop_hb.tick_progress(i, len(games), "Xbox library", "cached")
             continue
         print(f"[{i}/{len(games)}] {name}", flush=True)
+        loop_hb.reset()
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:
@@ -198,6 +201,7 @@ def main() -> int:
             )
         )
         stats.ok += 1
+        loop_hb.tick_progress(i, len(games), "Xbox library", name[:40])
 
     games_out = apply_carry_forward(
         games_out,

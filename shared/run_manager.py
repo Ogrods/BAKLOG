@@ -920,6 +920,29 @@ class RunManager:
         active = [e for e in _read_active_runs() if e.get("id") != run_id]
         _write_active_runs(active)
 
+    def _wait_or_kill_proc(self, run: Run, proc: subprocess.Popen[str]) -> None:
+        """Wait for a fetcher child to exit; force-kill and log if it survives."""
+        grace = _run_cfg("TERMINATE_GRACE_SEC", TERMINATE_GRACE_SEC)
+        try:
+            proc.wait(timeout=grace)
+            return
+        except Exception:  # noqa: BLE001 - subprocess.TimeoutExpired or platform variants
+            pass
+        if proc.poll() is not None or not proc.pid:
+            return
+        _terminate_pid(proc.pid)
+        try:
+            proc.wait(timeout=grace)
+            return
+        except Exception:  # noqa: BLE001
+            pass
+        if proc.poll() is None:
+            run.add_line(
+                "stderr",
+                f"[server] PID {proc.pid} did not exit after kill; "
+                f"abandoning it and advancing the queue",
+            )
+
     def _reap_orphan_processes(self) -> None:
         for entry in _read_active_runs():
             pid = int(entry.get("pid") or 0)
@@ -1623,23 +1646,9 @@ class RunManager:
         # taskkill), then never block the worker indefinitely — a lingering
         # zombie must not wedge the queue. We finalize after a bounded wait so
         # the next queued run can start regardless.
-        if run.cancelled and proc.poll() is None:
-            if proc.pid:
-                _terminate_pid(proc.pid)
-            try:
-                proc.wait(timeout=_run_cfg("TERMINATE_GRACE_SEC", TERMINATE_GRACE_SEC))
-            except Exception:  # noqa: BLE001 - subprocess.TimeoutExpired or platform variants
-                run.add_line(
-                    "stderr",
-                    f"[server] PID {proc.pid} did not exit after kill; "
-                    f"abandoning it and advancing the queue",
-                )
-        else:
-            try:
-                proc.wait(timeout=_run_cfg("TERMINATE_GRACE_SEC", TERMINATE_GRACE_SEC))
-            except Exception:  # noqa: BLE001
-                if proc.pid:
-                    _terminate_pid(proc.pid)
+        if run.cancelled and proc.poll() is None and proc.pid:
+            _terminate_pid(proc.pid)
+        self._wait_or_kill_proc(run, proc)
         run.exit_code = proc.returncode if proc.returncode is not None else -1
         if max_runtime_killed:
             run.status = "failed"

@@ -46,7 +46,7 @@ from fetchers._base import (
     refuse_empty_result,
     write_games_json,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, started
+from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 
 GAMES_ITCH_JSON = Path("games_itch.json")
 HLTB_DELAY_SEC = 1.0
@@ -475,10 +475,12 @@ def main() -> int:
 
         print(f"Found {len(filtered)} owned titles in butler.db.", flush=True)
 
+        loop_hb = HeartbeatTimer(interval=25.0)
         for i, rec in enumerate(filtered, 1):
             gid = rec["itch_id"]
             name = rec["name"]
             print(f"[{i}/{len(filtered)}] {name}", flush=True)
+            loop_hb.reset()
 
             cached = existing.get(str(gid))
             if cached is not None and _effective_row_source(cached) != source:
@@ -512,6 +514,7 @@ def main() -> int:
                     hltb_updated=hltb_updated,
                 )
             )
+            loop_hb.tick_progress(i, len(filtered), "itch.io library", name[:40])
     else:
         api_key = resolve_env("ITCH_API_KEY", provider="itch")
         if not api_key:
@@ -527,7 +530,7 @@ def main() -> int:
             if user.get("username"):
                 print(f"Signed in to itch.io as {user['username']}", flush=True)
             print("Walking owned-keys pages (this can take a minute)...", flush=True)
-            keys = client.all_owned_keys()
+            keys = run_with_heartbeat(client.all_owned_keys, "itch.io owned keys")
         except ItchAuthError as e:
             mark_invalid("itch", error=str(e))
             stats.error(str(e))
@@ -558,13 +561,16 @@ def main() -> int:
         if skipped_price:
             print(f"  filtered {skipped_price} items below --min-price", flush=True)
 
+        loop_hb = HeartbeatTimer(interval=25.0)
         for i, entry in enumerate(filtered_entries, 1):
             game = entry.get("game") or {}
             name = (game.get("title") or "Untitled").strip()
             gid = game.get("id")
             if gid is None:
+                loop_hb.tick_progress(i, len(filtered_entries), "itch.io library", "skip")
                 continue
             print(f"[{i}/{len(filtered_entries)}] {name}", flush=True)
+            loop_hb.reset()
 
             cached = existing.get(str(gid))
             if cached is not None and _effective_row_source(cached) != source:
@@ -606,6 +612,7 @@ def main() -> int:
                         hltb_updated=hltb_updated,
                     )
                 )
+            loop_hb.tick_progress(i, len(filtered_entries), "itch.io library", name[:40])
 
     games_out = merge_itch_sources(current_rows, carried_rows, source)
 

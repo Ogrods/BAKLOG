@@ -216,12 +216,24 @@ from shared.profile_paths import (  # noqa: E402
     free_claims_path,
     get_active_profile_id,
     personal_backup_dir,
-    personal_dir,
-    personal_path,
     profile_root,
     runs_dir,
     set_request_profile_id,
     sponsors_path,
+)
+from shared.server_personal import (  # noqa: E402
+    BAKLOG_ALLOW_EMPTY_HEADER as _BAKLOG_ALLOW_EMPTY_HEADER,
+)
+from shared.server_personal import (  # noqa: E402
+    PERSONAL_MAX_BYTES,
+    PersonalCorruptError,
+    PersonalEmptyOverwriteError,
+)
+from shared.server_personal import (  # noqa: E402
+    load_personal_doc as _load_personal_doc,
+)
+from shared.server_personal import (  # noqa: E402
+    save_personal_doc as _save_personal_doc,
 )
 from shared.server_static import (  # noqa: E402
     LIBRARY_JSON_RE as _LIBRARY_JSON_RE,
@@ -234,14 +246,6 @@ from shared.server_static import (  # noqa: E402
 )
 from shared.server_static import (  # noqa: E402
     static_class as _static_class_impl,
-)
-from shared.server_personal import (  # noqa: E402
-    BAKLOG_ALLOW_EMPTY_HEADER as _BAKLOG_ALLOW_EMPTY_HEADER,
-    PERSONAL_MAX_BYTES,
-    PersonalCorruptError,
-    PersonalEmptyOverwriteError,
-    load_personal_doc as _load_personal_doc,
-    save_personal_doc as _save_personal_doc,
 )
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402, F401 — re-exported for tests
 

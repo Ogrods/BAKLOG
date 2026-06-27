@@ -39,9 +39,22 @@ foreach ($name in @("BAKLOG.exe", "BAKLOG Tray.exe", "apply_update.ps1", "BAKLOG
     }
 }
 
-Write-Host "==> Installer branding assets"
-& $Python (Join-Path $Root "packaging\generate_installer_assets.py")
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$assetFiles = @(
+    (Join-Path $Root "packaging\BAKLOG.ico"),
+    (Join-Path $Root "packaging\installer-icon.ico"),
+    (Join-Path $Root "packaging\installer-wizard-large.bmp"),
+    (Join-Path $Root "packaging\installer-wizard-small.bmp")
+)
+$missingAssets = @($assetFiles | Where-Object { -not (Test-Path $_) })
+if ($missingAssets.Count -gt 0) {
+    Write-Host "==> Installer branding assets (missing: $($missingAssets.Count))"
+    & $Python -m pip install "Pillow>=10.0" -q
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $Python (Join-Path $Root "packaging\generate_installer_assets.py")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+} else {
+    Write-Host "==> Installer branding assets present (skip generate)"
+}
 
 Write-Host "==> ISCC compile packaging/baklog.iss"
 Push-Location (Join-Path $Root "packaging")

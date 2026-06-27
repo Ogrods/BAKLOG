@@ -66,7 +66,7 @@ procedure InitializeWizard();
 var
   DataDir, AppDir: String;
 begin
-  { Never ExpandConstant('{app}') during install — {app} is not valid until after wpSelectDir. }
+  { Do not use the app dir constant during install — not valid until after wpSelectDir. }
   AppDir := ExpandConstant('{localappdata}\BAKLOG');
   DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
   CreateOutputMsgPage(

@@ -31,7 +31,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
-- Inno Setup install wizard: finish page uses `{localappdata}` paths only (never `{app}` during install); removes CurPageChanged runtime crash.
+- CI/release gate: Inno verify skips Pillow when branding assets exist; packaging test strips Pascal comments before `{app}` guard.
 
 ## [0.8.30] - 2026-06-27
 

@@ -7,7 +7,7 @@ const WEIGHT_RULES = {
   'max-lines': ['warn', { max: 1200, skipBlankLines: true, skipComments: true }],
   'max-lines-per-function': ['warn', { max: 120, skipBlankLines: true, skipComments: true }],
   complexity: ['warn', 25],
-  'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+  'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
   'import/no-cycle': ['warn', { maxDepth: 4 }],
   // Legacy empty catch blocks — weight pass only; tighten later.
   'no-empty': 'off',

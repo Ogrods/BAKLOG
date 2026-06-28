@@ -1,17 +1,10 @@
 /** Fetcher health barrel: wires submodules and re-exports the public API. */
 import { configureFetcherCooldown } from './fetcher-cooldown.js';
 import {
-  ensureAgeTicker,
-  isFastAgeTickActive,
-  refreshChipAgesInPlace,
-  startFastAgeTick,
-  stopAgeTicker,
-  stopFastAgeTick,
   wireFetcherChips,
 } from './fetcher-chips.js';
 import { setFetcherRunner, lastRunFailedByKey, setLegendTipsOpen } from './fetcher-health-shared.js';
 import { fetcherRunner } from './fetcher/runner/index.js';
-import { fetchWithTimeout, FETCH_TIMEOUT_MS } from './fetcher/http.js';
 import { wireFetcherHealthAutoRefresh } from './fetcher/auto-refresh-wire.js';
 import {
   wireFetcherReconnect,
@@ -22,7 +15,7 @@ import {
   isFetcherReconnectRequired,
 } from './fetcher/reconnect.js';
 import { fetcherFreshness, humanizeAge } from './fetcher/freshness.js';
-import { renderDashboardFetcherHealth, cycleStatLayout, toggleLegendTips } from './fetcher/render/dashboard.js';
+import { renderDashboardFetcherHealth, cycleStatLayout } from './fetcher/render/dashboard.js';
 
 setFetcherRunner(fetcherRunner);
 

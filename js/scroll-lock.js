@@ -92,7 +92,7 @@ function applyLock(shouldLock) {
   const body = document.body;
   if (shouldLock) {
     const stableGutter = htmlUsesStableScrollbarGutter();
-    const measuredGap = window.innerWidth - html.clientWidth;
+    const _measuredGap = window.innerWidth - html.clientWidth;
     const compensation = scrollbarCompensationPx();
     _saved.htmlOverflow = html.style.overflow;
     _saved.htmlScrollbarGutter = html.style.scrollbarGutter;

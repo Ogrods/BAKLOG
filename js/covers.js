@@ -32,7 +32,7 @@ function escHtml(s) {
   );
 }
 
-const DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
+const _DASH_FAILED_COVERS_KEY = "baklog-dash-failed-covers";
 window.__dashFailedCovers = window.__dashFailedCovers || (() => {
   try {
     const stored = JSON.parse(localStorage.getItem(dashFailedCoversStorageKey()) || "[]");
@@ -96,7 +96,7 @@ window.coverFallback = function (img) {
   const safeCap = escHtml(captionRaw);
   img.outerHTML = `<div class="${cls}" title="${safeName}"><span class="placeholder-initials">${initials}</span><span class="placeholder-caption">${safeCap}</span></div>`;
 };
-const LANDSCAPE_CACHE_KEY = "baklog-landscape-covers";
+const _LANDSCAPE_CACHE_KEY = "baklog-landscape-covers";
 window.__landscapeCovers = (() => {
   try { return new Set(JSON.parse(localStorage.getItem(landscapeCoversStorageKey()) || "[]")); }
   catch { return new Set(); }

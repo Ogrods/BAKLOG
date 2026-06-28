@@ -21,7 +21,7 @@ let galleryIndex = 0;
 let artCandidates = [];
 let artCandidateIndex = 0;
 
-const GALLERY_MODE_KEY = 'baklog.coverGalleryMode';
+const _GALLERY_MODE_KEY = 'baklog.coverGalleryMode';
 
 const MAX_VIEW_W = 1100;
 const MAX_VIEW_H_RATIO = 0.85;

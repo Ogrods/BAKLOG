@@ -26,15 +26,12 @@ import {
   normalizeGame,
   ratingValue,
   hltbMain,
-  chipStatusKey,
-  priorityScore,
   renderStatusChipsHtml,
   renderBulkStatusButtons,
   hltbBacklogHoursTitle,
   HLTB_FETCH_TOOLTIP,
   recomputeCrossStoreHidden,
   itchIsGame,
-  combinedPlaytime,
   findGameByKey,
 } from './game-core.js';
 import { STORE_DISPLAY_ORDER, storeDisplayRank } from './dashboard-shared.js';
@@ -634,7 +631,6 @@ export function switchView(view) {
   cancelAllLibraryCountAnimations();
   const fromView = state.activeView;
   const drillIn = !!state._pendingFocusKey;
-  let drillOverlaySafety = null;
   const fpBefore = view !== "dashboard" ? tableFingerprint().replace(/"v":"[^"]+"/, `"v":"${view}"`) : "";
   const tableCached = !drillIn && view !== "dashboard" && isViewCached(view, fpBefore);
   const dashCached = view === "dashboard" && dashboardWasRendered();
@@ -648,7 +644,7 @@ export function switchView(view) {
   if (useOverlay) showViewOverlay(view);
   else syncViewTabAria(view);
   if (drillIn && state._drillHideOverlay) {
-    drillOverlaySafety = setTimeout(() => {
+    setTimeout(() => {
       if (state._drillHideOverlay) {
         state._drillHideOverlay = false;
         hideViewOverlay();

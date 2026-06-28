@@ -379,7 +379,7 @@ export function stopSpotlightRotation() {
   // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
 }
 
-function poolKeysEqual(a, b) {
+function _poolKeysEqual(a, b) {
   if (!a || !b || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (gameKey(a[i]) !== gameKey(b[i])) return false;

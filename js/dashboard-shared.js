@@ -1,9 +1,7 @@
 // Shared dashboard constants and tiny utilities. Leaf module.
 // Extracted from dashboard.js as part of the dashboard module split.
 
-import { state } from './state.js';
-import { gameKey } from './game-core.js';
-import { filterOutHidden, filterCounted, libraryGamesBase } from './personal-storage.js';
+import { filterCounted, libraryGamesBase } from './personal-storage.js';
 import { prefersReducedMotion } from './motion.js';
 import { isPageHidden } from './visibility.js';
 import { STORE_BRAND_COLORS } from './store-brand-colors.js';

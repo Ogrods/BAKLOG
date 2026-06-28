@@ -13,16 +13,12 @@ import { escapeHtml, formatNum, escapeAttr } from './dom-util.js';
 import { renderDashboardFetcherHealth } from './fetcher-health.js';
 import {
   gameKey,
-  hltbMain,
-  ratingValue,
   normalizeGame,
-  combinedPlaytime,
   itchIsGame,
   HLTB_FETCH_TOOLTIP,
   hltbBacklogHoursTitle,
   hltbClearByYearsTitle,
 } from './game-core.js';
-import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';

@@ -125,7 +125,7 @@ const CONN_HELP_LINKS = {
 
 
 
-const PROVIDER_BRAND = {
+const _PROVIDER_BRAND = {
   steam: { color: STORE_BRAND_COLORS.steam, initial: 'S' },
   gog: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
   gog_galaxy: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
@@ -1951,7 +1951,7 @@ async function startBrowserConnect(provider) {
 
     res = await baklogFetch(`/api/auth/${provider}/start${fresh ? '?fresh=1' : ''}`, { method: 'POST' });
 
-  } catch (err) {
+  } catch (_) {
     if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
 
     return;

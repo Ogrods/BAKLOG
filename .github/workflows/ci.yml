@@ -42,6 +42,9 @@ jobs:
       - name: Lint with ruff
         run: ruff check .
 
+      - name: Profile Isolation & Security Audit
+        run: python scripts/audit_security.py --fail-on high --ignore-disk-bleed
+
       # --force-sugar streams a live "NN%" progress bar to the Actions log even
       # though it is not a TTY, so a long run shows how far it has gotten instead
       # of looking hung. --durations=20 prints the slowest tests at the end.

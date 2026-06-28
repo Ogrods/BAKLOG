@@ -1,6 +1,6 @@
 /** Fetcher health stat tiles + dashboard patch helpers. */
 import { escapeAttr, escapeHtml } from '../../dom-util.js';
-import { fetcherSources, fetcherRunner, legendTipsOpen } from '../../fetcher-health-shared.js';
+import { fetcherSources, fetcherRunner } from '../../fetcher-health-shared.js';
 import { ensureAgeTicker } from '../../fetcher-chips.js';
 import { statLayout } from './layout.js';
 import { fetcherFreshness, humanizeAge } from '../freshness.js';

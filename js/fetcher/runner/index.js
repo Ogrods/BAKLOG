@@ -2,7 +2,6 @@
 import { baklogFetch, urlWithStreamTicket } from '../../api-client.js';
 import { isPageHidden, registerPausable } from '../../visibility.js';
 import { state } from '../../state.js';
-import { escapeAttr, escapeHtml } from '../../dom-util.js';
 import {
   LOG_PANEL_CHROME_HTML,
   LOG_EMPTY_MESSAGE,
@@ -1100,7 +1099,7 @@ export const fetcherRunner = (() => {
     }
   }
 
-  function closePanel() {
+  function _closePanel() {
     collapsePanel({ manual: true });
   }
 

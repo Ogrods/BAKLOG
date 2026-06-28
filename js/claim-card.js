@@ -20,11 +20,7 @@
  */
 import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
 import {
-  EPIC_MOBILE_STORE,
-  hasValidClaimLinks,
-  inferClaimUrlPlatform,
   isEpicMobileStore,
-  missingClaimLinkFields,
   normalizeClaimUrls,
 } from './claim-links.js';
 import { normalizeNameForDedup } from './game-core.js';

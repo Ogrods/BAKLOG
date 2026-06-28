@@ -1,10 +1,5 @@
-"""OpenXBL client for Xbox / Microsoft Store library (title history)."""
-
-from __future__ import annotations
-
 import requests
 
-# api.xbl.io often 500s; xbl.io is the working host per OpenXBL docs.
 BASE = "https://xbl.io/api/v2"
 
 
@@ -13,19 +8,11 @@ class XboxAuthError(Exception):
 
 
 class XboxRateLimitError(XboxAuthError):
-    """OpenXBL throttled the request (HTTP 429 / body code 429).
-
-    Subclasses XboxAuthError so existing ``except XboxAuthError`` handlers keep
-    catching it, but lets callers distinguish a transient rate limit (the key is
-    fine) from a real credential rejection (401) so they don't force a reconnect.
-    """
+    pass
 
 
-def _rate_limit_message(resp: requests.Response) -> str:
-    msg = (
-        "OpenXBL rate limit reached (HTTP 429). The free OpenXBL tier caps "
-        "requests per hour — your API key is still valid, just wait and retry."
-    )
+def _rate_limit_message(resp):
+    msg = "OpenXBL rate limit reached (HTTP 429). The free OpenXBL tier caps requests per hour — your API key is still valid, just wait and retry."
     retry_after = (resp.headers.get("Retry-After") or "").strip()
     if retry_after:
         msg += f" Retry after {retry_after}s."
@@ -33,20 +20,16 @@ def _rate_limit_message(resp: requests.Response) -> str:
 
 
 class XboxClient:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key):
         key = (api_key or "").strip()
         if not key:
             raise XboxAuthError("Set XBL_API_KEY in .env (free key from https://xbl.io/)")
         self.session = requests.Session()
         self.session.headers.update(
-            {
-                "X-Authorization": key,
-                "Accept": "application/json",
-                "User-Agent": "steam-backlog/1.0",
-            }
+            {"X-Authorization": key, "Accept": "application/json", "User-Agent": "steam-backlog/1.0"}
         )
 
-    def _get(self, path: str, timeout: int = 60) -> dict:
+    def _get(self, path, timeout=60):
         url = f"{BASE}/{path.lstrip('/')}"
         resp = self.session.get(url, timeout=timeout)
         if resp.status_code == 401:
@@ -59,16 +42,15 @@ class XboxClient:
         if isinstance(data, dict) and data.get("code") not in (None, 200, "200", "SUCCESS"):
             code = data.get("code")
             msg = data.get("message") or code
-            # OpenXBL often signals throttling as HTTP 200 with body code 429.
             if str(code).strip() == "429" or str(msg).strip() == "429":
                 raise XboxRateLimitError(_rate_limit_message(resp))
             raise XboxAuthError(f"OpenXBL error: {msg}")
         return data
 
-    def get_account(self) -> dict:
+    def get_account(self):
         return self._get("account")
 
-    def get_xuid(self) -> str:
+    def get_xuid(self):
         data = self.get_account()
         content = data.get("content") or data
         users = content.get("profileUsers") or []
@@ -76,7 +58,7 @@ class XboxClient:
             raise XboxAuthError("No profile on OpenXBL account response")
         return str(users[0].get("id") or users[0].get("hostId") or "")
 
-    def get_gamertag(self) -> str | None:
+    def get_gamertag(self):
         data = self.get_account()
         content = data.get("content") or data
         users = content.get("profileUsers") or []
@@ -85,8 +67,7 @@ class XboxClient:
         settings = {s.get("id"): s.get("value") for s in users[0].get("settings") or []}
         return settings.get("Gamertag")
 
-    def get_title_history(self) -> list[dict]:
-        """Games on the signed-in account (played / owned in Xbox library graph)."""
+    def get_title_history(self):
         data = self._get("player/titleHistory")
         content = data.get("content") or data
         titles = content.get("titles") or []

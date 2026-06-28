@@ -1,12 +1,7 @@
-"""In-process update download/apply coordinator (frozen Windows/macOS builds)."""
-
-from __future__ import annotations
-
 import json
 import os
 import tempfile
 import threading
-from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -39,62 +34,55 @@ _MANIFEST_NAME = "apply-manifest.json"
 
 @dataclass
 class UpdateStatus:
-    phase: str = "idle"
-    progress_bytes: int = 0
-    total_bytes: int | None = None
-    version: str | None = None
-    error: str | None = None
-    ready: bool = False
-    can_apply: bool = False
+    phase: "Any" = "idle"
+    progress_bytes: "Any" = 0
+    total_bytes: "Any" = None
+    version: "Any" = None
+    error: "Any" = None
+    ready: "Any" = False
+    can_apply: "Any" = False
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self):
         return asdict(self)
 
 
 class UpdateManager:
-    def __init__(
-        self,
-        *,
-        current_version: Callable[[], str],
-        has_in_flight_runs: Callable[[], bool],
-        has_active_sessions: Callable[[], bool] | None = None,
-        work_root: Path | None = None,
-    ) -> None:
+    def __init__(self, *, current_version, has_in_flight_runs, has_active_sessions=None, work_root=None):
         self._current_version = current_version
         self._has_in_flight_runs = has_in_flight_runs
         self._has_active_sessions = has_active_sessions or (lambda: False)
         self._work_root = (work_root or Path(tempfile.gettempdir()) / "BAKLOG-update").resolve()
         self._lock = threading.Lock()
         self._status = UpdateStatus()
-        self._thread: threading.Thread | None = None
+        self._thread = None
         self._cancel = threading.Event()
-        self._artifacts: ReleaseArtifacts | None = None
-        self._zip_path: Path | None = None
+        self._artifacts = None
+        self._zip_path = None
         self._rehydrate_from_disk()
 
-    def status_dict(self) -> dict[str, Any]:
+    def status_dict(self):
         with self._lock:
             payload = self._status.to_dict()
         payload["frozen"] = is_frozen()
         payload["runtime_label"] = runtime_label()
         return payload
 
-    def apply_result_dict(self) -> dict[str, Any] | None:
+    def apply_result_dict(self):
         return read_apply_result(self._work_root)
 
-    def _set_status(self, **kwargs: Any) -> None:
+    def _set_status(self, **kwargs):
         with self._lock:
             for key, value in kwargs.items():
                 setattr(self._status, key, value)
 
-    def _rehydrate_from_disk(self) -> None:
+    def _rehydrate_from_disk(self):
         meta = scan_ready_state(self._work_root)
         if not meta:
             return
         version = str(meta.get("version") or "").strip()
         sha256 = str(meta.get("sha256") or "").strip().lower()
         zip_path = Path(str(meta.get("zip_path") or ""))
-        if not version or not sha256 or not zip_path.is_file():
+        if not version or not sha256 or (not zip_path.is_file()):
             return
         try:
             verify_file_sha256(zip_path, sha256)
@@ -106,11 +94,7 @@ class UpdateManager:
         with self._lock:
             self._zip_path = zip_path
             self._artifacts = ReleaseArtifacts(
-                tag=f"v{version}",
-                version=version,
-                html_url=html_url or "",
-                zip_url=zip_url or "",
-                sha256=sha256,
+                tag=f"v{version}", version=version, html_url=html_url or "", zip_url=zip_url or "", sha256=sha256
             )
             self._status = UpdateStatus(
                 phase="ready",
@@ -122,7 +106,7 @@ class UpdateManager:
                 can_apply=True,
             )
 
-    def _preflight_mutating(self) -> str | None:
+    def _preflight_mutating(self):
         if not is_frozen():
             return "Updates apply only to installed BAKLOG builds"
         if not is_in_app_apply_platform():
@@ -135,29 +119,24 @@ class UpdateManager:
             return "Wait for running fetchers to finish before updating"
         return None
 
-    def start_download(self) -> dict[str, Any]:
+    def start_download(self):
         blocked = self._preflight_mutating()
         if blocked:
             return {"ok": False, "error": blocked}
-
         current = self._current_version()
         try:
             artifacts = fetch_release_artifacts()
         except UpdateSecurityError as exc:
             return {"ok": False, "error": str(exc)}
-
         if not artifacts.zip_url:
             return {"ok": False, "error": "Release download URL unavailable for this platform"}
-
         if not update_available(current, artifacts.version):
             return {"ok": False, "error": "Already on latest release"}
-
         with self._lock:
             if self._status.phase == "downloading":
                 return {"ok": True, "started": False, "phase": "downloading"}
             if self._status.phase == "ready" and self._status.version == artifacts.version:
                 return {"ok": True, "started": False, "phase": "ready"}
-
         self._cancel.clear()
         self._artifacts = artifacts
         self._set_status(
@@ -170,15 +149,12 @@ class UpdateManager:
             can_apply=False,
         )
         self._thread = threading.Thread(
-            target=self._download_worker,
-            args=(artifacts,),
-            name="baklog-update-download",
-            daemon=True,
+            target=self._download_worker, args=(artifacts,), name="baklog-update-download", daemon=True
         )
         self._thread.start()
         return {"ok": True, "started": True, "phase": "downloading"}
 
-    def cancel_download(self) -> dict[str, Any]:
+    def cancel_download(self):
         self._cancel.set()
         with self._lock:
             if self._status.phase != "downloading":
@@ -186,17 +162,10 @@ class UpdateManager:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
         self._cleanup_partial()
-        self._set_status(
-            phase="idle",
-            progress_bytes=0,
-            total_bytes=None,
-            error=None,
-            ready=False,
-            can_apply=False,
-        )
+        self._set_status(phase="idle", progress_bytes=0, total_bytes=None, error=None, ready=False, can_apply=False)
         return {"ok": True, "cancelled": True}
 
-    def discard_ready_update(self) -> dict[str, Any]:
+    def discard_ready_update(self):
         with self._lock:
             version = self._status.version
             phase = self._status.phase
@@ -207,50 +176,37 @@ class UpdateManager:
             self._zip_path = None
             self._artifacts = None
         self._set_status(
-            phase="idle",
-            progress_bytes=0,
-            total_bytes=None,
-            version=None,
-            error=None,
-            ready=False,
-            can_apply=False,
+            phase="idle", progress_bytes=0, total_bytes=None, version=None, error=None, ready=False, can_apply=False
         )
         return {"ok": True, "discarded": True, "version": version}
 
-    def apply_ready_update(self) -> dict[str, Any]:
+    def apply_ready_update(self):
         blocked = self._preflight_mutating()
         if blocked:
             return {"ok": False, "error": blocked}
-
         with self._lock:
-            if self._status.phase != "ready" or not self._zip_path or not self._artifacts:
+            if self._status.phase != "ready" or not self._zip_path or (not self._artifacts):
                 return {"ok": False, "error": "No verified update package is ready"}
             zip_path = self._zip_path
             artifacts = self._artifacts
             sha256 = artifacts.sha256
-
         if not sha256:
             return {"ok": False, "error": "Release sha256 unavailable — cannot apply safely"}
-
         try:
             verify_file_sha256(zip_path, sha256)
         except UpdateSecurityError as exc:
             return {"ok": False, "error": str(exc)}
-
         work_root = self._work_root.resolve()
         zip_resolved = zip_path.resolve()
         if work_root not in zip_resolved.parents and zip_resolved.parent != work_root:
             return {"ok": False, "error": "Update package path is outside the trusted update workspace"}
-
         install_dir = frozen_bundle_dir()
         script = install_dir / apply_script_name()
         if not script.is_file():
             return {"ok": False, "error": f"{apply_script_name()} missing from install"}
-
         server_bin = install_dir / server_binary_name()
         if not server_bin.is_file():
             return {"ok": False, "error": "Install dir is not a BAKLOG bundle"}
-
         manifest = {
             "install_dir": str(install_dir),
             "zip_path": str(zip_path),
@@ -261,27 +217,20 @@ class UpdateManager:
         }
         manifest_path = zip_path.parent / _MANIFEST_NAME
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-
         clear_apply_result(self._work_root)
         self._set_status(phase="applying", can_apply=False, ready=False)
-
         try:
-            launch_apply_subprocess(
-                script=script,
-                manifest_path=manifest_path,
-                install_dir=install_dir,
-            )
+            launch_apply_subprocess(script=script, manifest_path=manifest_path, install_dir=install_dir)
         except OSError as exc:
             self._set_status(phase="ready", ready=True, can_apply=True, error=str(exc))
             return {"ok": False, "error": f"Failed to launch updater: {exc}"}
-
         return {"ok": True, "applying": True, "version": artifacts.version}
 
-    def _download_worker(self, artifacts: ReleaseArtifacts) -> None:
+    def _download_worker(self, artifacts):
         version_dir = self._work_root / artifacts.version
         zip_path = version_dir / "package.zip"
 
-        def on_progress(written: int, total: int | None) -> None:
+        def on_progress(written, total):
             self._set_status(progress_bytes=written, total_bytes=total)
 
         try:
@@ -312,10 +261,8 @@ class UpdateManager:
                     return
                 except UpdateSecurityError:
                     zip_path.unlink(missing_ok=True)
-
             if not artifacts.zip_url:
                 raise UpdateSecurityError("release download url missing")
-
             written = fetch_url_to_file(artifacts.zip_url, zip_path, on_progress=on_progress)
             if self._cancel.is_set():
                 raise UpdateSecurityError("download cancelled")
@@ -333,7 +280,6 @@ class UpdateManager:
                 with self._lock:
                     self._zip_path = zip_path
                 return
-
             with self._lock:
                 self._zip_path = zip_path
             write_ready_state(
@@ -345,41 +291,31 @@ class UpdateManager:
                 html_url=artifacts.html_url,
             )
             self._set_status(
-                phase="ready",
-                ready=True,
-                can_apply=True,
-                progress_bytes=written,
-                total_bytes=written,
-                error=None,
+                phase="ready", ready=True, can_apply=True, progress_bytes=written, total_bytes=written, error=None
             )
         except UpdateSecurityError as exc:
             self._cleanup_partial()
             self._set_status(phase="error", error=str(exc), ready=False, can_apply=False)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._cleanup_partial()
             self._set_status(phase="error", error=str(exc), ready=False, can_apply=False)
 
-    def _cleanup_partial(self) -> None:
+    def _cleanup_partial(self):
         with self._lock:
             path = self._zip_path
             version = self._status.version
             phase = self._status.phase
             self._zip_path = None
-        if path and path.is_file() and phase != "ready":
+        if path and path.is_file() and (phase != "ready"):
             path.unlink(missing_ok=True)
             if version:
                 clear_ready_state(self._work_root, version)
 
 
-_MANAGER: UpdateManager | None = None
+_MANAGER = None
 
 
-def get_update_manager(
-    *,
-    current_version: Callable[[], str],
-    has_in_flight_runs: Callable[[], bool],
-    has_active_sessions: Callable[[], bool] | None = None,
-) -> UpdateManager:
+def get_update_manager(*, current_version, has_in_flight_runs, has_active_sessions=None):
     global _MANAGER
     if _MANAGER is None:
         _MANAGER = UpdateManager(
@@ -390,6 +326,6 @@ def get_update_manager(
     return _MANAGER
 
 
-def reset_update_manager_for_tests() -> None:
+def reset_update_manager_for_tests():
     global _MANAGER
     _MANAGER = None

@@ -1,7 +1,3 @@
-"""Static path classification and traversal guards (audit 2026-06-09)."""
-
-from __future__ import annotations
-
 import pytest
 
 import server
@@ -25,25 +21,24 @@ import server
         ("/js/app.js", "public"),
     ],
 )
-def test_static_class(path: str, expected: str) -> None:
+def test_static_class(path, expected):
     assert server._static_class(path) == expected
 
 
-def test_normalize_static_path_decodes_percent_encoding() -> None:
+def test_normalize_static_path_decodes_percent_encoding():
     assert server._normalize_static_path("/%2eenv") == "/.env"
     assert server._normalize_static_path("/Cache/Auth/x") == "/cache/auth/x"
 
 
-def test_resolved_static_path_blocks_dotenv(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolved_static_path_blocks_dotenv(tmp_path, monkeypatch):
     env_file = tmp_path / ".env"
     env_file.write_text("SECRET=1", encoding="utf-8")
     monkeypatch.setattr(server, "ROOT", tmp_path)
-
     monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
     assert server._resolved_static_path_allowed(str(env_file)) is False
 
 
-def test_resolved_static_path_allows_public_asset(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolved_static_path_allows_public_asset(tmp_path, monkeypatch):
     index = tmp_path / "index.html"
     index.write_text("<html></html>", encoding="utf-8")
     monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
@@ -53,7 +48,7 @@ def test_resolved_static_path_allows_public_asset(tmp_path, monkeypatch: pytest.
     assert server._resolved_static_path_allowed(str(index)) is True
 
 
-def test_resolved_static_path_allows_profile_catalog(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolved_static_path_allows_profile_catalog(tmp_path, monkeypatch):
     import shared.profile_paths as profile_paths
 
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)

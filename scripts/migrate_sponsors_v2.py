@@ -1,15 +1,9 @@
-#!/usr/bin/env python3
-"""One-shot migrator: sponsors.json v1 items[] -> v2 ads{} + locations{}."""
-from __future__ import annotations
-
 import json
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-
-# Sync pair: keep aligned with js/sponsored-deals.js AD_LOCATIONS keys.
-PLACEMENT_TO_LOCATIONS: dict[str, list[str]] = {
+PLACEMENT_TO_LOCATIONS = {
     "spotlight": ["dash-spotlight"],
     "dash-feature-banner": ["dash-feature-banner"],
     "coop-online": ["dash-coop-online"],
@@ -21,10 +15,6 @@ PLACEMENT_TO_LOCATIONS: dict[str, list[str]] = {
     "deal-rail": ["wish-deal-hero"],
     "dash-deal-rail": ["dash-house"],
 }
-
-# Sync pair: keep aligned with js/sponsored-deals.js HOUSE_DEFAULTS +
-# curated/sponsors.json. dismissible: closeable (session-scoped) house promos;
-# the Pro promo + house-spotlight-pro-* slides are permanent (Pro-only removal).
 HOUSE_DEFAULTS = {
     "house-support-baklog": {
         "kind": "house",
@@ -39,10 +29,7 @@ HOUSE_DEFAULTS = {
     "house-pro-promo": {
         "kind": "house",
         "title": "Refresh faster. See fewer ads.",
-        "tagline": (
-            "Queue stale stores, sync across machines, and remove sponsored deal cards. "
-            "Nothing you use today moves behind paywall."
-        ),
+        "tagline": "Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -83,10 +70,7 @@ HOUSE_DEFAULTS = {
     "house-spotlight-pro-sync": {
         "kind": "house",
         "title": "Sync every machine",
-        "slogan": (
-            "Keep your library and personal data aligned across machines "
-            "- no manual exports."
-        ),
+        "slogan": "Keep your library and personal data aligned across machines - no manual exports.",
         "tagline": "Cloud sync for library JSON and personal prefs.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
@@ -123,9 +107,7 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "It's just your library",
         "slogan": "Your library, every store, one place.",
-        "tagline": (
-            "Every game you own, deduped across stores. Local-first."
-        ),
+        "tagline": "Every game you own, deduped across stores. Local-first.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -136,7 +118,7 @@ HOUSE_DEFAULTS = {
 }
 
 
-def parse_placements(raw) -> list[str]:
+def parse_placements(raw):
     if raw is None or raw == "":
         return ["deal-rail"]
     if isinstance(raw, list):
@@ -144,21 +126,37 @@ def parse_placements(raw) -> list[str]:
     return [p.strip().lower() for p in str(raw).split(",") if p.strip()]
 
 
-def migrate_v1(doc: dict) -> dict:
+def migrate_v1(doc):
     items = doc.get("items") if isinstance(doc.get("items"), list) else []
-    ads: dict[str, dict] = {}
-    locations: dict[str, list[str]] = {k: [] for k in [
-        "dash-spotlight", "dash-feature-banner", "dash-coop-online", "dash-coop-couch",
-        "dash-versus-rated", "dash-versus-fast", "dash-pick", "dash-house",
-        "lib-pick", "lib-row", "lib-house",
-        "wish-pick", "wish-row", "wish-deal-hero", "wish-deal-portrait", "wish-house",
-        "deals-pick", "deals-row",
-        "itch-pick", "itch-row", "itch-house",
-        "claim-cards",
-    ]}
-
-    versus_items: list[tuple[int, str]] = []
-
+    ads = {}
+    locations = {
+        k: []
+        for k in [
+            "dash-spotlight",
+            "dash-feature-banner",
+            "dash-coop-online",
+            "dash-coop-couch",
+            "dash-versus-rated",
+            "dash-versus-fast",
+            "dash-pick",
+            "dash-house",
+            "lib-pick",
+            "lib-row",
+            "lib-house",
+            "wish-pick",
+            "wish-row",
+            "wish-deal-hero",
+            "wish-deal-portrait",
+            "wish-house",
+            "deals-pick",
+            "deals-row",
+            "itch-pick",
+            "itch-row",
+            "itch-house",
+            "claim-cards",
+        ]
+    }
+    versus_items = []
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -167,7 +165,6 @@ def migrate_v1(doc: dict) -> dict:
             continue
         creative = {k: v for k, v in item.items() if k not in ("id", "placements", "priority")}
         ads[ad_id] = creative
-
         for placement in parse_placements(item.get("placements")):
             if placement == "dash-versus":
                 versus_items.append((int(item.get("priority") or 99), ad_id))
@@ -175,7 +172,6 @@ def migrate_v1(doc: dict) -> dict:
             for loc in PLACEMENT_TO_LOCATIONS.get(placement, []):
                 if ad_id not in locations[loc]:
                     locations[loc].append(ad_id)
-
     versus_items.sort(key=lambda x: x[0])
     for _, ad_id in versus_items[:1]:
         if ad_id not in locations["dash-versus-rated"]:
@@ -183,10 +179,8 @@ def migrate_v1(doc: dict) -> dict:
     for _, ad_id in versus_items[1:2]:
         if ad_id not in locations["dash-versus-fast"]:
             locations["dash-versus-fast"].append(ad_id)
-
     for hid, creative in HOUSE_DEFAULTS.items():
         ads.setdefault(hid, creative)
-
     house_locs = {
         "dash-house": "house-pro-promo",
         "wish-house": "house-support-baklog",
@@ -196,7 +190,6 @@ def migrate_v1(doc: dict) -> dict:
     for loc, hid in house_locs.items():
         if not locations[loc] and hid in ads:
             locations[loc] = [hid]
-
     return {
         "version": 2,
         "generated_at": doc.get("generated_at"),
@@ -205,7 +198,7 @@ def migrate_v1(doc: dict) -> dict:
     }
 
 
-def main() -> int:
+def main():
     src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "curated" / "sponsors.json"
     dst = Path(sys.argv[2]) if len(sys.argv) > 2 else src
     doc = json.loads(src.read_text(encoding="utf-8"))
@@ -214,7 +207,7 @@ def main() -> int:
         return 0
     out = migrate_v1(doc)
     dst.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote v2 ({len(out['ads'])} ads, {sum(len(v) for v in out['locations'].values())} assignments) -> {dst}")
+    print(f"wrote v2 ({len(out['ads'])} ads, {sum((len(v) for v in out['locations'].values()))} assignments) -> {dst}")
     return 0
 
 

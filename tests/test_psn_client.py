@@ -1,22 +1,10 @@
-"""Tests for PSN library playtime aggregation (PS4 + PS5 cross-gen sum)."""
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from clients.psn_client import PsnClient, _accumulate_stat_into_agg, _apply_stat_to_entry, _new_stat_agg
 
 
-def _stat(
-    *,
-    title_id: str,
-    name: str,
-    hours: int = 0,
-    minutes: int = 0,
-    play_count: int | None = None,
-    last: datetime | None = None,
-    first: datetime | None = None,
-) -> SimpleNamespace:
+def _stat(*, title_id, name, hours=0, minutes=0, play_count=None, last=None, first=None):
     return SimpleNamespace(
         title_id=title_id,
         name=name,
@@ -28,24 +16,13 @@ def _stat(
     )
 
 
-def _trophy_set(*, bronze=0, silver=0, gold=0, platinum=0) -> SimpleNamespace:
-    return SimpleNamespace(
-        bronze=bronze,
-        silver=silver,
-        gold=gold,
-        platinum=platinum,
-    )
+def _trophy_set(*, bronze=0, silver=0, gold=0, platinum=0):
+    return SimpleNamespace(bronze=bronze, silver=silver, gold=gold, platinum=platinum)
 
 
 def _trophy(
-    *,
-    comm_id: str = "NPWR22022_00",
-    name: str = "Fortnite",
-    title_id: str = "PPSA01922_00",
-    platform: str = "PS5",
-    earned: SimpleNamespace | None = None,
-    defined: SimpleNamespace | None = None,
-) -> SimpleNamespace:
+    *, comm_id="NPWR22022_00", name="Fortnite", title_id="PPSA01922_00", platform="PS5", earned=None, defined=None
+):
     return SimpleNamespace(
         np_communication_id=comm_id,
         title_name=name,
@@ -60,12 +37,7 @@ def _trophy(
 
 
 class _FakePsnMe:
-    def __init__(
-        self,
-        stats: list,
-        trophies: list,
-        entitlements: list | None = None,
-    ) -> None:
+    def __init__(self, stats, trophies, entitlements=None):
         self._stats = stats
         self._trophies = trophies
         self._entitlements = entitlements or []
@@ -80,16 +52,15 @@ class _FakePsnMe:
         yield from self._entitlements
 
 
-def test_parallel_collect_walks_run_concurrently() -> None:
-    """title_stats, trophy_titles, and entitlements walks start in parallel."""
+def test_parallel_collect_walks_run_concurrently():
     import threading
     import time
 
     lock = threading.Lock()
-    active: set[str] = set()
+    active = set()
     peak = 0
 
-    def track(name: str):
+    def track(name):
         with lock:
             active.add(name)
             nonlocal peak
@@ -120,7 +91,7 @@ def test_parallel_collect_walks_run_concurrently() -> None:
     assert len(games) >= 1
 
 
-def test_cross_gen_playtime_summed() -> None:
+def test_cross_gen_playtime_summed():
     ps4_min = int(timedelta(hours=2304, minutes=16).total_seconds() // 60)
     ps5_min = int(timedelta(hours=168).total_seconds() // 60)
     stats = [
@@ -130,11 +101,11 @@ def test_cross_gen_playtime_summed() -> None:
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(stats, [_trophy(title_id="PPSA01922_00")])
     games = client.collect_library()
-    fn = next(g for g in games if g.name == "Fortnite")
+    fn = next((g for g in games if g.name == "Fortnite"))
     assert fn.playtime_minutes == ps4_min + ps5_min
 
 
-def test_cross_gen_last_first_play_count_merged() -> None:
+def test_cross_gen_last_first_play_count_merged():
     stats = [
         _stat(
             title_id="CUSA07022_00",
@@ -155,33 +126,24 @@ def test_cross_gen_last_first_play_count_merged() -> None:
     ]
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(stats, [_trophy()])
-    fn = next(g for g in client.collect_library() if g.name == "Fortnite")
+    fn = next((g for g in client.collect_library() if g.name == "Fortnite"))
     assert fn.play_count == 55
     assert fn.last_played.startswith("2025-01-01")
     assert fn.first_played.startswith("2018-01-01")
 
 
-def test_single_platform_not_inflated() -> None:
+def test_single_platform_not_inflated():
     stats = [_stat(title_id="CUSA12345_00", name="Solo Game", hours=42)]
     client = object.__new__(PsnClient)
-    client._client = _FakePsnMe(
-        stats,
-        [_trophy(comm_id="NPWR1", name="Solo Game", title_id="CUSA12345_00")],
-    )
-    solo = next(g for g in client.collect_library() if g.name == "Solo Game")
+    client._client = _FakePsnMe(stats, [_trophy(comm_id="NPWR1", name="Solo Game", title_id="CUSA12345_00")])
+    solo = next((g for g in client.collect_library() if g.name == "Solo Game"))
     assert solo.playtime_minutes == 42 * 60
 
 
-def test_edition_suffix_groups_via_dedupe_key() -> None:
+def test_edition_suffix_groups_via_dedupe_key():
     stat_agg = _new_stat_agg()
-    _accumulate_stat_into_agg(
-        stat_agg,
-        _stat(title_id="A", name="Game Name - Deluxe Edition", hours=10),
-    )
-    _accumulate_stat_into_agg(
-        stat_agg,
-        _stat(title_id="B", name="Game Name", hours=5),
-    )
+    _accumulate_stat_into_agg(stat_agg, _stat(title_id="A", name="Game Name - Deluxe Edition", hours=10))
+    _accumulate_stat_into_agg(stat_agg, _stat(title_id="B", name="Game Name", hours=5))
     from clients.psn_client import PsnGameEntry
 
     entry = PsnGameEntry(
@@ -207,42 +169,28 @@ def test_edition_suffix_groups_via_dedupe_key() -> None:
     assert entry.playtime_minutes == 15 * 60
 
 
-def test_trophy_counts_and_platinum_flags() -> None:
+def test_trophy_counts_and_platinum_flags():
     earned = _trophy_set(bronze=10, silver=4, gold=2, platinum=1)
     defined = _trophy_set(bronze=20, silver=8, gold=4, platinum=1)
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(
-        [],
-        [
-            _trophy(
-                comm_id="NPWR99999_00",
-                name="Platinum Game",
-                earned=earned,
-                defined=defined,
-            )
-        ],
+        [], [_trophy(comm_id="NPWR99999_00", name="Platinum Game", earned=earned, defined=defined)]
     )
-    game = next(g for g in client.collect_library() if g.name == "Platinum Game")
+    game = next((g for g in client.collect_library() if g.name == "Platinum Game"))
     assert game.trophies_earned == 17
     assert game.trophies_total == 33
     assert game.has_platinum is True
     assert game.platinum_earned is True
 
 
-def test_entitlement_beta_and_non_game_skipped() -> None:
+def test_entitlement_beta_and_non_game_skipped():
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(
         [],
         [],
         entitlements=[
-            {
-                "isGame": False,
-                "titleMeta": {"titleId": "CUSA00001_00", "name": "Not A Game"},
-            },
-            {
-                "isBeta": True,
-                "titleMeta": {"titleId": "CUSA00002_00", "name": "Beta Build"},
-            },
+            {"isGame": False, "titleMeta": {"titleId": "CUSA00001_00", "name": "Not A Game"}},
+            {"isBeta": True, "titleMeta": {"titleId": "CUSA00002_00", "name": "Beta Build"}},
             {
                 "titleMeta": {
                     "titleId": "CUSA00003_00",

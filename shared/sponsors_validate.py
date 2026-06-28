@@ -1,11 +1,5 @@
-"""Sponsor feed schema validation (v1 items/placements + v2 ads/locations)."""
 
-from __future__ import annotations
-
-from typing import Any
-
-# Sync pair: js/sponsored-deals.js AD_LOCATIONS, admin/admin.js, migrate_sponsors_v2.py
-SPONSOR_AD_LOCATIONS: frozenset[str] = frozenset(
+SPONSOR_AD_LOCATIONS = frozenset(
     {
         "dash-spotlight",
         "dash-feature-banner",
@@ -33,7 +27,7 @@ SPONSOR_AD_LOCATIONS: frozenset[str] = frozenset(
 )
 
 
-def _validate_sponsor_creative(ad_id: str, item: Any) -> str | None:
+def _validate_sponsor_creative(ad_id, item):
     if not isinstance(item, dict):
         return f"ads[{ad_id}] must be an object"
     if not str(item.get("title") or "").strip():
@@ -44,10 +38,10 @@ def _validate_sponsor_creative(ad_id: str, item: Any) -> str | None:
         if not (u.startswith("http://") or u.startswith("https://")):
             return f"ads[{ad_id}] url must start with http:// or https://"
     enabled = item.get("enabled")
-    if enabled is not None and not isinstance(enabled, bool):
+    if enabled is not None and (not isinstance(enabled, bool)):
         return f"ads[{ad_id}] enabled must be boolean"
     dismissible = item.get("dismissible")
-    if dismissible is not None and not isinstance(dismissible, bool):
+    if dismissible is not None and (not isinstance(dismissible, bool)):
         return f"ads[{ad_id}] dismissible must be boolean"
     art_mode = item.get("art_mode")
     if art_mode is not None and str(art_mode).strip():
@@ -62,15 +56,13 @@ def _validate_sponsor_creative(ad_id: str, item: Any) -> str | None:
     if cover is not None and str(cover).strip():
         c = str(cover).strip()
         if not (
-            c.startswith("http://")
-            or c.startswith("https://")
-            or (c.startswith("/") and not c.startswith("//"))
+            c.startswith("http://") or c.startswith("https://") or (c.startswith("/") and (not c.startswith("//")))
         ):
             return f"ads[{ad_id}] cover must be http(s) URL or same-origin path"
     return None
 
 
-def _validate_sponsors_v2(doc: dict[str, Any]) -> str | None:
+def _validate_sponsors_v2(doc):
     ads = doc.get("ads")
     locations = doc.get("locations")
     if not isinstance(ads, dict):
@@ -98,7 +90,7 @@ def _validate_sponsors_v2(doc: dict[str, Any]) -> str | None:
     return None
 
 
-def _validate_sponsors_v1(doc: dict[str, Any]) -> str | None:
+def _validate_sponsors_v1(doc):
     items = doc.get("items")
     if not isinstance(items, list):
         return "items must be a list"
@@ -134,7 +126,7 @@ def _validate_sponsors_v1(doc: dict[str, Any]) -> str | None:
     return None
 
 
-def validate_sponsors_payload(doc: dict[str, Any]) -> str | None:
+def validate_sponsors_payload(doc):
     if doc.get("version") == 2:
         return _validate_sponsors_v2(doc)
     if "ads" in doc or "locations" in doc:

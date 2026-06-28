@@ -1,25 +1,21 @@
-"""Tests for shared.comp_pro (auto Pro on sign-in)."""
-
-from __future__ import annotations
-
 from shared import comp_pro
 
 
-def test_load_comp_pro_emails(tmp_path) -> None:
+def test_load_comp_pro_emails(tmp_path):
     path = tmp_path / "list.txt"
     path.write_text("# comment\n\nPAUL@example.com\n", encoding="utf-8")
     assert comp_pro.load_comp_pro_emails(path) == frozenset({"paul@example.com"})
 
 
-def test_ensure_comp_pro_skips_unlisted(monkeypatch) -> None:
+def test_ensure_comp_pro_skips_unlisted(monkeypatch):
     monkeypatch.setattr(comp_pro, "load_comp_pro_emails", lambda *_a, **_k: frozenset({"listed@example.com"}))
     assert comp_pro.ensure_comp_pro_on_login("uid", "other@example.com") == (False, False)
 
 
-def test_ensure_comp_pro_upgrades(monkeypatch) -> None:
+def test_ensure_comp_pro_upgrades(monkeypatch):
     monkeypatch.setattr(comp_pro, "load_comp_pro_emails", lambda *_a, **_k: frozenset({"paul@example.com"}))
     monkeypatch.setattr(comp_pro, "_admin_creds", lambda: ("https://demo.supabase.co", "service-key"))
-    writes: list[tuple] = []
+    writes = []
 
     def fake_admin(method, url, *, key, body=None):
         if method == "GET":
@@ -34,10 +30,10 @@ def test_ensure_comp_pro_upgrades(monkeypatch) -> None:
     assert writes and writes[0][2]["app_metadata"]["plan"] == "pro"
 
 
-def test_ensure_comp_pro_idempotent_when_already_pro(monkeypatch) -> None:
+def test_ensure_comp_pro_idempotent_when_already_pro(monkeypatch):
     monkeypatch.setattr(comp_pro, "load_comp_pro_emails", lambda *_a, **_k: frozenset({"paul@example.com"}))
     monkeypatch.setattr(comp_pro, "_admin_creds", lambda: ("https://demo.supabase.co", "service-key"))
-    calls: list[str] = []
+    calls = []
 
     def fake_admin(method, url, *, key, body=None):
         calls.append(method)

@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch the user's GOG wishlist into games_wishlist_gog.json.
-
-Uses the GOG_AL session cookie (same one as fetch_gog.py) to read the wishlist
-from embed.gog.com, then enriches each title with public api.gog.com product
-data (price, cover, slug, release date). HLTB is skipped by default to keep
-runs fast; use --hltb to enable.
-
-The dashboard merges this file into the Wishlist tab alongside the Steam
-wishlist, so you can deal-radar across stores in one place.
-"""
-
 import argparse
 import json
 import time
@@ -41,39 +29,24 @@ GOG_PRODUCT_DELAY_SEC = 0.4
 HLTB_DELAY_SEC = 1.0
 
 
-def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
-    """Mirror fetch_gog.py: turn a bare GOG image hash into header + cover URLs."""
+def _gog_image_urls(raw):
     if not raw:
-        return None, None
+        return (None, None)
     url = raw
     if url.startswith("//"):
         url = "https:" + url
     if not url.startswith("http"):
-        return None, None
+        return (None, None)
     if url.endswith(".jpg") or url.endswith(".png"):
-        return url, url
-    return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
+        return (url, url)
+    return (f"{url}.jpg", f"{url}_glx_vertical_cover.jpg")
 
 
-def _fetch_wishlist_ids(gog: GogClient, refresh: bool) -> list[int]:
-    """Return the user's wishlisted GOG product IDs.
-
-    The embed endpoint returns shapes like ``{"wishlist": {"<id>": 1}}`` (current)
-    or ``{"products": [<id>, ...]}`` (older); handle both.
-    """
-    # The wishlist ID list is tiny and changes whenever the user heart-clicks
-    # on GOG. Use the user-state TTL (0s) so we don't keep showing yesterday's
-    # snapshot, while still honoring an explicit ``--refresh`` for any future
-    # cache layers we might add.
+def _fetch_wishlist_ids(gog, refresh):
     from clients.gog_client import USER_STATE_TTL
 
-    data = gog._get(
-        "/user/wishlist.json",
-        refresh=refresh,
-        cache_key="user_wishlist",
-        max_age_seconds=USER_STATE_TTL,
-    )
-    ids: list[int] = []
+    data = gog._get("/user/wishlist.json", refresh=refresh, cache_key="user_wishlist", max_age_seconds=USER_STATE_TTL)
+    ids = []
     wl = data.get("wishlist")
     if isinstance(wl, dict):
         for k in wl.keys():
@@ -93,8 +66,7 @@ def _fetch_wishlist_ids(gog: GogClient, refresh: bool) -> list[int]:
     return ids
 
 
-def _fetch_product(session: requests.Session, gog_id: int, country: str) -> dict | None:
-    """api.gog.com/products is the simplest public-product endpoint."""
+def _fetch_product(session, gog_id, country):
     try:
         resp = session.get(
             f"{GOG_API_BASE}/products/{gog_id}",
@@ -103,10 +75,7 @@ def _fetch_product(session: requests.Session, gog_id: int, country: str) -> dict
         )
         if resp.status_code != 200:
             snippet = (resp.text or "")[:120].replace("\n", " ")
-            print(
-                f"  HTTP {resp.status_code} for {resp.url}: {snippet}",
-                flush=True,
-            )
+            print(f"  HTTP {resp.status_code} for {resp.url}: {snippet}", flush=True)
             return None
         return resp.json()
     except requests.RequestException as exc:
@@ -114,20 +83,12 @@ def _fetch_product(session: requests.Session, gog_id: int, country: str) -> dict
         return None
 
 
-def _fetch_price(session: requests.Session, gog_id: int, country: str) -> dict | None:
-    """Pricing is on a separate endpoint; auth not required."""
+def _fetch_price(session, gog_id, country):
     try:
-        resp = session.get(
-            f"{GOG_API_BASE}/products/{gog_id}/prices",
-            params={"countryCode": country},
-            timeout=20,
-        )
+        resp = session.get(f"{GOG_API_BASE}/products/{gog_id}/prices", params={"countryCode": country}, timeout=20)
         if resp.status_code != 200:
             snippet = (resp.text or "")[:120].replace("\n", " ")
-            print(
-                f"  HTTP {resp.status_code} for {resp.url}: {snippet}",
-                flush=True,
-            )
+            print(f"  HTTP {resp.status_code} for {resp.url}: {snippet}", flush=True)
             return None
         return resp.json()
     except requests.RequestException as exc:
@@ -135,12 +96,10 @@ def _fetch_price(session: requests.Session, gog_id: int, country: str) -> dict |
         return None
 
 
-def _money_to_float(amount: str | int | float | None) -> float | None:
-    """GOG returns prices as zero-padded micro-string like '1999' (= $19.99)."""
+def _money_to_float(amount):
     if amount is None:
         return None
     try:
-        # Some endpoints return integer hundredths (e.g. "1999" => 19.99).
         s = str(amount)
         if s.isdigit():
             return int(s) / 100.0
@@ -149,19 +108,17 @@ def _money_to_float(amount: str | int | float | None) -> float | None:
         return None
 
 
-def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_data: dict | None) -> dict:
+def _build_row(gog_id, product, price_doc, hltb_data):
     title = (product or {}).get("title") or f"GOG {gog_id}"
     image = (product or {}).get("image") or (product or {}).get("background_image")
     header_url, library_url = _gog_image_urls(image)
     release = (product or {}).get("release_date")
     slug = (product or {}).get("slug") or str(gog_id)
-
     final = None
     base = None
     discount = None
     currency = None
     price_str = None
-
     if price_doc:
         embedded = price_doc.get("_embedded") or {}
         prices_list = embedded.get("prices") or []
@@ -169,22 +126,16 @@ def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_d
             best = prices_list[0]
             fp_raw = best.get("finalPrice")
             bp_raw = best.get("basePrice")
-            final = _money_to_float(
-                fp_raw.split(" ")[0] if isinstance(fp_raw, str) else fp_raw
-            )
-            base = _money_to_float(
-                bp_raw.split(" ")[0] if isinstance(bp_raw, str) else bp_raw
-            )
+            final = _money_to_float(fp_raw.split(" ")[0] if isinstance(fp_raw, str) else fp_raw)
+            base = _money_to_float(bp_raw.split(" ")[0] if isinstance(bp_raw, str) else bp_raw)
             currency = (best.get("currency") or {}).get("code") if isinstance(best.get("currency"), dict) else None
             if isinstance(best.get("finalPrice"), str) and " " in best["finalPrice"]:
                 currency = currency or best["finalPrice"].split(" ")[-1]
             if final is not None:
                 price_str = f"${final:.2f}"
-            if final is not None and base and base > 0:
+            if final is not None and base and (base > 0):
                 discount = round(100 * (1 - final / base))
-
     cur_norm = currency or "USD"
-
     return {
         "store": "wishlist",
         "wishlist_store": "gog",
@@ -215,7 +166,7 @@ def _build_row(gog_id: int, product: dict | None, price_doc: dict | None, hltb_d
     }
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch GOG wishlist")
     parser.add_argument("--refresh", action="store_true", help="Ignore cached wishlist ID list")
     parser.add_argument("--country", default="US", help="GOG storefront country code (default US)")
@@ -231,49 +182,35 @@ def main() -> int:
     if not gog_al:
         stats.error("Set GOG_AL in .env (see README for cookie instructions).")
         return stats.finish("fetch_gog_wishlist", t0, exit_code=1)
-
     probe_err = probe_gog_session(gog_al)
     if probe_err:
         mark_invalid("gog", error=probe_err)
         stats.error(probe_err)
         return stats.finish("fetch_gog_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
     gog = GogClient(gog_al)
-
     print("Fetching GOG wishlist IDs...", flush=True)
     try:
-        ids = run_with_heartbeat(
-            lambda: _fetch_wishlist_ids(gog, refresh=args.refresh),
-            "GOG wishlist capture",
-        )
+        ids = run_with_heartbeat(lambda: _fetch_wishlist_ids(gog, refresh=args.refresh), "GOG wishlist capture")
     except GogAuthError as e:
         mark_invalid("gog", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_gog_wishlist", t0, exit_code=EXIT_CODE_AUTH)
     empty_exit = refuse_empty_result(
-        ids,
-        label="GOG wishlist",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_WISHLIST_GOG_JSON,
+        ids, label="GOG wishlist", allow_empty=args.allow_empty, output_path=GAMES_WISHLIST_GOG_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_gog_wishlist", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        ids,
-        label="GOG wishlist",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_WISHLIST_GOG_JSON,
+        ids, label="GOG wishlist", allow_drift=args.allow_drift, output_path=GAMES_WISHLIST_GOG_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_gog_wishlist", t0, exit_code=drift_exit)
-
     print(f"Found {len(ids)} GOG wishlist items.", flush=True)
     session = requests.Session()
     session.headers["User-Agent"] = "steam-backlog/1.0"
     hltb = HltbClient() if args.hltb else None
     existing = load_existing_games(GAMES_WISHLIST_GOG_JSON)
-
-    rows: list[dict] = []
+    rows = []
     for i, gog_id in enumerate(ids, 1):
         cached = existing.get(str(gog_id))
         if args.only_new and cached:
@@ -293,7 +230,6 @@ def main() -> int:
                 stats.warn(f"HLTB for {product['title']!r}: {e}")
         rows.append(_build_row(gog_id, product, price_doc, hltb_data))
         stats.ok += 1
-
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_gog",

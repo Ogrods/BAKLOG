@@ -17,10 +17,7 @@ def test_slim_row_keeps_non_null_enrichment():
 
 
 def test_slim_games_payload():
-    payload = {
-        "store": "steam",
-        "games": [{"id": 1, "steam_review_percent": None, "name": "Game"}],
-    }
+    payload = {"store": "steam", "games": [{"id": 1, "steam_review_percent": None, "name": "Game"}]}
     out = slim_games_payload(payload)
     assert "steam_review_percent" not in out["games"][0]
     assert out["games"][0]["name"] == "Game"

@@ -1,24 +1,9 @@
-#!/usr/bin/env python3
-"""Fetch Epic Games Store wishlist into games_wishlist_epic.json.
-
-Uses the saved Epic Store browser profile (Connections -> Epic wishlist) and
-loads store.epicgames.com/wishlist headlessly, capturing storefront GraphQL
-responses. No cookie replay from Python (Cloudflare binds cf_clearance to the
-browser TLS fingerprint).
-
-Output rows match the shared dashboard wishlist schema (``store: "wishlist"``,
-``wishlist_store: "epic"``).
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 from urllib.parse import quote
 
 from dotenv import load_dotenv
@@ -52,36 +37,27 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, sta
 GAMES_WISHLIST_EPIC_JSON = Path("games_wishlist_epic.json")
 WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
 
-def dump_dir() -> Path:
+
+def dump_dir():
     from shared.profile_paths import epic_cache_dir
 
     return epic_cache_dir()
 
 
-def dump_html() -> Path:
+def dump_html():
     return dump_dir() / "wishlist_dump.html"
 
 
-def dump_json() -> Path:
+def dump_json():
     return dump_dir() / "wishlist_dump.json"
+
+
 HLTB_DELAY_SEC = 1.0
-
-LIBRARY_IMAGE_TYPES = (
-    "DieselGameBoxTall",
-    "Thumbnail",
-    "OfferImageTall",
-    "VaultClosed",
-    "DieselGameBox",
-)
-HEADER_IMAGE_TYPES = (
-    "OfferImageWide",
-    "DieselStoreFrontWide",
-    "DieselGameBox",
-    "Featured",
-)
+LIBRARY_IMAGE_TYPES = ("DieselGameBoxTall", "Thumbnail", "OfferImageTall", "VaultClosed", "DieselGameBox")
+HEADER_IMAGE_TYPES = ("OfferImageWide", "DieselStoreFrontWide", "DieselGameBox", "Featured")
 
 
-def _pick_image(key_images: list | None, types: tuple[str, ...]) -> str | None:
+def _pick_image(key_images, types):
     if not key_images:
         return None
     by_type = {k.get("type"): k.get("url") for k in key_images if isinstance(k, dict)}
@@ -92,14 +68,14 @@ def _pick_image(key_images: list | None, types: tuple[str, ...]) -> str | None:
     return None
 
 
-def _is_public_slug(value: str | None) -> bool:
+def _is_public_slug(value):
     if not value:
         return False
     s = str(value).strip()
-    return bool(s) and s.replace("-", "").replace("_", "").isalnum() and s == s.lower()
+    return bool(s) and s.replace("-", "").replace("_", "").isalnum() and (s == s.lower())
 
 
-def _store_url(offer: dict | None, fallback_name: str) -> str:
+def _store_url(offer, fallback_name):
     if offer:
         for key in ("productSlug", "urlSlug", "pageSlug"):
             slug = offer.get(key)
@@ -108,10 +84,10 @@ def _store_url(offer: dict | None, fallback_name: str) -> str:
     return f"https://store.epicgames.com/en-US/browse?q={quote(fallback_name)}"
 
 
-def _genres(offer: dict | None) -> list[str]:
+def _genres(offer):
     if not offer:
         return []
-    out: list[str] = []
+    out = []
     for tag in offer.get("tags") or []:
         if not isinstance(tag, dict):
             continue
@@ -121,13 +97,8 @@ def _genres(offer: dict | None) -> list[str]:
     return list(dict.fromkeys(out))
 
 
-def _price_fields(offer: dict | None) -> dict:
-    blank = {
-        "price": None,
-        "price_initial": None,
-        "discount_percent": None,
-        "currency": None,
-    }
+def _price_fields(offer):
+    blank = {"price": None, "price_initial": None, "discount_percent": None, "currency": None}
     if not offer:
         return blank
     price = (offer.get("price") or {}).get("totalPrice") or {}
@@ -142,7 +113,7 @@ def _price_fields(offer: dict | None) -> dict:
         discount_pct = round(100 * (1 - final_cents / base_cents))
     price_str = fmt.get("discountPrice") or fmt.get("originalPrice")
     price_initial_str = fmt.get("originalPrice")
-    if final_cents == 0 and not price_str:
+    if final_cents == 0 and (not price_str):
         price_str = "Free"
     return {
         "price": price_str,
@@ -152,7 +123,7 @@ def _price_fields(offer: dict | None) -> dict:
     }
 
 
-def _release(offer: dict | None) -> str | None:
+def _release(offer):
     if not offer:
         return None
     for key in ("releaseDate", "pcReleaseDate", "effectiveDate"):
@@ -162,7 +133,7 @@ def _release(offer: dict | None) -> str | None:
     return None
 
 
-def _build_row(element: dict, hltb: dict | None) -> dict | None:
+def _build_row(element, hltb):
     offer = element.get("offer") or {}
     namespace = element.get("namespace") or offer.get("namespace")
     offer_id = element.get("offerId") or offer.get("id")
@@ -173,7 +144,6 @@ def _build_row(element: dict, hltb: dict | None) -> dict | None:
     header = _pick_image(key_images, HEADER_IMAGE_TYPES)
     library = _pick_image(key_images, LIBRARY_IMAGE_TYPES) or header
     price_info = _price_fields(offer)
-
     row = {
         "store": "wishlist",
         "wishlist_store": "epic",
@@ -204,7 +174,7 @@ def _build_row(element: dict, hltb: dict | None) -> dict | None:
     return row
 
 
-def _elements_from_payload(payload: Any) -> list[dict]:
+def _elements_from_payload(payload):
     if not isinstance(payload, dict):
         return []
     data = payload.get("data") or payload
@@ -222,11 +192,10 @@ def _elements_from_payload(payload: Any) -> list[dict]:
     return [el for el in elements if isinstance(el, dict)]
 
 
-def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[dict]:
-    """Merge wishlist elements from captured GraphQL and dehydrated HTML state."""
+def parse_wishlist_sources(html, api_payloads):
     all_payloads = list(api_payloads)
     all_payloads.extend(extract_wishlist_payloads_from_html(html))
-    found: dict[str, dict] = {}
+    found = {}
     for payload in all_payloads:
         for el in _elements_from_payload(payload):
             offer = el.get("offer") or {}
@@ -257,95 +226,76 @@ _CDP_TRANSPORT_TYPES = (
 )
 
 
-def _is_cdp_transport_error(exc: BaseException) -> bool:
+def _is_cdp_transport_error(exc):
     msg = str(exc).lower()
     type_name = type(exc).__name__.lower()
-    if any(tok in msg for tok in _CDP_TRANSPORT_MSG):
+    if any((tok in msg for tok in _CDP_TRANSPORT_MSG)):
         return True
-    return any(tok in type_name for tok in _CDP_TRANSPORT_TYPES)
+    return any((tok in type_name for tok in _CDP_TRANSPORT_TYPES))
 
 
-def _read_page_html(page, *, timeout: float = 10) -> str:
-    """Read page HTML with a short CDP timeout so a dead socket fails fast."""
+def _read_page_html(page, *, timeout=10):
     html = page.evaluate(
-        """() => {
-            const d = document.documentElement;
-            return d ? d.outerHTML : '';
-        }""",
+        "() => {\n            const d = document.documentElement;\n            return d ? d.outerHTML : '';\n        }",
         timeout=timeout,
     )
     return html if isinstance(html, str) else ""
 
 
-def _wishlist_capture_complete(html: str, api_payloads: list[Any]) -> bool:
-    if any(wishlist_graphql_ok(p) for p in api_payloads):
+def _wishlist_capture_complete(html, api_payloads):
+    if any((wishlist_graphql_ok(p) for p in api_payloads)):
         return True
     return wishlist_capture_complete_from_html(html)
 
 
-def _drain_wishlist_candidates(
-    candidates: list[Any], seen: list[dict[str, Any]] | None = None
-) -> list[Any]:
-    """Parse stashed GraphQL responses on the main thread (safe for CDP)."""
-    found: list[Any] = []
+def _drain_wishlist_candidates(candidates, seen=None):
+    found = []
     while candidates:
         resp = candidates.pop(0)
         try:
             payload = resp.json()
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         if seen is not None:
             try:
                 seen.append(graphql_debug_entry(resp.url or "", payload))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         if wishlist_graphql_ok(payload):
             found.append(payload)
     return found
 
 
-def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
+def _fetch_with_profile_once(*, dump=False, timeout_s=45):
     from auth.cdp_browser import STEALTH_INIT_SCRIPT, launch_persistent_profile
 
     profile = profile_dir("epic_wishlist")
     if not profile.exists():
         raise RuntimeError(
-            "No saved Epic wishlist profile at cache/auth/profiles/epic_wishlist. "
-            "Open the Connections page and connect 'Epic (wishlist)' first."
+            "No saved Epic wishlist profile at cache/auth/profiles/epic_wishlist. Open the Connections page and connect 'Epic (wishlist)' first."
         )
+    api_payloads = []
+    seen_graphql = []
+    candidates = []
 
-    api_payloads: list[Any] = []
-    seen_graphql: list[dict[str, Any]] = []
-    # Network handlers run on the CDP reader thread; calling response.json()
-    # there deadlocks (getResponseBody waits on the same thread). Stash
-    # candidate responses and read their bodies from the main thread below.
-    candidates: list[Any] = []
-
-    def _capture(response) -> None:
+    def _capture(response):
         try:
             if not is_epic_graphql_url(response.url or ""):
                 return
             if response.status == 200:
                 candidates.append(response)
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
     poll_deadline_s = min(max(timeout_s - 5, 20), 25)
     poll_interval_ms = 500
-
-    # Headed off-screen: same browser fingerprint as connect without stealing focus
-    # or inviting accidental window close during automated fetch.
     with launch_persistent_profile(
-        str(profile),
-        headless=False,
-        window_position=(-32000, 0),
-        window_size=(1280, 900),
+        str(profile), headless=False, window_position=(-32000, 0), window_size=(1280, 900)
     ) as ctx:
         ctx.add_init_script(STEALTH_INIT_SCRIPT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", _capture)
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-
         deadline = time.time() + poll_deadline_s
         consecutive_transport = 0
         while time.time() < deadline:
@@ -357,7 +307,7 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
                 html = _read_page_html(page)
                 url = page.url or WISHLIST_URL
                 consecutive_transport = 0
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if _is_cdp_transport_error(exc):
                     consecutive_transport += 1
                     if consecutive_transport >= 3:
@@ -365,8 +315,6 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
                     page.wait_for_timeout(poll_interval_ms)
                     continue
                 raise
-            # Cloudflare may show briefly on wishlist even with a valid profile —
-            # keep polling so headed Chrome can auto-resolve before we give up.
             if cloudflare_interstitial(html, url):
                 page.wait_for_timeout(poll_interval_ms)
                 continue
@@ -375,16 +323,14 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
             if storefront_signed_out(html, url):
                 break
             page.wait_for_timeout(poll_interval_ms)
-
         if not api_payloads:
             api_payloads.extend(_drain_wishlist_candidates(candidates, seen_graphql))
-
         try:
             html = _read_page_html(page, timeout=15)
             url = page.url or WISHLIST_URL
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if _is_cdp_transport_error(exc) and api_payloads:
-                html, url = "", page.url or WISHLIST_URL
+                html, url = ("", page.url or WISHLIST_URL)
             else:
                 raise
         if dump:
@@ -406,22 +352,18 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
                 encoding="utf-8",
             )
             print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
+        return (html, url, api_payloads)
 
-        return html, url, api_payloads
 
-
-def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
-    last_exc: BaseException | None = None
+def _fetch_with_profile(*, dump=False, timeout_s=45):
+    last_exc = None
     for attempt in range(2):
         try:
             return _fetch_with_profile_once(dump=dump, timeout_s=timeout_s)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if attempt == 0 and _is_cdp_transport_error(exc):
                 last_exc = exc
-                print(
-                    "  Epic browser connection lost — relaunching and retrying once...",
-                    flush=True,
-                )
+                print("  Epic browser connection lost — relaunching and retrying once...", flush=True)
                 time.sleep(1.5)
                 continue
             raise
@@ -430,7 +372,7 @@ def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str
     raise RuntimeError("Epic wishlist fetch failed after retry")
 
 
-def _load_existing() -> dict[str, dict]:
+def _load_existing():
     if not catalog_file(GAMES_WISHLIST_EPIC_JSON).exists():
         return {}
     try:
@@ -440,31 +382,25 @@ def _load_existing() -> dict[str, dict]:
     return {g["id"]: g for g in data.get("games", []) if isinstance(g, dict) and g.get("id")}
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch Epic wishlist into games_wishlist_epic.json")
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     add_only_new_arg(parser)
     parser.add_argument("--country", default="US", help="Storefront country code (default US)")
     parser.add_argument("--locale", default="en-US", help="Storefront locale (default en-US)")
-    parser.add_argument(
-        "--dump",
-        action="store_true",
-        help=f"Save raw HTML + captured GraphQL to {dump_dir()}/",
-    )
+    parser.add_argument("--dump", action="store_true", help=f"Save raw HTML + captured GraphQL to {dump_dir()}/")
     add_allow_empty_arg(parser)
     args = parser.parse_args()
     configure_stdout()
     t0 = started("fetch_epic_wishlist")
     stats = RunStats()
     load_dotenv()
-
     print("Fetching Epic wishlist via saved storefront profile...", flush=True)
     try:
         html, url, api_payloads = run_with_heartbeat(
-            lambda: _fetch_with_profile(dump=args.dump),
-            "Epic wishlist capture",
+            lambda: _fetch_with_profile(dump=args.dump), "Epic wishlist capture"
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         msg = str(exc)
         is_transport = _is_cdp_transport_error(exc)
         if is_transport:
@@ -473,48 +409,32 @@ def main() -> int:
         mark_invalid("epic_wishlist", error=f"wishlist fetch failed: {msg}")
         stats.error(msg)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
     if not _wishlist_capture_complete(html, api_payloads) and storefront_auth_blocked(html, url):
         msg = storefront_auth_error_message(html, url)
         mark_invalid("epic_wishlist", error=msg)
         stats.error(msg)
         return stats.finish("fetch_epic_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
     elements = parse_wishlist_sources(html, api_payloads)
-    print(
-        f"  parsed {len(elements)} wishlist items ({len(api_payloads)} captured GraphQL responses)",
-        flush=True,
-    )
-
+    print(f"  parsed {len(elements)} wishlist items ({len(api_payloads)} captured GraphQL responses)", flush=True)
     if args.dump:
         return stats.finish("fetch_epic_wishlist", t0, exit_code=0, extra="dump only")
-
     empty_exit = refuse_empty_result(
-        elements,
-        label="Epic wishlist",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_WISHLIST_EPIC_JSON,
+        elements, label="Epic wishlist", allow_empty=args.allow_empty, output_path=GAMES_WISHLIST_EPIC_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_epic_wishlist", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        elements,
-        label="Epic wishlist",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_WISHLIST_EPIC_JSON,
+        elements, label="Epic wishlist", allow_drift=args.allow_drift, output_path=GAMES_WISHLIST_EPIC_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_epic_wishlist", t0, exit_code=drift_exit)
-
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing()
-    rows: list[dict] = []
-
+    rows = []
     for i, el in enumerate(elements, 1):
         offer = el.get("offer") or {}
         name = offer.get("title") or el.get("offerId") or "?"
         print(f"[{i}/{len(elements)}] {name}", flush=True)
-
         hltb = None
         row_id = f"epic-{el.get('namespace') or offer.get('namespace')}:{el.get('offerId') or offer.get('id')}"
         cached = existing.get(row_id)
@@ -534,14 +454,12 @@ def main() -> int:
                 try:
                     time.sleep(HLTB_DELAY_SEC)
                     hltb = hltb_client.lookup(name)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     print(f"  HLTB warning: {exc}", flush=True)
-
         row = _build_row(el, hltb)
         if row is None:
             continue
         rows.append(row)
-
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_epic",

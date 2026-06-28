@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch PlayStation library data and write games_psn.json for the dashboard."""
-
 import argparse
 import json
 import time
@@ -11,7 +8,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from clients.hltb_client import HltbClient
-from clients.psn_client import PsnAuthError, PsnClient, PsnGameEntry, _dedupe_key
+from clients.psn_client import PsnAuthError, PsnClient, _dedupe_key
 from fetchers._authoritative import PSN
 from fetchers._base import (
     STALE_FIELD,
@@ -34,51 +31,38 @@ GAMES_PSN_JSON = Path("games_psn.json")
 HLTB_DELAY_SEC = 1.0
 
 
-def apply_psn_carry_forward(
-    games_out: list[dict],
-    existing: dict[str, dict],
-    *,
-    no_carry: bool = False,
-) -> list[dict]:
-    """Carry forward missing rows; drop stale copies superseded by id churn (NPWR vs PPSA)."""
+def apply_psn_carry_forward(games_out, existing, *, no_carry=False):
     if no_carry:
         return games_out
-    carried = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_id,
-        no_carry=False,
-    )
+    carried = apply_carry_forward(games_out, existing, key_fn=row_key_by_id, no_carry=False)
     fresh_name_keys = {_dedupe_key(row.get("name")) for row in games_out}
     fresh_name_keys.discard("")
     if not fresh_name_keys:
         return carried
-    pruned: list[dict] = []
+    pruned = []
     dropped = 0
     for row in carried:
         name_key = _dedupe_key(row.get("name"))
-        if row.get(STALE_FIELD) and name_key and name_key in fresh_name_keys:
+        if row.get(STALE_FIELD) and name_key and (name_key in fresh_name_keys):
             dropped += 1
             continue
         pruned.append(row)
     if dropped:
         print(
-            f"  Pruned {dropped} stale PSN row(s) superseded by a fresh copy "
-            f"(cross-id trophy/entitlement merge).",
+            f"  Pruned {dropped} stale PSN row(s) superseded by a fresh copy (cross-id trophy/entitlement merge).",
             flush=True,
         )
     return pruned
 
 
-def prune_stale_psn_duplicates(games: list[dict]) -> list[dict]:
-    """One-shot catalog repair: drop stale rows when a fresh same-title row exists."""
+def prune_stale_psn_duplicates(games):
     fresh_keys = {_dedupe_key(g.get("name")) for g in games if not g.get(STALE_FIELD)}
     fresh_keys.discard("")
-    out: list[dict] = []
+    out = []
     dropped = 0
     for g in games:
         name_key = _dedupe_key(g.get("name"))
-        if g.get(STALE_FIELD) and name_key and name_key in fresh_keys:
+        if g.get(STALE_FIELD) and name_key and (name_key in fresh_keys):
             dropped += 1
             continue
         cleaned = dict(g)
@@ -86,14 +70,13 @@ def prune_stale_psn_duplicates(games: list[dict]) -> list[dict]:
             cleaned.pop(STALE_FIELD, None)
             cleaned.pop(STALE_SINCE_FIELD, None)
         out.append(cleaned)
-    return out, dropped
+    return (out, dropped)
 
 
-def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
-    tags: list[str] = []
+def _build_game_row(entry, hltb):
+    tags = []
     if entry.trophy_progress is not None:
         tags.append(f"Trophy {entry.trophy_progress}%")
-
     row = {
         "store": "psn",
         "id": entry.id,
@@ -132,7 +115,6 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
         "discount_percent": None,
         "currency": None,
     }
-
     if hltb:
         row.update(
             {
@@ -143,19 +125,18 @@ def _build_game_row(entry: PsnGameEntry, hltb: dict | None) -> dict:
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
-
     maybe_tag_library_noise_row(row, "psn")
     return row
 
 
-def load_existing() -> dict[str, dict]:
+def load_existing():
     if not catalog_file(GAMES_PSN_JSON).exists():
         return {}
     data = json.loads(catalog_file(GAMES_PSN_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch PSN library into games_psn.json")
     parser.add_argument("--refresh", action="store_true", help="Refetch library metadata from PSN")
     parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_psn.json")
@@ -167,13 +148,11 @@ def main() -> int:
     configure_stdout()
     t0 = started("fetch_psn")
     stats = RunStats()
-
     load_dotenv()
     npsso = resolve_env("PSN_NPSSO", provider="psn")
     if not npsso:
         stats.error("Set PSN_NPSSO in .env (see README for NPSSO instructions).")
         return stats.finish("fetch_psn", t0, exit_code=1)
-
     try:
         psn = PsnClient(npsso)
         online_id = psn.validate_session()
@@ -181,24 +160,22 @@ def main() -> int:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
         return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
-
     hltb_client = HltbClient()
     existing = load_existing()
-    prev_meta: dict = {}
+    prev_meta = {}
     if catalog_file(GAMES_PSN_JSON).exists():
         try:
             prev_meta = json.loads(catalog_file(GAMES_PSN_JSON).read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             prev_meta = {}
-
     print(f"Fetching PSN library for {online_id}...", flush=True)
-    library: list | None = None
+    library = None
     if (
         args.only_new
-        and not args.refresh
-        and not args.psn_id
+        and (not args.refresh)
+        and (not args.psn_id)
         and existing
-        and prev_meta.get("title_stats_count") is not None
+        and (prev_meta.get("title_stats_count") is not None)
     ):
         try:
             probe_count, probe_max = psn.probe_library_fingerprint()
@@ -206,16 +183,9 @@ def main() -> int:
             mark_invalid("psn", error=str(exc))
             stats.error(str(exc))
             return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
-        if (
-            probe_count == prev_meta.get("title_stats_count")
-            and probe_max == prev_meta.get("max_last_played")
-        ):
-            print(
-                "PSN library fingerprint unchanged — skipping full collect.",
-                flush=True,
-            )
+        if probe_count == prev_meta.get("title_stats_count") and probe_max == prev_meta.get("max_last_played"):
+            print("PSN library fingerprint unchanged — skipping full collect.", flush=True)
             library = []
-
     if library is None:
         try:
             library = run_with_heartbeat(psn.collect_library, "PSN library capture")
@@ -223,13 +193,12 @@ def main() -> int:
             mark_invalid("psn", error=str(exc))
             stats.error(str(exc))
             return stats.finish("fetch_psn", t0, exit_code=EXIT_CODE_AUTH)
-
     if args.psn_id:
         library = [entry for entry in library if entry.id == args.psn_id]
         if not library:
             stats.error(f"No PSN title found with id {args.psn_id!r}.")
             return stats.finish("fetch_psn", t0, exit_code=1)
-    elif not library and args.only_new and not args.refresh and existing:
+    elif not library and args.only_new and (not args.refresh) and existing:
         games_out = sorted(existing.values(), key=lambda g: g["name"].lower())
         payload = {
             "fetched_at": datetime.now(UTC).isoformat(),
@@ -248,43 +217,32 @@ def main() -> int:
         return stats.finish("fetch_psn", t0, exit_code=0, extra=f"{len(games_out)} games")
     else:
         empty_exit = refuse_empty_result(
-            library,
-            label="PSN library API",
-            allow_empty=args.allow_empty,
-            output_path=GAMES_PSN_JSON,
+            library, label="PSN library API", allow_empty=args.allow_empty, output_path=GAMES_PSN_JSON
         )
         if empty_exit is not None:
             return stats.finish("fetch_psn", t0, exit_code=empty_exit)
-
     dropped = getattr(psn, "last_dedupe_dropped", 0)
     filtered = getattr(psn, "last_filtered_non_games", 0)
-    parts: list[str] = []
+    parts = []
     if dropped:
         parts.append(f"merged {dropped} cross-platform duplicates")
     if filtered:
         parts.append(f"tagged {filtered} library noise")
     suffix = f" ({', '.join(parts)})" if parts else ""
     print(f"Found {len(library)} titles{suffix}.", flush=True)
-
-    games_out: list[dict] = []
-
+    games_out = []
     loop_hb = HeartbeatTimer(interval=25.0)
     for i, entry in enumerate(library, 1):
-        if args.only_new and entry.id in existing and not args.refresh and not args.psn_id:
+        if args.only_new and entry.id in existing and (not args.refresh) and (not args.psn_id):
             games_out.append(existing[entry.id])
             loop_hb.tick_progress(i, len(library), "PSN library", "cached")
             continue
-
         print(f"[{i}/{len(library)}] {entry.name} ({entry.id})", flush=True)
         loop_hb.reset()
-
         cached_row = existing.get(entry.id)
-
         hltb = None
         hltb_updated = False
-        if not args.skip_hltb and (
-            args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None
-        ):
+        if not args.skip_hltb and (args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None):
             try:
                 time.sleep(HLTB_DELAY_SEC)
                 hltb = hltb_client.lookup(entry.name)
@@ -299,25 +257,14 @@ def main() -> int:
                 "hltb_match_confidence": cached_row.get("hltb_match_confidence"),
                 "hltb_name": cached_row.get("hltb_name"),
             }
-
         games_out.append(
-            merge_cached_row(
-                _build_game_row(entry, hltb),
-                cached_row,
-                authoritative=PSN,
-                hltb_updated=hltb_updated,
-            )
+            merge_cached_row(_build_game_row(entry, hltb), cached_row, authoritative=PSN, hltb_updated=hltb_updated)
         )
         loop_hb.tick_progress(i, len(library), "PSN library", entry.name[:40])
-
     for row in games_out:
         maybe_tag_library_noise_row(row, "psn")
-
     empty_exit = refuse_empty_result(
-        games_out,
-        label="PSN library rows",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_PSN_JSON,
+        games_out, label="PSN library rows", allow_empty=args.allow_empty, output_path=GAMES_PSN_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_psn", t0, exit_code=empty_exit)
@@ -330,13 +277,7 @@ def main() -> int:
         )
         if drift_exit is not None:
             return stats.finish("fetch_psn", t0, exit_code=drift_exit)
-
-    games_out = apply_psn_carry_forward(
-        games_out,
-        existing,
-        no_carry=args.no_carry,
-    )
-
+    games_out = apply_psn_carry_forward(games_out, existing, no_carry=args.no_carry)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "psn",
@@ -345,13 +286,9 @@ def main() -> int:
         "title_stats_count": getattr(psn, "last_title_stats_count", None),
         "trophy_count": getattr(psn, "last_trophy_count", None),
         "entitlement_count": getattr(psn, "last_entitlement_count", None),
-        "max_last_played": max(
-            (g.get("last_played") for g in games_out if g.get("last_played")),
-            default=None,
-        ),
+        "max_last_played": max((g.get("last_played") for g in games_out if g.get("last_played")), default=None),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-
     write_catalog_text(GAMES_PSN_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_PSN_JSON}.", flush=True)
     print("Open index.html in your browser to view the dashboard.", flush=True)

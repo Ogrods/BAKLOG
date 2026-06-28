@@ -1,9 +1,4 @@
-"""Tests for encrypted auth credential store."""
-
-from __future__ import annotations
-
 import json
-from pathlib import Path
 
 import pytest
 
@@ -13,7 +8,7 @@ from auth.secrets import _secrets_file, load_doc, set_master_password_override
 
 
 @pytest.fixture(autouse=True)
-def _isolated_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def _isolated_auth(tmp_path, monkeypatch):
     auth_dir = tmp_path / "auth"
     monkeypatch.setattr("auth.secrets.AUTH_DIR", auth_dir)
     monkeypatch.setattr("auth.secrets.SECRETS_FILE", auth_dir / "secrets.bin")
@@ -28,17 +23,14 @@ def _isolated_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         sf.unlink()
 
 
-def test_stored_credentials_roundtrip() -> None:
-    mark_connected(
-        "steam",
-        {"STEAM_API_KEY": "abc123", "STEAM_ID": "76561198000000000"},
-    )
+def test_stored_credentials_roundtrip():
+    mark_connected("steam", {"STEAM_API_KEY": "abc123", "STEAM_ID": "76561198000000000"})
     creds = get_credentials("steam")
     assert creds["STEAM_API_KEY"] == "abc123"
     assert resolve_env("STEAM_API_KEY", provider="steam") == "abc123"
 
 
-def test_api_providers_auth_kind() -> None:
+def test_api_providers_auth_kind():
     for key in ("steam", "xbox"):
         assert spec_for(key).kind == "browser"
         assert spec_for(key).login_url
@@ -47,7 +39,7 @@ def test_api_providers_auth_kind() -> None:
         assert spec_for(key).login_url
 
 
-def test_env_fallback_when_store_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_env_fallback_when_store_empty(monkeypatch):
     from shared.profile_paths import DEFAULT_PROFILE_ID
 
     monkeypatch.setenv("BAKLOG_PROFILE", DEFAULT_PROFILE_ID)
@@ -55,7 +47,7 @@ def test_env_fallback_when_store_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resolve_env("ITAD_API_KEY", provider="itad") == "from-env"
 
 
-def test_mark_connected_and_disconnect() -> None:
+def test_mark_connected_and_disconnect():
     mark_connected("nintendo", {"NINTENDO_COOKIE": "session=1"})
     assert get_credentials("nintendo")["NINTENDO_COOKIE"] == "session=1"
     disconnect("nintendo")
@@ -63,8 +55,7 @@ def test_mark_connected_and_disconnect() -> None:
     assert "nintendo" not in doc.get("providers", {})
 
 
-def test_gog_and_battlenet_connect_blob_used_by_resolve_env() -> None:
-    """Connect saves cookie creds to the blob; fetchers read via resolve_env(provider=...)."""
+def test_gog_and_battlenet_connect_blob_used_by_resolve_env():
     mark_connected("gog", {"GOG_AL": "gog-session-token"})
     assert get_credentials("gog")["GOG_AL"] == "gog-session-token"
     assert resolve_env("GOG_AL", provider="gog") == "gog-session-token"
@@ -73,9 +64,7 @@ def test_gog_and_battlenet_connect_blob_used_by_resolve_env() -> None:
     assert resolve_env("BATTLENET_COOKIE", provider="battlenet") == "cookie=blizzard"
 
 
-def test_profile_subkeys_isolate_secrets_blob(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_profile_subkeys_isolate_secrets_blob(tmp_path, monkeypatch):
     import os
 
     from auth.secrets import KEY_VERSION_PROFILE, _decrypt_blob, _encrypt_doc
@@ -85,7 +74,6 @@ def test_profile_subkeys_isolate_secrets_blob(
     monkeypatch.setattr("auth.secrets.SECRETS_FILE", auth_dir / "secrets.bin")
     monkeypatch.setattr("auth.secrets.MASTER_KEY_FILE", auth_dir / ".master_key")
     set_master_password_override("test-passphrase-for-unit-tests")
-
     doc = {"providers": {"steam": {"STEAM_API_KEY": "abc"}}, "settings": {}}
     raw = _encrypt_doc(doc, "work")
     assert raw[0] == KEY_VERSION_PROFILE
@@ -93,8 +81,6 @@ def test_profile_subkeys_isolate_secrets_blob(
     assert out["providers"]["steam"]["STEAM_API_KEY"] == "abc"
     with pytest.raises(Exception):
         _decrypt_blob(raw, "default")
-
-    # Legacy v0 blob still decrypts and can migrate on load.
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
     from auth.secrets import _get_master_key, load_doc

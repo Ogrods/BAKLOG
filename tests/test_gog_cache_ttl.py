@@ -1,10 +1,6 @@
-"""Tests for the per-endpoint cache TTL added to GogClient._read_cache."""
-from __future__ import annotations
-
 import json
 import os
 import time
-from pathlib import Path
 
 import pytest
 
@@ -12,28 +8,28 @@ from clients.gog_client import GogClient
 
 
 @pytest.fixture()
-def client(tmp_path: Path) -> GogClient:
+def client(tmp_path):
     return GogClient(gog_al="dummy", cache_dir=tmp_path / "gog")
 
 
-def _write(client: GogClient, key: str, payload: dict) -> Path:
+def _write(client, key, payload):
     client.cache_dir.mkdir(parents=True, exist_ok=True)
     path = client._cache_path(key)
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
 
-def test_read_cache_returns_payload_when_no_ttl(client: GogClient):
+def test_read_cache_returns_payload_when_no_ttl(client):
     _write(client, "k", {"hello": "world"})
     assert client._read_cache("k") == {"hello": "world"}
 
 
-def test_read_cache_returns_none_when_ttl_zero(client: GogClient):
+def test_read_cache_returns_none_when_ttl_zero(client):
     _write(client, "k", {"hello": "world"})
     assert client._read_cache("k", max_age_seconds=0) is None
 
 
-def test_read_cache_respects_ttl(client: GogClient):
+def test_read_cache_respects_ttl(client):
     path = _write(client, "k", {"hello": "world"})
     aged = time.time() - 120
     os.utime(path, (aged, aged))
@@ -41,12 +37,12 @@ def test_read_cache_respects_ttl(client: GogClient):
     assert client._read_cache("k", max_age_seconds=600) == {"hello": "world"}
 
 
-def test_read_cache_missing_file_returns_none(client: GogClient):
+def test_read_cache_missing_file_returns_none(client):
     assert client._read_cache("nope") is None
     assert client._read_cache("nope", max_age_seconds=10) is None
 
 
-def test_read_cache_handles_corruption(client: GogClient):
+def test_read_cache_handles_corruption(client):
     path = client._cache_path("k")
     client.cache_dir.mkdir(parents=True, exist_ok=True)
     path.write_text("{not json", encoding="utf-8")

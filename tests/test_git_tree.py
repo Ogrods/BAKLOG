@@ -1,7 +1,3 @@
-"""Tests for scripts/git_tree.py snapshot collectors and rendering."""
-
-from __future__ import annotations
-
 import importlib.util
 import json
 from pathlib import Path
@@ -25,9 +21,7 @@ def test_parse_ahead_behind_malformed():
 
 
 def test_parse_branch_row_full():
-    line = "\x1f".join(
-        ["feature/x", "abc1234", "origin/feature/x", "2026-06-10 10:00:00 -0700", "Do a thing"]
-    )
+    line = "\x1f".join(["feature/x", "abc1234", "origin/feature/x", "2026-06-10 10:00:00 -0700", "Do a thing"])
     row = git_tree.parse_branch_row(line)
     assert row == {
         "name": "feature/x",
@@ -39,7 +33,6 @@ def test_parse_branch_row_full():
 
 
 def test_parse_branch_row_missing_fields():
-    # No upstream, no subject, no author -> blanks, still parses.
     line = "\x1f".join(["solo", "def5678", "", "2026-06-10 10:00:00 -0700"])
     row = git_tree.parse_branch_row(line)
     assert row is not None
@@ -51,7 +44,7 @@ def test_parse_branch_row_missing_fields():
 
 def test_parse_branch_row_blank_returns_none():
     assert git_tree.parse_branch_row("") is None
-    assert git_tree.parse_branch_row("\x1fabc\x1f") is None  # empty name
+    assert git_tree.parse_branch_row("\x1fabc\x1f") is None
 
 
 def test_collect_prs_gh_absent(monkeypatch):
@@ -61,7 +54,6 @@ def test_collect_prs_gh_absent(monkeypatch):
 
 
 def test_render_fragment_escapes_script_close(monkeypatch):
-    # A subject containing </script> must not break out of the JSON block.
     snapshot = {
         "generated_at": "2026-06-10T22:00:00-07:00",
         "repo": "steam-backlog",
@@ -69,10 +61,18 @@ def test_render_fragment_escapes_script_close(monkeypatch):
         "current": "main",
         "dirty": False,
         "dirty_count": 0,
-        "branches": [{
-            "name": "main", "sha": "abc", "subject": "</script> hack",
-            "date": "", "upstream": "", "ahead": 0, "behind": 0, "current": True,
-        }],
+        "branches": [
+            {
+                "name": "main",
+                "sha": "abc",
+                "subject": "</script> hack",
+                "date": "",
+                "upstream": "",
+                "ahead": 0,
+                "behind": 0,
+                "current": True,
+            }
+        ],
         "commits": [],
         "graph_text": "",
         "prs": {"available": False, "items": []},
@@ -81,7 +81,6 @@ def test_render_fragment_escapes_script_close(monkeypatch):
     fragment = git_tree.render_fragment(snapshot)
     assert "</script> hack" not in fragment
     assert "<\\/script>" in fragment
-    # The embedded JSON is still valid once the escape is reversed.
     start = fragment.index('id="git-tree-data">') + len('id="git-tree-data">')
     end = fragment.index("</script>", start)
     payload = fragment[start:end].replace("<\\/", "</")
@@ -116,10 +115,18 @@ def test_render_fragment_script_placeholder_before_data():
         "current": "main",
         "dirty": False,
         "dirty_count": 0,
-        "branches": [{
-            "name": "main", "sha": "abc", "subject": "ok",
-            "date": "", "upstream": "", "ahead": 0, "behind": 0, "current": True,
-        }],
+        "branches": [
+            {
+                "name": "main",
+                "sha": "abc",
+                "subject": "ok",
+                "date": "",
+                "upstream": "",
+                "ahead": 0,
+                "behind": 0,
+                "current": True,
+            }
+        ],
         "commits": [],
         "graph_text": "",
         "prs": {"available": False, "items": []},
@@ -127,9 +134,7 @@ def test_render_fragment_script_placeholder_before_data():
     }
     fragment = git_tree.render_fragment(snapshot)
     assert "git-tree-mount" in fragment
-    parsed = json.loads(
-        fragment.split('id="git-tree-data">', 1)[1].split("</script>", 1)[0]
-    )
+    parsed = json.loads(fragment.split('id="git-tree-data">', 1)[1].split("</script>", 1)[0])
     assert parsed["repo"] == "__SCRIPT__"
     assert "(function ()" in fragment
 
@@ -151,8 +156,6 @@ def test_render_html_is_self_contained():
     html = git_tree.render_html(snapshot)
     assert html.startswith("<!DOCTYPE html>")
     assert "git-tree-data" in html
-    # No external asset loading (offline-safe): no CDN scripts/styles/images.
-    # (The SVG XML namespace URL is a required constant, not a fetch.)
     assert "<script src=" not in html
     assert "<link " not in html
     assert "src=" not in html

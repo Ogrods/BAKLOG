@@ -1,7 +1,3 @@
-"""Tests for auto-sourced free-claim discovery and merge."""
-
-from __future__ import annotations
-
 from datetime import UTC, datetime
 
 from fetchers.fetch_claim_sources import _stamp_first_seen
@@ -19,7 +15,7 @@ from shared.free_claims_sources import (
 )
 
 
-def _epic_element(*, discount: int, title: str = "Free Game", slug: str = "free-game-123") -> dict:
+def _epic_element(*, discount, title="Free Game", slug="free-game-123"):
     return {
         "title": title,
         "offerMappings": [{"pageSlug": slug, "pageType": "productHome"}],
@@ -31,10 +27,7 @@ def _epic_element(*, discount: int, title: str = "Free Game", slug: str = "free-
                         {
                             "startDate": "2020-01-01T00:00:00.000Z",
                             "endDate": "2099-12-31T23:59:59.000Z",
-                            "discountSetting": {
-                                "discountType": "PERCENTAGE",
-                                "discountPercentage": discount,
-                            },
+                            "discountSetting": {"discountType": "PERCENTAGE", "discountPercentage": discount},
                         }
                     ]
                 }
@@ -94,21 +87,7 @@ def test_gamerpower_parses_end_date_and_na():
 def test_itad_filters_bundle_and_noise_titles():
     assert should_skip_itad_title("Build your own Bundle Fanatical") is True
     assert should_skip_itad_title("Free Beta Access Key") is True
-    rss = """<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <item>
-      <title>Steam Free Game Giveaway</title>
-      <link>https://isthereanydeal.com/giveaway/steam-free</link>
-      <description>Claim on Steam.</description>
-    </item>
-    <item>
-      <title>Build your own Bundle</title>
-      <link>https://isthereanydeal.com/giveaway/bundle</link>
-      <description>Fanatical bundle.</description>
-    </item>
-  </channel>
-</rss>"""
+    rss = '<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <item>\n      <title>Steam Free Game Giveaway</title>\n      <link>https://isthereanydeal.com/giveaway/steam-free</link>\n      <description>Claim on Steam.</description>\n    </item>\n    <item>\n      <title>Build your own Bundle</title>\n      <link>https://isthereanydeal.com/giveaway/bundle</link>\n      <description>Fanatical bundle.</description>\n    </item>\n  </channel>\n</rss>'
     items = parse_itad_rss(rss)
     assert len(items) == 1
     assert items[0]["store"] == "steam"
@@ -164,12 +143,7 @@ def test_dedup_by_id_collapses_same_id_prefers_epic():
 
 def test_merge_manual_wins_on_duplicate_title_and_id():
     manual = [
-        {
-            "id": "epic-manual",
-            "store": "epic",
-            "title": "Manual Override",
-            "claim_url": "https://example.com/manual",
-        }
+        {"id": "epic-manual", "store": "epic", "title": "Manual Override", "claim_url": "https://example.com/manual"}
     ]
     auto = [
         {
@@ -193,7 +167,7 @@ def test_merge_manual_wins_on_duplicate_title_and_id():
     assert merged[1]["id"] == "gog-auto"
 
 
-def test_carry_claim_enrichment_fills_missing_fields_only() -> None:
+def test_carry_claim_enrichment_fills_missing_fields_only():
     fresh = {
         "id": "itad-b07aac9ebd26",
         "store": "epic",
@@ -216,63 +190,42 @@ def test_carry_claim_enrichment_fills_missing_fields_only() -> None:
     assert out["title"] == "Wytchwood"
 
 
-def test_claim_match_keys_appid_and_title() -> None:
-    keys = claim_match_keys(
-        {
-            "id": "gamerpower-2386",
-            "title": "Tell Me Why (Steam) Giveaway",
-            "steam_appid": 1180660,
-        }
-    )
+def test_claim_match_keys_appid_and_title():
+    keys = claim_match_keys({"id": "gamerpower-2386", "title": "Tell Me Why (Steam) Giveaway", "steam_appid": 1180660})
     assert keys == {"appid:1180660", "title:tell me why"}
 
 
-def test_claim_match_keys_title_only() -> None:
-    keys = claim_match_keys(
-        {
-            "id": "epic-songs-of-conquest",
-            "title": "Songs of Conquest",
-        }
-    )
+def test_claim_match_keys_title_only():
+    keys = claim_match_keys({"id": "epic-songs-of-conquest", "title": "Songs of Conquest"})
     assert keys == {"title:songs of conquest"}
 
 
-def test_claim_match_keys_empty_when_no_title_or_appid() -> None:
+def test_claim_match_keys_empty_when_no_title_or_appid():
     assert claim_match_keys({"id": "itad-x", "title": "!!!"}) == set()
 
 
-def test_norm_title_treats_ampersand_and_and_as_equivalent() -> None:
+def test_norm_title_treats_ampersand_and_and_as_equivalent():
     assert norm_title("Mr.Brocco & Co") == "mr brocco and co"
     assert norm_title("Mr.Brocco And Co (IndieGala) Giveaway") == "mr brocco and co"
 
 
-def test_claim_match_keys_collapses_ampersand_and_and_titles() -> None:
+def test_claim_match_keys_collapses_ampersand_and_and_titles():
     amp = claim_match_keys({"id": "itad-brocco", "title": "Mr.Brocco & Co"})
-    and_title = claim_match_keys(
-        {"id": "gp-brocco", "title": "Mr.Brocco And Co (IndieGala) Giveaway"}
-    )
+    and_title = claim_match_keys({"id": "gp-brocco", "title": "Mr.Brocco And Co (IndieGala) Giveaway"})
     assert amp & and_title == {"title:mr brocco and co"}
 
 
-def test_carry_claim_enrichment_does_not_clobber_fresh_cover() -> None:
-    fresh = {
-        "id": "gamerpower-1",
-        "header_image": "https://www.gamerpower.com/new.jpg",
-    }
+def test_carry_claim_enrichment_does_not_clobber_fresh_cover():
+    fresh = {"id": "gamerpower-1", "header_image": "https://www.gamerpower.com/new.jpg"}
     existing = {"id": "gamerpower-1", "header_image": "https://cdn.example/old.jpg"}
     out = carry_claim_enrichment(fresh, existing)
     assert out["header_image"] == "https://www.gamerpower.com/new.jpg"
 
 
-def test_stamp_first_seen_preserves_existing_and_stamps_new() -> None:
+def test_stamp_first_seen_preserves_existing_and_stamps_new():
     fetched_at = "2026-06-10T12:00:00+00:00"
-    existing_by_id = {
-        "steam-keep": {"id": "steam-keep", "first_seen": "2026-06-01T08:00:00+00:00"},
-    }
-    items = [
-        {"id": "steam-keep", "title": "Keep Me"},
-        {"id": "epic-new", "title": "Fresh Drop"},
-    ]
+    existing_by_id = {"steam-keep": {"id": "steam-keep", "first_seen": "2026-06-01T08:00:00+00:00"}}
+    items = [{"id": "steam-keep", "title": "Keep Me"}, {"id": "epic-new", "title": "Fresh Drop"}]
     _stamp_first_seen(items, existing_by_id, fetched_at)
     assert items[0]["first_seen"] == "2026-06-01T08:00:00+00:00"
     assert items[1]["first_seen"] == fetched_at

@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Refresh cached FX rates (Frankfurter) for wishlist price conversion."""
-
 import argparse
 
 from fetchers._base import configure_stdout
@@ -9,7 +6,7 @@ from shared.fx import ensure_fx_rates
 from shared.profile_paths import fx_rates_path
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch FX rates into cache/fx_rates.json")
     parser.add_argument("--force", action="store_true", help="Ignore 24h cache and refetch")
     args = parser.parse_args()
@@ -23,10 +20,7 @@ def main() -> int:
         return stats.finish("fetch_fx", t0, exit_code=1)
     rates = doc.get("rates") or {}
     stats.ok = len(rates)
-    print(
-        f"FX cache ready ({len(rates)} pairs, base {doc.get('base')}) at {fx_rates_path()}.",
-        flush=True,
-    )
+    print(f"FX cache ready ({len(rates)} pairs, base {doc.get('base')}) at {fx_rates_path()}.", flush=True)
     return stats.finish("fetch_fx", t0, exit_code=0)
 
 

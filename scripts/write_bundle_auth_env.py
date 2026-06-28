@@ -1,31 +1,14 @@
-"""Write a minimal ``.env`` beside the frozen BAKLOG bundle to enable account auth.
-
-Sources (first match wins):
-  1. ``packaging/bundle-auth.env`` (maintainer-local, gitignored)
-  2. Repo root ``.env`` (only ``BAKLOG_SUPABASE_*`` lines)
-  3. Process environment (CI secrets)
-
-Never writes service-role keys or store credentials.
-"""
-
-from __future__ import annotations
-
 import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE_KEYS = (
-    "BAKLOG_SUPABASE_URL",
-    "BAKLOG_SUPABASE_ANON_KEY",
-    "BAKLOG_SUPABASE_JWT_SECRET",
-    "BAKLOG_LOCAL_PROFILES",
-)
+BUNDLE_KEYS = ("BAKLOG_SUPABASE_URL", "BAKLOG_SUPABASE_ANON_KEY", "BAKLOG_SUPABASE_JWT_SECRET", "BAKLOG_LOCAL_PROFILES")
 REQUIRED_KEYS = ("BAKLOG_SUPABASE_URL", "BAKLOG_SUPABASE_ANON_KEY")
 
 
-def _parse_env_file(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
+def _parse_env_file(path):
+    out = {}
     if not path.is_file():
         return out
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -40,8 +23,8 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return out
 
 
-def collect_auth_env() -> dict[str, str]:
-    merged: dict[str, str] = {}
+def collect_auth_env():
+    merged = {}
     for path in (ROOT / "packaging" / "bundle-auth.env", ROOT / ".env"):
         for key, val in _parse_env_file(path).items():
             if key in BUNDLE_KEYS and key not in merged:
@@ -54,7 +37,7 @@ def collect_auth_env() -> dict[str, str]:
     return merged
 
 
-def render_env_lines(values: dict[str, str]) -> list[str]:
+def render_env_lines(values):
     lines = [
         "# BAKLOG account auth (bundled for beta builds).",
         "# Anon key is public; included so the local app can require sign-in.",
@@ -65,7 +48,7 @@ def render_env_lines(values: dict[str, str]) -> list[str]:
     return lines
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv=None):
     args = list(argv or sys.argv[1:])
     if not args:
         print("Usage: write_bundle_auth_env.py <bundle-out-dir>", file=sys.stderr)

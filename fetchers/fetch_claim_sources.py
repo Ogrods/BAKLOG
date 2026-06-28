@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch auto-discovered free claimable games from Epic, GamerPower, and ITAD RSS."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -33,17 +28,13 @@ REQUEST_TIMEOUT = 30
 DEBUG_CLAIMS = os.environ.get("BAKLOG_DEBUG_CLAIMS") == "1"
 
 
-def _debug_claims(msg: str) -> None:
+def _debug_claims(msg):
     if DEBUG_CLAIMS:
         print(f"  [claims-debug] {msg}", flush=True)
 
 
-def _fetch_json(url: str) -> dict | list:
-    resp = requests.get(
-        url,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-        timeout=REQUEST_TIMEOUT,
-    )
+def _fetch_json(url):
+    resp = requests.get(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     data = resp.json()
     if not isinstance(data, (dict, list)):
@@ -51,7 +42,7 @@ def _fetch_json(url: str) -> dict | list:
     return data
 
 
-def _fetch_text(url: str) -> str:
+def _fetch_text(url):
     resp = requests.get(
         url,
         headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml"},
@@ -61,34 +52,28 @@ def _fetch_text(url: str) -> str:
     return resp.text
 
 
-def fetch_epic_claims(*, now: datetime | None = None) -> list[dict]:
+def fetch_epic_claims(*, now=None):
     payload = _fetch_json(EPIC_FREE_GAMES_URL)
     if not isinstance(payload, dict):
         raise ValueError("Epic feed must be a JSON object")
     return parse_epic_payload(payload, now=now)
 
 
-def fetch_gamerpower_claims() -> list[dict]:
+def fetch_gamerpower_claims():
     payload = _fetch_json(GAMERPOWER_URL)
     if not isinstance(payload, list):
         raise ValueError("GamerPower feed must be a JSON array")
     return parse_gamerpower_payload(payload)
 
 
-def fetch_itad_claims() -> list[dict]:
+def fetch_itad_claims():
     xml_text = _fetch_text(ITAD_GIVEAWAYS_RSS)
     return parse_itad_rss(xml_text)
 
 
-def collect_claims(
-    sources: set[str],
-    *,
-    now: datetime | None = None,
-    stats: RunStats | None = None,
-) -> tuple[list[dict], dict[str, int]]:
-    counts: dict[str, int] = {}
-    collected: list[dict] = []
-
+def collect_claims(sources, *, now=None, stats=None):
+    counts = {}
+    collected = []
     if "epic" in sources:
         try:
             items = fetch_epic_claims(now=now)
@@ -97,7 +82,6 @@ def collect_claims(
         except (requests.RequestException, ValueError) as exc:
             if stats:
                 stats.warn(f"Epic source skipped: {exc}")
-
     if "gamerpower" in sources:
         try:
             items = fetch_gamerpower_claims()
@@ -106,7 +90,6 @@ def collect_claims(
         except (requests.RequestException, ValueError) as exc:
             if stats:
                 stats.warn(f"GamerPower source skipped: {exc}")
-
     if "itad" in sources:
         try:
             items = fetch_itad_claims()
@@ -115,13 +98,12 @@ def collect_claims(
         except (requests.RequestException, ValueError) as exc:
             if stats:
                 stats.warn(f"ITAD source skipped: {exc}")
-
     deduped = dedup_claim_items_by_id(collected)
     if DEBUG_CLAIMS:
         _debug_claims(f"per-source counts: {counts or {}}")
         _debug_claims(f"collected before id-dedup: {len(collected)}")
         _debug_claims(f"after dedup_claim_items_by_id: {len(deduped)}")
-        title_keys: dict[str, list[str]] = {}
+        title_keys = {}
         for item in deduped:
             title = norm_title(item.get("title"))
             if not title:
@@ -130,13 +112,12 @@ def collect_claims(
         dup_titles = {k: v for k, v in title_keys.items() if len(v) > 1}
         if dup_titles:
             _debug_claims(
-                f"title collisions (kept for admin DUPE stamp): "
-                f"{len(dup_titles)} title(s), e.g. {list(dup_titles.items())[:3]}"
+                f"title collisions (kept for admin DUPE stamp): {len(dup_titles)} title(s), e.g. {list(dup_titles.items())[:3]}"
             )
-    return deduped, counts
+    return (deduped, counts)
 
 
-def _load_prior_source_counts(output: Path) -> dict[str, int]:
+def _load_prior_source_counts(output):
     if not output.is_file():
         return {}
     try:
@@ -149,15 +130,14 @@ def _load_prior_source_counts(output: Path) -> dict[str, int]:
     return {str(k): int(v) for k, v in raw.items() if str(k).strip()}
 
 
-def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
-    """Return ({id: row}, total_row_count) from a prior auto feed, if present."""
-    existing_by_id: dict[str, dict] = {}
+def _load_existing_items(output):
+    existing_by_id = {}
     count = 0
     if output.is_file():
         try:
             old_doc = json.loads(output.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return existing_by_id, 0
+            return (existing_by_id, 0)
         for row in old_doc.get("items") or []:
             if not isinstance(row, dict):
                 continue
@@ -165,15 +145,10 @@ def _load_existing_items(output: Path) -> tuple[dict[str, dict], int]:
             row_id = str(row.get("id") or "").strip()
             if row_id:
                 existing_by_id[row_id] = row
-    return existing_by_id, count
+    return (existing_by_id, count)
 
 
-def _stamp_first_seen(
-    items: list[dict],
-    existing_by_id: dict[str, dict],
-    fetched_at: str,
-) -> None:
-    """Set per-item first_seen: preserve the oldest stamp, else stamp this fetch."""
+def _stamp_first_seen(items, existing_by_id, fetched_at):
     for item in items:
         item_id = str(item.get("id") or "").strip()
         prior = item.get("first_seen")
@@ -182,7 +157,7 @@ def _stamp_first_seen(
         item["first_seen"] = prior or fetched_at
 
 
-def main() -> int:
+def main():
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH)
@@ -194,9 +169,7 @@ def main() -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
-        "--allow-empty",
-        action="store_true",
-        help="Allow writing an empty feed (e.g. genuinely no live giveaways).",
+        "--allow-empty", action="store_true", help="Allow writing an empty feed (e.g. genuinely no live giveaways)."
     )
     parser.add_argument(
         "--allow-drift",
@@ -204,30 +177,17 @@ def main() -> int:
         help="Allow a feed sharply smaller than the prior run (partial source outage).",
     )
     args = parser.parse_args()
-
     stats = RunStats()
     t0 = started("fetch_claim_sources.py")
-
     if args.source == "all":
         sources = {"epic", "gamerpower", "itad"}
     else:
         sources = {args.source}
-
     items, counts = collect_claims(sources, stats=stats)
     fetched_at = datetime.now(UTC).isoformat()
-
     existing_by_id, prior_count = _load_existing_items(args.output)
     if existing_by_id:
-        items = [
-            carry_claim_enrichment(item, existing_by_id.get(str(item.get("id") or "").strip()))
-            for item in items
-        ]
-        # A source that raised (network/parse hiccup) is absent from `counts`,
-        # unlike a source that genuinely returned 0 (key present, value 0). When
-        # at least one other source succeeded, carry that failed source's prior
-        # rows forward so a transient single-source outage doesn't silently wipe
-        # its claims from the feed (and the admin editor). Mirrors the published
-        # feed carry-forward in build_free_claims.py.
+        items = [carry_claim_enrichment(item, existing_by_id.get(str(item.get("id") or "").strip())) for item in items]
         failed_sources = {s for s in sources if s not in counts}
         if failed_sources and counts:
             present_ids = {str(it.get("id") or "").strip() for it in items}
@@ -239,24 +199,15 @@ def main() -> int:
             ]
             if carried:
                 stats.warn(
-                    f"carried forward {len(carried)} item(s) from failed source(s): "
-                    f"{', '.join(sorted(failed_sources))}"
+                    f"carried forward {len(carried)} item(s) from failed source(s): {', '.join(sorted(failed_sources))}"
                 )
                 items.extend(carried)
-
     _stamp_first_seen(items, existing_by_id, fetched_at)
-
-    # Refuse to clobber a good feed with nothing (e.g. every source failed) —
-    # mirrors the library fetcher exit-2 contract.
     code = refuse_empty_result(
-        items,
-        label="fetch_claim_sources",
-        allow_empty=args.allow_empty,
-        output_path=args.output,
+        items, label="fetch_claim_sources", allow_empty=args.allow_empty, output_path=args.output
     )
     if code is not None:
         return stats.finish("fetch_claim_sources", t0, exit_code=code)
-
     prior_sources = set(_load_prior_source_counts(args.output).keys())
     vanished_sources = prior_sources - set(counts.keys())
     if vanished_sources:
@@ -264,27 +215,19 @@ def main() -> int:
         unrecovered = vanished_sources - present_sources
         for src in sorted(vanished_sources):
             stats.warn(f"source {src} absent from fetch counts (was in prior feed)")
-        if unrecovered and not args.allow_drift:
+        if unrecovered and (not args.allow_drift):
             stats.error(
-                f"source(s) disappeared from fetch with no recovered rows: "
-                f"{', '.join(sorted(unrecovered))}. "
-                "Re-run with --allow-drift if this drop is real."
+                f"source(s) disappeared from fetch with no recovered rows: {', '.join(sorted(unrecovered))}. Re-run with --allow-drift if this drop is real."
             )
             return stats.finish("fetch_claim_sources", t0, exit_code=3)
-
-    # Refuse a suspicious shrink vs the prior feed (partial source outage) so a
-    # half-collected run can't silently halve the published claims (exit 3).
     if not args.allow_drift and prior_count > 0:
         floor = max(1, prior_count // 2)
         if len(items) < floor:
             stats.error(
-                f"fetch_claim_sources collected {len(items)} item(s) but the prior feed "
-                f"had {prior_count} (under the 50% floor) — likely a partial source outage. "
-                "Re-run with --allow-drift if this drop is real."
+                f"fetch_claim_sources collected {len(items)} item(s) but the prior feed had {prior_count} (under the 50% floor) — likely a partial source outage. Re-run with --allow-drift if this drop is real."
             )
             return stats.finish("fetch_claim_sources", t0, exit_code=3)
-
-    has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
+    has_gamerpower = any((item.get("source") == "gamerpower" for item in items))
     payload = {
         "fetched_at": fetched_at,
         "sources": counts,
@@ -292,21 +235,12 @@ def main() -> int:
         "items": items,
     }
     text = json.dumps(payload, indent=2, ensure_ascii=False)
-
     if args.dry_run:
-        print(
-            f"dry-run: would write {len(items)} claim(s) to {args.output} "
-            f"(sources: {counts or 'none'})",
-            flush=True,
-        )
+        print(f"dry-run: would write {len(items)} claim(s) to {args.output} (sources: {counts or 'none'})", flush=True)
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         safe_write_text(args.output, text)
-        print(
-            f"Wrote {len(items)} claim(s) to {args.output} (sources: {counts or 'none'}).",
-            flush=True,
-        )
-
+        print(f"Wrote {len(items)} claim(s) to {args.output} (sources: {counts or 'none'}).", flush=True)
     stats.ok = len(items)
     return stats.finish("fetch_claim_sources", t0, exit_code=0, extra=f"{len(items)} claim(s)")
 

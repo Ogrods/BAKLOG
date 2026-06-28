@@ -1,7 +1,3 @@
-"""Tests for Steam review enrichment helpers."""
-
-from __future__ import annotations
-
 import pytest
 
 from shared.steam_match import close_enough_title, normalize_title
@@ -19,5 +15,5 @@ from shared.steam_match import close_enough_title, normalize_title
         ("age of wonders", "age of wonders 4", False),
     ],
 )
-def test_close_enough_title_sequel_guard(target: str, candidate: str, expected: bool) -> None:
+def test_close_enough_title_sequel_guard(target, candidate, expected):
     assert close_enough_title(normalize_title(target), normalize_title(candidate)) is expected

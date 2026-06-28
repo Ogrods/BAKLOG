@@ -1,25 +1,14 @@
-"""Tests for shared.bundled_auth_env."""
-
-from __future__ import annotations
-
 import os
-from pathlib import Path
 
-from shared.bundled_auth_env import (
-    apply_install_dir_auth_env,
-    parse_env_file,
-    sync_bundled_auth_env_to_data_dir,
-)
+from shared.bundled_auth_env import apply_install_dir_auth_env, parse_env_file, sync_bundled_auth_env_to_data_dir
 
 
-def test_sync_fills_missing_auth_keys_when_data_env_absent(tmp_path: Path) -> None:
+def test_sync_fills_missing_auth_keys_when_data_env_absent(tmp_path):
     install = tmp_path / "install"
     data = tmp_path / "data"
     install.mkdir()
     (install / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
-        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
-        "BAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\nBAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
         encoding="utf-8",
     )
     assert sync_bundled_auth_env_to_data_dir(install, data) is True
@@ -29,18 +18,16 @@ def test_sync_fills_missing_auth_keys_when_data_env_absent(tmp_path: Path) -> No
     assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
 
 
-def test_sync_overwrites_stale_data_auth_keys(tmp_path: Path) -> None:
+def test_sync_overwrites_stale_data_auth_keys(tmp_path):
     install = tmp_path / "install"
     data = tmp_path / "data"
     install.mkdir()
     data.mkdir()
     (install / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://new.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=new-anon\n",
-        encoding="utf-8",
+        "BAKLOG_SUPABASE_URL=https://new.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=new-anon\n", encoding="utf-8"
     )
     (data / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://old.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=old-anon\n",
-        encoding="utf-8",
+        "BAKLOG_SUPABASE_URL=https://old.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=old-anon\n", encoding="utf-8"
     )
     assert sync_bundled_auth_env_to_data_dir(install, data) is True
     merged = parse_env_file(data / ".env")
@@ -48,39 +35,33 @@ def test_sync_overwrites_stale_data_auth_keys(tmp_path: Path) -> None:
     assert merged["BAKLOG_SUPABASE_ANON_KEY"] == "new-anon"
 
 
-def test_sync_does_not_copy_jwt_secret_to_data_dir(tmp_path: Path) -> None:
+def test_sync_does_not_copy_jwt_secret_to_data_dir(tmp_path):
     install = tmp_path / "install"
     data = tmp_path / "data"
     install.mkdir()
     data.mkdir()
     (install / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
-        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
-        "BAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\nBAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
         encoding="utf-8",
     )
     (data / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n",
-        encoding="utf-8",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n", encoding="utf-8"
     )
     assert sync_bundled_auth_env_to_data_dir(install, data) is False
     merged = parse_env_file(data / ".env")
     assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
 
 
-def test_sync_strips_legacy_jwt_secret_from_data_env(tmp_path: Path) -> None:
+def test_sync_strips_legacy_jwt_secret_from_data_env(tmp_path):
     install = tmp_path / "install"
     data = tmp_path / "data"
     install.mkdir()
     data.mkdir()
     (install / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n",
-        encoding="utf-8",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n", encoding="utf-8"
     )
     (data / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
-        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
-        "BAKLOG_SUPABASE_JWT_SECRET=legacy-jwt\n",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\nBAKLOG_SUPABASE_JWT_SECRET=legacy-jwt\n",
         encoding="utf-8",
     )
     assert sync_bundled_auth_env_to_data_dir(install, data) is True
@@ -88,14 +69,11 @@ def test_sync_strips_legacy_jwt_secret_from_data_env(tmp_path: Path) -> None:
     assert "BAKLOG_SUPABASE_JWT_SECRET" not in merged
 
 
-def test_apply_install_dir_auth_env_overwrites_stale_process_env(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_apply_install_dir_auth_env_overwrites_stale_process_env(tmp_path, monkeypatch):
     install = tmp_path / "install"
     install.mkdir()
     (install / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n",
-        encoding="utf-8",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\n", encoding="utf-8"
     )
     monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://stale.supabase.co")
     monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "stale-anon")

@@ -1,13 +1,8 @@
-"""Windows uninstall helpers: login autostart registry, keyring, and data dir."""
-
-from __future__ import annotations
-
 import os
 import shutil
 import socket
 import time
 import urllib.request
-from pathlib import Path
 
 from shared.startup import disable_startup
 
@@ -15,8 +10,7 @@ _SHUTDOWN_HOST = "127.0.0.1"
 _SHUTDOWN_PORT = int(os.environ.get("PORT", "8765"))
 
 
-def _request_graceful_shutdown() -> bool:
-    """POST /api/shutdown when the local server is up. Best-effort."""
+def _request_graceful_shutdown():
     try:
         with socket.create_connection((_SHUTDOWN_HOST, _SHUTDOWN_PORT), timeout=0.3):
             pass
@@ -42,16 +36,14 @@ def _request_graceful_shutdown() -> bool:
     return False
 
 
-def cleanup_autostart() -> None:
-    """Remove HKCU Run\\BAKLOG login autostart (safe when the app is uninstalled)."""
+def cleanup_autostart():
     disable_startup()
 
 
-def wipe_user_data(data_dir: Path) -> list[str]:
-    """Remove library data dir and OS keyring master key. Returns status notes."""
+def wipe_user_data(data_dir):
     from auth.secrets import delete_keyring_master_key
 
-    notes: list[str] = []
+    notes = []
     _request_graceful_shutdown()
     cleanup_autostart()
     if delete_keyring_master_key():

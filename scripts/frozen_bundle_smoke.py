@@ -1,16 +1,3 @@
-#!/usr/bin/env python3
-"""Post-build smoke for a frozen BAKLOG onedir bundle (CI + local release).
-
-Checks artifact layout, bundled auth .env, server boot (/api/config), data-dir
-migration, and fetcher --help dispatch for every manifest key.
-
-Usage (from repo root, after packaging/build_windows.ps1):
-  .\\.venv\\Scripts\\python.exe scripts\\frozen_bundle_smoke.py \\
-    --bundle-dir release/BAKLOG
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -28,25 +15,22 @@ if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
 
-def _read_expected_version() -> str:
+def _read_expected_version():
     text = (_REPO / "pyproject.toml").read_text(encoding="utf-8")
-    m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    m = re.search('^version\\s*=\\s*"([^"]+)"', text, re.MULTILINE)
     if not m:
         raise RuntimeError("could not read version from pyproject.toml")
     return m.group(1)
 
 
-def _wait_for_server(base: str, proc: subprocess.Popen, *, timeout_sec: float = 30.0) -> tuple[bool, str | None]:
+def _wait_for_server(base, proc, *, timeout_sec=30.0):
     from scripts.smoke_port_guard import wait_for_owned_server
 
     return wait_for_owned_server(proc, base, timeout_sec=timeout_sec)
 
 
-def _manifest_fetcher_count(bundle_dir: Path) -> int:
-    for rel in (
-        Path("_internal") / "fetchers" / "manifest.json",
-        Path("fetchers") / "manifest.json",
-    ):
+def _manifest_fetcher_count(bundle_dir):
+    for rel in (Path("_internal") / "fetchers" / "manifest.json", Path("fetchers") / "manifest.json"):
         path = bundle_dir / rel
         if path.is_file():
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -54,9 +38,9 @@ def _manifest_fetcher_count(bundle_dir: Path) -> int:
     return 0
 
 
-def _env_has_auth_keys(env_path: Path) -> tuple[bool, list[str]]:
+def _env_has_auth_keys(env_path):
     required = ("BAKLOG_SUPABASE_URL", "BAKLOG_SUPABASE_ANON_KEY")
-    found: dict[str, str] = {}
+    found = {}
     if env_path.is_file():
         for line in env_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -68,19 +52,17 @@ def _env_has_auth_keys(env_path: Path) -> tuple[bool, list[str]]:
             if key and val:
                 found[key] = val
     missing = [k for k in required if not found.get(k)]
-    return not missing, missing
+    return (not missing, missing)
 
 
-def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
+def run_smoke(bundle_dir, *, expected_version=None):
     bundle_dir = bundle_dir.resolve()
     version = expected_version or _read_expected_version()
-    report: dict = {"ok": False, "bundle_dir": str(bundle_dir), "checks": {}}
-
+    report = {"ok": False, "bundle_dir": str(bundle_dir), "checks": {}}
     server_exe = bundle_dir / "BAKLOG.exe"
     tray_exe = bundle_dir / "BAKLOG Tray.exe"
     fallback = bundle_dir / "_internal" / "curated" / "free_claims.fallback.json"
     env_path = bundle_dir / ".env"
-
     static_ok = server_exe.is_file() and tray_exe.is_file() and fallback.is_file()
     fetcher_count = _manifest_fetcher_count(bundle_dir)
     env_ok, env_missing = _env_has_auth_keys(env_path)
@@ -100,7 +82,6 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
     if not env_ok:
         report["error"] = f"bundled .env missing keys: {', '.join(env_missing)}"
         return report
-
     from scripts.frozen_data_dir_migration_smoke import run_smoke as migrate_smoke
     from scripts.smoke_port_guard import port_collision_message, port_listener_pid
 
@@ -109,9 +90,8 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
     if not migrate.get("ok"):
         report["error"] = "frozen_data_dir_migration_smoke failed"
         return report
-
-    proc: subprocess.Popen | None = None
-    config: dict | None = None
+    proc = None
+    config = None
     holder = port_listener_pid()
     if holder is not None:
         report["error"] = port_collision_message(holder)
@@ -120,11 +100,7 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
     try:
         with tempfile.TemporaryDirectory(prefix="baklog-bundle-smoke-") as td:
             localappdata = Path(td)
-            env = {
-                **os.environ,
-                "LOCALAPPDATA": str(localappdata),
-                "BAKLOG_NO_BROWSER": "1",
-            }
+            env = {**os.environ, "LOCALAPPDATA": str(localappdata), "BAKLOG_NO_BROWSER": "1"}
             env.pop("BAKLOG_DATA_DIR", None)
             env.pop("BAKLOG_PORTABLE", None)
             proc = subprocess.Popen(
@@ -142,8 +118,8 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
                 return report
             with urllib.request.urlopen("http://127.0.0.1:8765/api/config", timeout=5) as resp:
                 config = json.loads(resp.read().decode("utf-8"))
-            mirror_status: int | None = None
-            mirror_body: dict | None = None
+            mirror_status = None
+            mirror_body = None
             try:
                 with urllib.request.urlopen("http://127.0.0.1:8765/api/mirror", timeout=5) as resp:
                     mirror_status = resp.status
@@ -154,7 +130,7 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
                     mirror_body = json.loads(exc.read().decode("utf-8"))
                 except json.JSONDecodeError:
                     mirror_body = {"error": exc.read().decode("utf-8", errors="replace")}
-            import_status: int | None = None
+            import_status = None
             try:
                 req = urllib.request.Request(
                     "http://127.0.0.1:8765/api/mirror/import",
@@ -180,18 +156,12 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
     finally:
         if proc is not None and proc.poll() is None:
             if sys.platform == "win32":
-                subprocess.run(
-                    ["taskkill", "/F", "/PID", str(proc.pid), "/T"],
-                    capture_output=True,
-                    check=False,
-                )
+                subprocess.run(["taskkill", "/F", "/PID", str(proc.pid), "/T"], capture_output=True, check=False)
             else:
                 proc.terminate()
-
     if not isinstance(config, dict):
         report["error"] = "invalid /api/config response"
         return report
-
     cfg_version = str(config.get("version") or "")
     cfg_frozen = bool(config.get("frozen"))
     report["checks"]["config"] = {
@@ -213,7 +183,6 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
     if not cfg_frozen:
         report["error"] = "expected frozen=true in /api/config"
         return report
-
     dispatch = subprocess.run(
         [
             sys.executable,
@@ -235,12 +204,11 @@ def run_smoke(bundle_dir: Path, *, expected_version: str | None = None) -> dict:
         tail = "\n".join((dispatch.stdout or "").splitlines()[-12:] + (dispatch.stderr or "").splitlines()[-12:])
         report["error"] = f"fetcher dispatch smoke failed (exit {dispatch.returncode})\n{tail}"
         return report
-
     report["ok"] = True
     return report
 
 
-def main() -> int:
+def main():
     ap = argparse.ArgumentParser(description="Frozen bundle post-build smoke")
     ap.add_argument(
         "--bundle-dir",
@@ -251,7 +219,6 @@ def main() -> int:
     ap.add_argument("--expected-version", default=None, help="Override pyproject version check")
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
-
     report = run_smoke(args.bundle_dir, expected_version=args.expected_version)
     text = json.dumps(report, indent=2)
     print(text)

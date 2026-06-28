@@ -1,26 +1,16 @@
-"""Unified enricher entry: ``python -m enrichers <command>``."""
-
-from __future__ import annotations
-
 import argparse
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-
-# Legacy CLI names -> manifest fetcher keys
-_LEGACY_ALIASES: dict[str, str] = {
-    "steam-reviews": "steamReviews",
-    "steam-tags": "steamTags",
-    "cross-store-images": "steamCovers",
-}
+_LEGACY_ALIASES = {"steam-reviews": "steamReviews", "steam-tags": "steamTags", "cross-store-images": "steamCovers"}
 
 
-def _commands_from_manifest() -> dict[str, list[str]]:
+def _commands_from_manifest():
     from fetchers.registry import manifest_entries
 
-    out: dict[str, list[str]] = {}
+    out = {}
     for entry in manifest_entries():
         if entry.get("group") != "enrich":
             continue
@@ -38,20 +28,10 @@ def _commands_from_manifest() -> dict[str, list[str]]:
 COMMANDS = _commands_from_manifest()
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Run enrichment scripts (HLTB, Steam reviews, cross-store images).",
-    )
-    parser.add_argument(
-        "command",
-        choices=sorted(COMMANDS),
-        help="Which enricher to run",
-    )
-    parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        help="Arguments passed through to the underlying script",
-    )
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Run enrichment scripts (HLTB, Steam reviews, cross-store images).")
+    parser.add_argument("command", choices=sorted(COMMANDS), help="Which enricher to run")
+    parser.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed through to the underlying script")
     ns = parser.parse_args(argv)
     cmd = COMMANDS[ns.command] + ns.args
     env = {**dict(__import__("os").environ), "PYTHONPATH": str(ROOT)}

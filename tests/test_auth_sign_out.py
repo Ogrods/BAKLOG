@@ -1,7 +1,3 @@
-"""Tests for POST /api/auth/sign-out cache clearing."""
-
-from __future__ import annotations
-
 import pytest
 
 from shared import entitlement as ent
@@ -26,7 +22,6 @@ def test_auth_sign_out_clears_mirror_session(auth_server):
     ent.note_authenticated_plan("pro")
     assert get_mirror_session() is not None
     assert ent.is_pro_background() is True
-
     status, data = _post_json(base, "/api/auth/sign-out", {})
     assert status == 200
     assert data.get("ok") is True

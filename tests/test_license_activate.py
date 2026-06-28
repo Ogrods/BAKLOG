@@ -1,7 +1,3 @@
-"""Tests for local license activation."""
-
-from __future__ import annotations
-
 import json
 
 import pytest
@@ -21,8 +17,7 @@ def _pure_local(tmp_path, monkeypatch):
 
 def test_activate_local_license_key_persists_pro(monkeypatch):
     monkeypatch.setattr(
-        "shared.polar_license.validate_license_key",
-        lambda key: {"ok": True, "status": "granted", "error": None},
+        "shared.polar_license.validate_license_key", lambda key: {"ok": True, "status": "granted", "error": None}
     )
     ok, msg = ent.activate_local_license_key("BAKLOG-AAAA-BBBB")
     assert ok is True
@@ -55,8 +50,7 @@ def test_activate_blocked_when_auth_enabled(monkeypatch):
 def test_maybe_refresh_downgrades_revoked_key(monkeypatch, tmp_path):
     ent.write_license_document({"plan": "pro", "key": "BAKLOG-OLD"})
     monkeypatch.setattr(
-        "shared.polar_license.validate_license_key",
-        lambda key: {"ok": False, "status": "revoked", "error": "revoked"},
+        "shared.polar_license.validate_license_key", lambda key: {"ok": False, "status": "revoked", "error": "revoked"}
     )
     ent.maybe_refresh_local_license(force=True)
     doc = json.loads(ent.license_path().read_text(encoding="utf-8"))

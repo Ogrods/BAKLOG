@@ -1,30 +1,18 @@
-"""Epic OAuth CSRF state map (legacy redirect flow only)."""
-
-from __future__ import annotations
-
 import threading
 import time
 
-# Epic OAuth state -> (expiry_monotonic, profile_id).
-# Production Epic Connect uses Playwright + authorizationCode paste (auth/runner.py);
-# this map is only populated if something calls register_epic_oauth_state.
-epic_oauth_states: dict[str, tuple[float, str]] = {}
+epic_oauth_states = {}
 _epic_oauth_states_lock = threading.Lock()
 
 
-def _prune_expired_epic_oauth_states() -> None:
+def _prune_expired_epic_oauth_states():
     now = time.monotonic()
     expired = [k for k, (exp, _) in epic_oauth_states.items() if exp < now]
     for k in expired:
         epic_oauth_states.pop(k, None)
 
 
-def register_epic_oauth_state(
-    state: str,
-    profile_id: str | None = None,
-    *,
-    ttl_sec: float = 600.0,
-) -> None:
+def register_epic_oauth_state(state, profile_id=None, *, ttl_sec=600.0):
     from shared.profile_paths import get_active_profile_id
 
     pid = profile_id or get_active_profile_id()
@@ -33,8 +21,7 @@ def register_epic_oauth_state(
         epic_oauth_states[state] = (time.monotonic() + ttl_sec, pid)
 
 
-def consume_epic_oauth_state(state: str | None) -> str | None:
-    """Return bound profile_id when state is valid; None when rejected."""
+def consume_epic_oauth_state(state):
     if not state:
         return None
     with _epic_oauth_states_lock:
@@ -47,8 +34,7 @@ def consume_epic_oauth_state(state: str | None) -> str | None:
     return profile_id
 
 
-def handle_epic_oauth_callback(handler) -> None:
-    """GET /oauth/epic/callback — exchange code and mark Epic connected."""
+def handle_epic_oauth_callback(handler):
     import html
     from http import HTTPStatus
     from urllib.parse import parse_qs, urlparse
@@ -92,18 +78,13 @@ def handle_epic_oauth_callback(handler) -> None:
         client = EpicClient(auth_code=code, cache_dir=default_epic_cache_dir())
         client.login()
         mark_connected("epic", {"EPIC_AUTH_CODE": code})
-        body = (
-            b"<html><body><p>Epic connected. You can close this tab and return to the dashboard.</p>"
-            b"<script>try{const c=new BroadcastChannel('baklog-auth');"
-            b"c.postMessage({provider:'epic'});c.close();}catch(e){}"
-            b"setTimeout(()=>window.close(),1500)</script></body></html>"
-        )
+        body = b"<html><body><p>Epic connected. You can close this tab and return to the dashboard.</p><script>try{const c=new BroadcastChannel('baklog-auth');c.postMessage({provider:'epic'});c.close();}catch(e){}setTimeout(()=>window.close(),1500)</script></body></html>"
         handler.send_response(HTTPStatus.OK)
         handler.send_header("Content-Type", "text/html; charset=utf-8")
         handler.send_header("Content-Length", str(len(body)))
         handler.end_headers()
         handler.wfile.write(body)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         safe = html.escape(str(exc), quote=True)
         body = f"<html><body><p>Epic sign-in failed: {safe}</p></body></html>".encode()
         handler.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)

@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-"""Sitewide listener/event inventory for BAKLOG (dashboard + landing).
-
-Read-only audit: scans js/, index.html, landing/ for DOM listeners, custom
-events, callback registries, and debounce timers. Writes EVENT_AUDIT.json and
-a human-readable EVENT_AUDIT.md at the repo root.
-
-Run: .\\.venv\\Scripts\\python.exe scripts/audit_event_listeners.py
-"""
-
-from __future__ import annotations
-
 import json
 import re
 from collections import defaultdict
@@ -17,23 +5,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-
 JS_GLOB = ["js/**/*.js", "landing/**/*.js"]
 HTML_PATHS = [ROOT / "index.html", ROOT / "landing/index.html"]
-
 LISTENER_RE = re.compile(
-    r"(?P<target>document|window|globalThis|[\w.$]+)"
-    r"\.addEventListener\(\s*['\"](?P<event>[^'\"]+)['\"]"
+    "(?P<target>document|window|globalThis|[\\w.$]+)\\.addEventListener\\(\\s*['\\\"](?P<event>[^'\\\"]+)['\\\"]"
 )
 DISPATCH_RE = re.compile(
-    r"(?P<target>document|window)\.dispatchEvent\(\s*"
-    r"(?:new\s+CustomEvent\(\s*['\"](?P<custom>[^'\"]+)['\"]"
-    r"|new\s+Event\(\s*['\"](?P<plain>[^'\"]+)['\"])"
+    "(?P<target>document|window)\\.dispatchEvent\\(\\s*(?:new\\s+CustomEvent\\(\\s*['\\\"](?P<custom>[^'\\\"]+)['\\\"]|new\\s+Event\\(\\s*['\\\"](?P<plain>[^'\\\"]+)['\\\"])"
 )
-CONFIGURE_RE = re.compile(r"export function (configure\w+)\(")
-DEBOUNCE_RE = re.compile(
-    r"(?:setTimeout|_debounce|DEBOUNCE|PUSH_DEBOUNCE|_filterDebounceTimer|POLL_MS)"
-)
+CONFIGURE_RE = re.compile("export function (configure\\w+)\\(")
+DEBOUNCE_RE = re.compile("(?:setTimeout|_debounce|DEBOUNCE|PUSH_DEBOUNCE|_filterDebounceTimer|POLL_MS)")
 ENRICH_CACHE_LOADERS = {
     "hltb": "loadHltbCache",
     "steamReviews": "loadSteamReviewCache",
@@ -43,29 +24,24 @@ ENRICH_CACHE_LOADERS = {
 }
 
 
-def _iter_js_files() -> list[Path]:
-    out: list[Path] = []
+def _iter_js_files():
+    out = []
     for pattern in JS_GLOB:
         out.extend(ROOT.glob(pattern))
     return sorted({p.resolve() for p in out if p.is_file()})
 
 
-def _line_no(text: str, pos: int) -> int:
+def _line_no(text, pos):
     return text.count("\n", 0, pos) + 1
 
 
-def scan_js(path: Path) -> dict:
+def scan_js(path):
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(ROOT).as_posix()
     listeners = []
     for m in LISTENER_RE.finditer(text):
         listeners.append(
-            {
-                "file": rel,
-                "line": _line_no(text, m.start()),
-                "target": m.group("target"),
-                "event": m.group("event"),
-            }
+            {"file": rel, "line": _line_no(text, m.start()), "target": m.group("target"), "event": m.group("event")}
         )
     dispatches = []
     for m in DISPATCH_RE.finditer(text):
@@ -87,19 +63,12 @@ def scan_js(path: Path) -> dict:
     }
 
 
-def scan_reload_after_fetcher() -> dict:
+def scan_reload_after_fetcher():
     path = ROOT / "js" / "library-load.js"
     text = path.read_text(encoding="utf-8")
-    branch = re.search(
-        r"export async function reloadAfterFetcher\(key\)\s*\{([\s\S]*?)^\}",
-        text,
-        re.MULTILINE,
-    )
+    branch = re.search("export async function reloadAfterFetcher\\(key\\)\\s*\\{([\\s\\S]*?)^\\}", text, re.MULTILINE)
     body = branch.group(1) if branch else ""
-    enrich_branch = re.search(
-        r"ENRICH_FETCHER_KEYS\.has\(key\)\)\s*\{([\s\S]*?)\} else if",
-        body,
-    )
+    enrich_branch = re.search("ENRICH_FETCHER_KEYS\\.has\\(key\\)\\)\\s*\\{([\\s\\S]*?)\\} else if", body)
     enrich_body = enrich_branch.group(1) if enrich_branch else ""
     cache_loaders = {}
     gaps = []
@@ -111,30 +80,17 @@ def scan_reload_after_fetcher() -> dict:
     return {"enrich_cache_loaders": cache_loaders, "gaps": gaps}
 
 
-def build_custom_event_index(scans: dict[str, dict]) -> dict:
-    emitters: dict[str, list] = defaultdict(list)
-    listeners: dict[str, list] = defaultdict(list)
+def build_custom_event_index(scans):
+    emitters = defaultdict(list)
+    listeners = defaultdict(list)
     for data in scans.values():
         for d in data["dispatches"]:
             emitters[d["event"]].append(f"{d['file']}:{d['line']}")
         for ln in data["listeners"]:
-            if ln["event"].startswith("baklog:") or ln["event"] in (
-                "visibilitychange",
-                "themechange",
-            ):
-                listeners[ln["event"]].append(
-                    f"{ln['file']}:{ln['line']} ({ln['target']})"
-                )
-    orphan_emit = {
-        ev: locs
-        for ev, locs in emitters.items()
-        if ev.startswith("baklog:") and ev not in listeners
-    }
-    orphan_listen = {
-        ev: locs
-        for ev, locs in listeners.items()
-        if ev.startswith("baklog:") and ev not in emitters
-    }
+            if ln["event"].startswith("baklog:") or ln["event"] in ("visibilitychange", "themechange"):
+                listeners[ln["event"]].append(f"{ln['file']}:{ln['line']} ({ln['target']})")
+    orphan_emit = {ev: locs for ev, locs in emitters.items() if ev.startswith("baklog:") and ev not in listeners}
+    orphan_listen = {ev: locs for ev, locs in listeners.items() if ev.startswith("baklog:") and ev not in emitters}
     return {
         "emitters": dict(emitters),
         "listeners": dict(listeners),
@@ -143,30 +99,23 @@ def build_custom_event_index(scans: dict[str, dict]) -> dict:
     }
 
 
-def main() -> int:
-    scans: dict[str, dict] = {}
+def main():
+    scans = {}
     total_listeners = 0
     for path in _iter_js_files():
         rel = path.relative_to(ROOT).as_posix()
         scans[rel] = scan_js(path)
         total_listeners += len(scans[rel]["listeners"])
-
     custom_index = build_custom_event_index(scans)
     reload_audit = scan_reload_after_fetcher()
-
-    debounce_files = sorted(k for k, v in scans.items() if v["has_debounce"])
-    configure_all = sorted(
-        {fn for v in scans.values() for fn in v["configure_exports"]}
-    )
-
+    debounce_files = sorted((k for k, v in scans.items() if v["has_debounce"]))
+    configure_all = sorted({fn for v in scans.values() for fn in v["configure_exports"]})
     report = {
         "generated_at": datetime.now(UTC).isoformat(),
         "summary": {
             "js_files_scanned": len(scans),
             "dom_listeners": total_listeners,
-            "custom_events": len(
-                [e for e in custom_index["emitters"] if e.startswith("baklog:")]
-            ),
+            "custom_events": len([e for e in custom_index["emitters"] if e.startswith("baklog:")]),
             "configure_registries": configure_all,
             "reload_gaps": reload_audit["gaps"],
         },
@@ -182,10 +131,8 @@ def main() -> int:
             for k, v in scans.items()
         },
     }
-
     json_path = ROOT / "EVENT_AUDIT.json"
     json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-
     md_lines = [
         "# BAKLOG event & listener audit",
         "",
@@ -200,14 +147,11 @@ def main() -> int:
         "## Custom events (`baklog:*`)",
         "",
     ]
-    for ev in sorted(e for e in custom_index["emitters"] if e.startswith("baklog:")):
+    for ev in sorted((e for e in custom_index["emitters"] if e.startswith("baklog:"))):
         md_lines.append(f"### `{ev}`")
         md_lines.append(f"- Emitters: {', '.join(custom_index['emitters'].get(ev, []))}")
-        md_lines.append(
-            f"- Listeners: {', '.join(custom_index['listeners'].get(ev, [])) or '_none_'}"
-        )
+        md_lines.append(f"- Listeners: {', '.join(custom_index['listeners'].get(ev, [])) or '_none_'}")
         md_lines.append("")
-
     md_lines.extend(
         [
             "## reloadAfterFetcher enrich cache loaders",
@@ -217,13 +161,11 @@ def main() -> int:
         ]
     )
     for key, ok in reload_audit["enrich_cache_loaders"].items():
-        md_lines.append(f"| {key} | {'yes' if ok else '**NO**'} |")
-
+        md_lines.append(f"| {key} | {('yes' if ok else '**NO**')} |")
     if reload_audit["gaps"]:
         md_lines.extend(["", "### Gaps", ""])
         for g in reload_audit["gaps"]:
             md_lines.append(f"- {g}")
-
     md_lines.extend(
         [
             "",
@@ -244,19 +186,18 @@ def main() -> int:
         md_lines.append(f"- `{f}`")
     if len(debounce_files) > 20:
         md_lines.append(f"- … and {len(debounce_files) - 20} more")
-
     merge_fn = (ROOT / "js" / "library-load.js").read_text(encoding="utf-8")
     double_chrome = (
         "renderSummary()" in merge_fn
-        and re.search(r"renderSummary\(\)[\s\S]{0,120}refreshFilterUI", merge_fn) is not None
+        and re.search("renderSummary\\(\\)[\\s\\S]{0,120}refreshFilterUI", merge_fn) is not None
     )
     md_lines.extend(
         [
             "",
             "## Phase 2 efficiency (2026-06-08)",
             "",
-            f"- Double summary/picks paint before refreshFilterUI: **{'FAIL' if double_chrome else 'ok'}**",
-            f"- Enrich wishlist reload scoped via ENRICH_RELOAD_WISHLIST_KEYS: **{'yes' if 'ENRICH_RELOAD_WISHLIST_KEYS' in merge_fn else 'no'}**",
+            f"- Double summary/picks paint before refreshFilterUI: **{('FAIL' if double_chrome else 'ok')}**",
+            f"- Enrich wishlist reload scoped via ENRICH_RELOAD_WISHLIST_KEYS: **{('yes' if 'ENRICH_RELOAD_WISHLIST_KEYS' in merge_fn else 'no')}**",
             "- Propagation counters: `?debug=1` → debug overlay `prop` row + `window.__baklogProp`",
             "",
             "## Phase 3 correctness (2026-06-08)",
@@ -284,20 +225,12 @@ def main() -> int:
             "",
             "## Phase 6 remediation tiers (2026-06-08)",
             "",
-            "Decision-record pass — P0/P1 substance already shipped (EVT-01/05/06/07/08). "
-            "Remaining P2s resolved as document/defer; no production code change.",
+            "Decision-record pass — P0/P1 substance already shipped (EVT-01/05/06/07/08). Remaining P2s resolved as document/defer; no production code change.",
             "",
-            "- EVT-02 → RESOLVED (documented): window vs document targets are intentional and "
-            "captured in js/custom-events.js BAKLOG_EVENT_REGISTRY (per-event `target`).",
-            "- EVT-03 → DEFERRED (blocked): #region agent log blocks in app.js/bind-events.js/"
-            "filters-ui.js/fetcher-health.js/picks-ui.js belong to the active picks-desync repro "
-            "(find_picks_hidden_button_desync, still INVESTIGATING). Trigger: strip when that finding flips to RESOLVED.",
-            "- EVT-04 remainder → DEFERRED (won't-fix-now): same-browser multi-tab covered by "
-            "installPersonalStorageSync (LS storage event). Residual: two tabs + server-side change "
-            "without an LS write could stale-overwrite. Cheap future option: visibility-triggered "
-            "GET /api/personal re-pull on tab focus. Low value for a local single-user app.",
-            "- P3 bind-events.js domain split + P4 baklog:library-merged event: OPTIONAL, deferred "
-            "(no orphaned-listener bug observed; bindEvents is guarded against double-bind).",
+            "- EVT-02 → RESOLVED (documented): window vs document targets are intentional and captured in js/custom-events.js BAKLOG_EVENT_REGISTRY (per-event `target`).",
+            "- EVT-03 → DEFERRED (blocked): #region agent log blocks in app.js/bind-events.js/filters-ui.js/fetcher-health.js/picks-ui.js belong to the active picks-desync repro (find_picks_hidden_button_desync, still INVESTIGATING). Trigger: strip when that finding flips to RESOLVED.",
+            "- EVT-04 remainder → DEFERRED (won't-fix-now): same-browser multi-tab covered by installPersonalStorageSync (LS storage event). Residual: two tabs + server-side change without an LS write could stale-overwrite. Cheap future option: visibility-triggered GET /api/personal re-pull on tab focus. Low value for a local single-user app.",
+            "- P3 bind-events.js domain split + P4 baklog:library-merged event: OPTIONAL, deferred (no orphaned-listener bug observed; bindEvents is guarded against double-bind).",
             "",
             "## Findings log",
             "",
@@ -322,7 +255,6 @@ def main() -> int:
             "",
         ]
     )
-
     md_path = ROOT / "EVENT_AUDIT.md"
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
     print(f"Wrote {json_path.name} and {md_path.name}")

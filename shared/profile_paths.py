@@ -1,73 +1,51 @@
-"""Resolve data paths for the active local profile (legacy root vs profiles/<id>/)."""
-
-from __future__ import annotations
-
 import contextvars
 import json
 import os
 import re
 import sys
 import threading
-from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
 
 from shared.install_paths import data_root
 
-_request_profile_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "_request_profile_id",
-    default=None,
-)
+_request_profile_id = contextvars.ContextVar("_request_profile_id", default=None)
 
 
-def set_request_profile_id(profile_id: str | None) -> None:
-    """Pin active profile for the current HTTP request (Supabase auth)."""
+def set_request_profile_id(profile_id):
     _request_profile_id.set(profile_id)
 
 
-def clear_request_profile_id() -> None:
+def clear_request_profile_id():
     _request_profile_id.set(None)
 
 
-# Bound at import; shared.install_paths.data_root() runs legacy migration on first call.
 ROOT = data_root()
 PROFILES_DIR = ROOT / "profiles"
 INDEX_FILE = PROFILES_DIR / "index.json"
 DEFAULT_PROFILE_ID = "default"
 MIGRATION_COMPLETE_MARKER = ".migration_complete"
 _ENV_OVERRIDE = "BAKLOG_PROFILE"
-
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
-_PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_SLUG_RE = re.compile("[^a-z0-9]+")
+_PROFILE_ID_RE = re.compile("^[a-z0-9][a-z0-9-]*$")
 _RESERVED_WIN_NAMES = frozenset(
-    {
-        "con",
-        "prn",
-        "aux",
-        "nul",
-        *(f"com{i}" for i in range(1, 10)),
-        *(f"lpt{i}" for i in range(1, 10)),
-    }
+    {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
 )
 _index_lock = threading.RLock()
 
 
-def _now_iso() -> str:
+def _now_iso():
     return datetime.now(UTC).isoformat()
 
 
-def _empty_index() -> dict[str, Any]:
+def _empty_index():
     return {
         "active": DEFAULT_PROFILE_ID,
-        "profiles": [
-            {"id": DEFAULT_PROFILE_ID, "label": "Default", "created_at": _now_iso()},
-        ],
+        "profiles": [{"id": DEFAULT_PROFILE_ID, "label": "Default", "created_at": _now_iso()}],
     }
 
 
-def _quarantine_corrupt_index(exc: BaseException) -> Path | None:
+def _quarantine_corrupt_index(exc):
     if not INDEX_FILE.is_file():
         return None
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -76,15 +54,11 @@ def _quarantine_corrupt_index(exc: BaseException) -> Path | None:
         INDEX_FILE.replace(dest)
     except OSError:
         return None
-    print(
-        f"[profiles] corrupt index.json quarantined to {dest.name}: {exc!r}",
-        file=sys.stderr,
-        flush=True,
-    )
+    print(f"[profiles] corrupt index.json quarantined to {dest.name}: {exc!r}", file=sys.stderr, flush=True)
     return dest
 
 
-def _load_index_unlocked() -> dict[str, Any]:
+def _load_index_unlocked():
     if not INDEX_FILE.exists():
         return _empty_index()
     try:
@@ -102,19 +76,19 @@ def _load_index_unlocked() -> dict[str, Any]:
     return doc
 
 
-def load_index() -> dict[str, Any]:
+def load_index():
     with _index_lock:
         return _load_index_unlocked()
 
 
-def _validate_index_doc(doc: dict[str, Any]) -> None:
+def _validate_index_doc(doc):
     active = doc.get("active")
-    if active is not None and not is_valid_profile_id(str(active)):
+    if active is not None and (not is_valid_profile_id(str(active))):
         raise ValueError(f"invalid active profile in index: {active!r}")
     profiles = doc.get("profiles")
     if not isinstance(profiles, list) or not profiles:
         raise ValueError("profiles index must list at least one profile")
-    profile_ids: set[str] = set()
+    profile_ids = set()
     for p in profiles:
         if isinstance(p, dict) and p.get("id") is not None:
             pid = normalize_profile_id(str(p["id"]))
@@ -123,7 +97,7 @@ def _validate_index_doc(doc: dict[str, Any]) -> None:
         raise ValueError(f"active profile {active!r} is not in profiles list")
 
 
-def _save_index_unlocked(doc: dict[str, Any]) -> None:
+def _save_index_unlocked(doc):
     _validate_index_doc(doc)
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     tmp = INDEX_FILE.with_suffix(".json.tmp")
@@ -131,21 +105,20 @@ def _save_index_unlocked(doc: dict[str, Any]) -> None:
     os.replace(tmp, INDEX_FILE)
 
 
-def save_index(doc: dict[str, Any]) -> None:
+def save_index(doc):
     with _index_lock:
         _save_index_unlocked(doc)
 
 
 @contextmanager
-def mutate_index() -> Iterator[dict[str, Any]]:
-    """Locked load → mutate → validate → save for profiles/index.json."""
+def mutate_index():
     with _index_lock:
         doc = _load_index_unlocked()
         yield doc
         _save_index_unlocked(doc)
 
 
-def is_valid_profile_id(profile_id: str) -> bool:
+def is_valid_profile_id(profile_id):
     pid = (profile_id or "").strip()
     if not pid or pid in (".", ".."):
         return False
@@ -161,15 +134,14 @@ def is_valid_profile_id(profile_id: str) -> bool:
         return False
 
 
-def normalize_profile_id(profile_id: str) -> str:
-    """Validate profile id; raise ValueError when unsafe or malformed."""
+def normalize_profile_id(profile_id):
     pid = (profile_id or "").strip()
     if not is_valid_profile_id(pid):
         raise ValueError(f"invalid profile id: {profile_id!r}")
     return pid
 
 
-def get_active_profile_id(*, doc: dict[str, Any] | None = None) -> str:
+def get_active_profile_id(*, doc=None):
     ctx = _request_profile_id.get()
     if ctx is not None:
         return ctx
@@ -177,11 +149,7 @@ def get_active_profile_id(*, doc: dict[str, Any] | None = None) -> str:
     if override:
         if is_valid_profile_id(override):
             return override
-        print(
-            f"WARN: ignoring invalid {_ENV_OVERRIDE}={override!r}; using index active",
-            file=sys.stderr,
-            flush=True,
-        )
+        print(f"WARN: ignoring invalid {_ENV_OVERRIDE}={override!r}; using index active", file=sys.stderr, flush=True)
     if doc is None:
         active = str(load_index().get("active") or DEFAULT_PROFILE_ID)
     else:
@@ -191,17 +159,16 @@ def get_active_profile_id(*, doc: dict[str, Any] | None = None) -> str:
     return DEFAULT_PROFILE_ID
 
 
-def profile_data_dir(profile_id: str) -> Path:
+def profile_data_dir(profile_id):
     pid = normalize_profile_id(profile_id)
     return PROFILES_DIR / pid
 
 
-def migration_complete_path(profile_id: str = DEFAULT_PROFILE_ID) -> Path:
+def migration_complete_path(profile_id=DEFAULT_PROFILE_ID):
     return profile_data_dir(profile_id) / MIGRATION_COMPLETE_MARKER
 
 
-def is_legacy_layout(profile_id: str | None = None) -> bool:
-    """True when default profile data still lives at repo root (not fully migrated)."""
+def is_legacy_layout(profile_id=None):
     pid = profile_id if profile_id is not None else get_active_profile_id()
     if pid != DEFAULT_PROFILE_ID:
         return False
@@ -211,85 +178,84 @@ def is_legacy_layout(profile_id: str | None = None) -> bool:
     return not migration_complete_path(DEFAULT_PROFILE_ID).is_file()
 
 
-def profile_root(profile_id: str | None = None) -> Path:
+def profile_root(profile_id=None):
     pid = profile_id if profile_id is not None else get_active_profile_id()
     if is_legacy_layout(pid):
         return ROOT
     return profile_data_dir(pid)
 
 
-def catalog_path(filename: str, *, profile_id: str | None = None) -> Path:
+def catalog_path(filename, *, profile_id=None):
     return profile_root(profile_id) / filename
 
 
-def itad_path(*, profile_id: str | None = None) -> Path:
+def itad_path(*, profile_id=None):
     return catalog_path("itad_prices.json", profile_id=profile_id)
 
 
-def free_claims_path(*, profile_id: str | None = None) -> Path:
+def free_claims_path(*, profile_id=None):
     return catalog_path("free_claims.json", profile_id=profile_id)
 
 
-def sponsors_path(*, profile_id: str | None = None) -> Path:
+def sponsors_path(*, profile_id=None):
     return catalog_path("sponsors.json", profile_id=profile_id)
 
 
-def personal_dir(*, profile_id: str | None = None) -> Path:
+def personal_dir(*, profile_id=None):
     return profile_root(profile_id) / "data"
 
 
-def personal_path(*, profile_id: str | None = None) -> Path:
+def personal_path(*, profile_id=None):
     return personal_dir(profile_id=profile_id) / "personal.json"
 
 
-def personal_backup_dir(*, profile_id: str | None = None) -> Path:
+def personal_backup_dir(*, profile_id=None):
     return personal_dir(profile_id=profile_id) / "personal_backups"
 
 
-def auth_dir(*, profile_id: str | None = None) -> Path:
+def auth_dir(*, profile_id=None):
     return profile_root(profile_id) / "cache" / "auth"
 
 
-def profile_cache_dir(*, profile_id: str | None = None) -> Path:
+def profile_cache_dir(*, profile_id=None):
     return profile_root(profile_id) / "cache"
 
 
-def epic_cache_dir(*, profile_id: str | None = None) -> Path:
+def epic_cache_dir(*, profile_id=None):
     return profile_cache_dir(profile_id=profile_id) / "epic"
 
 
-def runs_dir(*, profile_id: str | None = None) -> Path:
+def runs_dir(*, profile_id=None):
     return profile_root(profile_id) / "cache" / "runs"
 
 
-def fx_rates_path(*, profile_id: str | None = None) -> Path:
+def fx_rates_path(*, profile_id=None):
     return profile_root(profile_id) / "cache" / "fx_rates.json"
 
 
-# Enrichment / FX cache files the dashboard loads via GET /cache/<name>.
-PROFILE_CACHE_JSON_FILES = frozenset({
-    "hltb_map.json",
-    "steam_review_map.json",
-    "cross_store_images_meta.json",
-    "steam_tags_meta.json",
-    "protondb_map.json",
-    "fx_rates.json",
-})
+PROFILE_CACHE_JSON_FILES = frozenset(
+    {
+        "hltb_map.json",
+        "steam_review_map.json",
+        "cross_store_images_meta.json",
+        "steam_tags_meta.json",
+        "protondb_map.json",
+        "fx_rates.json",
+    }
+)
 
 
-def cache_json_path(filename: str, *, profile_id: str | None = None) -> Path:
-    """Path to a profile-scoped cache JSON file (enrichment meta, FX rates)."""
+def cache_json_path(filename, *, profile_id=None):
     if filename not in PROFILE_CACHE_JSON_FILES:
         raise ValueError(f"unknown profile cache file: {filename!r}")
     return profile_root(profile_id) / "cache" / filename
 
 
-def games_backup_root(*, profile_id: str | None = None) -> Path:
+def games_backup_root(*, profile_id=None):
     return personal_dir(profile_id=profile_id) / "games_backups"
 
 
-def resolve_catalog_path(path: Path, *, profile_id: str | None = None) -> Path:
-    """Map a relative games_*.json / itad path to the active profile root."""
+def resolve_catalog_path(path, *, profile_id=None):
     if path.is_absolute():
         return path
     name = path.name
@@ -302,12 +268,12 @@ def resolve_catalog_path(path: Path, *, profile_id: str | None = None) -> Path:
     return profile_root(profile_id) / path
 
 
-def slug_from_label(label: str) -> str:
+def slug_from_label(label):
     base = _SLUG_RE.sub("-", label.strip().lower()).strip("-")
     return base or "profile"
 
 
-def list_profiles() -> list[dict[str, Any]]:
+def list_profiles():
     doc = load_index()
     profiles = doc.get("profiles")
     if not isinstance(profiles, list):
@@ -315,37 +281,28 @@ def list_profiles() -> list[dict[str, Any]]:
     return [dict(p) for p in profiles if isinstance(p, dict) and p.get("id")]
 
 
-def profile_label(profile_id: str) -> str:
+def profile_label(profile_id):
     for p in list_profiles():
         if p.get("id") == profile_id:
             return str(p.get("label") or profile_id)
     return profile_id
 
 
-def profile_dir_ids_on_disk() -> set[str]:
+def profile_dir_ids_on_disk():
     if not PROFILES_DIR.is_dir():
         return set()
-    return {
-        child.name
-        for child in PROFILES_DIR.iterdir()
-        if child.is_dir() and is_valid_profile_id(child.name)
-    }
+    return {child.name for child in PROFILES_DIR.iterdir() if child.is_dir() and is_valid_profile_id(child.name)}
 
 
-def _label_for_orphan_profile_id(profile_id: str) -> str:
+def _label_for_orphan_profile_id(profile_id):
     return profile_id.replace("-", " ").strip().title() or profile_id
 
 
-def unique_profile_id_for_doc(label: str, doc: dict[str, Any]) -> str:
-    """Pick a slug not present in the index doc or on disk."""
+def unique_profile_id_for_doc(label, doc):
     base = slug_from_label(label)
     if not is_valid_profile_id(base):
         base = f"{base}-profile" if base else "profile"
-    indexed = {
-        str(p["id"])
-        for p in doc.get("profiles", [])
-        if isinstance(p, dict) and p.get("id")
-    }
+    indexed = {str(p["id"]) for p in doc.get("profiles", []) if isinstance(p, dict) and p.get("id")}
     taken = indexed | profile_dir_ids_on_disk()
     if base not in taken:
         return base
@@ -359,19 +316,15 @@ def unique_profile_id_for_doc(label: str, doc: dict[str, Any]) -> str:
     return candidate
 
 
-def reconcile_profile_store(*, adopt_orphans: bool | None = None) -> list[str]:
-    """Align index.json with on-disk profile dirs; adopt orphan dirs on boot."""
+def reconcile_profile_store(*, adopt_orphans=None):
     if adopt_orphans is None:
         try:
             from shared.supabase_auth import auth_enabled, local_profiles_enabled
 
-            # Supabase-only installs map one user id per profile dir; local
-            # profile switcher (BAKLOG_LOCAL_PROFILES) still needs index.json
-            # when data was migrated without an index (frozen BAKLOG-Data).
             adopt_orphans = not auth_enabled() or local_profiles_enabled()
         except Exception:
             adopt_orphans = True
-    notes: list[str] = []
+    notes = []
     with _index_lock:
         doc = _load_index_unlocked()
         profiles = doc.get("profiles")
@@ -379,18 +332,14 @@ def reconcile_profile_store(*, adopt_orphans: bool | None = None) -> list[str]:
             profiles = []
             doc["profiles"] = profiles
         indexed_ids = {
-            str(p["id"])
-            for p in profiles
-            if isinstance(p, dict) and p.get("id") and is_valid_profile_id(str(p["id"]))
+            str(p["id"]) for p in profiles if isinstance(p, dict) and p.get("id") and is_valid_profile_id(str(p["id"]))
         }
         disk_ids = profile_dir_ids_on_disk()
         orphans = sorted(disk_ids - indexed_ids)
         for pid in orphans:
             msg = f"orphan profile dir not in index: {pid}"
             if adopt_orphans:
-                profiles.append(
-                    {"id": pid, "label": _label_for_orphan_profile_id(pid), "created_at": _now_iso()}
-                )
+                profiles.append({"id": pid, "label": _label_for_orphan_profile_id(pid), "created_at": _now_iso()})
                 indexed_ids.add(pid)
                 msg = f"adopted orphan profile dir into index: {pid}"
             notes.append(msg)
@@ -401,13 +350,13 @@ def reconcile_profile_store(*, adopt_orphans: bool | None = None) -> list[str]:
             doc["active"] = sorted(indexed_ids)[0]
             notes.append(f"active profile reset to {doc['active']!r}")
         materialize_index = not INDEX_FILE.is_file() and bool(disk_ids)
-        if (orphans and adopt_orphans) or materialize_index:
+        if orphans and adopt_orphans or materialize_index:
             _save_index_unlocked(doc)
-            if materialize_index and not (orphans and adopt_orphans):
+            if materialize_index and (not (orphans and adopt_orphans)):
                 notes.append("materialized profiles/index.json from on-disk profile dirs")
     return notes
 
 
-def unique_profile_id(label: str) -> str:
+def unique_profile_id(label):
     doc = load_index()
     return unique_profile_id_for_doc(label, doc)

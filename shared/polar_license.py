@@ -1,7 +1,3 @@
-"""Validate BAKLOG Pro license keys via Polar's customer-portal API."""
-
-from __future__ import annotations
-
 import json
 import os
 import urllib.error
@@ -11,38 +7,29 @@ _VALIDATE_PATH = "/v1/customer-portal/license-keys/validate"
 _GRANTED = frozenset({"granted"})
 
 
-def polar_configured() -> bool:
+def polar_configured():
     return bool(os.environ.get("BAKLOG_POLAR_ORG_ID", "").strip())
 
 
-def polar_org_id() -> str:
+def polar_org_id():
     return os.environ.get("BAKLOG_POLAR_ORG_ID", "").strip()
 
 
-def polar_api_base() -> str:
+def polar_api_base():
     return os.environ.get("BAKLOG_POLAR_API_BASE", "https://api.polar.sh").rstrip("/")
 
 
-def validate_license_key(key: str) -> dict:
-    """Validate a Polar license key.
-
-    Returns ``{"ok": bool, "status": str|None, "error": str|None}``.
-    Network failures surface as ``ok=False`` with a short error string.
-    """
+def validate_license_key(key):
     org_id = polar_org_id()
     cleaned = (key or "").strip()
     if not org_id:
         return {"ok": False, "status": None, "error": "Polar org id not configured"}
     if not cleaned:
         return {"ok": False, "status": None, "error": "License key is required"}
-
     payload = json.dumps({"key": cleaned, "organization_id": org_id}).encode("utf-8")
     url = f"{polar_api_base()}{_VALIDATE_PATH}"
     req = urllib.request.Request(
-        url,
-        data=payload,
-        method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        url, data=payload, method="POST", headers={"Content-Type": "application/json", "Accept": "application/json"}
     )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
@@ -54,10 +41,8 @@ def validate_license_key(key: str) -> dict:
         return {"ok": False, "status": None, "error": detail or f"Polar HTTP {exc.code}"}
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         return {"ok": False, "status": None, "error": f"Could not reach Polar ({exc})"}
-
     if not isinstance(body, dict):
         return {"ok": False, "status": None, "error": "Unexpected Polar response"}
-
     status = body.get("status")
     status_norm = status.strip().lower() if isinstance(status, str) else ""
     if status_norm in _GRANTED:

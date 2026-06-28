@@ -1,12 +1,5 @@
-"""Tests for enrich_cross_store_images.py (Steam CDN covers for non-Steam rows)."""
-
-from __future__ import annotations
-
 import json
 import sys
-from pathlib import Path
-
-import pytest
 
 import enrichers.enrich_cross_store_images as enrich
 from shared.steam_match import normalize_title
@@ -22,15 +15,15 @@ ARMATUS_ROW = {
 }
 
 
-def test_needs_images_true_when_both_missing() -> None:
+def test_needs_images_true_when_both_missing():
     assert enrich.needs_images({"header_image": None, "library_image": None}) is True
 
 
-def test_needs_images_true_for_eprt_placeholder() -> None:
+def test_needs_images_true_for_eprt_placeholder():
     assert enrich.needs_images({"header_image": "x.eprt", "library_image": ""}) is True
 
 
-def test_needs_images_false_when_urls_present() -> None:
+def test_needs_images_false_when_urls_present():
     g = {
         "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1/header.jpg",
         "library_image": "https://cdn.akamai.steamstatic.com/steam/apps/1/library_600x900_2x.jpg",
@@ -38,7 +31,7 @@ def test_needs_images_false_when_urls_present() -> None:
     assert enrich.needs_images(g) is False
 
 
-def test_needs_lowres_upgrade_true_for_native_store_art() -> None:
+def test_needs_lowres_upgrade_true_for_native_store_art():
     g = {
         "header_image": "https://images-eds-ssl.xboxlive.com/image/foo",
         "library_image": "https://images-eds-ssl.xboxlive.com/image/bar",
@@ -46,7 +39,7 @@ def test_needs_lowres_upgrade_true_for_native_store_art() -> None:
     assert enrich.needs_lowres_upgrade(g) is True
 
 
-def test_needs_lowres_upgrade_false_for_steamstatic() -> None:
+def test_needs_lowres_upgrade_false_for_steamstatic():
     g = {
         "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1/header.jpg",
         "library_image": "https://cdn.akamai.steamstatic.com/steam/apps/1/library_600x900_2x.jpg",
@@ -55,7 +48,7 @@ def test_needs_lowres_upgrade_false_for_steamstatic() -> None:
     assert enrich.needs_lowres_upgrade(g) is False
 
 
-def test_should_process_upgrade_only_when_flag_set() -> None:
+def test_should_process_upgrade_only_when_flag_set():
     g = {
         "header_image": "https://images-eds-ssl.xboxlive.com/image/foo",
         "library_image": "https://images-eds-ssl.xboxlive.com/image/bar",
@@ -64,23 +57,24 @@ def test_should_process_upgrade_only_when_flag_set() -> None:
     assert enrich.should_process(g, upgrade_lowres=True) is True
 
 
-def test_normalize_strips_trademark_symbols() -> None:
+def test_normalize_strips_trademark_symbols():
     assert normalize_title("Armatus™") == "armatus"
 
 
-def test_store_files_includes_wishlist_xbox_and_itch() -> None:
+def test_store_files_includes_wishlist_xbox_and_itch():
     names = {row[0].name for row in enrich.STORE_FILES}
     assert "games_wishlist_xbox.json" in names
     assert "games_itch.json" in names
     assert "games_wishlist_gog.json" in names
 
 
-def test_steam_search_appid_exact_name_match(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_steam_search_appid_exact_name_match(monkeypatch):
+
     class FakeResp:
         status_code = 200
 
         @staticmethod
-        def json() -> dict:
+        def json():
             return {"items": [{"id": 3660710, "name": "Armatus"}]}
 
     monkeypatch.setattr(enrich.requests, "get", lambda *a, **k: FakeResp())
@@ -88,33 +82,26 @@ def test_steam_search_appid_exact_name_match(monkeypatch: pytest.MonkeyPatch) ->
     assert enrich.steam_search_appid("Armatus") == 3660710
 
 
-def test_enriches_armatus_wishlist_row(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enriches_armatus_wishlist_row(tmp_path, monkeypatch):
     wishlist_path = tmp_path / "games_wishlist_xbox.json"
-    wishlist_path.write_text(
-        json.dumps({"games": [dict(ARMATUS_ROW)]}, indent=2),
-        encoding="utf-8",
-    )
+    wishlist_path.write_text(json.dumps({"games": [dict(ARMATUS_ROW)]}, indent=2), encoding="utf-8")
     meta_path = tmp_path / "cross_store_images_meta.json"
 
-    def fake_catalog(rel: Path) -> Path:
+    def fake_catalog(rel):
         if rel.name == "games_wishlist_xbox.json":
             return wishlist_path
         return tmp_path / f"missing-{rel.name}"
 
     monkeypatch.setattr(enrich, "catalog_file", fake_catalog)
     monkeypatch.setattr(
-        enrich,
-        "write_catalog_text",
-        lambda rel, text: wishlist_path.write_text(text, encoding="utf-8"),
+        enrich, "write_catalog_text", lambda rel, text: wishlist_path.write_text(text, encoding="utf-8")
     )
     monkeypatch.setattr(enrich, "meta_file", lambda: meta_path)
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: 3660710 if name == "Armatus" else None)
     monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
     monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
-
     enrich.main()
-
     data = json.loads(wishlist_path.read_text(encoding="utf-8"))
     row = data["games"][0]
     assert row["steam_appid"] == 3660710
@@ -123,7 +110,7 @@ def test_enriches_armatus_wishlist_row(tmp_path: Path, monkeypatch: pytest.Monke
     assert row["image_source"] == "steam_search"
 
 
-def test_itch_non_game_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_itch_non_game_skipped(tmp_path, monkeypatch):
     itch_path = tmp_path / "games_itch.json"
     itch_path.write_text(
         json.dumps(
@@ -150,31 +137,25 @@ def test_itch_non_game_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         encoding="utf-8",
     )
     meta_path = tmp_path / "cross_store_images_meta.json"
-    searches: list[str] = []
+    searches = []
 
-    def fake_catalog(rel: Path) -> Path:
+    def fake_catalog(rel):
         if rel.name == "games_itch.json":
             return itch_path
         return tmp_path / f"missing-{rel.name}"
 
-    def fake_search(name: str) -> int:
+    def fake_search(name):
         searches.append(name)
         return 42
 
     monkeypatch.setattr(enrich, "catalog_file", fake_catalog)
-    monkeypatch.setattr(
-        enrich,
-        "write_catalog_text",
-        lambda rel, text: itch_path.write_text(text, encoding="utf-8"),
-    )
+    monkeypatch.setattr(enrich, "write_catalog_text", lambda rel, text: itch_path.write_text(text, encoding="utf-8"))
     monkeypatch.setattr(enrich, "meta_file", lambda: meta_path)
     monkeypatch.setattr(enrich, "steam_search_appid", fake_search)
     monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
     monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
-
     enrich.main()
-
     assert searches == ["Indie Game"]
     data = json.loads(itch_path.read_text(encoding="utf-8"))
     by_id = {g["id"]: g for g in data["games"]}
@@ -191,13 +172,13 @@ NATIVE_ROW = {
 }
 
 
-def test_upgrade_lowres_skipped_without_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upgrade_lowres_skipped_without_flag(tmp_path, monkeypatch):
     xbox_path = tmp_path / "games_xbox.json"
     xbox_path.write_text(json.dumps({"games": [dict(NATIVE_ROW)]}, indent=2), encoding="utf-8")
     meta_path = tmp_path / "cross_store_images_meta.json"
-    searches: list[str] = []
+    searches = []
 
-    def fake_catalog(rel: Path) -> Path:
+    def fake_catalog(rel):
         if rel.name == "games_xbox.json":
             return xbox_path
         return tmp_path / f"missing-{rel.name}"
@@ -208,20 +189,18 @@ def test_upgrade_lowres_skipped_without_flag(tmp_path: Path, monkeypatch: pytest
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: searches.append(name) or 99)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
     monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
-
     enrich.main()
-
     assert searches == []
     row = json.loads(xbox_path.read_text(encoding="utf-8"))["games"][0]
     assert row["header_image"] == NATIVE_ROW["header_image"]
 
 
-def test_upgrade_lowres_replaces_native_art(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upgrade_lowres_replaces_native_art(tmp_path, monkeypatch):
     xbox_path = tmp_path / "games_xbox.json"
     xbox_path.write_text(json.dumps({"games": [dict(NATIVE_ROW)]}, indent=2), encoding="utf-8")
     meta_path = tmp_path / "cross_store_images_meta.json"
 
-    def fake_catalog(rel: Path) -> Path:
+    def fake_catalog(rel):
         if rel.name == "games_xbox.json":
             return xbox_path
         return tmp_path / f"missing-{rel.name}"
@@ -233,9 +212,7 @@ def test_upgrade_lowres_replaces_native_art(tmp_path: Path, monkeypatch: pytest.
     monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
     monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py", "--upgrade-lowres"])
-
     enrich.main()
-
     row = json.loads(xbox_path.read_text(encoding="utf-8"))["games"][0]
     assert row["steam_appid"] == 4242
     assert "4242" in row["header_image"]
@@ -245,17 +222,16 @@ def test_upgrade_lowres_replaces_native_art(tmp_path: Path, monkeypatch: pytest.
     assert "xbox:xbox-native-1" in meta["lowres_checked"]
 
 
-def test_upgrade_lowres_skips_cached_checked_rows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upgrade_lowres_skips_cached_checked_rows(tmp_path, monkeypatch):
     xbox_path = tmp_path / "games_xbox.json"
     xbox_path.write_text(json.dumps({"games": [dict(NATIVE_ROW)]}, indent=2), encoding="utf-8")
     meta_path = tmp_path / "cross_store_images_meta.json"
     meta_path.write_text(
-        json.dumps({"lowres_checked": ["xbox:xbox-native-1"], "no_steam_match": []}, indent=2),
-        encoding="utf-8",
+        json.dumps({"lowres_checked": ["xbox:xbox-native-1"], "no_steam_match": []}, indent=2), encoding="utf-8"
     )
-    searches: list[str] = []
+    searches = []
 
-    def fake_catalog(rel: Path) -> Path:
+    def fake_catalog(rel):
         if rel.name == "games_xbox.json":
             return xbox_path
         return tmp_path / f"missing-{rel.name}"
@@ -266,7 +242,5 @@ def test_upgrade_lowres_skips_cached_checked_rows(tmp_path: Path, monkeypatch: p
     monkeypatch.setattr(enrich, "steam_search_appid", lambda name: searches.append(name) or 4242)
     monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
     monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py", "--upgrade-lowres"])
-
     enrich.main()
-
     assert searches == []

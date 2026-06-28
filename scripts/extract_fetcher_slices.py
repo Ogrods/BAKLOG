@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 lines = (ROOT / "js/fetcher-health.js").read_text(encoding="utf-8").splitlines()
 
 
-def sl(a: int, b: int) -> str:
+def sl(a, b):
     return "\n".join(lines[a - 1 : b]) + "\n"
 
 

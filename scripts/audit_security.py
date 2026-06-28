@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-"""Unified local security audit: profile isolation + client storage registry.
-
-Usage:
-  .\\.venv\\Scripts\\python.exe scripts\\audit_security.py
-  .\\.venv\\Scripts\\python.exe scripts\\audit_security.py --fail-on high
-  .\\.venv\\Scripts\\python.exe scripts\\audit_security.py --ignore-disk-bleed
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import re
@@ -19,72 +8,66 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES_DIR = ROOT / "profiles"
 JS_DIR = ROOT / "js"
-
-GLOBAL_LS_ALLOWLIST = frozenset({
-    "baklog-active-profile",
-    "baklog-debug",
-    "baklog-debug-pro",
-    "baklog-perf",
-    "baklog-error-log",
-    "steam-backlog-personal",
-    "baklog-admin.knownAutoIds",
-})
-
-GLOBAL_SS_ALLOWLIST = frozenset({
-    "baklog-stale-chunk-reload",
-})
-
-EXPECTED_SCOPED_LS_BASES = frozenset({
-    "steam-backlog-ui-prefs",
-    "baklog-itad-snapshot",
-    "baklog-claims-snapshot",
-    "steam-backlog-personal",
-    "steam-backlog-manual-games",
-    "steam-backlog-library-first-seen",
-    "baklog-known-library-keys",
-    "baklog-spotlight-recent",
-    "baklog-fetcher-auth-cooldown",
-    "baklog-reconnect-dismissed",
-    "baklog-itad-last-auto-run",
-    "baklog-claims-last-auto-run",
-    "baklog-auto-stale-last-run",
-    "baklog-library-watch",
-    "baklog-ad-cursors",
-    "baklog-color-theme",
-    "baklog-fetcher-stat-layout",
-    "baklog.coverGalleryMode",
-    "baklog-dash-failed-covers",
-    "baklog-landscape-covers",
-    "baklog-metrics-rendered",
-    "baklog-metrics-untapped-batch-seeded",
-})
-
-EXPECTED_SCOPED_SS_BASES = frozenset({
-    "fetcher-suppressed-run-ids",
-    "fetcher-last-seq-by-run",
-    "__baklogMetricSeed",
-    "baklog-pro-welcome",
-})
-
+GLOBAL_LS_ALLOWLIST = frozenset(
+    {
+        "baklog-active-profile",
+        "baklog-debug",
+        "baklog-debug-pro",
+        "baklog-perf",
+        "baklog-error-log",
+        "steam-backlog-personal",
+        "baklog-admin.knownAutoIds",
+    }
+)
+GLOBAL_SS_ALLOWLIST = frozenset({"baklog-stale-chunk-reload"})
+EXPECTED_SCOPED_LS_BASES = frozenset(
+    {
+        "steam-backlog-ui-prefs",
+        "baklog-itad-snapshot",
+        "baklog-claims-snapshot",
+        "steam-backlog-personal",
+        "steam-backlog-manual-games",
+        "steam-backlog-library-first-seen",
+        "baklog-known-library-keys",
+        "baklog-spotlight-recent",
+        "baklog-fetcher-auth-cooldown",
+        "baklog-reconnect-dismissed",
+        "baklog-itad-last-auto-run",
+        "baklog-claims-last-auto-run",
+        "baklog-auto-stale-last-run",
+        "baklog-library-watch",
+        "baklog-ad-cursors",
+        "baklog-color-theme",
+        "baklog-fetcher-stat-layout",
+        "baklog.coverGalleryMode",
+        "baklog-dash-failed-covers",
+        "baklog-landscape-covers",
+        "baklog-metrics-rendered",
+        "baklog-metrics-untapped-batch-seeded",
+    }
+)
+EXPECTED_SCOPED_SS_BASES = frozenset(
+    {"fetcher-suppressed-run-ids", "fetcher-last-seq-by-run", "__baklogMetricSeed", "baklog-pro-welcome"}
+)
 PERSONAL_BLEED_KEYS = ("__dismissedClaims", "__dismissedClaimKeys", "__purgedClaimKeys")
 
 
 @dataclass
 class Finding:
-    severity: str
-    code: str
-    message: str
+    severity: "Any"
+    code: "Any"
+    message: "Any"
 
 
 @dataclass
 class AuditReport:
-    findings: list[Finding] = field(default_factory=list)
+    findings: "Any" = field(default_factory=list)
 
-    def add(self, severity: str, code: str, message: str) -> None:
+    def add(self, severity, code, message):
         self.findings.append(Finding(severity, code, message))
 
 
-def _personal_blob(path: Path) -> dict[str, Any]:
+def _personal_blob(path):
     if not path.is_file():
         return {}
     try:
@@ -95,8 +78,8 @@ def _personal_blob(path: Path) -> dict[str, Any]:
     return inner if isinstance(inner, dict) else doc if isinstance(doc, dict) else {}
 
 
-def _personal_maps(personal: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    out: dict[str, dict[str, Any]] = {}
+def _personal_maps(personal):
+    out = {}
     for key in PERSONAL_BLEED_KEYS:
         val = personal.get(key)
         if isinstance(val, dict) and val:
@@ -104,26 +87,25 @@ def _personal_maps(personal: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _shared_identical_entries(a_map: dict[str, Any], b_map: dict[str, Any], min_count: int = 3) -> list[str]:
+def _shared_identical_entries(a_map, b_map, min_count=3):
     shared = set(a_map) & set(b_map)
     identical = [k for k in shared if a_map[k] == b_map[k]]
     return identical if len(identical) >= min_count else []
 
 
-def audit_disk_personal_bleed(report: AuditReport, *, skip: bool = False) -> None:
+def audit_disk_personal_bleed(report, *, skip=False):
     if skip or not PROFILES_DIR.is_dir():
         return
-    profiles: dict[str, dict[str, dict[str, Any]]] = {}
+    profiles = {}
     for entry in sorted(PROFILES_DIR.iterdir()):
         if not entry.is_dir():
             continue
         maps = _personal_maps(_personal_blob(entry / "data" / "personal.json"))
         if maps:
             profiles[entry.name] = maps
-
     ids = list(profiles.keys())
     for i, a in enumerate(ids):
-        for b in ids[i + 1:]:
+        for b in ids[i + 1 :]:
             for field_key in PERSONAL_BLEED_KEYS:
                 a_map = profiles[a].get(field_key) or {}
                 b_map = profiles[b].get(field_key) or {}
@@ -134,13 +116,11 @@ def audit_disk_personal_bleed(report: AuditReport, *, skip: bool = False) -> Non
                 report.add(
                     "high",
                     code,
-                    f"profiles/{a} and profiles/{b} share {len(identical)} "
-                    f"{field_key} id(s) with identical values (likely legacy bleed). "
-                    f"Sample: {identical[:3]}",
+                    f"profiles/{a} and profiles/{b} share {len(identical)} {field_key} id(s) with identical values (likely legacy bleed). Sample: {identical[:3]}",
                 )
 
 
-def audit_profile_catalog_isolation(report: AuditReport) -> None:
+def audit_profile_catalog_isolation(report):
     if not PROFILES_DIR.is_dir():
         return
     for entry in sorted(PROFILES_DIR.iterdir()):
@@ -148,15 +128,11 @@ def audit_profile_catalog_isolation(report: AuditReport) -> None:
             continue
         for cat in entry.glob("games_*.json"):
             if not cat.is_file():
-                report.add(
-                    "high",
-                    "CATALOG_MISSING",
-                    f"{cat.relative_to(ROOT)} is not a regular file",
-                )
+                report.add("high", "CATALOG_MISSING", f"{cat.relative_to(ROOT)} is not a regular file")
 
 
-def _registry_source_text() -> str:
-    chunks: list[str] = []
+def _registry_source_text():
+    chunks = []
     for rel in ("state.js", "profiles.js"):
         path = JS_DIR / rel
         if path.is_file():
@@ -164,7 +140,7 @@ def _registry_source_text() -> str:
     return "\n".join(chunks)
 
 
-def audit_scoped_registry(report: AuditReport) -> None:
+def audit_scoped_registry(report):
     text = _registry_source_text()
     if not text:
         return
@@ -176,53 +152,38 @@ def audit_scoped_registry(report: AuditReport) -> None:
                 f"Expected profile-scoped base {base!r} missing from js/profiles.js / state.js",
             )
     if "LS_ACTIVE_VIEW_SESSION" not in text:
-        report.add(
-            "medium",
-            "REGISTRY_DRIFT",
-            "LS_ACTIVE_VIEW_SESSION missing from js/profiles.js session registry",
-        )
+        report.add("medium", "REGISTRY_DRIFT", "LS_ACTIVE_VIEW_SESSION missing from js/profiles.js session registry")
 
 
-def _parse_storage_key_helpers() -> set[str]:
+def _parse_storage_key_helpers():
     profiles_js = JS_DIR / "profiles.js"
     if not profiles_js.is_file():
         return set()
     text = profiles_js.read_text(encoding="utf-8", errors="replace")
-    helpers = set(re.findall(r"export function (\w+StorageKey|\w+SessionKey)", text))
+    helpers = set(re.findall("export function (\\w+StorageKey|\\w+SessionKey)", text))
     return helpers
 
 
-def audit_helper_registry_coverage(report: AuditReport) -> None:
+def audit_helper_registry_coverage(report):
     profiles_js = JS_DIR / "profiles.js"
     if not profiles_js.is_file():
         return
     text = profiles_js.read_text(encoding="utf-8", errors="replace")
-    ls_match = re.search(
-        r"PROFILE_SCOPED_STORAGE_KEYS = Object\.freeze\(\[(.*?)\]\)",
-        text,
-        re.S,
-    )
-    ss_match = re.search(
-        r"PROFILE_SCOPED_SESSION_KEYS = Object\.freeze\(\[(.*?)\]\)",
-        text,
-        re.S,
-    )
+    ls_match = re.search("PROFILE_SCOPED_STORAGE_KEYS = Object\\.freeze\\(\\[(.*?)\\]\\)", text, re.S)
+    ss_match = re.search("PROFILE_SCOPED_SESSION_KEYS = Object\\.freeze\\(\\[(.*?)\\]\\)", text, re.S)
     if not ls_match or not ss_match:
         report.add("high", "REGISTRY_DRIFT", "Could not parse PROFILE_SCOPED_* lists in js/profiles.js")
         return
-    ls_bases = set(re.findall(r"(?:LS_\w+|PREFS_KEY|STORAGE_KEY|[A-Z_]+_PREFIX)", ls_match.group(1)))
+    ls_bases = set(re.findall("(?:LS_\\w+|PREFS_KEY|STORAGE_KEY|[A-Z_]+_PREFIX)", ls_match.group(1)))
     for helper in _parse_storage_key_helpers():
         if helper.endswith("SessionKey"):
             continue
-        # helpers resolve at runtime — ensure exported names exist
         if f"export function {helper}" not in text:
             report.add("medium", "REGISTRY_DRIFT", f"Missing helper export {helper} in js/profiles.js")
 
 
-def audit_js_localstorage_keys(report: AuditReport) -> None:
-    pattern = re.compile(
-        r"localStorage\.(?:getItem|setItem|removeItem)\(\s*['\"]([^'\"]+)['\"]",
-    )
+def audit_js_localstorage_keys(report):
+    pattern = re.compile("localStorage\\.(?:getItem|setItem|removeItem)\\(\\s*['\\\"]([^'\\\"]+)['\\\"]")
     for js_path in sorted(JS_DIR.glob("*.js")):
         text = js_path.read_text(encoding="utf-8", errors="replace")
         for match in pattern.finditer(text):
@@ -238,10 +199,8 @@ def audit_js_localstorage_keys(report: AuditReport) -> None:
             )
 
 
-def audit_js_sessionstorage_keys(report: AuditReport) -> None:
-    pattern = re.compile(
-        r"sessionStorage\.(?:getItem|setItem|removeItem)\(\s*['\"]([^'\"]+)['\"]",
-    )
+def audit_js_sessionstorage_keys(report):
+    pattern = re.compile("sessionStorage\\.(?:getItem|setItem|removeItem)\\(\\s*['\\\"]([^'\\\"]+)['\\\"]")
     for js_path in sorted(JS_DIR.glob("*.js")):
         text = js_path.read_text(encoding="utf-8", errors="replace")
         for match in pattern.finditer(text):
@@ -255,14 +214,11 @@ def audit_js_sessionstorage_keys(report: AuditReport) -> None:
             )
 
 
-def _bleed_remediation_hint() -> str:
-    return (
-        "Remediation: reload the app (client no longer merges default localStorage into other profiles). "
-        "Run scripts/clean_profile_dismiss_bleed.py --dry-run then --apply, or restore hidden claims in the UI."
-    )
+def _bleed_remediation_hint():
+    return "Remediation: reload the app (client no longer merges default localStorage into other profiles). Run scripts/clean_profile_dismiss_bleed.py --dry-run then --apply, or restore hidden claims in the UI."
 
 
-def run_audit(*, ignore_disk_bleed: bool = False) -> AuditReport:
+def run_audit(*, ignore_disk_bleed=False):
     report = AuditReport()
     audit_disk_personal_bleed(report, skip=ignore_disk_bleed)
     audit_profile_catalog_isolation(report)
@@ -273,12 +229,10 @@ def run_audit(*, ignore_disk_bleed: bool = False) -> AuditReport:
     return report
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--fail-on",
-        choices=("high", "medium", "low"),
-        help="Exit 1 when findings at or above this severity exist",
+        "--fail-on", choices=("high", "medium", "low"), help="Exit 1 when findings at or above this severity exist"
     )
     parser.add_argument(
         "--ignore-disk-bleed",
@@ -295,18 +249,17 @@ def main(argv: list[str] | None = None) -> int:
     elif not report.findings:
         print("security audit: OK (no findings)")
     else:
-        by_sev: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+        by_sev = {"high": 0, "medium": 0, "low": 0}
         for f in report.findings:
             by_sev[f.severity] = by_sev.get(f.severity, 0) + 1
             print(f"[{f.severity}] {f.code}: {f.message}")
         print(
-            f"\nsecurity audit: {len(report.findings)} finding(s) "
-            f"(high={by_sev.get('high', 0)}, medium={by_sev.get('medium', 0)}, low={by_sev.get('low', 0)})"
+            f"\nsecurity audit: {len(report.findings)} finding(s) (high={by_sev.get('high', 0)}, medium={by_sev.get('medium', 0)}, low={by_sev.get('low', 0)})"
         )
-        if any(f.code in ("DISMISS_BLEED", "PERSONAL_BLEED") for f in report.findings):
+        if any((f.code in ("DISMISS_BLEED", "PERSONAL_BLEED") for f in report.findings)):
             print(f"\n{_bleed_remediation_hint()}")
     if args.fail_on and report.findings:
-        worst = min(order[f.severity] for f in report.findings)
+        worst = min((order[f.severity] for f in report.findings))
         if worst <= order[args.fail_on]:
             return 1
     return 0

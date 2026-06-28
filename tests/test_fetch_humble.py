@@ -1,12 +1,8 @@
-"""Humble fetcher merge behavior (no live API)."""
-
-from __future__ import annotations
-
 from fetchers._authoritative import HUMBLE
 from fetchers._base import merge_cached_row
 
 
-def test_humble_refetch_preserves_cached_enrichment() -> None:
+def test_humble_refetch_preserves_cached_enrichment():
     cached = {
         "store": "humble",
         "id": "humble-foo",

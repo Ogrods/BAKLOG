@@ -1,7 +1,3 @@
-"""Tests for Nintendo VGC portal parsing and catalog diff helpers."""
-
-from __future__ import annotations
-
 import pytest
 
 from clients.nintendo_vgc import (
@@ -18,40 +14,34 @@ from clients.nintendo_vgc import (
 )
 from scripts.probe_nintendo_vgc import diff_vgc_vs_catalog
 
-SAMPLE_PORTAL_HTML = """
-<html><body>
-<div id="data" data-json="{&quot;idToken&quot;:&quot;tok-abc&quot;,&quot;savannaClientId&quot;:&quot;client-1&quot;,&quot;shopGraphQLApiUrl&quot;:&quot;https://example.test/graphql&quot;}"></div>
-<div id="state" data-json="{&quot;lang&quot;:&quot;en-US&quot;,&quot;user&quot;:{&quot;country&quot;:&quot;US&quot;}}">
-</div>
-</body></html>
-"""
+SAMPLE_PORTAL_HTML = '\n<html><body>\n<div id="data" data-json="{&quot;idToken&quot;:&quot;tok-abc&quot;,&quot;savannaClientId&quot;:&quot;client-1&quot;,&quot;shopGraphQLApiUrl&quot;:&quot;https://example.test/graphql&quot;}"></div>\n<div id="state" data-json="{&quot;lang&quot;:&quot;en-US&quot;,&quot;user&quot;:{&quot;country&quot;:&quot;US&quot;}}">\n</div>\n</body></html>\n'
 
 
-def test_parse_vgc_embedded_json() -> None:
+def test_parse_vgc_embedded_json():
     data, state = parse_vgc_embedded_json(SAMPLE_PORTAL_HTML)
     assert data["idToken"] == "tok-abc"
     assert data["shopGraphQLApiUrl"] == "https://example.test/graphql"
     assert state["lang"] == "en-US"
 
 
-def test_parse_vgc_embedded_json_missing_data_raises() -> None:
+def test_parse_vgc_embedded_json_missing_data_raises():
     with pytest.raises(NintendoVgcCaptureError, match="missing embedded"):
         parse_vgc_embedded_json("<html><body>no data</body></html>")
 
 
-def test_region_from_vgc_state_us() -> None:
+def test_region_from_vgc_state_us():
     region = region_from_vgc_state({"user": {"country": "US"}})
     assert region["country"] == "US"
     assert region["shop_id"] == 1
 
 
-def test_region_from_vgc_state_lang_fallback_gb() -> None:
+def test_region_from_vgc_state_lang_fallback_gb():
     region = region_from_vgc_state({"lang": "en-GB"})
     assert region["country"] == "GB"
     assert region["shop_id"] == 3
 
 
-def test_map_vgc_view_switch_and_dlc() -> None:
+def test_map_vgc_view_switch_and_dlc():
     base = map_vgc_view(
         {
             "id": "vgc-1",
@@ -59,10 +49,7 @@ def test_map_vgc_view_switch_and_dlc() -> None:
             "applicationName": "Zelda™ Tears",
             "apparentPlatform": "NX",
             "hasNxApplication": True,
-            "icon": {
-                "url": "https://atum-img.test/i/c/abc_${size}",
-                "sizes": [128, 256, 512],
-            },
+            "icon": {"url": "https://atum-img.test/i/c/abc_${size}", "sizes": [128, 256, 512]},
         }
     )
     assert base["application_id"] == "0100abc"
@@ -71,28 +58,17 @@ def test_map_vgc_view_switch_and_dlc() -> None:
     assert base["icon_url"] == "https://atum-img.test/i/c/abc_512"
     assert base["icon_url_standard"] == "https://atum-img.test/i/c/abc_256"
     assert base["is_dlc"] is False
-
-    dlc = map_vgc_view(
-        {
-            "applicationId": "dlc-1",
-            "applicationName": "Expansion Pass",
-            "hasNxAddOnContents": True,
-        }
-    )
+    dlc = map_vgc_view({"applicationId": "dlc-1", "applicationName": "Expansion Pass", "hasNxAddOnContents": True})
     assert dlc["is_dlc"] is True
 
 
-def test_resolve_nintendo_icon_url_expands_size_placeholder() -> None:
+def test_resolve_nintendo_icon_url_expands_size_placeholder():
     url = "https://atum-img.test/i/c/abc_${size}"
-    assert resolve_nintendo_icon_url(url, [128, 256, 512]) == (
-        "https://atum-img.test/i/c/abc_256"
-    )
-    assert resolve_nintendo_icon_url(url, [128, 256, 512], prefer_large=True) == (
-        "https://atum-img.test/i/c/abc_512"
-    )
+    assert resolve_nintendo_icon_url(url, [128, 256, 512]) == "https://atum-img.test/i/c/abc_256"
+    assert resolve_nintendo_icon_url(url, [128, 256, 512], prefer_large=True) == "https://atum-img.test/i/c/abc_512"
 
 
-def test_map_vgc_view_exposes_entitlement_metadata() -> None:
+def test_map_vgc_view_exposes_entitlement_metadata():
     view = {
         "id": "vgc-1",
         "applicationId": "0100abc",
@@ -118,7 +94,7 @@ def test_map_vgc_view_exposes_entitlement_metadata() -> None:
     assert "raw" not in mapped
 
 
-def test_merge_vgc_payload_dedupes_application_id() -> None:
+def test_merge_vgc_payload_dedupes_application_id():
     payload = {
         "data": {
             "account": {
@@ -134,28 +110,29 @@ def test_merge_vgc_payload_dedupes_application_id() -> None:
             }
         }
     }
-    collected: list = []
-    seen: set[str] = set()
+    collected = []
+    seen = set()
     added = _merge_vgc_payload(payload, collected, seen)
     assert added == 2
     assert [r["application_id"] for r in collected] == ["a1", "a2"]
 
 
-def test_portal_html_helpers() -> None:
+def test_portal_html_helpers():
     assert _portal_html_has_vgc_data(SAMPLE_PORTAL_HTML) is True
     assert _portal_html_looks_unsigned(SAMPLE_PORTAL_HTML) is False
     assert _portal_html_looks_unsigned("<html>Please sign in</html>") is True
 
 
-def test_fetch_vgc_portal_html_via_http_get() -> None:
+def test_fetch_vgc_portal_html_via_http_get():
+
     class _Resp:
         status = 200
 
-        def text(self) -> str:
+        def text(self):
             return SAMPLE_PORTAL_HTML
 
     class _Request:
-        def get(self, url: str, *, headers: dict, timeout: float) -> _Resp:
+        def get(self, url, *, headers, timeout):
             assert "accounts.nintendo.com" in url
             return _Resp()
 
@@ -166,15 +143,16 @@ def test_fetch_vgc_portal_html_via_http_get() -> None:
     assert "data-json" in html
 
 
-def test_fetch_vgc_portal_html_unsigned_raises() -> None:
+def test_fetch_vgc_portal_html_unsigned_raises():
+
     class _Resp:
         status = 200
 
-        def text(self) -> str:
+        def text(self):
             return "<html><body>Please sign in to continue</body></html>"
 
     class _Request:
-        def get(self, url: str, *, headers: dict, timeout: float) -> _Resp:
+        def get(self, url, *, headers, timeout):
             return _Resp()
 
     class _Ctx:
@@ -184,11 +162,8 @@ def test_fetch_vgc_portal_html_unsigned_raises() -> None:
         fetch_vgc_portal_html(_Ctx(), user_agent="test-agent")
 
 
-def test_diff_vgc_vs_catalog_legacy_gap() -> None:
-    vgc_rows = [
-        {"name": "Fresh Game", "application_id": "app-1"},
-        {"name": "Shared Title", "application_id": "app-2"},
-    ]
+def test_diff_vgc_vs_catalog_legacy_gap():
+    vgc_rows = [{"name": "Fresh Game", "application_id": "app-1"}, {"name": "Shared Title", "application_id": "app-2"}]
     catalog = [
         {"name": "Shared Title", "id": "tx-1"},
         {"name": "Old Purchase", "id": "tx-2", "nintendo_legacy": True},

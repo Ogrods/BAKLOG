@@ -1,13 +1,9 @@
-"""Tests for fetcher cache merge (enrichment preservation)."""
-
-from __future__ import annotations
-
 from fetchers._authoritative import AMAZON, GOG, HUMBLE, PSN
 from fetchers._base import merge_cached_row
 from fetchers.fetch_gog import merge_gog_cached_row
 
 
-def test_merge_preserves_steam_reviews() -> None:
+def test_merge_preserves_steam_reviews():
     cached = {
         "store": "gog",
         "id": 1,
@@ -35,9 +31,7 @@ def test_merge_preserves_steam_reviews() -> None:
     assert merged["hltb_main_hours"] == 12.0
 
 
-def test_merge_preserves_enriched_images_when_fresh_is_empty() -> None:
-    """An Amazon refetch with no native cover URL must not clobber the Steam-CDN
-    URLs that enrich_cross_store_images.py wrote on a previous run."""
+def test_merge_preserves_enriched_images_when_fresh_is_empty():
     cached = {
         "store": "amazon",
         "id": "abc",
@@ -63,8 +57,7 @@ def test_merge_preserves_enriched_images_when_fresh_is_empty() -> None:
     assert merged["steam_appid"] == 2307350
 
 
-def test_merge_lets_fresh_image_override_enrichment() -> None:
-    """If the store fetcher later publishes a real cover URL, it wins."""
+def test_merge_lets_fresh_image_override_enrichment():
     cached = {
         "store": "amazon",
         "id": "abc",
@@ -85,7 +78,7 @@ def test_merge_lets_fresh_image_override_enrichment() -> None:
     assert merged["library_image"] == fresh["library_image"]
 
 
-def test_merge_overwrites_hltb_when_updated() -> None:
+def test_merge_overwrites_hltb_when_updated():
     cached = {"store": "gog", "id": 1, "hltb_main_hours": 10.0, "hltb_name": "Old"}
     fresh = {
         "store": "gog",
@@ -101,41 +94,23 @@ def test_merge_overwrites_hltb_when_updated() -> None:
     assert merged["hltb_name"] == "New"
 
 
-def test_merge_preserves_playtime_when_fresh_is_zero() -> None:
-    cached = {
-        "store": "gog",
-        "id": 1,
-        "gog_id": 1,
-        "playtime_minutes": 120,
-        "last_played": "2024-06-01",
-    }
-    fresh = {
-        "store": "gog",
-        "id": 1,
-        "gog_id": 1,
-        "playtime_minutes": 0,
-        "last_played": None,
-    }
+def test_merge_preserves_playtime_when_fresh_is_zero():
+    cached = {"store": "gog", "id": 1, "gog_id": 1, "playtime_minutes": 120, "last_played": "2024-06-01"}
+    fresh = {"store": "gog", "id": 1, "gog_id": 1, "playtime_minutes": 0, "last_played": None}
     merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=False)
     assert merged["playtime_minutes"] == 120
     assert merged["last_played"] == "2024-06-01"
 
 
-def test_merge_overwrites_playtime_when_fresh_has_real_value() -> None:
+def test_merge_overwrites_playtime_when_fresh_has_real_value():
     cached = {"store": "gog", "id": 1, "gog_id": 1, "playtime_minutes": 120}
     fresh = {"store": "gog", "id": 1, "gog_id": 1, "playtime_minutes": 240}
     merged = merge_cached_row(fresh, cached, authoritative=GOG, hltb_updated=False)
     assert merged["playtime_minutes"] == 240
 
 
-def test_merge_hltb_partial_update_keeps_cached_for_empty_fresh_keys() -> None:
-    cached = {
-        "store": "gog",
-        "id": 1,
-        "hltb_main_hours": 10.0,
-        "hltb_main_extra_hours": 15.0,
-        "hltb_name": "Old",
-    }
+def test_merge_hltb_partial_update_keeps_cached_for_empty_fresh_keys():
+    cached = {"store": "gog", "id": 1, "hltb_main_hours": 10.0, "hltb_main_extra_hours": 15.0, "hltb_name": "Old"}
     fresh = {
         "store": "gog",
         "id": 1,
@@ -151,28 +126,16 @@ def test_merge_hltb_partial_update_keeps_cached_for_empty_fresh_keys() -> None:
     assert merged["hltb_name"] == "Old"
 
 
-def test_merge_preserves_coop_when_fresh_is_false() -> None:
+def test_merge_preserves_coop_when_fresh_is_false():
     auth = GOG | frozenset({"coop_online", "coop_local"})
-    cached = {
-        "store": "gog",
-        "id": 1,
-        "gog_id": 1,
-        "coop_online": True,
-        "coop_local": True,
-    }
-    fresh = {
-        "store": "gog",
-        "id": 1,
-        "gog_id": 1,
-        "coop_online": False,
-        "coop_local": False,
-    }
+    cached = {"store": "gog", "id": 1, "gog_id": 1, "coop_online": True, "coop_local": True}
+    fresh = {"store": "gog", "id": 1, "gog_id": 1, "coop_online": False, "coop_local": False}
     merged = merge_cached_row(fresh, cached, authoritative=auth, hltb_updated=False)
     assert merged["coop_online"] is True
     assert merged["coop_local"] is True
 
 
-def test_merge_preserves_psn_first_played_and_trophy_when_fresh_empty() -> None:
+def test_merge_preserves_psn_first_played_and_trophy_when_fresh_empty():
     cached = {
         "store": "psn",
         "id": "CUSA12345_00",
@@ -196,7 +159,7 @@ def test_merge_preserves_psn_first_played_and_trophy_when_fresh_empty() -> None:
     assert merged["playtime_minutes"] == 300
 
 
-def test_merge_price_overwrites_to_zero_when_fresh_is_zero() -> None:
+def test_merge_price_overwrites_to_zero_when_fresh_is_zero():
     cached = {
         "store": "gog",
         "id": 1,
@@ -222,42 +185,21 @@ def test_merge_price_overwrites_to_zero_when_fresh_is_zero() -> None:
     assert merged["currency"] == ""
 
 
-def test_merge_last_played_keeps_newer_date() -> None:
-    cached = {
-        "store": "psn",
-        "id": "x",
-        "psn_id": "x",
-        "last_played": "2024-06-01T12:00:00Z",
-    }
-    fresh = {
-        "store": "psn",
-        "id": "x",
-        "psn_id": "x",
-        "last_played": "2023-01-01T00:00:00Z",
-    }
+def test_merge_last_played_keeps_newer_date():
+    cached = {"store": "psn", "id": "x", "psn_id": "x", "last_played": "2024-06-01T12:00:00Z"}
+    fresh = {"store": "psn", "id": "x", "psn_id": "x", "last_played": "2023-01-01T00:00:00Z"}
     merged = merge_cached_row(fresh, cached, authoritative=PSN, hltb_updated=False)
     assert merged["last_played"] == "2024-06-01T12:00:00Z"
 
 
-def test_merge_first_played_keeps_earlier_date() -> None:
-    cached = {
-        "store": "psn",
-        "id": "x",
-        "psn_id": "x",
-        "first_played": "2020-01-01T00:00:00Z",
-    }
-    fresh = {
-        "store": "psn",
-        "id": "x",
-        "psn_id": "x",
-        "first_played": "2022-06-15T00:00:00Z",
-    }
+def test_merge_first_played_keeps_earlier_date():
+    cached = {"store": "psn", "id": "x", "psn_id": "x", "first_played": "2020-01-01T00:00:00Z"}
+    fresh = {"store": "psn", "id": "x", "psn_id": "x", "first_played": "2022-06-15T00:00:00Z"}
     merged = merge_cached_row(fresh, cached, authoritative=PSN, hltb_updated=False)
     assert merged["first_played"] == "2020-01-01T00:00:00Z"
 
 
-def test_merge_humble_preserves_enrichment_on_refetch() -> None:
-    """Humble fetch rows default playtime/reviews to empty; merge must keep cache."""
+def test_merge_humble_preserves_enrichment_on_refetch():
     cached = {
         "store": "humble",
         "id": "humble-game-one",
@@ -296,8 +238,7 @@ def test_merge_humble_preserves_enrichment_on_refetch() -> None:
     assert merged["name"] == "Game One"
 
 
-def test_merge_gog_cross_source_preserves_metadata() -> None:
-    """Web → local source flip must not wipe release_date/genres/images."""
+def test_merge_gog_cross_source_preserves_metadata():
     cached = {
         "store": "gog",
         "id": 1,
@@ -343,22 +284,10 @@ def test_merge_gog_cross_source_preserves_metadata() -> None:
     assert merged["hltb_main_hours"] == 14.0
 
 
-def test_merge_sets_coop_when_fresh_is_true() -> None:
+def test_merge_sets_coop_when_fresh_is_true():
     auth = GOG | frozenset({"coop_online", "coop_local"})
-    cached = {
-        "store": "gog",
-        "id": 1,
-        "gog_id": 1,
-        "coop_online": False,
-        "coop_local": False,
-    }
-    fresh = {
-        "store": "gog",
-        "id": 1,
-        "gog_id": 1,
-        "coop_online": True,
-        "coop_local": True,
-    }
+    cached = {"store": "gog", "id": 1, "gog_id": 1, "coop_online": False, "coop_local": False}
+    fresh = {"store": "gog", "id": 1, "gog_id": 1, "coop_online": True, "coop_local": True}
     merged = merge_cached_row(fresh, cached, authoritative=auth, hltb_updated=False)
     assert merged["coop_online"] is True
     assert merged["coop_local"] is True

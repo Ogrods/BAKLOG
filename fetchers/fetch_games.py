@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch Steam library data and write games_steam.json for the dashboard."""
-
 import argparse
 import json
 import sys
@@ -33,27 +30,21 @@ GAMES_STEAM_JSON = Path("games_steam.json")
 HLTB_DELAY_SEC = 1.0
 
 
-def _finalize_steam_row(row: dict) -> dict:
+def _finalize_steam_row(row):
     appid = row["appid"]
     row["store"] = "steam"
     row["id"] = appid
     return row
 
 
-def _parse_release_date(data: dict) -> str | None:
+def _parse_release_date(data):
     rd = data.get("release_date", {}) or {}
     return rd.get("date") or None
 
 
-def _build_game_row(
-    owned: dict,
-    details: dict | None,
-    reviews: dict | None,
-    hltb: dict | None,
-) -> dict | None:
+def _build_game_row(owned, details, reviews, hltb):
     appid = owned["appid"]
     name = owned.get("name") or (details or {}).get("name", f"App {appid}")
-
     if details is None:
         return _finalize_steam_row(
             {
@@ -82,17 +73,13 @@ def _build_game_row(
                 "currency": None,
             }
         )
-
     if details.get("type") != "game":
         return None
-
     genres = [g["description"] for g in details.get("genres", [])]
     categories = details.get("categories") or []
     tags = [c["description"] for c in categories[:16]]
     coop_online, coop_local = coop_flags_from_categories(categories)
-
     price = details.get("price_overview") or {}
-
     row = {
         "appid": appid,
         "name": details.get("name", name),
@@ -121,7 +108,6 @@ def _build_game_row(
         "discount_percent": price.get("discount_percent"),
         "currency": price.get("currency"),
     }
-
     meta = enrichment_from_appdetails(details)
     row.update(
         {
@@ -132,7 +118,6 @@ def _build_game_row(
             "early_access": meta["early_access"],
         }
     )
-
     if hltb:
         row.update(
             {
@@ -143,19 +128,17 @@ def _build_game_row(
                 "hltb_name": hltb.get("hltb_name"),
             }
         )
-
     return _finalize_steam_row(row)
 
 
-def load_existing() -> dict[int, dict]:
+def load_existing():
     if not catalog_file(GAMES_STEAM_JSON).exists():
         return {}
     data = json.loads(catalog_file(GAMES_STEAM_JSON).read_text(encoding="utf-8"))
     return {g["appid"]: g for g in data.get("games", [])}
 
 
-def _row_from_cached_catalog(owned: dict, cached_row: dict) -> dict:
-    """Reuse a prior catalog row; refresh playtime from GetOwnedGames only."""
+def _row_from_cached_catalog(owned, cached_row):
     return _finalize_steam_row(
         {
             **cached_row,
@@ -165,17 +148,9 @@ def _row_from_cached_catalog(owned: dict, cached_row: dict) -> dict:
     )
 
 
-def _fetch_store_data(
-    steam: SteamClient,
-    appid: int,
-    *,
-    refresh: bool,
-    cached_row: dict | None,
-    skip_reviews: bool = False,
-) -> tuple[dict | None, dict | None]:
-    """Return (details_data, reviews) from store APIs with cache fallback."""
-    details_data: dict | None = None
-    reviews: dict | None = None
+def _fetch_store_data(steam, appid, *, refresh, cached_row, skip_reviews=False):
+    details_data = None
+    reviews = None
     try:
         app_result = steam.get_app_details(appid, refresh=refresh)
         if app_result and app_result.get("success"):
@@ -204,18 +179,14 @@ def _fetch_store_data(
                     "genres": [{"description": g} for g in cached_row.get("genres", [])],
                     "categories": [{"description": t} for t in cached_row.get("tags", [])],
                     "header_image": cached_row.get("header_image"),
-                    "release_date": (
-                        {"date": cached_row.get("release_date")}
-                        if cached_row.get("release_date")
-                        else {}
-                    ),
+                    "release_date": {"date": cached_row.get("release_date")} if cached_row.get("release_date") else {},
                 }
         else:
             reviews = None
-    return details_data, reviews
+    return (details_data, reviews)
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch Steam library into games_steam.json")
     parser.add_argument("--refresh", action="store_true", help="Ignore API cache")
     parser.add_argument("--only-new", action="store_true", help="Only fetch games not in games_steam.json")
@@ -227,18 +198,15 @@ def main() -> int:
     configure_stdout()
     t0 = started("fetch_games")
     stats = RunStats()
-
     load_dotenv()
     api_key = resolve_env("STEAM_API_KEY", provider="steam")
     steam_id = resolve_env("STEAM_ID", provider="steam")
     if not api_key or not steam_id:
         stats.error(STEAM_CREDENTIALS_HINT)
         return stats.finish("fetch_games", t0, exit_code=1)
-
     steam = SteamClient(api_key, steam_id)
     hltb_client = HltbClient()
     existing = load_existing()
-
     print("Fetching owned games from Steam...", flush=True)
     try:
         owned_games = run_with_heartbeat(steam.get_owned_games, "Steam owned-games API")
@@ -250,68 +218,50 @@ def main() -> int:
         stats.error(f"Steam API error: {e}")
         return stats.finish("fetch_games", t0, exit_code=1)
     print(f"Found {len(owned_games)} entries in library.", flush=True)
-
     if not args.appid:
         if not owned_games:
             stats.warn(STEAM_PRIVATE_PROFILE_HINT)
         empty_exit = refuse_empty_result(
-            owned_games,
-            label="Steam owned-games API",
-            allow_empty=args.allow_empty,
-            output_path=GAMES_STEAM_JSON,
+            owned_games, label="Steam owned-games API", allow_empty=args.allow_empty, output_path=GAMES_STEAM_JSON
         )
         if empty_exit is not None:
             return stats.finish("fetch_games", t0, exit_code=empty_exit)
-
     if args.appid:
         owned_games = [g for g in owned_games if g["appid"] == args.appid]
         if not owned_games:
             stats.error(f"App ID {args.appid} not in your library.")
             return stats.finish("fetch_games", t0, exit_code=1)
-
-    games_out: list[dict] = []
+    games_out = []
     skipped = 0
-
-    store_prefetch: list[int] = []
+    store_prefetch = []
     for owned in owned_games:
         appid = owned["appid"]
-        if args.only_new and appid in existing and not args.refresh and not args.appid:
+        if args.only_new and appid in existing and (not args.refresh) and (not args.appid):
             continue
         cached_row = existing.get(appid)
         if args.refresh or cached_row is None or args.appid:
             store_prefetch.append(appid)
     if store_prefetch:
-        print(
-            f"Prefetching store metadata for {len(store_prefetch)} games...",
-            flush=True,
-        )
+        print(f"Prefetching store metadata for {len(store_prefetch)} games...", flush=True)
         prefetch_hb = HeartbeatTimer(interval=25.0)
         for j, appid in enumerate(store_prefetch, 1):
-            prefetch_hb.tick_progress(
-                j, len(store_prefetch), "Steam store metadata", str(appid)
-            )
+            prefetch_hb.tick_progress(j, len(store_prefetch), "Steam store metadata", str(appid))
             steam.get_app_details(appid, refresh=args.refresh)
-
     loop_hb = HeartbeatTimer(interval=25.0)
     for i, owned in enumerate(owned_games, 1):
         appid = owned["appid"]
         name = owned.get("name", str(appid))
-
-        if args.only_new and appid in existing and not args.refresh and not args.appid:
+        if args.only_new and appid in existing and (not args.refresh) and (not args.appid):
             games_out.append(_finalize_steam_row(dict(existing[appid])))
             loop_hb.tick_progress(i, len(owned_games), "Steam library", "cached")
             continue
-
         print(f"[{i}/{len(owned_games)}] {name} ({appid})", flush=True)
         loop_hb.reset()
-
         cached_row = existing.get(appid)
         need_store = args.refresh or cached_row is None or args.appid
-
         use_cached_only = not need_store and cached_row is not None
-        details_data: dict | None = None
-        reviews: dict | None = None
-
+        details_data = None
+        reviews = None
         if use_cached_only:
             reviews = {
                 "percent_positive": cached_row.get("steam_review_percent"),
@@ -324,9 +274,8 @@ def main() -> int:
                 appid,
                 refresh=args.refresh,
                 cached_row=cached_row,
-                skip_reviews=args.only_new and not args.refresh and not args.appid,
+                skip_reviews=args.only_new and (not args.refresh) and (not args.appid),
             )
-
         hltb = None
         if not args.skip_hltb and (args.refresh or cached_row is None or cached_row.get("hltb_main_hours") is None):
             try:
@@ -344,7 +293,6 @@ def main() -> int:
                 "hltb_match_confidence": cached_row.get("hltb_match_confidence"),
                 "hltb_name": cached_row.get("hltb_name"),
             }
-
         if use_cached_only:
             row = _row_from_cached_catalog(owned, cached_row)
             if hltb:
@@ -360,7 +308,6 @@ def main() -> int:
             games_out.append(row)
             loop_hb.tick_progress(i, len(owned_games), "Steam library", name[:40])
             continue
-
         row = _build_game_row(owned, details_data, reviews, hltb)
         if row is None:
             skipped += 1
@@ -368,40 +315,23 @@ def main() -> int:
             continue
         games_out.append(row)
         loop_hb.tick_progress(i, len(owned_games), "Steam library", name[:40])
-
     empty_exit = refuse_empty_result(
-        games_out,
-        label="Steam library rows",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_STEAM_JSON,
+        games_out, label="Steam library rows", allow_empty=args.allow_empty, output_path=GAMES_STEAM_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_games", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        games_out,
-        label="Steam library rows",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_STEAM_JSON,
+        games_out, label="Steam library rows", allow_drift=args.allow_drift, output_path=GAMES_STEAM_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_games", t0, exit_code=drift_exit)
-
-    games_out = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_appid,
-        no_carry=args.no_carry,
-    )
-
-    # Inline write (not write_games_json) because the payload includes steam_id at root.
-    # Per-row enrichment is preserved via cached_row in the loop above.
+    games_out = apply_carry_forward(games_out, existing, key_fn=row_key_by_appid, no_carry=args.no_carry)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "steam_id": steam_id,
         "game_count": len(games_out),
         "games": sorted(games_out, key=lambda g: g["name"].lower()),
     }
-
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     disk = write_catalog_text(GAMES_STEAM_JSON, text)
     print(f"\nWrote {len(games_out)} games to {disk} (skipped {skipped} non-game items).", flush=True)

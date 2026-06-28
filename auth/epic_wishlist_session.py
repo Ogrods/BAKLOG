@@ -1,40 +1,26 @@
-"""Shared Epic storefront wishlist session checks for connect and fetch."""
-
-from __future__ import annotations
-
 import json
 import re
-from typing import Any
 from urllib.parse import quote, urlparse
 
 EPIC_WISHLIST_URL = "https://store.epicgames.com/en-US/wishlist"
 
 
-def epic_store_login_url() -> str:
-    """Epic ID login that redirects back to the storefront wishlist after sign-in."""
-    return (
-        "https://www.epicgames.com/id/login?lang=en-US&noHostRedirect=true"
-        f"&redirectUrl={quote(EPIC_WISHLIST_URL, safe='')}"
-    )
-
-_SIGN_IN_RE = re.compile(r"sign\s*in|log\s*in", re.I)
-_CF_TITLE_RE = re.compile(r"<title>\s*just a moment", re.I)
+def epic_store_login_url():
+    return f"https://www.epicgames.com/id/login?lang=en-US&noHostRedirect=true&redirectUrl={quote(EPIC_WISHLIST_URL, safe='')}"
 
 
-def is_epic_graphql_url(url: str) -> bool:
-    """True for any Epic GraphQL endpoint (store, graphql.*, www.*)."""
+_SIGN_IN_RE = re.compile("sign\\s*in|log\\s*in", re.I)
+_CF_TITLE_RE = re.compile("<title>\\s*just a moment", re.I)
+
+
+def is_epic_graphql_url(url):
     u = (url or "").lower()
     return "/graphql" in u and "epicgames.com" in u
 
 
-def wishlist_graphql_ok(payload: Any) -> bool:
-    """True for the main wishlist query — not ancillary Wishlist.* toast calls.
-
-    Epic's GraphQL gateway may answer a single query as a dict or batch several
-    operations into a top-level list, so handle both shapes.
-    """
+def wishlist_graphql_ok(payload):
     if isinstance(payload, list):
-        return any(wishlist_graphql_ok(p) for p in payload)
+        return any((wishlist_graphql_ok(p) for p in payload))
     if _elements_from_payload(payload):
         return True
     if not isinstance(payload, dict):
@@ -49,9 +35,9 @@ def wishlist_graphql_ok(payload: Any) -> bool:
     return isinstance(items, dict)
 
 
-def _elements_from_payload(payload: Any) -> list[dict]:
+def _elements_from_payload(payload):
     if isinstance(payload, list):
-        out: list[dict] = []
+        out = []
         for entry in payload:
             out.extend(_elements_from_payload(entry))
         return out
@@ -72,12 +58,11 @@ def _elements_from_payload(payload: Any) -> list[dict]:
     return [el for el in elements if isinstance(el, dict)]
 
 
-def graphql_debug_entry(url: str, payload: Any) -> dict[str, Any]:
-    """Compact summary of a captured GraphQL response for diagnosing misses."""
+def graphql_debug_entry(url, payload):
 
-    def data_keys(p: Any) -> list[str]:
+    def data_keys(p):
         if isinstance(p, list):
-            keys: list[str] = []
+            keys = []
             for entry in p:
                 keys.extend(data_keys(entry))
             return keys
@@ -87,9 +72,9 @@ def graphql_debug_entry(url: str, payload: Any) -> dict[str, Any]:
                 return list(data.keys())
         return []
 
-    def wishlist_sub_keys(p: Any) -> list[str]:
+    def wishlist_sub_keys(p):
         if isinstance(p, list):
-            keys: list[str] = []
+            keys = []
             for entry in p:
                 keys.extend(wishlist_sub_keys(entry))
             return keys
@@ -114,13 +99,12 @@ def graphql_debug_entry(url: str, payload: Any) -> dict[str, Any]:
 _GET_WISHLIST_QUERY_KEY = '"queryKey":["getWishlist"'
 
 
-def _parse_json_value(text: str, start: int) -> tuple[Any | None, int]:
-    """Parse one JSON object/array at text[start:]; return (value, end_index)."""
+def _parse_json_value(text, start):
     pos = start
     while pos < len(text) and text[pos] in " \t\n\r":
         pos += 1
     if pos >= len(text) or text[pos] not in "{[":
-        return None, pos
+        return (None, pos)
     open_ch = text[pos]
     close_ch = "}" if open_ch == "{" else "]"
     depth = 0
@@ -145,26 +129,21 @@ def _parse_json_value(text: str, start: int) -> tuple[Any | None, int]:
             depth -= 1
             if depth == 0:
                 try:
-                    return json.loads(text[pos : i + 1]), i + 1
+                    return (json.loads(text[pos : i + 1]), i + 1)
                 except json.JSONDecodeError:
-                    return None, i + 1
-    return None, len(text)
+                    return (None, i + 1)
+    return (None, len(text))
 
 
-def extract_wishlist_payloads_from_html(html: str) -> list[dict[str, Any]]:
-    """Pull wishlist GraphQL-shaped payloads from Epic's dehydrated React Query state.
-
-    The storefront SSR embeds ``getWishlist`` results in the page HTML; no separate
-    GraphQL network request fires on a warm profile navigation.
-    """
+def extract_wishlist_payloads_from_html(html):
     body = html or ""
-    payloads: list[dict[str, Any]] = []
+    payloads = []
     idx = 0
     while True:
         pos = body.find(_GET_WISHLIST_QUERY_KEY, idx)
         if pos == -1:
             break
-        window_start = max(0, pos - 12_000)
+        window_start = max(0, pos - 12000)
         window = body[window_start:pos]
         for marker in ('"data":{"Wishlist"', '"data": {"Wishlist"'):
             rel = window.rfind(marker)
@@ -186,10 +165,9 @@ def extract_wishlist_payloads_from_html(html: str) -> list[dict[str, Any]]:
     return payloads
 
 
-def extract_catalog_offers_from_html(html: str) -> dict[str, dict[str, Any]]:
-    """Map offer id -> catalogOffer blobs from the same dehydrated state."""
+def extract_catalog_offers_from_html(html):
     body = html or ""
-    offers: dict[str, dict[str, Any]] = {}
+    offers = {}
     idx = 0
     marker = '"catalogOffer"'
     while True:
@@ -209,14 +187,11 @@ def extract_catalog_offers_from_html(html: str) -> dict[str, dict[str, Any]]:
     return offers
 
 
-def enrich_wishlist_elements_with_catalog(
-    html: str, elements: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    """Attach catalogOffer metadata when dehydrated wishlist rows omit embedded offers."""
+def enrich_wishlist_elements_with_catalog(html, elements):
     offers = extract_catalog_offers_from_html(html)
     if not offers:
         return elements
-    out: list[dict[str, Any]] = []
+    out = []
     for el in elements:
         row = dict(el)
         if not row.get("offer"):
@@ -227,12 +202,11 @@ def enrich_wishlist_elements_with_catalog(
     return out
 
 
-def wishlist_capture_complete_from_html(html: str) -> bool:
-    return any(wishlist_graphql_ok(p) for p in extract_wishlist_payloads_from_html(html))
+def wishlist_capture_complete_from_html(html):
+    return any((wishlist_graphql_ok(p) for p in extract_wishlist_payloads_from_html(html)))
 
 
-def cloudflare_interstitial(html: str, url: str) -> bool:
-    """True only for an active Cloudflare challenge page (not embedded CF scripts)."""
+def cloudflare_interstitial(html, url):
     u = (url or "").lower()
     if "/cdn-cgi/challenge" in u:
         return True
@@ -244,25 +218,23 @@ def cloudflare_interstitial(html: str, url: str) -> bool:
     return False
 
 
-def storefront_bounced_to_home(url: str) -> bool:
-    """True when the storefront URL is not the wishlist after a wishlist navigation."""
+def storefront_bounced_to_home(url):
     parsed = urlparse(url or "")
     host = (parsed.netloc or "").lower()
     path = (parsed.path or "").lower()
     return "store.epicgames.com" in host and "wishlist" not in path
 
 
-def storefront_signed_out(html: str, url: str) -> bool:
-    """True when the storefront session is not active (excluding in-progress CF)."""
+def storefront_signed_out(html, url):
     u = (url or "").lower()
-    if "id.epicgames.com/login" in u or "/login" in u and "store" not in u:
+    if "id.epicgames.com/login" in u or ("/login" in u and "store" not in u):
         return True
     if cloudflare_interstitial(html, url):
         return False
     if storefront_bounced_to_home(url):
         return True
     body = html or ""
-    if _SIGN_IN_RE.search(body) and not _CF_TITLE_RE.search(body):
+    if _SIGN_IN_RE.search(body) and (not _CF_TITLE_RE.search(body)):
         if storefront_bounced_to_home(url):
             return True
         if "wishlist" not in body.lower():
@@ -270,27 +242,13 @@ def storefront_signed_out(html: str, url: str) -> bool:
     return False
 
 
-def storefront_auth_blocked(html: str, url: str) -> bool:
-    """True when the storefront cannot load the wishlist after waiting."""
+def storefront_auth_blocked(html, url):
     return cloudflare_interstitial(html, url) or storefront_signed_out(html, url)
 
 
-def storefront_auth_error_message(html: str, url: str) -> str:
-    """User-facing error for a failed wishlist capture."""
+def storefront_auth_error_message(html, url):
     if cloudflare_interstitial(html, url):
-        return (
-            "Cloudflare blocked the Epic wishlist fetch. Open Connections, click "
-            "Epic (wishlist) \u2192 Connect, complete any Cloudflare check, sign in, "
-            "open Wishlist, and wait for it to finish loading."
-        )
+        return "Cloudflare blocked the Epic wishlist fetch. Open Connections, click Epic (wishlist) → Connect, complete any Cloudflare check, sign in, open Wishlist, and wait for it to finish loading."
     if storefront_bounced_to_home(url):
-        return (
-            "Epic storefront session is not active (bounced to store home). Open "
-            "Connections, click Epic (wishlist) \u2192 Connect, sign in, open Wishlist "
-            "from the menu, and wait for your tiles to load before the window closes."
-        )
-    return (
-        "Epic storefront session is missing or expired. Open Connections, click "
-        "Epic (wishlist) \u2192 Connect, sign in at store.epicgames.com/wishlist "
-        "(clear Cloudflare if shown), and wait for the wishlist to load."
-    )
+        return "Epic storefront session is not active (bounced to store home). Open Connections, click Epic (wishlist) → Connect, sign in, open Wishlist from the menu, and wait for your tiles to load before the window closes."
+    return "Epic storefront session is missing or expired. Open Connections, click Epic (wishlist) → Connect, sign in at store.epicgames.com/wishlist (clear Cloudflare if shown), and wait for the wishlist to load."

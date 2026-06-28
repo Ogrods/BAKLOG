@@ -1,9 +1,4 @@
-"""Verify Supabase access tokens for the BAKLOG dev server."""
-
-from __future__ import annotations
-
 import os
-from typing import Any
 
 import jwt
 from jwt.exceptions import InvalidTokenError
@@ -12,70 +7,56 @@ _AUDIENCE = "authenticated"
 _HS256_ALGORITHMS = ("HS256",)
 _JWKS_ALGORITHMS = ("ES256", "RS256")
 _JWT_REQUIRED_CLAIMS = ("exp", "sub", "iss")
-_cached_jwks_client: jwt.PyJWKClient | None = None
+_cached_jwks_client = None
 
 
-def auth_disabled() -> bool:
-    return os.environ.get("BAKLOG_AUTH_DISABLED", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
+def auth_disabled():
+    return os.environ.get("BAKLOG_AUTH_DISABLED", "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def local_profiles_enabled() -> bool:
-    """Allow local Work/Play profile switching even when Supabase auth is on."""
-    return os.environ.get("BAKLOG_LOCAL_PROFILES", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
+def local_profiles_enabled():
+    return os.environ.get("BAKLOG_LOCAL_PROFILES", "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def _jwt_secret() -> str:
+def _jwt_secret():
     return os.environ.get("BAKLOG_SUPABASE_JWT_SECRET", "").strip()
 
 
-def _supabase_url() -> str:
+def _supabase_url():
     return os.environ.get("BAKLOG_SUPABASE_URL", "").strip().rstrip("/")
 
 
-def _anon_key() -> str:
+def _anon_key():
     return os.environ.get("BAKLOG_SUPABASE_ANON_KEY", "").strip()
 
 
-def _jwt_issuer() -> str | None:
+def _jwt_issuer():
     url = _supabase_url()
     return f"{url}/auth/v1" if url else None
 
 
-def auth_enabled() -> bool:
+def auth_enabled():
     if auth_disabled():
         return False
     return bool(_supabase_url() and _anon_key())
 
 
-def public_auth_config() -> dict[str, Any]:
-    """Values safe to expose to the browser via GET /api/config."""
+def public_auth_config():
     return {
         "supabaseUrl": _supabase_url(),
         "supabaseAnonKey": _anon_key(),
         "authRequired": auth_enabled(),
         "localProfiles": local_profiles_enabled(),
         "authConfirmRedirectUrl": os.environ.get(
-            "BAKLOG_AUTH_CONFIRM_REDIRECT_URL",
-            "https://baklog.app/auth/confirmed",
+            "BAKLOG_AUTH_CONFIRM_REDIRECT_URL", "https://baklog.app/auth/confirmed"
         ).strip(),
         "authResetRedirectUrl": os.environ.get(
-            "BAKLOG_AUTH_RESET_REDIRECT_URL",
-            "https://baklog.app/auth/reset",
+            "BAKLOG_AUTH_RESET_REDIRECT_URL", "https://baklog.app/auth/reset"
         ).strip(),
     }
 
 
-def _parse_bearer(authorization: str | None) -> str | None:
+def _parse_bearer(authorization):
     if not authorization:
         return None
     parts = authorization.strip().split(None, 1)
@@ -85,12 +66,12 @@ def _parse_bearer(authorization: str | None) -> str | None:
     return token or None
 
 
-def _jwks_url() -> str | None:
+def _jwks_url():
     url = _supabase_url()
     return f"{url}/auth/v1/.well-known/jwks.json" if url else None
 
 
-def _get_jwks_client() -> jwt.PyJWKClient | None:
+def _get_jwks_client():
     global _cached_jwks_client
     jwks_url = _jwks_url()
     if not jwks_url:
@@ -103,8 +84,7 @@ def _get_jwks_client() -> jwt.PyJWKClient | None:
     return _cached_jwks_client
 
 
-def warmup_jwks_client() -> None:
-    """Fetch JWKS once at server boot when auth is on (best-effort)."""
+def warmup_jwks_client():
     if not auth_enabled() or _jwt_secret():
         return
     jwks_url = _jwks_url()
@@ -120,7 +100,7 @@ def warmup_jwks_client() -> None:
         pass
 
 
-def _decode_hs256(raw: str) -> dict[str, Any] | None:
+def _decode_hs256(raw):
     secret = _jwt_secret()
     if not secret:
         return None
@@ -141,8 +121,7 @@ def _decode_hs256(raw: str) -> dict[str, Any] | None:
     return payload
 
 
-def _decode_jwks(raw: str) -> dict[str, Any] | None:
-    """Verify asymmetric Supabase access tokens (ES256/RS256) via JWKS."""
+def _decode_jwks(raw):
     import time
 
     global _cached_jwks_client
@@ -175,22 +154,19 @@ def _decode_jwks(raw: str) -> dict[str, Any] | None:
     return None
 
 
-def _decode_access_token(raw: str) -> dict[str, Any] | None:
-    """Verify JWT via legacy HS256 secret and/or project JWKS (ES256/RS256)."""
+def _decode_access_token(raw):
     payload = _decode_hs256(raw)
     if payload is not None:
         return payload
     return _decode_jwks(raw)
 
 
-def verify_bearer_token(authorization: str | None) -> str | None:
-    """Return Supabase user id (JWT ``sub``) or None when invalid."""
+def verify_bearer_token(authorization):
     user = verify_bearer_user(authorization)
     return user["id"] if user else None
 
 
-def verify_bearer_user(authorization: str | None) -> dict[str, str] | None:
-    """Return ``{"id", "email"}`` for a valid token, else None."""
+def verify_bearer_user(authorization):
     if not auth_enabled():
         return None
     raw = _parse_bearer(authorization)
@@ -203,21 +179,11 @@ def verify_bearer_user(authorization: str | None) -> dict[str, str] | None:
     if not isinstance(sub, str) or not sub.strip():
         return None
     email = payload.get("email")
-    return {
-        "id": sub.strip(),
-        "email": email.strip() if isinstance(email, str) else "",
-    }
+    return {"id": sub.strip(), "email": email.strip() if isinstance(email, str) else ""}
 
 
-def _extract_plan(payload: dict[str, Any]) -> str | None:
-    """Pull a plan/entitlement string from a verified JWT payload.
-
-    Only server-controlled claims are trusted: a top-level ``plan`` claim (set
-    via a Supabase access-token hook) and ``app_metadata.plan``. ``user_metadata``
-    is deliberately ignored — Supabase users can edit their own ``user_metadata``
-    via the client SDK, so trusting it would let a free user self-assign ``pro``.
-    """
-    candidates: list[Any] = [payload.get("plan")]
+def _extract_plan(payload):
+    candidates = [payload.get("plan")]
     app_meta = payload.get("app_metadata")
     if isinstance(app_meta, dict):
         candidates.append(app_meta.get("plan"))
@@ -227,13 +193,7 @@ def _extract_plan(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def verify_bearer_plan(authorization: str | None) -> str | None:
-    """Return the signed plan claim for a valid token, else None.
-
-    Because the token signature is verified, this claim cannot be forged
-    without a valid Supabase session — the basis for entitlement gating when
-    auth is enabled.
-    """
+def verify_bearer_plan(authorization):
     if not auth_enabled():
         return None
     raw = _parse_bearer(authorization)
@@ -245,7 +205,6 @@ def verify_bearer_plan(authorization: str | None) -> str | None:
     return _extract_plan(payload)
 
 
-def reset_jwks_client_for_tests() -> None:
-    """Clear cached JWKS client (tests only)."""
+def reset_jwks_client_for_tests():
     global _cached_jwks_client
     _cached_jwks_client = None

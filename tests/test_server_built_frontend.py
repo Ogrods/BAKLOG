@@ -1,7 +1,3 @@
-"""Tests for built-frontend index rewriting and cache headers."""
-
-from __future__ import annotations
-
 import importlib
 
 import pytest
@@ -17,9 +13,7 @@ def server_mod(monkeypatch, tmp_path):
     )
     index = tmp_path / "index.html"
     index.write_text(
-        '<link rel="stylesheet" href="tailwind.css" />\n'
-        '<link rel="stylesheet" href="app.css" />\n'
-        '<script type="module" src="js/app.js"></script>\n',
+        '<link rel="stylesheet" href="tailwind.css" />\n<link rel="stylesheet" href="app.css" />\n<script type="module" src="js/app.js"></script>\n',
         encoding="utf-8",
     )
     monkeypatch.setenv("BAKLOG_SERVE_BUILT", "1")
@@ -62,7 +56,6 @@ def test_built_index_html_rewrites_css_when_frozen(server_mod, tmp_path, monkeyp
     bf.invalidate_built_index_cache()
     ip._BUILT_MANIFEST_CACHE = None
     ip._BUILT_MANIFEST_MTIME_NS = None
-
     html = built_index_html()
     assert html is not None
     assert 'href="dist/tailwind.AAAA.css"' in html
@@ -100,10 +93,6 @@ def test_immutable_built_asset_detection(server_mod):
 
 
 def test_built_table_query_worker_served_as_public_static(tmp_path, monkeypatch):
-    """The worker that js/table-query.js spawns in built mode resolves to
-    /dist/js/table-query.worker.js (tableQueryWorkerUrl, built branch). Guard
-    that this path is classified public AND actually served over HTTP, so the
-    off-main-thread filter/sort path can't silently 404 in a frozen build."""
     import threading
     import urllib.request
     from functools import partial
@@ -114,25 +103,17 @@ def test_built_table_query_worker_served_as_public_static(tmp_path, monkeypatch)
     from shared.server_static import static_class
 
     assert static_class("/dist/js/table-query.worker.js") == "public"
-
     worker = tmp_path / "dist" / "js" / "table-query.worker.js"
     worker.parent.mkdir(parents=True)
     worker.write_text("self.onmessage = () => {};\n", encoding="utf-8")
-
-    # _resolved_static_path_allowed (translate_path) validates against bundle_root.
     monkeypatch.setattr(ip, "bundle_root", lambda: tmp_path)
     monkeypatch.setattr(server, "ROOT", tmp_path)
-
-    httpd = ThreadingHTTPServer(
-        ("127.0.0.1", 0), partial(server.Handler, directory=str(tmp_path))
-    )
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(tmp_path)))
     port = httpd.server_address[1]
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/dist/js/table-query.worker.js", timeout=5
-        ) as resp:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/dist/js/table-query.worker.js", timeout=5) as resp:
             status = resp.status
             ctype = resp.headers.get("Content-Type", "")
             body = resp.read().decode("utf-8")
@@ -140,7 +121,6 @@ def test_built_table_query_worker_served_as_public_static(tmp_path, monkeypatch)
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=5)
-
     assert status == 200
     assert "javascript" in ctype.lower()
     assert "onmessage" in body

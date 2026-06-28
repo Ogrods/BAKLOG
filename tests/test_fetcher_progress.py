@@ -1,16 +1,7 @@
-"""Tests for fetcher progress helpers and empty/drift guards."""
-from __future__ import annotations
-
 import json
 
 from fetchers._base import refuse_drift_result, refuse_empty_result
-from fetchers._progress import (
-    HeartbeatTimer,
-    RunStats,
-    pct,
-    progress_line,
-    started,
-)
+from fetchers._progress import HeartbeatTimer, RunStats, pct, progress_line, started
 
 
 def test_refuse_empty_result_blocks_by_default():
@@ -31,7 +22,6 @@ def _write_games_file(path, count):
 
 
 def test_refuse_drift_no_baseline_passes(tmp_path):
-    # No previous file → can't measure drift → return None.
     out = tmp_path / "games.json"
     assert refuse_drift_result(list(range(5)), label="x", allow_drift=False, output_path=out) is None
 
@@ -39,14 +29,12 @@ def test_refuse_drift_no_baseline_passes(tmp_path):
 def test_refuse_drift_within_threshold_passes(tmp_path):
     out = tmp_path / "games.json"
     _write_games_file(out, 100)
-    # 60 >= floor(50) → allowed.
     assert refuse_drift_result(list(range(60)), label="x", allow_drift=False, output_path=out) is None
 
 
 def test_refuse_drift_under_threshold_blocks(tmp_path):
     out = tmp_path / "games.json"
     _write_games_file(out, 600)
-    # 3 << floor(300) → exit 3.
     assert refuse_drift_result(list(range(3)), label="x", allow_drift=False, output_path=out) == 3
 
 
@@ -59,13 +47,7 @@ def test_refuse_drift_allow_drift_overrides(tmp_path):
 def test_refuse_drift_custom_threshold(tmp_path):
     out = tmp_path / "games.json"
     _write_games_file(out, 100)
-    # threshold 0.9 → floor 90 → 80 fails.
-    assert (
-        refuse_drift_result(
-            list(range(80)), label="x", allow_drift=False, output_path=out, threshold=0.9
-        )
-        == 3
-    )
+    assert refuse_drift_result(list(range(80)), label="x", allow_drift=False, output_path=out, threshold=0.9) == 3
 
 
 def test_refuse_drift_handles_malformed_baseline(tmp_path):
@@ -119,8 +101,6 @@ def test_heartbeat_timer_emits_after_interval(capsys):
     timer = HeartbeatTimer(interval=0.02)
     timer.tick("silent")
     assert capsys.readouterr().out == ""
-    # Simulate elapsed silence deterministically; real sleep margins are flaky
-    # on loaded CI runners where monotonic()/sleep() resolution varies.
     timer._last -= timer.interval + 0.01
     timer.tick("still working")
     assert "still working" in capsys.readouterr().out

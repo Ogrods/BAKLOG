@@ -1,7 +1,3 @@
-"""Tests for cross-platform login startup registration (shared/startup.py)."""
-
-from __future__ import annotations
-
 import plistlib
 import subprocess
 import sys
@@ -11,7 +7,6 @@ from unittest.mock import MagicMock
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import shared.startup as startup
 
 
@@ -34,8 +29,8 @@ def test_startup_argv_frozen_uses_tray_exe(monkeypatch, tmp_path):
 def test_startup_argv_frozen_falls_back_to_executable(monkeypatch, tmp_path):
     monkeypatch.setattr(startup, "is_frozen", lambda: True)
     monkeypatch.setattr(startup, "frozen_tray_exe", lambda: tmp_path / "missing.exe")
-    monkeypatch.setattr(startup.sys, "executable", r"C:\fallback\BAKLOG.exe")
-    assert startup.startup_argv() == [r"C:\fallback\BAKLOG.exe"]
+    monkeypatch.setattr(startup.sys, "executable", "C:\\fallback\\BAKLOG.exe")
+    assert startup.startup_argv() == ["C:\\fallback\\BAKLOG.exe"]
 
 
 def test_startup_argv_dev_ends_with_tray_app(monkeypatch):
@@ -51,9 +46,9 @@ def test_startup_argv_dev_ends_with_tray_app(monkeypatch):
 def test_startup_argv_dev_windows_prefers_pythonw(monkeypatch):
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(startup, "is_frozen", lambda: False)
-    monkeypatch.setattr(startup, "pythonw_executable", lambda: r"C:\proj\.venv\Scripts\pythonw.exe")
+    monkeypatch.setattr(startup, "pythonw_executable", lambda: "C:\\proj\\.venv\\Scripts\\pythonw.exe")
     argv = startup.startup_argv()
-    assert argv[0] == r"C:\proj\.venv\Scripts\pythonw.exe"
+    assert argv[0] == "C:\\proj\\.venv\\Scripts\\pythonw.exe"
 
 
 def test_pythonw_executable_honors_override(monkeypatch):
@@ -63,7 +58,7 @@ def test_pythonw_executable_honors_override(monkeypatch):
 
 def test_toggle_startup_enables_when_disabled(monkeypatch):
     monkeypatch.setattr(startup, "is_startup_enabled", lambda: False)
-    calls: list[str] = []
+    calls = []
     monkeypatch.setattr(startup, "enable_startup", lambda: calls.append("enable"))
     monkeypatch.setattr(startup, "disable_startup", lambda: calls.append("disable"))
     startup.toggle_startup()
@@ -72,7 +67,7 @@ def test_toggle_startup_enables_when_disabled(monkeypatch):
 
 def test_toggle_startup_disables_when_enabled(monkeypatch):
     monkeypatch.setattr(startup, "is_startup_enabled", lambda: True)
-    calls: list[str] = []
+    calls = []
     monkeypatch.setattr(startup, "enable_startup", lambda: calls.append("enable"))
     monkeypatch.setattr(startup, "disable_startup", lambda: calls.append("disable"))
     startup.toggle_startup()
@@ -122,8 +117,8 @@ def test_win_is_enabled_false_on_missing_value(monkeypatch):
 
 def test_win_enable_sets_registry_value(monkeypatch):
     monkeypatch.setattr(sys, "platform", "win32")
-    monkeypatch.setattr(startup, "startup_argv", lambda: [r"C:\pythonw.exe", r"C:\tray_app.py"])
-    stored: dict[str, str] = {}
+    monkeypatch.setattr(startup, "startup_argv", lambda: ["C:\\pythonw.exe", "C:\\tray_app.py"])
+    stored = {}
 
     def fake_create(key, subkey):
         return _FakeRegKey()
@@ -143,7 +138,7 @@ def test_win_enable_sets_registry_value(monkeypatch):
 
 
 def test_win_disable_deletes_value(monkeypatch):
-    deleted: list[str] = []
+    deleted = []
 
     def fake_open(key, subkey, reserved, access):
         return _FakeRegKey()
@@ -166,7 +161,7 @@ def test_mac_enable_writes_plist_and_loads(monkeypatch, tmp_path):
     monkeypatch.setattr(startup, "startup_argv", lambda: ["/venv/bin/python", "/app/tray_app.py"])
     agent_dir = tmp_path / "Library" / "LaunchAgents"
     monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
-    launchctl_calls: list[list[str]] = []
+    launchctl_calls = []
 
     def fake_run(cmd, **kwargs):
         launchctl_calls.append(cmd)
@@ -192,7 +187,7 @@ def test_mac_disable_unloads_and_removes_plist(monkeypatch, tmp_path):
     plist_path = agent_dir / startup._LAUNCH_AGENT_NAME
     plist_path.write_bytes(b"plist")
     monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
-    launchctl_calls: list[list[str]] = []
+    launchctl_calls = []
 
     def fake_run(cmd, **kwargs):
         launchctl_calls.append(cmd)
@@ -250,15 +245,14 @@ def test_is_startup_enabled_unsupported_platform(monkeypatch):
 
 def test_enable_disable_noop_on_unsupported_platform(monkeypatch):
     monkeypatch.setattr(sys, "platform", "freebsd")
-    startup.enable_startup()  # must not raise
+    startup.enable_startup()
     startup.disable_startup()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows registry integration")
 def test_win_round_trip_integration(monkeypatch):
-    """Enable then disable via real registry; cleans up afterward."""
     try:
-        import winreg  # noqa: F401  # availability guard; real registry work is in startup.*
+        import winreg
     except ImportError:
         pytest.skip("winreg unavailable")
     monkeypatch.setattr(startup, "startup_argv", lambda: ["test.exe", "tray"])
@@ -275,11 +269,7 @@ def test_win_round_trip_integration(monkeypatch):
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS LaunchAgent integration")
 def test_mac_round_trip_integration(monkeypatch, tmp_path):
     monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
-    monkeypatch.setattr(
-        startup,
-        "startup_argv",
-        lambda: [sys.executable, str(Path(__file__).resolve())],
-    )
+    monkeypatch.setattr(startup, "startup_argv", lambda: [sys.executable, str(Path(__file__).resolve())])
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: MagicMock(returncode=0))
     startup.disable_startup()
     assert startup.is_startup_enabled() is False
@@ -294,11 +284,7 @@ def test_mac_round_trip_integration(monkeypatch, tmp_path):
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux XDG autostart integration")
 def test_linux_round_trip_integration(monkeypatch, tmp_path):
     monkeypatch.setattr(startup.Path, "home", staticmethod(lambda: tmp_path))
-    monkeypatch.setattr(
-        startup,
-        "startup_argv",
-        lambda: [sys.executable, str(Path(__file__).resolve())],
-    )
+    monkeypatch.setattr(startup, "startup_argv", lambda: [sys.executable, str(Path(__file__).resolve())])
     startup.disable_startup()
     assert startup.is_startup_enabled() is False
     startup.enable_startup()

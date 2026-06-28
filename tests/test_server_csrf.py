@@ -1,12 +1,7 @@
-"""CSRF / localhost guard on mutating API routes."""
-
-from __future__ import annotations
-
 import json
 import threading
 from functools import partial
 from http.server import ThreadingHTTPServer
-from pathlib import Path
 
 import pytest
 
@@ -15,13 +10,12 @@ from shared import profile_paths
 
 
 @pytest.fixture()
-def csrf_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def csrf_server(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
     monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
     server._refresh_personal_paths()
-
     runs_dir = tmp_path / "runs"
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
@@ -54,97 +48,76 @@ def csrf_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         thread.join(timeout=5)
 
 
-def _post(
-    base: str,
-    path: str,
-    *,
-    origin: str | None = None,
-    local_header: bool = False,
-) -> tuple[int, dict]:
+def _post(base, path, *, origin=None, local_header=False):
     import urllib.error
     import urllib.request
 
-    headers: dict[str, str] = {}
+    headers = {}
     if origin is not None:
         headers["Origin"] = origin
     if local_header:
         headers[server._BAKLOG_LOCAL_HEADER] = "1"
-    req = urllib.request.Request(
-        f"{base}{path}",
-        method="POST",
-        headers=headers,
-        data=b"",
-    )
+    req = urllib.request.Request(f"{base}{path}", method="POST", headers=headers, data=b"")
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            return (resp.status, json.loads(resp.read().decode("utf-8")))
     except urllib.error.HTTPError as exc:
         payload = exc.read().decode("utf-8")
         try:
             parsed = json.loads(payload)
         except json.JSONDecodeError:
             parsed = {"error": payload}
-        return exc.code, parsed
+        return (exc.code, parsed)
 
 
-def test_cross_origin_post_blocked(csrf_server: str) -> None:
+def test_cross_origin_post_blocked(csrf_server):
     status, body = _post(csrf_server, "/api/runs/cancel", origin="https://evil.example")
     assert status == 403
     assert "cross-origin" in body.get("error", "").lower()
 
 
-def test_local_header_post_allowed(csrf_server: str) -> None:
+def test_local_header_post_allowed(csrf_server):
     status, _body = _post(csrf_server, "/api/runs/cancel", local_header=True)
     assert status == 200
 
 
-def test_local_origin_post_requires_local_header(csrf_server: str) -> None:
+def test_local_origin_post_requires_local_header(csrf_server):
     base = csrf_server
     status, body = _post(base, "/api/runs/cancel", origin=base)
     assert status == 403
     assert "cross-origin" in body.get("error", "").lower()
 
 
-def _put_personal(
-    base: str,
-    *,
-    origin: str | None = None,
-    local_header: bool = False,
-) -> tuple[int, dict]:
+def _put_personal(base, *, origin=None, local_header=False):
     import urllib.error
     import urllib.request
 
-    headers: dict[str, str] = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json"}
     if origin is not None:
         headers["Origin"] = origin
     if local_header:
         headers[server._BAKLOG_LOCAL_HEADER] = "1"
     body = json.dumps({"personal": {}, "prefs": {}, "manual": []}).encode("utf-8")
-    req = urllib.request.Request(
-        f"{base}/api/personal",
-        method="PUT",
-        headers=headers,
-        data=body,
-    )
+    req = urllib.request.Request(f"{base}/api/personal", method="PUT", headers=headers, data=body)
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            return (resp.status, json.loads(resp.read().decode("utf-8")))
     except urllib.error.HTTPError as exc:
         payload = exc.read().decode("utf-8")
         try:
             parsed = json.loads(payload)
         except json.JSONDecodeError:
             parsed = {"error": payload}
-        return exc.code, parsed
+        return (exc.code, parsed)
 
 
-def test_personal_put_requires_local_header_not_origin_only(csrf_server: str) -> None:
+def test_personal_put_requires_local_header_not_origin_only(csrf_server):
     base = csrf_server
     status, body = _put_personal(base, origin=base)
     assert status == 403
     assert "cross-origin" in body.get("error", "").lower()
 
 
-def test_personal_put_allowed_with_local_header(csrf_server: str) -> None:
+def test_personal_put_allowed_with_local_header(csrf_server):
     status, _body = _put_personal(csrf_server, local_header=True)
     assert status == 200

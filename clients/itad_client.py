@@ -1,8 +1,5 @@
-"""IsThereAnyDeal API client. Requires free API key from isthereanydeal.com."""
-
 import json
 import time
-from pathlib import Path
 from urllib.parse import quote
 
 import requests
@@ -20,14 +17,14 @@ class ItadError(Exception):
     pass
 
 
-def _default_itad_cache_dir() -> Path:
+def _default_itad_cache_dir():
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "itad"
 
 
 class ItadClient:
-    def __init__(self, api_key: str, country: str = "US", cache_dir: Path | None = None):
+    def __init__(self, api_key, country="US", cache_dir=None):
         if cache_dir is None:
             cache_dir = _default_itad_cache_dir()
         self.api_key = api_key
@@ -38,15 +35,15 @@ class ItadClient:
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "steam-backlog/1.0"
 
-    def _throttle(self) -> None:
+    def _throttle(self):
         elapsed = time.time() - self._last
         if elapsed < REQUEST_DELAY_SEC:
             time.sleep(REQUEST_DELAY_SEC - elapsed)
         self._last = time.time()
 
-    def _get(self, path: str, params: dict | None = None) -> dict:
+    def _get(self, path, params=None):
         p = {"key": self.api_key, **(params or {})}
-        last_exc: BaseException | None = None
+        last_exc = None
         for attempt in range(len(_RETRY_BACKOFF) + 1):
             self._throttle()
             resp = self.session.get(f"{BASE}/{path}", params=p, timeout=30)
@@ -63,7 +60,7 @@ class ItadClient:
                 if (
                     exc.response is not None
                     and exc.response.status_code in _RETRYABLE_HTTP
-                    and attempt < len(_RETRY_BACKOFF)
+                    and (attempt < len(_RETRY_BACKOFF))
                 ):
                     time.sleep(_RETRY_BACKOFF[attempt])
                     continue
@@ -72,7 +69,7 @@ class ItadClient:
             raise last_exc
         raise RuntimeError("ITAD GET retry loop exited without response")
 
-    def _post(self, path: str, body: list | dict, params: dict | None = None) -> list | dict:
+    def _post(self, path, body, params=None):
         self._throttle()
         p = {"key": self.api_key, **(params or {})}
         resp = self.session.post(f"{BASE}/{path}", params=p, json=body, timeout=60)
@@ -81,20 +78,17 @@ class ItadClient:
         resp.raise_for_status()
         return resp.json()
 
-    def lookup_title(self, title: str, appid: int | None = None) -> str | None:
-        """Return ITAD game id (UUID) for a title, or None."""
+    def lookup_title(self, title, appid=None):
         cache_key = f"{appid}:{title}" if appid else title
         cache_path = self.cache_dir / "lookup" / f"{quote(cache_key, safe='')[:120]}.json"
         if cache_path.exists():
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             return cached.get("id")
-
-        params: dict = {}
+        params = {}
         if appid:
             params["appid"] = appid
         else:
             params["title"] = title
-
         try:
             data = self._get("games/lookup/v1", params)
         except requests.HTTPError as e:
@@ -102,20 +96,17 @@ class ItadClient:
                 data = {"found": False}
             else:
                 raise
-
         game_id = None
         if data.get("found") and data.get("game"):
             game_id = data["game"].get("id")
-
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps({"id": game_id}, ensure_ascii=False), encoding="utf-8")
         return game_id
 
-    def prices_for_ids(self, game_ids: list[str]) -> dict[str, dict]:
-        """Batch current prices. Returns game id -> best deal info."""
+    def prices_for_ids(self, game_ids):
         if not game_ids:
             return {}
-        out: dict[str, dict] = {}
+        out = {}
         chunk_size = 200
         total_chunks = max(1, (len(game_ids) + chunk_size - 1) // chunk_size)
         hb = HeartbeatTimer(interval=25.0)
@@ -137,21 +128,14 @@ class ItadClient:
                 price_amt = price.get("amount")
                 all_low = (hist.get("all") or {}).get("amount")
                 year_low = (hist.get("year") or {}).get("amount")
-                is_all_time = (
-                    price_amt is not None
-                    and all_low is not None
-                    and price_amt <= all_low + 0.01
-                )
+                is_all_time = price_amt is not None and all_low is not None and (price_amt <= all_low + 0.01)
                 is_year = (
                     price_amt is not None
                     and year_low is not None
-                    and price_amt <= year_low + 0.01
-                    and not is_all_time
+                    and (price_amt <= year_low + 0.01)
+                    and (not is_all_time)
                 )
-                currency = normalize_currency_code(
-                    price.get("currency"),
-                    country=self.country,
-                )
+                currency = normalize_currency_code(price.get("currency"), country=self.country)
                 out[gid] = {
                     "shop": (best.get("shop") or {}).get("name"),
                     "price": price_amt,
@@ -167,6 +151,5 @@ class ItadClient:
                 }
         return out
 
-    # Back-compat alias used by fetch_itad.py
-    def prices_for_plains(self, plains: list[str]) -> dict[str, dict]:
+    def prices_for_plains(self, plains):
         return self.prices_for_ids(plains)

@@ -1,7 +1,3 @@
-"""Tests for shared/cloud_mirror.py."""
-
-from __future__ import annotations
-
 import json
 import time
 
@@ -36,8 +32,7 @@ def profile_root(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     prof.mkdir(parents=True)
     (prof / "index.json").write_text(
-        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}),
-        encoding="utf-8",
+        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}), encoding="utf-8"
     )
     (prof / "default").mkdir()
     (prof / "default" / "data").mkdir()
@@ -58,7 +53,7 @@ def _enable_auth(monkeypatch):
     reset_jwks_client_for_tests()
 
 
-def _pro_bearer(sub: str = "550e8400-e29b-41d4-a716-446655440000") -> str:
+def _pro_bearer(sub="550e8400-e29b-41d4-a716-446655440000"):
     token = jwt.encode(
         {
             "sub": sub,
@@ -104,8 +99,7 @@ def test_flush_skips_when_pro_but_toggle_off(profile_root, monkeypatch):
     path = catalog_path("games_steam.json", profile_id="default")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('{"games":[]}', encoding="utf-8")
-
-    uploaded: list[str] = []
+    uploaded = []
 
     def _upload(**kwargs):
         uploaded.append(kwargs["artifact_path"])
@@ -126,8 +120,7 @@ def test_flush_uploads_when_pro_auth_and_session(profile_root, monkeypatch):
     path = catalog_path("games_steam.json", profile_id="default")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('{"games":[]}', encoding="utf-8")
-
-    uploaded: list[str] = []
+    uploaded = []
 
     def _upload(**kwargs):
         uploaded.append(kwargs["artifact_path"])
@@ -135,7 +128,6 @@ def test_flush_uploads_when_pro_auth_and_session(profile_root, monkeypatch):
 
     monkeypatch.setattr("shared.supabase_mirror.upload_mirror_object", _upload)
     monkeypatch.setattr("shared.supabase_mirror.upsert_mirror_snapshot_row", lambda **kwargs: None)
-
     cm.schedule_mirror_upload(path, profile_id="default")
     with cm._lock:
         cm._pending["default"]["flush_at"] = time.time() - 1
@@ -202,20 +194,11 @@ def test_mirror_read_allowed_requires_pro_jwt(profile_root, monkeypatch):
 def test_import_remote_mirror_writes_catalogs_and_personal(profile_root, monkeypatch):
     _enable_auth(monkeypatch)
     steam_doc = {"games": [{"store": "steam", "id": "570", "name": "Dota 2"}]}
-    personal_doc = {
-        "personal": {"steam:570": {"status": "playing"}},
-        "prefs": {},
-        "manual": [],
-        "libraryFirstSeen": {},
-    }
-
+    personal_doc = {"personal": {"steam:570": {"status": "playing"}}, "prefs": {}, "manual": [], "libraryFirstSeen": {}}
     monkeypatch.setattr(
         cm,
         "list_remote_mirror_artifacts",
-        lambda **kwargs: [
-            {"path": "games_steam.json"},
-            {"path": "data/personal.json"},
-        ],
+        lambda **kwargs: [{"path": "games_steam.json"}, {"path": "data/personal.json"}],
     )
 
     def _download(**kwargs):
@@ -227,13 +210,11 @@ def test_import_remote_mirror_writes_catalogs_and_personal(profile_root, monkeyp
         raise AssertionError(path)
 
     monkeypatch.setattr(cm, "download_remote_mirror_artifact", _download)
-
     result = cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
     assert result["count"] == 2
     assert "games_steam.json" in result["imported"]
     assert "data/personal.json" in result["imported"]
     assert result["personal"] is True
-
     saved_steam = json.loads(catalog_path("games_steam.json", profile_id="default").read_text(encoding="utf-8"))
     assert saved_steam["games"][0]["name"] == "Dota 2"
     saved_personal = json.loads(personal_path(profile_id="default").read_text(encoding="utf-8"))
@@ -249,15 +230,9 @@ def test_import_remote_mirror_empty_raises(profile_root, monkeypatch):
 
 def test_import_rejects_empty_games_catalog(profile_root, monkeypatch):
     _enable_auth(monkeypatch)
+    monkeypatch.setattr(cm, "list_remote_mirror_artifacts", lambda **kwargs: [{"path": "games_steam.json"}])
     monkeypatch.setattr(
-        cm,
-        "list_remote_mirror_artifacts",
-        lambda **kwargs: [{"path": "games_steam.json"}],
-    )
-    monkeypatch.setattr(
-        cm,
-        "download_remote_mirror_artifact",
-        lambda **kwargs: json.dumps({"games": []}).encode("utf-8"),
+        cm, "download_remote_mirror_artifact", lambda **kwargs: json.dumps({"games": []}).encode("utf-8")
     )
     with pytest.raises(ValueError, match="empty games"):
         cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
@@ -266,21 +241,10 @@ def test_import_rejects_empty_games_catalog(profile_root, monkeypatch):
 def test_import_rollback_on_catalog_failure(profile_root, monkeypatch):
     _enable_auth(monkeypatch)
     steam_doc = {"games": [{"store": "steam", "id": "570", "name": "Dota 2"}]}
-    personal_doc = {
-        "personal": {"steam:570": {"status": "playing"}},
-        "prefs": {},
-        "manual": [],
-        "libraryFirstSeen": {},
-    }
-    local_personal = {
-        "personal": {"steam:1": {"status": "backlog"}},
-        "prefs": {},
-        "manual": [],
-        "libraryFirstSeen": {},
-    }
+    personal_doc = {"personal": {"steam:570": {"status": "playing"}}, "prefs": {}, "manual": [], "libraryFirstSeen": {}}
+    local_personal = {"personal": {"steam:1": {"status": "backlog"}}, "prefs": {}, "manual": [], "libraryFirstSeen": {}}
     personal_path(profile_id="default").parent.mkdir(parents=True, exist_ok=True)
     personal_path(profile_id="default").write_text(json.dumps(local_personal), encoding="utf-8")
-
     monkeypatch.setattr(
         cm,
         "list_remote_mirror_artifacts",
@@ -301,9 +265,7 @@ def test_import_rollback_on_catalog_failure(profile_root, monkeypatch):
         raise ValueError("catalog write failed")
 
     monkeypatch.setattr("shared.server_catalog_import.import_catalog_payload", _fail_import)
-
     with pytest.raises(ValueError, match="catalog write failed"):
         cm.import_remote_mirror_to_profile(authorization=_pro_bearer())
-
     restored = json.loads(personal_path(profile_id="default").read_text(encoding="utf-8"))
     assert restored["personal"]["steam:1"]["status"] == "backlog"

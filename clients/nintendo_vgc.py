@@ -1,38 +1,24 @@
-"""Nintendo Virtual Game Cards (VGC) via accounts.nintendo.com portal.
-
-Entitlements list (stable applicationId) complements eShop transaction history
-in clients/nintendo_client.py (~2 year receipt window).
-"""
-
-from __future__ import annotations
-
 import html
 import json
 import re
 import time
-from pathlib import Path
-from typing import Any
 
-VGC_PORTAL_URL = (
-    "https://accounts.nintendo.com/portal/vgcs/?sort=activated_date&order=desc"
-)
+VGC_PORTAL_URL = "https://accounts.nintendo.com/portal/vgcs/?sort=activated_date&order=desc"
 VGC_PAGE_LIMIT = 300
-DATA_JSON_RE = re.compile(r'<div id="data" data-json="(.*?)"', re.DOTALL)
-STATE_JSON_RE = re.compile(r'<div id="state" data-json="(.*?)"', re.DOTALL)
+DATA_JSON_RE = re.compile('<div id="data" data-json="(.*?)"', re.DOTALL)
+STATE_JSON_RE = re.compile('<div id="state" data-json="(.*?)"', re.DOTALL)
 DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
-
 _SIZE_PLACEHOLDER = "${size}"
 _DEFAULT_ICON_SIZE = 256
 _HEADER_ICON_SIZE = 512
 
 
-def _parse_icon_sizes(sizes: Any) -> list[int]:
+def _parse_icon_sizes(sizes):
     if not isinstance(sizes, list):
         return []
-    out: list[int] = []
+    out = []
     for raw in sizes:
         try:
             out.append(int(raw))
@@ -41,7 +27,7 @@ def _parse_icon_sizes(sizes: Any) -> list[int]:
     return out
 
 
-def _pick_icon_size(sizes: Any, *, prefer_large: bool = False) -> int:
+def _pick_icon_size(sizes, *, prefer_large=False):
     parsed = _parse_icon_sizes(sizes)
     if not parsed:
         return _HEADER_ICON_SIZE if prefer_large else _DEFAULT_ICON_SIZE
@@ -52,13 +38,7 @@ def _pick_icon_size(sizes: Any, *, prefer_large: bool = False) -> int:
     return min(pool, key=lambda s: abs(s - _DEFAULT_ICON_SIZE))
 
 
-def resolve_nintendo_icon_url(
-    url: str | None,
-    sizes: Any = None,
-    *,
-    prefer_large: bool = False,
-) -> str | None:
-    """Expand Nintendo atum CDN ``${size}`` placeholders to a real pixel size."""
+def resolve_nintendo_icon_url(url, sizes=None, *, prefer_large=False):
     if not url:
         return None
     text = str(url).strip()
@@ -69,100 +49,24 @@ def resolve_nintendo_icon_url(
     size = _pick_icon_size(sizes, prefer_large=prefer_large)
     return text.replace(_SIZE_PLACEHOLDER, str(size))
 
-REGION_DEFAULTS: dict[str, dict[str, Any]] = {
-    "US": {
-        "country": "US",
-        "shop_id": 1,
-        "nas_language": "en-US",
-        "language": "en",
-    },
-    "GB": {
-        "country": "GB",
-        "shop_id": 3,
-        "nas_language": "en-GB",
-        "language": "en",
-    },
-    "CA": {
-        "country": "CA",
-        "shop_id": 2,
-        "nas_language": "en-CA",
-        "language": "en",
-    },
-}
 
-VGC_GRAPHQL_QUERY = """query getVgcs(
-    $idToken: String!
-    $country: CountryCode!
-    $language: LanguageCode!
-    $shopId: Int!
-    $limit: Int!
-    $nasLanguage: String!
-    $offset: Int!
-    $order: RequestableVgcViewOrder!
-    $sortBy: RequestableVgcViewSortBy!
-    $vgcViewType: VgcViewTypeInput
-    $vgcViewStatus: VgcViewStatusInput
-  ) @inContext(country: $country, language: $language, shopId: $shopId) {
-    account {
-      vgc {
-        vgcViews(
-          idToken: $idToken,
-          limit: $limit,
-          nasLanguage: $nasLanguage,
-          offset: $offset,
-          order: $order,
-          sortBy: $sortBy,
-          isHidden: false,
-          vgcViewType: $vgcViewType,
-          vgcViewStatus: $vgcViewStatus,
-        ) {
-          offsetInfo {
-            total
-            offset
-          }
-          views {
-            id
-            applicationId
-            applicationName
-            apparentPlatform
-            publisher
-            icon {
-              url
-              upgradedIconUrl
-              sizes
-            }
-            ownerNaId
-            userNaId
-            isHidden
-            isLending
-            isPartialLending
-            lendingExpireDatetime
-            insertedNsDeviceId
-            hasApplication
-            hasAddOnContents
-            hasUpgrade
-            hasNxApplication
-            hasNxAddOnContents
-            hasOunceApplication
-            hasOunceAddOnContents
-            containsReleased
-          }
-        }
-      }
-    }
-  }"""
+REGION_DEFAULTS = {
+    "US": {"country": "US", "shop_id": 1, "nas_language": "en-US", "language": "en"},
+    "GB": {"country": "GB", "shop_id": 3, "nas_language": "en-GB", "language": "en"},
+    "CA": {"country": "CA", "shop_id": 2, "nas_language": "en-CA", "language": "en"},
+}
+VGC_GRAPHQL_QUERY = "query getVgcs(\n    $idToken: String!\n    $country: CountryCode!\n    $language: LanguageCode!\n    $shopId: Int!\n    $limit: Int!\n    $nasLanguage: String!\n    $offset: Int!\n    $order: RequestableVgcViewOrder!\n    $sortBy: RequestableVgcViewSortBy!\n    $vgcViewType: VgcViewTypeInput\n    $vgcViewStatus: VgcViewStatusInput\n  ) @inContext(country: $country, language: $language, shopId: $shopId) {\n    account {\n      vgc {\n        vgcViews(\n          idToken: $idToken,\n          limit: $limit,\n          nasLanguage: $nasLanguage,\n          offset: $offset,\n          order: $order,\n          sortBy: $sortBy,\n          isHidden: false,\n          vgcViewType: $vgcViewType,\n          vgcViewStatus: $vgcViewStatus,\n        ) {\n          offsetInfo {\n            total\n            offset\n          }\n          views {\n            id\n            applicationId\n            applicationName\n            apparentPlatform\n            publisher\n            icon {\n              url\n              upgradedIconUrl\n              sizes\n            }\n            ownerNaId\n            userNaId\n            isHidden\n            isLending\n            isPartialLending\n            lendingExpireDatetime\n            insertedNsDeviceId\n            hasApplication\n            hasAddOnContents\n            hasUpgrade\n            hasNxApplication\n            hasNxAddOnContents\n            hasOunceApplication\n            hasOunceAddOnContents\n            containsReleased\n          }\n        }\n      }\n    }\n  }"
 
 
 class NintendoVgcAuthError(Exception):
-    """Session expired or VGC portal not reachable while signed in."""
+    pass
 
 
 class NintendoVgcCaptureError(Exception):
-    """Signed-in session present but VGC list could not be parsed."""
+    pass
 
 
-def parse_vgc_embedded_json(page_html: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Extract ``data`` and ``state`` JSON blobs embedded in the VGC portal HTML."""
+def parse_vgc_embedded_json(page_html):
     data_match = DATA_JSON_RE.search(page_html or "")
     state_match = STATE_JSON_RE.search(page_html or "")
     if not data_match:
@@ -176,18 +80,12 @@ def parse_vgc_embedded_json(page_html: str) -> tuple[dict[str, Any], dict[str, A
         raise NintendoVgcCaptureError("VGC data-json was not an object.")
     if not isinstance(state, dict):
         state = {}
-    return data, state
+    return (data, state)
 
 
-def region_from_vgc_state(state: dict[str, Any]) -> dict[str, Any]:
-    """Map portal state to Savanna GraphQL region variables."""
+def region_from_vgc_state(state):
     user = state.get("user") if isinstance(state.get("user"), dict) else {}
-    country = (
-        state.get("country")
-        or user.get("country")
-        or user.get("countryCode")
-        or ""
-    )
+    country = state.get("country") or user.get("country") or user.get("countryCode") or ""
     if isinstance(country, str) and country.upper() in REGION_DEFAULTS:
         return dict(REGION_DEFAULTS[country.upper()])
     lang = str(state.get("lang") or user.get("language") or "").lower()
@@ -198,40 +96,27 @@ def region_from_vgc_state(state: dict[str, Any]) -> dict[str, Any]:
     return dict(REGION_DEFAULTS["US"])
 
 
-def _platform_label(view: dict[str, Any]) -> str | None:
+def _platform_label(view):
     platform = (view.get("apparentPlatform") or "").upper()
     if platform == "NX" or view.get("hasNxApplication") or view.get("hasNxAddOnContents"):
         return "Nintendo Switch"
-    if platform == "OUNCE" or view.get("hasOunceApplication") or view.get(
-        "hasOunceAddOnContents"
-    ):
+    if platform == "OUNCE" or view.get("hasOunceApplication") or view.get("hasOunceAddOnContents"):
         return "Nintendo Switch 2"
     if platform:
         return platform
     return None
 
 
-def map_vgc_view(view: dict[str, Any]) -> dict[str, Any]:
-    """Normalize a single VGC view row for catalog merge / probe diff."""
+def map_vgc_view(view):
     icon = view.get("icon") if isinstance(view.get("icon"), dict) else {}
     icon_sizes = icon.get("sizes")
-    icon_url = resolve_nintendo_icon_url(
-        icon.get("upgradedIconUrl") or icon.get("url"),
-        icon_sizes,
-        prefer_large=True,
-    )
-    icon_standard = resolve_nintendo_icon_url(
-        icon.get("url"),
-        icon_sizes,
-        prefer_large=False,
-    )
+    icon_url = resolve_nintendo_icon_url(icon.get("upgradedIconUrl") or icon.get("url"), icon_sizes, prefer_large=True)
+    icon_standard = resolve_nintendo_icon_url(icon.get("url"), icon_sizes, prefer_large=False)
     name = " ".join(str(view.get("applicationName") or "").split()).strip()
     app_id = str(view.get("applicationId") or view.get("id") or "").strip()
     is_dlc = bool(
-        view.get("hasAddOnContents")
-        or view.get("hasNxAddOnContents")
-        or view.get("hasOunceAddOnContents")
-    ) and not view.get("hasApplication")
+        view.get("hasAddOnContents") or view.get("hasNxAddOnContents") or view.get("hasOunceAddOnContents")
+    ) and (not view.get("hasApplication"))
     return {
         "application_id": app_id,
         "vgc_id": str(view.get("id") or ""),
@@ -257,18 +142,8 @@ def map_vgc_view(view: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _merge_vgc_payload(
-    payload: dict[str, Any],
-    collected: list[dict[str, Any]],
-    seen_ids: set[str],
-) -> int:
-    views = (
-        payload.get("data", {})
-        .get("account", {})
-        .get("vgc", {})
-        .get("vgcViews", {})
-        .get("views")
-    )
+def _merge_vgc_payload(payload, collected, seen_ids):
+    views = payload.get("data", {}).get("account", {}).get("vgc", {}).get("vgcViews", {}).get("views")
     if not isinstance(views, list):
         return 0
     added = 0
@@ -285,90 +160,69 @@ def _merge_vgc_payload(
     return added
 
 
-def _portal_html_has_vgc_data(page_html: str) -> bool:
+def _portal_html_has_vgc_data(page_html):
     return bool(DATA_JSON_RE.search(page_html or ""))
 
 
-def _portal_html_looks_unsigned(page_html: str) -> bool:
+def _portal_html_looks_unsigned(page_html):
     body = (page_html or "").lower()
-    return ("log in" in body or "sign in" in body) and not _portal_html_has_vgc_data(page_html)
+    return ("log in" in body or "sign in" in body) and (not _portal_html_has_vgc_data(page_html))
 
 
-def fetch_vgc_portal_html(context: Any, *, user_agent: str, page: Any | None = None) -> str:
-    """Load VGC portal HTML via HTTP GET with profile cookies, not SPA domcontentloaded."""
+def fetch_vgc_portal_html(context, *, user_agent, page=None):
     headers = {
         "User-Agent": user_agent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://accounts.nintendo.com/",
     }
-    resp = context.request.get(VGC_PORTAL_URL, headers=headers, timeout=60_000)
+    resp = context.request.get(VGC_PORTAL_URL, headers=headers, timeout=60000)
     html_body = resp.text() if resp.status == 200 else ""
     if _portal_html_has_vgc_data(html_body):
         return html_body
     if _portal_html_looks_unsigned(html_body):
-        raise NintendoVgcAuthError(
-            "Nintendo session expired - reconnect Nintendo in Connections."
-        )
-
+        raise NintendoVgcAuthError("Nintendo session expired - reconnect Nintendo in Connections.")
     active_page = page
     if active_page is None:
         active_page = context.pages[0] if context.pages else context.new_page()
     try:
-        active_page.goto(VGC_PORTAL_URL, wait_until="commit", timeout=30_000)
+        active_page.goto(VGC_PORTAL_URL, wait_until="commit", timeout=30000)
     except Exception as exc:
-        raise NintendoVgcAuthError(
-            f"Could not open Nintendo VGC portal: {exc}"
-        ) from exc
+        raise NintendoVgcAuthError(f"Could not open Nintendo VGC portal: {exc}") from exc
     time.sleep(3)
     html_body = active_page.content()
     if _portal_html_looks_unsigned(html_body):
-        raise NintendoVgcAuthError(
-            "Nintendo session expired - reconnect Nintendo in Connections."
-        )
+        raise NintendoVgcAuthError("Nintendo session expired - reconnect Nintendo in Connections.")
     return html_body
 
 
 class NintendoVgcClient:
-    def __init__(
-        self,
-        *,
-        profile_path: Path,
-        headless: bool = True,
-        user_agent: str | None = None,
-    ) -> None:
+    def __init__(self, *, profile_path, headless=True, user_agent=None):
         self._profile_path = profile_path
         self._headless = headless
         self._user_agent = user_agent or DEFAULT_USER_AGENT
 
-    def fetch_all_cards(self) -> list[dict[str, Any]]:
+    def fetch_all_cards(self):
         if not self._profile_path.exists():
-            raise NintendoVgcAuthError(
-                "Nintendo browser profile missing. Connect Nintendo in Connections first."
-            )
+            raise NintendoVgcAuthError("Nintendo browser profile missing. Connect Nintendo in Connections first.")
         return self._fetch_via_browser_profile(self._profile_path)
 
-    def _fetch_via_browser_profile(self, profile_path: Path) -> list[dict[str, Any]]:
+    def _fetch_via_browser_profile(self, profile_path):
         from auth.cdp_browser import launch_persistent_profile
 
-        collected: list[dict[str, Any]] = []
-        seen_ids: set[str] = set()
-
+        collected = []
+        seen_ids = set()
         with launch_persistent_profile(profile_path, headless=self._headless) as context:
             page = context.pages[0] if context.pages else None
-            html_body = fetch_vgc_portal_html(
-                context, user_agent=self._user_agent, page=page
-            )
+            html_body = fetch_vgc_portal_html(context, user_agent=self._user_agent, page=page)
             data, state = parse_vgc_embedded_json(html_body)
             id_token = data.get("idToken")
             shop_url = data.get("shopGraphQLApiUrl")
             savanna_client_id = data.get("savannaClientId")
-            if not id_token or not shop_url or not savanna_client_id:
+            if not id_token or not shop_url or (not savanna_client_id):
                 raise NintendoVgcCaptureError(
-                    "VGC portal data-json missing idToken, shopGraphQLApiUrl, or "
-                    "savannaClientId."
+                    "VGC portal data-json missing idToken, shopGraphQLApiUrl, or savannaClientId."
                 )
-
             region = region_from_vgc_state(state)
             offset = 0
             total = None
@@ -396,29 +250,19 @@ class NintendoVgcClient:
                         "Accept": "application/json",
                         "Content-Type": "application/json",
                     },
-                    timeout=60_000,
+                    timeout=60000,
                 )
                 if resp.status != 200:
-                    raise NintendoVgcCaptureError(
-                        f"VGC GraphQL HTTP {resp.status}: {resp.text()[:400]}"
-                    )
+                    raise NintendoVgcCaptureError(f"VGC GraphQL HTTP {resp.status}: {resp.text()[:400]}")
                 try:
                     payload = json.loads(resp.text())
                 except json.JSONDecodeError as exc:
-                    raise NintendoVgcCaptureError(
-                        f"VGC GraphQL response was not JSON: {exc}"
-                    ) from exc
+                    raise NintendoVgcCaptureError(f"VGC GraphQL response was not JSON: {exc}") from exc
                 if payload.get("errors"):
-                    raise NintendoVgcCaptureError(
-                        f"VGC GraphQL errors: {payload.get('errors')}"
-                    )
+                    raise NintendoVgcCaptureError(f"VGC GraphQL errors: {payload.get('errors')}")
                 _merge_vgc_payload(payload, collected, seen_ids)
                 offset_info = (
-                    payload.get("data", {})
-                    .get("account", {})
-                    .get("vgc", {})
-                    .get("vgcViews", {})
-                    .get("offsetInfo", {})
+                    payload.get("data", {}).get("account", {}).get("vgc", {}).get("vgcViews", {}).get("offsetInfo", {})
                 )
                 if not isinstance(offset_info, dict):
                     break
@@ -427,7 +271,6 @@ class NintendoVgcClient:
                 if offset >= total:
                     break
                 time.sleep(0.3)
-
         if not collected:
             raise NintendoVgcCaptureError("VGC portal returned zero game cards.")
         return collected

@@ -1,18 +1,13 @@
-"""Supabase Storage helpers for the Pro cloud read-only mirror."""
-
-from __future__ import annotations
-
 import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
 
 MIRROR_BUCKET = "baklog-mirror"
 _STORAGE_TIMEOUT_SEC = 120
 
 
-def _base_url() -> str:
+def _base_url():
     from shared.supabase_auth import _supabase_url
 
     url = _supabase_url()
@@ -21,7 +16,7 @@ def _base_url() -> str:
     return url.rstrip("/")
 
 
-def _anon_key() -> str:
+def _anon_key():
     from shared.supabase_auth import _anon_key
 
     key = _anon_key()
@@ -30,30 +25,20 @@ def _anon_key() -> str:
     return key
 
 
-def mirror_object_key(user_id: str, profile_id: str, artifact_path: str) -> str:
-    """Storage object path: ``{user_id}/{profile_id}/{artifact}``."""
+def mirror_object_key(user_id, profile_id, artifact_path):
     uid = (user_id or "").strip().strip("/")
     pid = (profile_id or "").strip().strip("/")
     rel = (artifact_path or "").strip().lstrip("/")
-    if not uid or not pid or not rel:
+    if not uid or not pid or (not rel):
         raise ValueError("invalid mirror object key parts")
     if ".." in rel.split("/"):
         raise ValueError("invalid artifact path")
     return f"{uid}/{pid}/{rel}"
 
 
-def upload_mirror_object(
-    *,
-    user_id: str,
-    profile_id: str,
-    artifact_path: str,
-    body: bytes,
-    bearer_token: str,
-    content_type: str = "application/json",
-) -> dict[str, Any]:
-    """Upload or replace one mirror artifact (RLS: user's own prefix)."""
+def upload_mirror_object(*, user_id, profile_id, artifact_path, body, bearer_token, content_type="application/json"):
     key = mirror_object_key(user_id, profile_id, artifact_path)
-    encoded = "/".join(urllib.parse.quote(part, safe="") for part in key.split("/"))
+    encoded = "/".join((urllib.parse.quote(part, safe="") for part in key.split("/")))
     url = f"{_base_url()}/storage/v1/object/{MIRROR_BUCKET}/{encoded}"
     req = urllib.request.Request(
         url,
@@ -69,23 +54,12 @@ def upload_mirror_object(
     return _json_request(req)
 
 
-def download_mirror_object(
-    *,
-    user_id: str,
-    profile_id: str,
-    artifact_path: str,
-    bearer_token: str,
-) -> bytes:
+def download_mirror_object(*, user_id, profile_id, artifact_path, bearer_token):
     key = mirror_object_key(user_id, profile_id, artifact_path)
-    encoded = "/".join(urllib.parse.quote(part, safe="") for part in key.split("/"))
+    encoded = "/".join((urllib.parse.quote(part, safe="") for part in key.split("/")))
     url = f"{_base_url()}/storage/v1/object/{MIRROR_BUCKET}/{encoded}"
     req = urllib.request.Request(
-        url,
-        method="GET",
-        headers={
-            "apikey": _anon_key(),
-            "Authorization": f"Bearer {bearer_token}",
-        },
+        url, method="GET", headers={"apikey": _anon_key(), "Authorization": f"Bearer {bearer_token}"}
     )
     try:
         with urllib.request.urlopen(req, timeout=_STORAGE_TIMEOUT_SEC) as resp:
@@ -95,13 +69,7 @@ def download_mirror_object(
         raise RuntimeError(f"GET mirror object HTTP {exc.code}: {detail}") from exc
 
 
-def list_mirror_objects(
-    *,
-    user_id: str,
-    profile_id: str,
-    bearer_token: str,
-    limit: int = 200,
-) -> list[dict[str, Any]]:
+def list_mirror_objects(*, user_id, profile_id, bearer_token, limit=200):
     prefix = f"{user_id.strip()}/{profile_id.strip()}"
     url = f"{_base_url()}/storage/v1/object/list/{MIRROR_BUCKET}"
     body = json.dumps({"prefix": prefix, "limit": limit, "offset": 0}).encode("utf-8")
@@ -109,11 +77,7 @@ def list_mirror_objects(
         url,
         data=body,
         method="POST",
-        headers={
-            "apikey": _anon_key(),
-            "Authorization": f"Bearer {bearer_token}",
-            "Content-Type": "application/json",
-        },
+        headers={"apikey": _anon_key(), "Authorization": f"Bearer {bearer_token}", "Content-Type": "application/json"},
     )
     result = _json_request(req)
     if isinstance(result, list):
@@ -121,22 +85,9 @@ def list_mirror_objects(
     return []
 
 
-def upsert_mirror_snapshot_row(
-    *,
-    user_id: str,
-    profile_id: str,
-    artifact_path: str,
-    byte_size: int,
-    bearer_token: str,
-) -> None:
-    """Best-effort metadata row in ``cloud_mirror_snapshots`` (PostgREST)."""
+def upsert_mirror_snapshot_row(*, user_id, profile_id, artifact_path, byte_size, bearer_token):
     url = f"{_base_url()}/rest/v1/cloud_mirror_snapshots"
-    payload = {
-        "user_id": user_id,
-        "profile_id": profile_id,
-        "artifact_path": artifact_path,
-        "byte_size": byte_size,
-    }
+    payload = {"user_id": user_id, "profile_id": profile_id, "artifact_path": artifact_path, "byte_size": byte_size}
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -152,11 +103,10 @@ def upsert_mirror_snapshot_row(
     try:
         _json_request(req)
     except RuntimeError:
-        # Table may not exist until maintainer runs landing/sql/cloud_mirror.sql.
         pass
 
 
-def _json_request(req: urllib.request.Request) -> Any:
+def _json_request(req):
     try:
         with urllib.request.urlopen(req, timeout=_STORAGE_TIMEOUT_SEC) as resp:
             raw = resp.read().decode("utf-8")

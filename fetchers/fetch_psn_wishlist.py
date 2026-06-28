@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch PlayStation Store wishlist into games_wishlist_psn.json.
-
-Uses the same NPSSO token as fetch_psn.py via psnawp — no browser cookie or
-DevTools scraping required. The store exposes ``metGetStoreWishlist`` on
-``m.np.playstation.com`` GraphQL; prices come back when the request includes
-Apollo CSRF headers.
-
-Output rows match the shared dashboard wishlist schema (``store: "wishlist"``,
-``wishlist_store: "psn"``) so the merged Wishlist tab + ITAD deal radar pick
-them up alongside Steam, GOG, and Epic entries.
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import time
@@ -23,7 +8,7 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from clients.hltb_client import HltbClient
-from clients.psn_client import PsnAuthError, PsnClient, PsnWishlistEntry
+from clients.psn_client import PsnAuthError, PsnClient
 from fetchers._base import (
     add_allow_empty_arg,
     add_only_new_arg,
@@ -37,25 +22,15 @@ from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, sta
 
 GAMES_WISHLIST_PSN_JSON = Path("games_wishlist_psn.json")
 HLTB_DELAY_SEC = 1.0
-
-# Skip obvious non-game SKUs the user probably didn't mean to track as deals.
-_SKIP_CLASSIFICATIONS = frozenset(
-    {
-        "THEME",
-        "AVATAR",
-        "CONSUMABLE",
-        "VIRTUAL_CURRENCY",
-    }
-)
+_SKIP_CLASSIFICATIONS = frozenset({"THEME", "AVATAR", "CONSUMABLE", "VIRTUAL_CURRENCY"})
 
 
-def _build_row(entry: PsnWishlistEntry, hltb: dict | None) -> dict:
-    tags: list[str] = []
+def _build_row(entry, hltb):
+    tags = []
     if entry.localized_classification:
         tags.append(entry.localized_classification)
     if entry.platforms:
         tags.append(", ".join(entry.platforms))
-
     return {
         "store": "wishlist",
         "wishlist_store": "psn",
@@ -88,7 +63,7 @@ def _build_row(entry: PsnWishlistEntry, hltb: dict | None) -> dict:
     }
 
 
-def _load_existing() -> dict[str, dict]:
+def _load_existing():
     if not catalog_file(GAMES_WISHLIST_PSN_JSON).exists():
         return {}
     try:
@@ -98,7 +73,7 @@ def _load_existing() -> dict[str, dict]:
     return {g["id"]: g for g in data.get("games", []) if isinstance(g, dict) and g.get("id")}
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch PSN wishlist into games_wishlist_psn.json")
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     add_only_new_arg(parser)
@@ -107,13 +82,11 @@ def main() -> int:
     configure_stdout()
     t0 = started("fetch_psn_wishlist")
     stats = RunStats()
-
     load_dotenv()
     npsso = resolve_env("PSN_NPSSO", provider="psn")
     if not npsso:
         stats.error("Set PSN_NPSSO in .env (see Connections page or README).")
         return stats.finish("fetch_psn_wishlist", t0, exit_code=1)
-
     try:
         psn = PsnClient(npsso)
         online_id = psn.validate_session()
@@ -121,7 +94,6 @@ def main() -> int:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
         return stats.finish("fetch_psn_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
     print(f"Fetching PSN wishlist for {online_id}...", flush=True)
     try:
         items = run_with_heartbeat(psn.collect_wishlist, "PSN wishlist capture")
@@ -129,38 +101,25 @@ def main() -> int:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
         return stats.finish("fetch_psn_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
-    skipped = [
-        e for e in items if (e.store_classification or "").upper() in _SKIP_CLASSIFICATIONS
-    ]
+    skipped = [e for e in items if (e.store_classification or "").upper() in _SKIP_CLASSIFICATIONS]
     items = [e for e in items if (e.store_classification or "").upper() not in _SKIP_CLASSIFICATIONS]
     if skipped:
         class_labels = sorted({s.store_classification for s in skipped if s.store_classification})
         print(f"  skipped {len(skipped)} non-game SKUs ({', '.join(class_labels)})")
-
     empty_exit = refuse_empty_result(
-        items,
-        label="PSN wishlist",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_WISHLIST_PSN_JSON,
+        items, label="PSN wishlist", allow_empty=args.allow_empty, output_path=GAMES_WISHLIST_PSN_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_psn_wishlist", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        items,
-        label="PSN wishlist",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_WISHLIST_PSN_JSON,
+        items, label="PSN wishlist", allow_drift=args.allow_drift, output_path=GAMES_WISHLIST_PSN_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_psn_wishlist", t0, exit_code=drift_exit)
-
     print(f"  {len(items)} wishlist items", flush=True)
-
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing()
-    rows: list[dict] = []
-
+    rows = []
     for i, entry in enumerate(items, 1):
         row_id = f"psn-{entry.id}"
         cached = existing.get(row_id)
@@ -185,7 +144,6 @@ def main() -> int:
                 except Exception as exc:
                     print(f"  HLTB warning: {exc}")
         rows.append(_build_row(entry, hltb))
-
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_psn",

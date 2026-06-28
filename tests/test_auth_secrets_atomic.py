@@ -1,9 +1,3 @@
-"""Atomic secrets.bin writes and corrupt-load protection."""
-
-from __future__ import annotations
-
-from pathlib import Path
-
 import pytest
 
 from auth.secrets import (
@@ -18,7 +12,7 @@ from auth.secrets import (
 
 
 @pytest.fixture(autouse=True)
-def _isolated_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def _isolated_auth(tmp_path, monkeypatch):
     auth_dir = tmp_path / "auth"
     monkeypatch.setattr("auth.secrets.AUTH_DIR", auth_dir)
     monkeypatch.setattr("auth.secrets.SECRETS_FILE", auth_dir / "secrets.bin")
@@ -32,7 +26,7 @@ def _isolated_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     mod._cache = None
 
 
-def test_corrupt_secrets_raises_not_empty() -> None:
+def test_corrupt_secrets_raises_not_empty():
     import auth.secrets as mod
 
     mod._cache = None
@@ -43,7 +37,7 @@ def test_corrupt_secrets_raises_not_empty() -> None:
         load_doc()
 
 
-def test_atomic_save_keeps_backup_on_replace() -> None:
+def test_atomic_save_keeps_backup_on_replace():
     save_doc({"providers": {"steam": {"x": 1}}, "settings": {"master_password_enabled": True}})
     path = _secrets_file()
     assert path.exists()
@@ -56,7 +50,7 @@ def test_atomic_save_keeps_backup_on_replace() -> None:
     assert doc["providers"]["steam"]["x"] == 2
 
 
-def test_reset_secrets_store_archives_corrupt_blob() -> None:
+def test_reset_secrets_store_archives_corrupt_blob():
     path = _secrets_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"not-valid-ciphertext")
@@ -71,9 +65,7 @@ def test_reset_secrets_store_archives_corrupt_blob() -> None:
     assert doc["providers"] == {}
 
 
-def test_master_key_prefers_file_key_when_keyring_mismatch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_master_key_prefers_file_key_when_keyring_mismatch(monkeypatch):
     import auth.secrets as mod
 
     set_master_password_override(None)

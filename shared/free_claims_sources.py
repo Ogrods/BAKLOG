@@ -1,44 +1,34 @@
-"""Shared helpers for auto-sourced free-claim discovery and merge."""
-
-from __future__ import annotations
-
 import hashlib
 import re
 from datetime import UTC, datetime
-from typing import Any
 from xml.etree import ElementTree
 
 from shared.steam_match import strip_giveaway_decorations
 
 EPIC_FREE_GAMES_URL = (
-    "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
-    "?locale=en-US&country=US&allowCountries=US"
+    "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
 )
 GAMERPOWER_URL = "https://www.gamerpower.com/api/giveaways?platform=pc&type=game"
 ITAD_GIVEAWAYS_RSS = "https://isthereanydeal.com/feeds/US/giveaways.rss"
 GAMERPOWER_ATTRIBUTION = "GamerPower.com"
-
 ITAD_SKIP_KEYWORDS = ("bundle", "beta", "dlc", "loot", " key")
-
 SOURCE_PRECEDENCE = {"epic": 0, "gamerpower": 1, "itad": 2}
-
 EPIC_MOBILE_STORE = "epic_mobile"
 
 
-def is_epic_mobile_store(store: object) -> bool:
+def is_epic_mobile_store(store):
     return str(store or "").strip().lower() == EPIC_MOBILE_STORE
 
 
-def _is_safe_http_url(url: str) -> bool:
+def _is_safe_http_url(url):
     u = str(url or "").strip()
     return u.startswith("http://") or u.startswith("https://")
 
 
-def normalize_claim_urls(raw: object) -> dict[str, str]:
-    """Return sanitized platform URLs (ios/android) with http(s) schemes only."""
+def normalize_claim_urls(raw):
     if not isinstance(raw, dict):
         return {}
-    out: dict[str, str] = {}
+    out = {}
     for key in ("ios", "android"):
         val = str(raw.get(key) or "").strip()
         if val and _is_safe_http_url(val):
@@ -46,15 +36,13 @@ def normalize_claim_urls(raw: object) -> dict[str, str]:
     return out
 
 
-def has_valid_claim_links(item: dict) -> bool:
-    """True when the item has the outbound link(s) required for its store."""
+def has_valid_claim_links(item):
     if is_epic_mobile_store(item.get("store")):
         return bool(normalize_claim_urls(item.get("claim_urls")))
     return _is_safe_http_url(str(item.get("claim_url") or ""))
 
 
-def item_missing_link_fields(item: dict) -> list[str]:
-    """Publish-time link field names missing from a claim row."""
+def item_missing_link_fields(item):
     if is_epic_mobile_store(item.get("store")):
         if not normalize_claim_urls(item.get("claim_urls")):
             return ["claim_urls"]
@@ -62,16 +50,12 @@ def item_missing_link_fields(item: dict) -> list[str]:
     if not str(item.get("claim_url") or "").strip():
         return ["claim_url"]
     return []
-# User-facing dedup (js/claim-card.js dedupeClaims) collapses by appid/title.
-# dedup_claim_items_by_id below dedupes by feed id only and keeps cross-source
-# title dupes so the admin console can DUPE-stamp them before publish approval.
 
-# Fields written by build_free_claims enrichment and carried across auto-feed fetches.
+
 CLAIM_ENRICH_FIELDS = ("header_image", "review_percent", "steam_appid", "genres", "blurb")
 
 
-def carry_claim_enrichment(fresh: dict, existing: dict | None) -> dict:
-    """Copy persisted enrichment from a prior auto-feed row when the fresh fetch lacks it."""
+def carry_claim_enrichment(fresh, existing):
     if not existing:
         return fresh
     out = dict(fresh)
@@ -87,29 +71,15 @@ def carry_claim_enrichment(fresh: dict, existing: dict | None) -> dict:
     return out
 
 
-def norm_title(title: str) -> str:
-    """Normalize a game title for dedup/merge keys.
-
-    Giveaway/store decorations are stripped first (via the shared
-    ``strip_giveaway_decorations`` matcher) so the same game from different
-    sources — e.g. "Portal 2 (Steam) Giveaway" vs "Portal 2 free on Steam" vs
-    "Portal 2" — collapses to one key instead of slipping past dedup.
-    """
+def norm_title(title):
     stripped = strip_giveaway_decorations(str(title or ""))
     base = stripped.lower().replace("&", " and ").replace("+", " and ")
-    base = re.sub(r"[^a-z0-9]+", " ", base).strip()
-    return re.sub(r"\s+", " ", base)
+    base = re.sub("[^a-z0-9]+", " ", base).strip()
+    return re.sub("\\s+", " ", base)
 
 
-def claim_match_keys(item: dict) -> set[str]:
-    """Stable dedup keys for matching a claim across feed id churn.
-
-    Sync pair: ``js/claimable.js`` ``claimDedupKey`` — the frontend picks one
-    key (appid first, else title); here we return a set so maintainer approval
-    can match when one row carries a ``steam_appid`` and the surviving row only
-    has a normalized title after a source flip.
-    """
-    keys: set[str] = set()
+def claim_match_keys(item):
+    keys = set()
     appid = item.get("steam_appid")
     if appid is not None:
         try:
@@ -124,17 +94,16 @@ def claim_match_keys(item: dict) -> set[str]:
     return keys
 
 
-def merge_key(item: dict) -> str:
+def merge_key(item):
     item_id = str(item.get("id") or "").strip()
     if item_id:
         return f"id:{item_id}"
     return f"title:{norm_title(str(item.get('title') or ''))}"
 
 
-def merge_manual_and_auto(manual_items: list[dict], auto_items: list[dict]) -> list[dict]:
-    """Merge manual + auto items; manual entries win on duplicate keys."""
-    seen: set[str] = set()
-    merged: list[dict] = []
+def merge_manual_and_auto(manual_items, auto_items):
+    seen = set()
+    merged = []
     for raw in manual_items:
         if not isinstance(raw, dict):
             continue
@@ -155,14 +124,8 @@ def merge_manual_and_auto(manual_items: list[dict], auto_items: list[dict]) -> l
     return merged
 
 
-def dedup_claim_items_by_id(items: list[dict]) -> list[dict]:
-    """Dedup auto items by stable ``id`` only; lower SOURCE_PRECEDENCE wins on ties.
-
-    Cross-source copies of the same game (different ids) are all kept so the
-    admin DUPE stamp can flag them. Rows without an id each get a synthetic key
-    so they are never silently dropped.
-    """
-    by_key: dict[str, dict] = {}
+def dedup_claim_items_by_id(items):
+    by_key = {}
     anon = 0
     for item in items:
         item_id = str(item.get("id") or "").strip()
@@ -183,7 +146,7 @@ def dedup_claim_items_by_id(items: list[dict]) -> list[dict]:
     return list(by_key.values())
 
 
-def _parse_iso_dt(value: str | None) -> datetime | None:
+def _parse_iso_dt(value):
     if not value:
         return None
     text = str(value).strip()
@@ -200,13 +163,13 @@ def _parse_iso_dt(value: str | None) -> datetime | None:
     return dt.astimezone(UTC)
 
 
-def _to_iso_z(dt: datetime | None) -> str | None:
+def _to_iso_z(dt):
     if dt is None:
         return None
     return dt.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _epic_page_slug(element: dict) -> str | None:
+def _epic_page_slug(element):
     mappings = element.get("offerMappings") or []
     if mappings and mappings[0].get("pageSlug"):
         return str(mappings[0]["pageSlug"])
@@ -223,7 +186,7 @@ def _epic_page_slug(element: dict) -> str | None:
     return None
 
 
-def _epic_header_image(element: dict) -> str | None:
+def _epic_header_image(element):
     for preferred in ("OfferImageWide", "Thumbnail", "OfferImageTall"):
         for img in element.get("keyImages") or []:
             if img.get("type") == preferred and img.get("url"):
@@ -231,7 +194,7 @@ def _epic_header_image(element: dict) -> str | None:
     return None
 
 
-def _active_epic_free_offer(element: dict, *, now: datetime | None = None) -> dict | None:
+def _active_epic_free_offer(element, *, now=None):
     now = now or datetime.now(UTC)
     promotions = element.get("promotions") or {}
     for group in promotions.get("promotionalOffers") or []:
@@ -249,7 +212,7 @@ def _active_epic_free_offer(element: dict, *, now: datetime | None = None) -> di
     return None
 
 
-def parse_epic_element(element: dict, *, now: datetime | None = None) -> dict | None:
+def parse_epic_element(element, *, now=None):
     offer = _active_epic_free_offer(element, now=now)
     if not offer:
         return None
@@ -271,14 +234,9 @@ def parse_epic_element(element: dict, *, now: datetime | None = None) -> dict | 
     }
 
 
-def parse_epic_payload(payload: dict, *, now: datetime | None = None) -> list[dict]:
-    elements = (
-        payload.get("data", {})
-        .get("Catalog", {})
-        .get("searchStore", {})
-        .get("elements", [])
-    )
-    items: list[dict] = []
+def parse_epic_payload(payload, *, now=None):
+    elements = payload.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])
+    items = []
     for element in elements:
         if not isinstance(element, dict):
             continue
@@ -288,7 +246,7 @@ def parse_epic_payload(payload: dict, *, now: datetime | None = None) -> list[di
     return items
 
 
-def platforms_to_store(platforms: str) -> str:
+def platforms_to_store(platforms):
     text = (platforms or "").lower()
     if "steam" in text:
         return "steam"
@@ -305,13 +263,13 @@ def platforms_to_store(platforms: str) -> str:
     return "other"
 
 
-def parse_gamerpower_item(raw: dict) -> dict | None:
+def parse_gamerpower_item(raw):
     if str(raw.get("status") or "").lower() != "active":
         return None
     gp_id = raw.get("id")
     title = str(raw.get("title") or "").strip()
     claim_url = str(raw.get("open_giveaway_url") or raw.get("open_giveaway") or "").strip()
-    if gp_id is None or not title or not claim_url:
+    if gp_id is None or not title or (not claim_url):
         return None
     end_dt = _parse_iso_dt(str(raw.get("end_date") or ""))
     return {
@@ -326,8 +284,8 @@ def parse_gamerpower_item(raw: dict) -> dict | None:
     }
 
 
-def parse_gamerpower_payload(payload: list[Any]) -> list[dict]:
-    items: list[dict] = []
+def parse_gamerpower_payload(payload):
+    items = []
     for raw in payload:
         if not isinstance(raw, dict):
             continue
@@ -337,12 +295,12 @@ def parse_gamerpower_payload(payload: list[Any]) -> list[dict]:
     return items
 
 
-def should_skip_itad_title(title: str) -> bool:
+def should_skip_itad_title(title):
     lower = (title or "").lower()
-    return any(keyword in lower for keyword in ITAD_SKIP_KEYWORDS)
+    return any((keyword in lower for keyword in ITAD_SKIP_KEYWORDS))
 
 
-def _itad_store_from_text(text: str) -> str:
+def _itad_store_from_text(text):
     lower = (text or "").lower()
     for store, needles in (
         ("steam", ("steam",)),
@@ -352,14 +310,14 @@ def _itad_store_from_text(text: str) -> str:
         ("ubisoft", ("ubisoft",)),
         ("humble", ("humble",)),
     ):
-        if any(n in lower for n in needles):
+        if any((n in lower for n in needles)):
             return store
     return "other"
 
 
-def parse_itad_rss(xml_text: str) -> list[dict]:
+def parse_itad_rss(xml_text):
     root = ElementTree.fromstring(xml_text)
-    items: list[dict] = []
+    items = []
     for item in root.findall("./channel/item"):
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()

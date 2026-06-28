@@ -1,9 +1,4 @@
-"""POST /api/auth/sign-out — clear server-side auth caches on client sign-out."""
-
-from __future__ import annotations
-
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler
 
 
 def _srv():
@@ -12,7 +7,7 @@ def _srv():
     return server
 
 
-def handle_auth_sign_out_post(handler: SimpleHTTPRequestHandler) -> None:
+def handle_auth_sign_out_post(handler):
     from shared.entitlement import clear_background_auth_caches
 
     s = _srv()

@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch Steam wishlist into games_wishlist.json."""
-
 import argparse
 import json
 import time
@@ -30,7 +27,7 @@ GAMES_WISHLIST_JSON = Path("games_wishlist.json")
 HLTB_DELAY_SEC = 1.0
 
 
-def fetch_wishlist_items(api_key: str, steam_id: str) -> list[dict]:
+def fetch_wishlist_items(api_key, steam_id):
     url = "https://api.steampowered.com/IWishlistService/GetWishlist/v1/"
     params = {"key": api_key, "steamid": steam_id}
     resp = requests.get(url, params=params, timeout=30)
@@ -38,12 +35,11 @@ def fetch_wishlist_items(api_key: str, steam_id: str) -> list[dict]:
     data = resp.json()
     items = data.get("response", {}).get("items", [])
     if not items:
-        # Some accounts return items at top level
         items = data.get("response", {}).get("wishlist", []) or []
     return items
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch Steam wishlist")
     parser.add_argument("--skip-hltb", action="store_true")
     add_only_new_arg(parser)
@@ -58,13 +54,9 @@ def main() -> int:
     if not api_key or not steam_id:
         stats.error(STEAM_CREDENTIALS_HINT)
         return stats.finish("fetch_wishlist", t0, exit_code=1)
-
     print("Fetching Steam wishlist...", flush=True)
     try:
-        items = run_with_heartbeat(
-            lambda: fetch_wishlist_items(api_key, steam_id),
-            "Steam wishlist API",
-        )
+        items = run_with_heartbeat(lambda: fetch_wishlist_items(api_key, steam_id), "Steam wishlist API")
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code in (401, 403):
             mark_invalid("steam", error=STEAM_CREDENTIALS_HINT)
@@ -73,22 +65,16 @@ def main() -> int:
         stats.error(f"Wishlist API error: {e}")
         stats.error("Ensure your Steam profile and wishlist are public.")
         return stats.finish("fetch_wishlist", t0, exit_code=1)
-
     empty_exit = refuse_empty_result(
-        items,
-        label="Steam wishlist",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_WISHLIST_JSON,
+        items, label="Steam wishlist", allow_empty=args.allow_empty, output_path=GAMES_WISHLIST_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_wishlist", t0, exit_code=empty_exit)
-
     print(f"Found {len(items)} wishlist items.", flush=True)
     steam = SteamClient(api_key, steam_id)
     hltb = HltbClient()
     existing = load_existing_games(GAMES_WISHLIST_JSON)
-    games_out: list[dict] = []
-
+    games_out = []
     loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(items, 1):
         appid = int(item.get("appid") or item.get("app_id") or 0)
@@ -101,25 +87,21 @@ def main() -> int:
             continue
         print(f"[{i}/{len(items)}] appid {appid}", flush=True)
         loop_hb.reset()
-
         details = None
         try:
             details = steam.get_app_details(appid)
         except Exception as e:
             print(f"  details warning: {e}", flush=True)
-
         data = (details or {}).get("data") if details else None
         name = (data or {}).get("name") or f"Steam {appid}"
         if data and data.get("type") != "game":
             loop_hb.tick_progress(i, len(items), "Steam wishlist", "non-game")
             continue
-
         reviews = None
         try:
             reviews = steam.get_review_summary(appid)
         except Exception:
             pass
-
         hltb_data = None
         if not args.skip_hltb:
             try:
@@ -127,7 +109,6 @@ def main() -> int:
                 hltb_data = hltb.lookup(name)
             except Exception as e:
                 print(f"  HLTB warning: {e}", flush=True)
-
         price_block = (data or {}).get("price_overview") or {}
         categories = (data or {}).get("categories") or []
         category_names = {str(c.get("description") or "").strip().lower() for c in categories}
@@ -174,24 +155,16 @@ def main() -> int:
         }
         games_out.append(row)
         loop_hb.tick_progress(i, len(items), "Steam wishlist", name[:40])
-
     empty_exit = refuse_empty_result(
-        games_out,
-        label="Steam wishlist rows",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_WISHLIST_JSON,
+        games_out, label="Steam wishlist rows", allow_empty=args.allow_empty, output_path=GAMES_WISHLIST_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_wishlist", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        games_out,
-        label="Steam wishlist rows",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_WISHLIST_JSON,
+        games_out, label="Steam wishlist rows", allow_drift=args.allow_drift, output_path=GAMES_WISHLIST_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_wishlist", t0, exit_code=drift_exit)
-
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist",

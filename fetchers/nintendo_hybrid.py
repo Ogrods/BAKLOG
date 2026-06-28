@@ -1,46 +1,29 @@
-"""Merge Nintendo Virtual Game Cards (primary) with eShop transactions (secondary)."""
-
-from __future__ import annotations
-
 import re
 from collections import defaultdict
-from typing import Any
 from urllib.parse import quote
 
-from shared.library_noise import (
-    edition_title_join_key,
-    is_nintendo_noise_row,
-    maybe_tag_library_noise_row,
-)
+from shared.library_noise import edition_title_join_key, is_nintendo_noise_row, maybe_tag_library_noise_row
 
-_TRADEMARK_RE = re.compile(r"[™®©]")
-_PUNCT_RE = re.compile(r"[^\w\s]+", re.UNICODE)
-
-_DELUXE_MARKERS = (
-    "digital deluxe",
-    "deluxe edition",
-    "gold edition",
-    "ultimate edition",
-)
+_TRADEMARK_RE = re.compile("[™®©]")
+_PUNCT_RE = re.compile("[^\\w\\s]+", re.UNICODE)
+_DELUXE_MARKERS = ("digital deluxe", "deluxe edition", "gold edition", "ultimate edition")
 
 
-def clean_nintendo_title(name: str) -> str:
+def clean_nintendo_title(name):
     text = _TRADEMARK_RE.sub("", name or "")
     text = _PUNCT_RE.sub(" ", text)
     return " ".join(text.split()).strip()
 
 
-def norm_nintendo_title(name: str) -> str:
+def norm_nintendo_title(name):
     return clean_nintendo_title(name).lower()
 
 
-def match_nintendo_title_key(name: str) -> str:
-    """Aggressive normalize for receipt↔VGC title join (edition suffixes stripped)."""
+def match_nintendo_title_key(name):
     return edition_title_join_key(name)
 
 
-def nintendo_store_url(application_id: str | None, name: str) -> str:
-    """Best-effort Nintendo store link; application_id (NS UID) is stable when present."""
+def nintendo_store_url(application_id, name):
     app = str(application_id or "").strip()
     if len(app) >= 8:
         return f"https://www.nintendo.com/us/store/products/game/{app}/"
@@ -48,11 +31,10 @@ def nintendo_store_url(application_id: str | None, name: str) -> str:
     return f"https://www.nintendo.com/us/store/products/{safe_name}/"
 
 
-def index_existing_rows(existing: dict[str, dict]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
-    """Build title, application_id, and nintendo_id indexes from a catalog cache."""
-    by_title: dict[str, dict] = {}
-    by_app_id: dict[str, dict] = {}
-    by_nintendo_id: dict[str, dict] = {}
+def index_existing_rows(existing):
+    by_title = {}
+    by_app_id = {}
+    by_nintendo_id = {}
     for row in existing.values():
         title_key = norm_nintendo_title(str(row.get("name") or ""))
         if title_key and title_key not in by_title:
@@ -63,18 +45,10 @@ def index_existing_rows(existing: dict[str, dict]) -> tuple[dict[str, dict], dic
         nid = str(row.get("nintendo_id") or row.get("id") or "").strip()
         if nid and nid not in by_nintendo_id:
             by_nintendo_id[nid] = row
-    return by_title, by_app_id, by_nintendo_id
+    return (by_title, by_app_id, by_nintendo_id)
 
 
-def find_existing_row(
-    item: dict[str, Any],
-    *,
-    existing: dict[str, dict],
-    by_title: dict[str, dict],
-    by_app_id: dict[str, dict],
-    by_nintendo_id: dict[str, dict],
-) -> dict | None:
-    """Resolve a cached row when catalog ids migrate from transaction id to application_id."""
+def find_existing_row(item, *, existing, by_title, by_app_id, by_nintendo_id):
     row_id = str(item.get("id") or "")
     if row_id and row_id in existing:
         return existing[row_id]
@@ -93,8 +67,8 @@ def find_existing_row(
     return None
 
 
-def index_transactions_by_title(tx_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    by_title: dict[str, dict[str, Any]] = {}
+def index_transactions_by_title(tx_rows):
+    by_title = {}
     for tx in tx_rows:
         name = str(tx.get("name") or "")
         for key in {norm_nintendo_title(name), match_nintendo_title_key(name)}:
@@ -103,10 +77,7 @@ def index_transactions_by_title(tx_rows: list[dict[str, Any]]) -> dict[str, dict
     return by_title
 
 
-def lookup_transaction_for_vgc(
-    vgc_name: str,
-    tx_by_title: dict[str, dict[str, Any]],
-) -> dict[str, Any] | None:
+def lookup_transaction_for_vgc(vgc_name, tx_by_title):
     for key_fn in (norm_nintendo_title, match_nintendo_title_key):
         tx = tx_by_title.get(key_fn(vgc_name))
         if tx:
@@ -114,8 +85,8 @@ def lookup_transaction_for_vgc(
     return None
 
 
-def _merge_tags(*tag_lists: list[str] | None) -> list[str]:
-    out: list[str] = []
+def _merge_tags(*tag_lists):
+    out = []
     for tags in tag_lists:
         if not tags:
             continue
@@ -125,8 +96,7 @@ def _merge_tags(*tag_lists: list[str] | None) -> list[str]:
     return out
 
 
-def _hybrid_from_vgc(vgc: dict[str, Any], tx: dict[str, Any] | None) -> dict[str, Any]:
-    """Build a hybrid row with VGC as the source of truth; overlay receipt metadata when matched."""
+def _hybrid_from_vgc(vgc, tx):
     app_id = str(vgc.get("application_id") or vgc.get("vgc_id") or "").strip()
     item = dict(vgc)
     item["id"] = app_id
@@ -151,8 +121,7 @@ def _hybrid_from_vgc(vgc: dict[str, Any], tx: dict[str, Any] | None) -> dict[str
     return item
 
 
-def _hybrid_from_tx_only(tx: dict[str, Any]) -> dict[str, Any]:
-    """Receipt-only row when no VGC entitlement matched (secondary / ~2yr window orphans)."""
+def _hybrid_from_tx_only(tx):
     tx_id = str(tx.get("id") or tx.get("nintendo_id") or "")
     return {
         "name": tx["name"],
@@ -170,40 +139,32 @@ def _hybrid_from_tx_only(tx: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def is_nintendo_playable_game(item: dict[str, Any]) -> bool:
-    """True for base-game library rows; false for DLC, skins, streaming apps, etc."""
+def is_nintendo_playable_game(item):
     return not is_nintendo_noise_row(item)
 
 
-def dedupe_deluxe_edition_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """When base + deluxe SKUs share a title key, keep the non-deluxe row."""
-    by_base: dict[str, list[dict[str, Any]]] = defaultdict(list)
+def dedupe_deluxe_edition_rows(rows):
+    by_base = defaultdict(list)
     for row in rows:
         by_base[match_nintendo_title_key(str(row.get("name") or ""))].append(row)
-
-    out: list[dict[str, Any]] = []
+    out = []
     for group in by_base.values():
         if len(group) == 1:
             out.append(group[0])
             continue
 
-        def _rank(row: dict[str, Any]) -> tuple:
+        def _rank(row):
             name_l = norm_nintendo_title(str(row.get("name") or ""))
-            deluxe = any(marker in name_l for marker in _DELUXE_MARKERS)
-            return (
-                deluxe,
-                row.get("ownership_source") != "both",
-                not row.get("application_id"),
-            )
+            deluxe = any((marker in name_l for marker in _DELUXE_MARKERS))
+            return (deluxe, row.get("ownership_source") != "both", not row.get("application_id"))
 
         group.sort(key=_rank)
         out.append(group[0])
     return out
 
 
-def finalize_nintendo_library_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Tag library noise rows and collapse duplicate edition SKUs."""
-    tagged: list[dict[str, Any]] = []
+def finalize_nintendo_library_rows(rows):
+    tagged = []
     for row in rows:
         merged = dict(row)
         maybe_tag_library_noise_row(merged, "nintendo")
@@ -211,15 +172,10 @@ def finalize_nintendo_library_rows(rows: list[dict[str, Any]]) -> list[dict[str,
     return dedupe_deluxe_edition_rows(tagged)
 
 
-def merge_vgc_with_transactions(
-    vgc_rows: list[dict[str, Any]],
-    tx_rows: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Union entitlements: every VGC card is a row; unmatched receipts are appended."""
+def merge_vgc_with_transactions(vgc_rows, tx_rows):
     tx_by_title = index_transactions_by_title(tx_rows)
-    matched_tx_keys: set[str] = set()
-    merged: list[dict[str, Any]] = []
-
+    matched_tx_keys = set()
+    merged = []
     for vgc in vgc_rows:
         app_id = str(vgc.get("application_id") or "").strip()
         name = str(vgc.get("name") or "").strip()
@@ -232,7 +188,6 @@ def merge_vgc_with_transactions(
                 if key:
                     matched_tx_keys.add(key)
         merged.append(_hybrid_from_vgc(vgc, tx))
-
     for tx in tx_rows:
         name = str(tx.get("name") or "")
         keys = {norm_nintendo_title(name), match_nintendo_title_key(name)}
@@ -241,5 +196,4 @@ def merge_vgc_with_transactions(
             continue
         matched_tx_keys |= keys
         merged.append(_hybrid_from_tx_only(tx))
-
     return finalize_nintendo_library_rows(merged)

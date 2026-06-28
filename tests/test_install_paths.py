@@ -1,7 +1,3 @@
-"""Tests for shared.install_paths."""
-
-from __future__ import annotations
-
 import os
 import sys
 import time
@@ -12,7 +8,7 @@ import pytest
 from shared import install_paths
 
 
-def _reset_frozen_cache() -> None:
+def _reset_frozen_cache():
     install_paths._FROZEN_DATA_ROOT = None
     install_paths._FROZEN_MIGRATION_ATTEMPTED = False
 
@@ -77,7 +73,6 @@ def test_manifest_cache_invalidates_on_mtime_change(monkeypatch, tmp_path):
     install_paths._BUILT_MANIFEST_MTIME_NS = None
     assert install_paths.load_built_manifest()["js/app.js"] == "js/app-OLD.js"
     manifest.write_text('{"js/app.js":"js/app-NEW.js"}', encoding="utf-8")
-    # Windows runners can expose coarse st_mtime; bump explicitly so invalidation is observable.
     os.utime(manifest, (time.time() + 1, time.time() + 1))
     assert install_paths.load_built_manifest()["js/app.js"] == "js/app-NEW.js"
 
@@ -86,8 +81,7 @@ def test_serve_built_true_with_flag_and_manifest(monkeypatch, tmp_path):
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / "manifest.json").write_text(
-        '{"app.css":"app.abc.css","js/app.js":"js/app-XYZ.js","js/chunks":[]}',
-        encoding="utf-8",
+        '{"app.css":"app.abc.css","js/app.js":"js/app-XYZ.js","js/chunks":[]}', encoding="utf-8"
     )
     monkeypatch.setenv("BAKLOG_SERVE_BUILT", "1")
     monkeypatch.setattr(install_paths, "is_frozen", lambda: False)
@@ -206,9 +200,7 @@ def test_frozen_syncs_bundled_auth_env_when_data_dir_missing_keys(monkeypatch, t
     (data_dir / ".legacy_migration_done").write_text("{}", encoding="utf-8")
     (app_dir / "BAKLOG.exe").write_text("exe", encoding="utf-8")
     (app_dir / ".env").write_text(
-        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
-        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
-        "BAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=anon-key\nBAKLOG_SUPABASE_JWT_SECRET=jwt-secret\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))

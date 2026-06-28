@@ -1,11 +1,3 @@
-"""Cross-platform guard tests for platform-restricted providers (Amazon).
-
-These run on every OS in CI (Ubuntu + macOS). The key guarantee: on a
-non-Windows host, GET /api/auth/status must not import amazon_client (which
-raises ImportError off Windows) and Amazon must report as 'unavailable'.
-"""
-from __future__ import annotations
-
 import json
 import sys
 import threading
@@ -13,7 +5,6 @@ import urllib.error
 import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
-from pathlib import Path
 
 import pytest
 
@@ -24,18 +15,15 @@ from shared.platform_support import platform_supported
 
 
 def test_platform_supported_semantics():
-    assert platform_supported(()) is True  # empty = all platforms
+    assert platform_supported(()) is True
     assert platform_supported(None) is True
     assert platform_supported((sys.platform,)) is True
     assert platform_supported(("definitely-not-this-os",)) is False
 
 
-def test_amazon_state_unavailable_off_platform(monkeypatch: pytest.MonkeyPatch):
-    """When the OS isn't supported, _provider_state must short-circuit to
-    'unavailable' without importing the Windows-only amazon_client."""
+def test_amazon_state_unavailable_off_platform(monkeypatch):
     sys.modules.pop("clients.amazon_client", None)
     monkeypatch.setattr(manager, "platform_supported", lambda platforms: False)
-
     assert manager._provider_state("amazon") == "unavailable"
     assert "amazon_client" not in sys.modules, "amazon_client must not be imported off-platform"
 
@@ -45,19 +33,17 @@ def test_get_status_amazon_carries_platform_metadata():
     amazon = rows["amazon"]
     assert amazon["platforms"] == ["win32"]
     assert amazon["available"] == platform_supported(("win32",))
-    # A normal provider has no platform restriction and is always available.
     assert rows["steam"]["available"] is True
     assert rows["steam"]["platforms"] == []
 
 
 @pytest.fixture()
-def auth_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def auth_server(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
     monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
     server._refresh_personal_paths()
-
     handler = partial(server.Handler, directory=str(server.ROOT))
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     port = httpd.server_address[1]
@@ -71,30 +57,25 @@ def auth_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         thread.join(timeout=5)
 
 
-def test_auth_status_endpoint_ok_and_reports_platform(auth_server: str):
+def test_auth_status_endpoint_ok_and_reports_platform(auth_server):
     req = urllib.request.Request(f"{auth_server}/api/auth/status", method="GET")
     with urllib.request.urlopen(req, timeout=5) as resp:
         status = resp.status
         payload = json.loads(resp.read().decode("utf-8"))
-
     assert status == 200
     assert payload["server_platform"] == sys.platform
-    amazon = next(p for p in payload["providers"] if p["key"] == "amazon")
+    amazon = next((p for p in payload["providers"] if p["key"] == "amazon"))
     assert amazon["platforms"] == ["win32"]
     if sys.platform != "win32":
         assert amazon["status"] == "unavailable"
         assert amazon["available"] is False
 
 
-def test_amazon_fetcher_allowed_off_windows(auth_server: str):
-    """POST /api/run/amazon is allowed on non-Windows (Prime Gaming web source)."""
+def test_amazon_fetcher_allowed_off_windows(auth_server):
     if sys.platform == "win32":
         pytest.skip("covered by launcher path on Windows")
     req = urllib.request.Request(
-        f"{auth_server}/api/run/amazon",
-        data=b"",
-        method="POST",
-        headers={server._BAKLOG_LOCAL_HEADER: "1"},
+        f"{auth_server}/api/run/amazon", data=b"", method="POST", headers={server._BAKLOG_LOCAL_HEADER: "1"}
     )
     with urllib.request.urlopen(req, timeout=5) as resp:
         status = resp.status
@@ -109,8 +90,7 @@ def test_amazon_web_provider_available_everywhere():
     assert web["kind"] == "browser"
 
 
-def test_amazon_local_data_absent_off_windows(monkeypatch: pytest.MonkeyPatch):
-    """Without an explicit SQL dir, Amazon launcher DB is not probed off Windows."""
+def test_amazon_local_data_absent_off_windows(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("AMAZON_GAMES_SQL_DIR", raising=False)
     sys.modules.pop("clients.amazon_client", None)
@@ -118,18 +98,17 @@ def test_amazon_local_data_absent_off_windows(monkeypatch: pytest.MonkeyPatch):
     assert "amazon_client" not in sys.modules
 
 
-def test_amazon_fetcher_available_for_web_on_all_platforms(auth_server: str):
-    """Amazon fetcher stays enabled everywhere; launcher vs web is resolved in fetch_amazon.py."""
+def test_amazon_fetcher_available_for_web_on_all_platforms(auth_server):
     assert server.FETCHERS["amazon"].get("platforms") == []
     req = urllib.request.Request(f"{auth_server}/api/fetchers", method="GET")
     with urllib.request.urlopen(req, timeout=5) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
-    amazon = next(f for f in payload["fetchers"] if f["key"] == "amazon")
+    amazon = next((f for f in payload["fetchers"] if f["key"] == "amazon"))
     assert amazon["available"] is True
     assert amazon["platforms"] == []
 
 
-def test_gog_galaxy_local_data_absent_on_linux(monkeypatch: pytest.MonkeyPatch):
+def test_gog_galaxy_local_data_absent_on_linux(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("GOG_GALAXY_DB", raising=False)
     assert manager._local_data_present("gog_galaxy", {}) is False

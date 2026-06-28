@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""Read-only audit of free-tier data artifacts (claims pipeline + adjacent catalogs).
-
-Usage:
-  .\\.venv\\Scripts\\python.exe scripts\\audit_free_surface_data.py
-  .\\.venv\\Scripts\\python.exe scripts\\audit_free_surface_data.py --check-urls --out review-report.json
-"""
-
-from __future__ import annotations
-
 import argparse
 import hashlib
 import json
@@ -18,27 +8,14 @@ import time
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-from shared.free_claims_sources import (
-    claim_match_keys,
-    is_epic_mobile_store,
-    item_missing_link_fields,
-    norm_title,
-)
-from shared.profile_paths import (
-    free_claims_path,
-    get_active_profile_id,
-    itad_path,
-    personal_backup_dir,
-    personal_path,
-)
+from shared.free_claims_sources import claim_match_keys, is_epic_mobile_store, item_missing_link_fields, norm_title
+from shared.profile_paths import free_claims_path, get_active_profile_id, itad_path, personal_backup_dir, personal_path
 
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"
 APPROVED_PATH = ROOT / "curated" / "free_claims.approved.json"
@@ -46,11 +23,9 @@ INPUT_PATH = ROOT / "free-claims.input.json"
 BUILT_PATH = ROOT / "landing" / "free-claims.json"
 FALLBACK_PATH = ROOT / "curated" / "free_claims.fallback.json"
 SPONSORS_PATH = ROOT / "curated" / "sponsors.json"
-
 REQUIRED_ITEM_FIELDS = ("id", "store", "title")
-BLURB_LEAK_RE = re.compile(r"<a\b|isthereanydeal\.com/giveaways", re.I)
-STEAM_PORTRAIT_RE = re.compile(r"/library_600x900_2x\.jpg", re.I)
-
+BLURB_LEAK_RE = re.compile("<a\\b|isthereanydeal\\.com/giveaways", re.I)
+STEAM_PORTRAIT_RE = re.compile("/library_600x900_2x\\.jpg", re.I)
 CLAIMS_PREFS_KEYS = (
     "claimsAutoRefreshIntervalMin",
     "claimsAutoRefreshDisabled",
@@ -61,7 +36,7 @@ CLAIMS_PREFS_KEYS = (
 )
 
 
-def _load_json(path: Path) -> dict | list | None:
+def _load_json(path):
     if not path.is_file():
         return None
     try:
@@ -70,7 +45,7 @@ def _load_json(path: Path) -> dict | list | None:
         return None
 
 
-def _file_meta(path: Path) -> dict[str, Any]:
+def _file_meta(path):
     if not path.is_file():
         return {"path": str(path.relative_to(ROOT)), "exists": False}
     stat = path.stat()
@@ -83,7 +58,7 @@ def _file_meta(path: Path) -> dict[str, Any]:
     }
 
 
-def _parse_ts(value: object) -> float:
+def _parse_ts(value):
     if not value:
         return 0.0
     text = str(value).strip()
@@ -98,14 +73,13 @@ def _parse_ts(value: object) -> float:
     return dt.timestamp()
 
 
-def feed_generated_at(doc: dict | None) -> float:
+def feed_generated_at(doc):
     if not doc:
         return 0.0
     return max(_parse_ts(doc.get("generated_at")), _parse_ts(doc.get("fetched_at")))
 
 
-def pick_newer_feed(primary: dict | None, secondary: dict | None) -> str:
-    """Return label of winning feed (mirrors js/claimable.js pickNewerFeed)."""
+def pick_newer_feed(primary, secondary):
     a_items = primary.get("items") if isinstance(primary, dict) else None
     b_items = secondary.get("items") if isinstance(secondary, dict) else None
     a = primary if isinstance(a_items, list) and a_items else None
@@ -117,7 +91,7 @@ def pick_newer_feed(primary: dict | None, secondary: dict | None) -> str:
     return "secondary" if feed_generated_at(b) > feed_generated_at(a) else "primary"
 
 
-def stable_key(item: dict) -> str:
+def stable_key(item):
     appid = item.get("steam_appid")
     if appid is not None:
         try:
@@ -132,12 +106,11 @@ def stable_key(item: dict) -> str:
     return f"id:{item.get('id') or '?'}"
 
 
-def claim_dedup_key(item: dict) -> str:
-    """Mirrors js/claim-card.js claimDedupKey (single canonical key)."""
+def claim_dedup_key(item):
     return stable_key(item)
 
 
-def _items(doc: dict | list | None) -> list[dict]:
+def _items(doc):
     if not isinstance(doc, dict):
         return []
     raw = doc.get("items")
@@ -146,7 +119,7 @@ def _items(doc: dict | list | None) -> list[dict]:
     return [x for x in raw if isinstance(x, dict)]
 
 
-def _parse_ends_at(ends_at: object) -> datetime | None:
+def _parse_ends_at(ends_at):
     if ends_at is None:
         return None
     text = str(ends_at).strip()
@@ -163,7 +136,7 @@ def _parse_ends_at(ends_at: object) -> datetime | None:
     return dt
 
 
-def _is_expired(item: dict, now: datetime | None = None) -> bool:
+def _is_expired(item, now=None):
     now = now or datetime.now(UTC)
     parsed = _parse_ends_at(item.get("ends_at"))
     if parsed is None:
@@ -171,8 +144,8 @@ def _is_expired(item: dict, now: datetime | None = None) -> bool:
     return parsed < now
 
 
-def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "") -> list[str]:
-    issues: list[str] = []
+def _row_issues(item, *, now=None, feed_name=""):
+    issues = []
     for field in REQUIRED_ITEM_FIELDS:
         if not str(item.get(field) or "").strip():
             issues.append(f"missing_{field}")
@@ -182,7 +155,7 @@ def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "")
             issues.append("epic_mobile_no_platform_urls")
     if not is_epic_mobile_store(item.get("store")):
         url = str(item.get("claim_url") or "")
-        if url and not url.startswith(("http://", "https://")):
+        if url and (not url.startswith(("http://", "https://"))):
             issues.append("bad_claim_url_scheme")
     if item.get("store") == "other":
         issues.append("store_other")
@@ -198,41 +171,33 @@ def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "")
     review = item.get("review_percent")
     store = str(item.get("store") or "")
     source = str(item.get("source") or "")
-    if store == "steam" and appid is None and source in ("gamerpower", "itad"):
+    if store == "steam" and appid is None and (source in ("gamerpower", "itad")):
         issues.append("steam_store_no_appid")
     if appid is not None and review is None:
         issues.append("appid_no_review")
-    if item.get("ends_at") is None and source == "itad" and feed_name == "auto":
+    if item.get("ends_at") is None and source == "itad" and (feed_name == "auto"):
         issues.append("itad_no_ends_at")
     return issues
 
 
-def _fill_rates(items: list[dict]) -> dict[str, Any]:
+def _fill_rates(items):
     n = len(items)
     if not n:
         return {"count": 0}
-    fields = (
-        "header_image",
-        "steam_appid",
-        "review_percent",
-        "genres",
-        "blurb",
-        "ends_at",
-        "source",
-    )
-    rates: dict[str, Any] = {"count": n}
+    fields = ("header_image", "steam_appid", "review_percent", "genres", "blurb", "ends_at", "source")
+    rates = {"count": n}
     for field in fields:
-        filled = sum(1 for it in items if it.get(field) not in (None, "", []))
+        filled = sum((1 for it in items if it.get(field) not in (None, "", [])))
         rates[field] = {"filled": filled, "pct": round(100 * filled / n, 1)}
-    by_source: dict[str, int] = Counter(str(it.get("source") or "?") for it in items)
+    by_source = Counter((str(it.get("source") or "?") for it in items))
     rates["by_source"] = dict(by_source)
-    by_store: dict[str, int] = Counter(str(it.get("store") or "?") for it in items)
+    by_store = Counter((str(it.get("store") or "?") for it in items))
     rates["by_store"] = dict(by_store)
     return rates
 
 
-def _duplicate_clusters(items: list[dict]) -> list[dict[str, Any]]:
-    by_key: dict[str, list[dict]] = defaultdict(list)
+def _duplicate_clusters(items):
+    by_key = defaultdict(list)
     for item in items:
         by_key[stable_key(item)].append(item)
     clusters = []
@@ -251,7 +216,7 @@ def _duplicate_clusters(items: list[dict]) -> list[dict[str, Any]]:
     return clusters
 
 
-def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
+def _audit_feed(name, doc, path):
     now = datetime.now(UTC)
     items = _items(doc)
     rows = []
@@ -281,22 +246,21 @@ def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
         "feed_generated_at": feed_generated_at(doc if isinstance(doc, dict) else None),
         "fill_rates": _fill_rates(items),
         "duplicate_clusters": _duplicate_clusters(items),
-        "rows_with_issues": sum(1 for r in rows if r["issues"]),
+        "rows_with_issues": sum((1 for r in rows if r["issues"])),
         "rows": rows,
     }
 
 
-def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None, input_doc: dict | None) -> dict[str, Any]:
+def _approved_audit(approved, auto, built, input_doc):
     if not isinstance(approved, dict):
         return {"exists": False}
-    ids = [str(x) for x in (approved.get("ids") or []) if str(x).strip()]
-    dismissed = {str(x) for x in (approved.get("dismissed") or []) if str(x).strip()}
+    ids = [str(x) for x in approved.get("ids") or [] if str(x).strip()]
+    dismissed = {str(x) for x in approved.get("dismissed") or [] if str(x).strip()}
     auto_by_id = {str(it.get("id")): it for it in _items(auto) if it.get("id")}
     built_items = _items(built)
     built_by_id = {str(it.get("id")): it for it in built_items if it.get("id")}
     built_keys = {stable_key(it) for it in built_items}
     input_by_id = {str(it.get("id")): it for it in _items(input_doc) if it.get("id")}
-
     orphans_not_in_auto = []
     orphans_not_in_built = []
     orphans_represented_by_stable_key = []
@@ -307,7 +271,6 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
             if aid in input_by_id:
                 carry_forward_candidates.append({"id": aid, "via": "input"})
         if aid not in built_by_id and aid not in dismissed:
-            # Approved id may publish under a sibling row (Epic wins over ITAD dedup).
             ref = auto_by_id.get(aid) or input_by_id.get(aid)
             ref_keys = {stable_key(ref)} if ref else set()
             ref_keys.update(claim_match_keys(ref) if ref else [])
@@ -317,7 +280,6 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
                 )
             else:
                 orphans_not_in_built.append(aid)
-
     store_overrides = approved.get("store_overrides") or {}
     field_overrides = approved.get("field_overrides") or {}
     override_drift = []
@@ -333,7 +295,6 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
                 override_drift.append(
                     {"id": aid, "field": field, "override": override_val, "built": built_val, "auto": auto_val}
                 )
-
     return {
         "exists": True,
         "approved_count": len(ids),
@@ -348,32 +309,25 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
     }
 
 
-def _cross_layer_diff(
-    built: dict | None,
-    fallback: dict | None,
-    profile: dict | None,
-) -> dict[str, Any]:
+def _cross_layer_diff(built, fallback, profile):
     built_items = _items(built)
     fallback_items = _items(fallback)
     profile_items = _items(profile)
 
-    def id_set(items: list[dict]) -> set[str]:
+    def id_set(items):
         return {str(it.get("id")) for it in items if it.get("id")}
 
-    def key_map(items: list[dict]) -> dict[str, str]:
+    def key_map(items):
         return {stable_key(it): str(it.get("id")) for it in items}
 
     built_ids = id_set(built_items)
     fallback_ids = id_set(fallback_items)
     profile_ids = id_set(profile_items)
-
     built_keys = key_map(built_items)
     fallback_keys = key_map(fallback_items)
     profile_keys = key_map(profile_items)
-
     pick_local_fb = pick_newer_feed(profile, fallback)
     pick_built_fb = pick_newer_feed(built, fallback)
-
     return {
         "built_vs_fallback": {
             "built_count": len(built_items),
@@ -401,43 +355,38 @@ def _cross_layer_diff(
     }
 
 
-def _claim_dedup_keys(item: dict) -> list[str]:
+def _claim_dedup_keys(item):
     keys = list(claim_match_keys(item))
     if not keys and item.get("id"):
         keys.append(f"id:{item['id']}")
     return keys
 
 
-def _personal_audit(profile_id: str, feed_items: list[dict]) -> dict[str, Any]:
+def _personal_audit(profile_id, feed_items):
     ppath = personal_path(profile_id=profile_id)
     doc = _load_json(ppath)
     personal = doc.get("personal", {}) if isinstance(doc, dict) else {}
     if not isinstance(personal, dict):
         personal = {}
-
     dismissed = personal.get("__dismissedClaims") or {}
     dismissed_keys = personal.get("__dismissedClaimKeys") or {}
     if not isinstance(dismissed, dict):
         dismissed = {}
     if not isinstance(dismissed_keys, dict):
         dismissed_keys = {}
-
     feed_ids = {str(it.get("id")) for it in feed_items if it.get("id")}
-    feed_key_set: set[str] = set()
+    feed_key_set = set()
     for it in feed_items:
         feed_key_set.update(_claim_dedup_keys(it))
-
     orphan_ids = [i for i in dismissed if i not in feed_ids]
     orphan_keys = [k for k in dismissed_keys if k not in feed_key_set]
-
     id_only_no_key = []
     for cid in dismissed:
         item = next((it for it in feed_items if str(it.get("id")) == cid), None)
         if item:
             keys = _claim_dedup_keys(item)
-            if not any(k in dismissed_keys for k in keys):
+            if not any((k in dismissed_keys for k in keys)):
                 id_only_no_key.append({"id": cid, "missing_keys": keys})
-
     backup_timeline = []
     bdir = personal_backup_dir(profile_id=profile_id)
     if bdir.is_dir():
@@ -455,7 +404,6 @@ def _personal_audit(profile_id: str, feed_items: list[dict]) -> dict[str, Any]:
                     "dismissed_keys": len(dk) if isinstance(dk, dict) else 0,
                 }
             )
-
     return {
         "personal_path": str(ppath.relative_to(ROOT)),
         "exists": ppath.is_file(),
@@ -468,7 +416,7 @@ def _personal_audit(profile_id: str, feed_items: list[dict]) -> dict[str, Any]:
     }
 
 
-def _itad_audit(profile_id: str) -> dict[str, Any]:
+def _itad_audit(profile_id):
     path = itad_path(profile_id=profile_id)
     doc = _load_json(path)
     if not isinstance(doc, dict):
@@ -492,7 +440,7 @@ def _itad_audit(profile_id: str) -> dict[str, Any]:
     }
 
 
-def _sponsors_audit() -> dict[str, Any]:
+def _sponsors_audit():
     doc = _load_json(SPONSORS_PATH)
     if not isinstance(doc, dict):
         return {"exists": False}
@@ -515,7 +463,7 @@ def _sponsors_audit() -> dict[str, Any]:
     }
 
 
-def _plan_audit() -> dict[str, Any]:
+def _plan_audit():
     from shared.entitlement import current_plan
 
     env_plan = os.environ.get("BAKLOG_PLAN", "").strip() or None
@@ -527,7 +475,7 @@ def _plan_audit() -> dict[str, Any]:
     }
 
 
-def _check_urls(items: list[dict], *, limit: int = 30, delay: float = 0.3) -> list[dict[str, Any]]:
+def _check_urls(items, *, limit=30, delay=0.3):
     results = []
     checked = 0
     for item in items:
@@ -552,7 +500,7 @@ def _check_urls(items: list[dict], *, limit: int = 30, delay: float = 0.3) -> li
                 "url": url,
                 "status": status,
                 "error": err,
-                "issue": "cover_404" if status == 404 else ("cover_error" if err else None),
+                "issue": "cover_404" if status == 404 else "cover_error" if err else None,
             }
         )
         checked += 1
@@ -560,32 +508,27 @@ def _check_urls(items: list[dict], *, limit: int = 30, delay: float = 0.3) -> li
     return results
 
 
-def _write_row_csv(report: dict[str, Any], path: Path) -> None:
-    """Per-feed row table: id | title | store | source | ends_at | appid | review% | issues."""
+def _write_row_csv(report, path):
     lines = ["feed,id,title,store,source,ends_at,steam_appid,review_percent,stable_key,issues"]
     for feed_name, feed in report.get("feeds", {}).items():
         for row in feed.get("rows", []):
             issues = ";".join(row.get("issues") or [])
             title = str(row.get("title") or "").replace('"', '""')
             lines.append(
-                f'{feed_name},{row.get("id")},"{title}",{row.get("store")},{row.get("source")},'
-                f'{row.get("ends_at")},{row.get("steam_appid")},{row.get("review_percent")},'
-                f'{row.get("stable_key")},"{issues}"'
+                f'''{feed_name},{row.get("id")},"{title}",{row.get("store")},{row.get("source")},{row.get("ends_at")},{row.get("steam_appid")},{row.get("review_percent")},{row.get("stable_key")},"{issues}"'''
             )
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _write_handoff_md(report: dict[str, Any], path: Path) -> None:
+def _write_handoff_md(report, path):
     b = report.get("baseline", {})
     counts = b.get("item_counts", {})
     approved = report.get("approved", {})
     personal = report.get("personal", {})
     cross = report.get("cross_layer", {})
     findings = report.get("findings", [])
-
     high = [f for f in findings if f["severity"] == "high"]
     medium = [f for f in findings if f["severity"] == "medium"]
-
     lines = [
         "# Free-tier data review — handoff",
         "",
@@ -599,7 +542,6 @@ def _write_handoff_md(report: dict[str, Any], path: Path) -> None:
     ]
     for name, n in counts.items():
         lines.append(f"| {name} | {n} |")
-
     lines.extend(
         [
             "",
@@ -630,7 +572,6 @@ def _write_handoff_md(report: dict[str, Any], path: Path) -> None:
     for f in high + medium:
         row = f" `{f['row']}`" if f.get("row") else ""
         lines.append(f"- **{f['id']}** ({f['severity']}, {f['owner']}){row}: {f['observed']}")
-
     lines.extend(
         [
             "",
@@ -647,20 +588,11 @@ def _write_handoff_md(report: dict[str, Any], path: Path) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
+def _compile_findings(report):
+    findings = []
     seq = 0
 
-    def add(
-        severity: str,
-        owner: str,
-        artifact: str,
-        observed: str,
-        expected: str,
-        suggested: str,
-        row: str | None = None,
-        blocks: str | None = None,
-    ) -> None:
+    def add(severity, owner, artifact, observed, expected, suggested, row=None, blocks=None):
         nonlocal seq
         seq += 1
         findings.append(
@@ -745,7 +677,6 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
                         "Remove from approved or re-run build",
                         row=row.get("id"),
                     )
-
     approved = report.get("approved", {})
     for oid in approved.get("orphans_not_in_built", []):
         add(
@@ -768,7 +699,6 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
             "Re-run build or fix override id mismatch",
             row=drift["id"],
         )
-
     personal = report.get("personal", {})
     if personal.get("orphan_dismissed_ids"):
         add(
@@ -790,10 +720,12 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
             "User clear may resurrect on id churn",
             blocks="p4_claim_hidden_restore",
         )
-
     cross = report.get("cross_layer", {})
     pvf = cross.get("pick_newer_feed", {})
-    if pvf.get("profile_vs_fallback_winner") == "fallback" and cross.get("built_vs_profile", {}).get("profile_count", 0) > 0:
+    if (
+        pvf.get("profile_vs_fallback_winner") == "fallback"
+        and cross.get("built_vs_profile", {}).get("profile_count", 0) > 0
+    ):
         prof = cross["built_vs_profile"]
         if prof.get("profile_count") != prof.get("built_count"):
             add(
@@ -805,7 +737,6 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "Verify feedGeneratedAt uses max(generated_at, fetched_at)",
                 blocks="p4_free_pill_question_mark",
             )
-
     bvf = cross.get("built_vs_fallback", {})
     if not bvf.get("ids_match"):
         add(
@@ -816,7 +747,6 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
             "fallback synced from last build",
             "Copy landing/free-claims.json to curated/free_claims.fallback.json",
         )
-
     for dup in report.get("feeds", {}).get("auto", {}).get("duplicate_clusters", []):
         if dup["count"] >= 2:
             add(
@@ -829,7 +759,6 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
                 row=dup["stable_key"],
                 blocks="Duplicate Epic+GP same game",
             )
-
     url_checks = report.get("url_checks", [])
     for uc in url_checks:
         if uc.get("issue"):
@@ -843,11 +772,10 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
                 row=uc.get("id"),
                 blocks="p4_claim_cover_broken_img",
             )
-
     return findings
 
 
-def build_baseline(profile_id: str) -> dict[str, Any]:
+def build_baseline(profile_id):
     paths = {
         "auto": AUTO_PATH,
         "approved": APPROVED_PATH,
@@ -859,12 +787,7 @@ def build_baseline(profile_id: str) -> dict[str, Any]:
         "itad": itad_path(profile_id=profile_id),
         "personal": personal_path(profile_id=profile_id),
     }
-    baseline: dict[str, Any] = {
-        "captured_at": datetime.now(UTC).isoformat(),
-        "profile_id": profile_id,
-        "files": {},
-        "item_counts": {},
-    }
+    baseline = {"captured_at": datetime.now(UTC).isoformat(), "profile_id": profile_id, "files": {}, "item_counts": {}}
     for name, path in paths.items():
         meta = _file_meta(path)
         baseline["files"][name] = meta
@@ -876,15 +799,14 @@ def build_baseline(profile_id: str) -> dict[str, Any]:
     return baseline
 
 
-def run_audit(profile_id: str, *, check_urls: bool = False, url_limit: int = 30) -> dict[str, Any]:
+def run_audit(profile_id, *, check_urls=False, url_limit=30):
     auto = _load_json(AUTO_PATH)
     approved = _load_json(APPROVED_PATH)
     input_doc = _load_json(INPUT_PATH)
     built = _load_json(BUILT_PATH)
     fallback = _load_json(FALLBACK_PATH)
     profile_fc = _load_json(free_claims_path(profile_id=profile_id))
-
-    report: dict[str, Any] = {
+    report = {
         "captured_at": datetime.now(UTC).isoformat(),
         "profile_id": profile_id,
         "baseline": build_baseline(profile_id),
@@ -893,9 +815,7 @@ def run_audit(profile_id: str, *, check_urls: bool = False, url_limit: int = 30)
             "built": _audit_feed("built", built if isinstance(built, dict) else None, BUILT_PATH),
             "fallback": _audit_feed("fallback", fallback if isinstance(fallback, dict) else None, FALLBACK_PATH),
             "profile": _audit_feed(
-                "profile",
-                profile_fc if isinstance(profile_fc, dict) else None,
-                free_claims_path(profile_id=profile_id),
+                "profile", profile_fc if isinstance(profile_fc, dict) else None, free_claims_path(profile_id=profile_id)
             ),
         },
         "approved": _approved_audit(
@@ -929,17 +849,15 @@ def run_audit(profile_id: str, *, check_urls: bool = False, url_limit: int = 30)
             },
         },
     }
-
     if check_urls:
         report["url_checks"] = _check_urls(_items(built if isinstance(built, dict) else None), limit=url_limit)
-
     report["findings"] = _compile_findings(report)
-    report["findings_summary"] = Counter(f["severity"] for f in report["findings"])
-    report["findings_by_owner"] = Counter(f["owner"] for f in report["findings"])
+    report["findings_summary"] = Counter((f["severity"] for f in report["findings"]))
+    report["findings_by_owner"] = Counter((f["owner"] for f in report["findings"]))
     return report
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", default=None, help="Profile id (default: active from index / BAKLOG_PROFILE)")
     parser.add_argument("--out", default="review-report.json", help="Output report path (repo root relative)")
@@ -956,19 +874,15 @@ def main() -> int:
         help="Exit 1 when findings at or above this severity exist (CI gate)",
     )
     args = parser.parse_args()
-
     profile_id = args.profile or get_active_profile_id()
     report = run_audit(profile_id, check_urls=args.check_urls, url_limit=args.url_limit)
-
     out_path = ROOT / args.out
     baseline_path = ROOT / args.baseline_out
     out_path.parent.mkdir(parents=True, exist_ok=True)
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
     baseline_path.write_text(json.dumps(report["baseline"], indent=2, ensure_ascii=False), encoding="utf-8")
-
     out_path = ROOT / args.out
     out_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-
     findings_path = ROOT / args.findings_out
     findings_path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["# Free-tier data review findings", f"# captured: {report['captured_at']}", ""]
@@ -980,15 +894,12 @@ def main() -> int:
                 lines.append(f"  {key}: {val}")
         lines.append("")
     findings_path.write_text("\n".join(lines), encoding="utf-8")
-
     csv_path = ROOT / args.csv_out
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     _write_row_csv(report, csv_path)
-
     handoff_path = ROOT / args.handoff_out
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
     _write_handoff_md(report, handoff_path)
-
     print(f"Profile: {profile_id}")
     print(f"Baseline -> {baseline_path}")
     print(f"Report   -> {out_path}")
@@ -1001,10 +912,7 @@ def main() -> int:
         floor = rank[args.fail_on]
         bad = [f for f in report["findings"] if rank.get(f.get("severity"), 0) >= floor]
         if bad:
-            print(
-                f"FAIL: {len(bad)} finding(s) at or above {args.fail_on} severity",
-                file=sys.stderr,
-            )
+            print(f"FAIL: {len(bad)} finding(s) at or above {args.fail_on} severity", file=sys.stderr)
             return 1
     return 0
 

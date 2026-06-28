@@ -1,19 +1,17 @@
-"""HowLongToBeat lookup with simple name-similarity scoring."""
-
 import re
 from difflib import SequenceMatcher
 
 from howlongtobeatpy import HowLongToBeat
 
 
-def _normalize_name(name: str) -> str:
+def _normalize_name(name):
     name = name.lower()
-    name = re.sub(r"[^\w\s]", "", name)
-    name = re.sub(r"\s+", " ", name).strip()
+    name = re.sub("[^\\w\\s]", "", name)
+    name = re.sub("\\s+", " ", name).strip()
     return name
 
 
-def _similarity(a: str, b: str) -> float:
+def _similarity(a, b):
     return SequenceMatcher(None, _normalize_name(a), _normalize_name(b)).ratio()
 
 
@@ -21,14 +19,12 @@ class HltbClient:
     def __init__(self):
         self._client = HowLongToBeat()
 
-    def lookup(self, game_name: str) -> dict | None:
+    def lookup(self, game_name):
         results = self._client.search(game_name)
         if not results:
             return None
-
         best = max(results, key=lambda r: _similarity(game_name, r.game_name))
         confidence = _similarity(game_name, best.game_name)
-
         return {
             "hltb_id": best.game_id,
             "hltb_name": best.game_name,
@@ -39,7 +35,7 @@ class HltbClient:
         }
 
 
-def _to_hours(value) -> float | None:
+def _to_hours(value):
     if value is None:
         return None
     try:

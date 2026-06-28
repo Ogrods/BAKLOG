@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""CDP Connect flow test harness (GOG web, Battle.net, Nintendo, Humble, EA).
-
-Automates preflight, profile setup, auth-status checks, and fetcher runs.
-Browser sign-in still requires manual completion in the headed Chrome window.
-
-Usage:
-  python scripts/test_cdp_connect_flows.py preflight
-  python scripts/test_cdp_connect_flows.py status
-  python scripts/test_cdp_connect_flows.py fetch [--provider gog]
-  python scripts/test_cdp_connect_flows.py all
-"""
-from __future__ import annotations
-
 import argparse
 import json
 import shutil
@@ -26,8 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = "http://127.0.0.1:8765"
 PROFILE_LABEL = "conn-test"
 RESULTS_PATH = ROOT / "docs" / "cdp-connect-test-results.json"
-
-CDP_PROVIDERS: dict[str, dict[str, object]] = {
+CDP_PROVIDERS = {
     "gog": {
         "label": "GOG (web)",
         "fetchers": ["gog", "wishlistGog"],
@@ -64,65 +49,53 @@ CDP_PROVIDERS: dict[str, dict[str, object]] = {
 
 @dataclass
 class ProviderResult:
-    provider: str
-    label: str
-    auth_status: str = "unknown"
-    connect: str = "not_run"
-    fetchers: dict[str, dict[str, object]] = field(default_factory=dict)
-    games_row_counts: dict[str, int | None] = field(default_factory=dict)
-    notes: list[str] = field(default_factory=list)
+    provider: "Any"
+    label: "Any"
+    auth_status: "Any" = "unknown"
+    connect: "Any" = "not_run"
+    fetchers: "Any" = field(default_factory=dict)
+    games_row_counts: "Any" = field(default_factory=dict)
+    notes: "Any" = field(default_factory=list)
 
 
 @dataclass
 class TestRun:
-    started_at: str
-    profile_id: str | None = None
-    profile_label: str = PROFILE_LABEL
-    preflight: dict[str, object] = field(default_factory=dict)
-    providers: list[ProviderResult] = field(default_factory=list)
-    finished_at: str | None = None
+    started_at: "Any"
+    profile_id: "Any" = None
+    profile_label: "Any" = PROFILE_LABEL
+    preflight: "Any" = field(default_factory=dict)
+    providers: "Any" = field(default_factory=list)
+    finished_at: "Any" = None
 
 
-def _headers(*, local: bool = True) -> dict[str, str]:
+def _headers(*, local=True):
     h = {"Content-Type": "application/json", "Origin": BASE}
     if local:
         h["X-BAKLOG-Local"] = "1"
     return h
 
 
-def api(
-    method: str,
-    path: str,
-    body: dict | None = None,
-    *,
-    strict_local: bool = False,
-    timeout: float = 30.0,
-) -> tuple[int, dict | str]:
+def api(method, path, body=None, *, strict_local=False, timeout=30.0):
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(
-        f"{BASE}{path}",
-        data=data,
-        method=method,
-        headers=_headers(local=True),
-    )
+    req = urllib.request.Request(f"{BASE}{path}", data=data, method=method, headers=_headers(local=True))
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode()
             try:
-                return resp.status, json.loads(raw)
+                return (resp.status, json.loads(raw))
             except json.JSONDecodeError:
-                return resp.status, raw
+                return (resp.status, raw)
     except urllib.error.HTTPError as e:
         raw = e.read().decode()
         try:
-            return e.code, json.loads(raw)
+            return (e.code, json.loads(raw))
         except json.JSONDecodeError:
-            return e.code, raw
+            return (e.code, raw)
 
 
-def ping_server() -> bool:
+def ping_server():
     try:
         code, _ = api("GET", "/api/runs")
         return code == 200
@@ -130,29 +103,29 @@ def ping_server() -> bool:
         return False
 
 
-def chrome_available() -> bool:
+def chrome_available():
     import os
 
     if os.environ.get("BAKLOG_CHROME_PATH"):
         return Path(os.environ["BAKLOG_CHROME_PATH"]).is_file()
     for name in (
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
     ):
         if Path(name).is_file():
             return True
     return bool(shutil.which("chrome") or shutil.which("google-chrome") or shutil.which("chromium"))
 
 
-def profile_games_dir(profile_id: str) -> Path:
+def profile_games_dir(profile_id):
     idx = ROOT / "profiles" / "index.json"
     if idx.is_file():
         return ROOT / "profiles" / profile_id
     return ROOT
 
 
-def count_games(path: Path) -> int | None:
+def count_games(path):
     if not path.is_file():
         return None
     try:
@@ -169,20 +142,20 @@ def count_games(path: Path) -> int | None:
     return None
 
 
-def wait_idle(timeout: float = 180.0) -> bool:
+def wait_idle(timeout=180.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         code, snap = api("GET", "/api/runs")
         if code != 200 or not isinstance(snap, dict):
             time.sleep(0.25)
             continue
-        if not snap.get("active") and not snap.get("queue"):
+        if not snap.get("active") and (not snap.get("queue")):
             return True
         time.sleep(0.25)
     return False
 
 
-def wait_run_done(run_id: str, timeout: float = 600.0) -> dict | None:
+def wait_run_done(run_id, timeout=600.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         code, snap = api("GET", "/api/runs")
@@ -194,22 +167,21 @@ def wait_run_done(run_id: str, timeout: float = 600.0) -> dict | None:
     return None
 
 
-def auth_status_map() -> dict[str, dict]:
+def auth_status_map():
     code, body = api("GET", "/api/auth/status")
     if code != 200 or not isinstance(body, dict):
         return {}
-    out: dict[str, dict] = {}
+    out = {}
     for p in body.get("providers") or []:
         if isinstance(p, dict) and p.get("key"):
             out[str(p["key"])] = p
     return out
 
 
-def ensure_conn_test_profile() -> tuple[str | None, str]:
+def ensure_conn_test_profile():
     code, body = api("GET", "/api/profiles")
     if code != 200 or not isinstance(body, dict):
-        return None, f"GET /api/profiles failed HTTP {code}: {body}"
-
+        return (None, f"GET /api/profiles failed HTTP {code}: {body}")
     profiles = body.get("profiles") or []
     for p in profiles:
         if isinstance(p, dict) and str(p.get("label", "")).lower() == PROFILE_LABEL.lower():
@@ -217,37 +189,36 @@ def ensure_conn_test_profile() -> tuple[str | None, str]:
             if pid and body.get("active") != pid:
                 sw_code, sw_body = api("POST", "/api/profiles/active", {"id": pid})
                 if sw_code not in (200, 204):
-                    return None, f"switch profile failed HTTP {sw_code}: {sw_body}"
-            return pid or None, "existing profile activated"
-
+                    return (None, f"switch profile failed HTTP {sw_code}: {sw_body}")
+            return (pid or None, "existing profile activated")
     cr_code, created = api("POST", "/api/profiles", {"label": PROFILE_LABEL})
     if cr_code not in (200, 201) or not isinstance(created, dict):
-        return None, f"create profile failed HTTP {cr_code}: {created}"
+        return (None, f"create profile failed HTTP {cr_code}: {created}")
     pid = str(created.get("id") or "")
     if not pid:
-        return None, "create profile returned no id"
+        return (None, "create profile returned no id")
     sw_code, sw_body = api("POST", "/api/profiles/active", {"id": pid})
     if sw_code not in (200, 204):
-        return None, f"switch new profile failed HTTP {sw_code}: {sw_body}"
-    return pid, "created and activated"
+        return (None, f"switch new profile failed HTTP {sw_code}: {sw_body}")
+    return (pid, "created and activated")
 
 
-def start_connect(provider: str) -> tuple[bool, str]:
+def start_connect(provider):
     code, body = api("POST", f"/api/auth/{provider}/start", {})
     if code not in (200, 202) or not isinstance(body, dict):
-        return False, f"HTTP {code}: {body}"
+        return (False, f"HTTP {code}: {body}")
     sid = body.get("session_id") or body.get("id")
-    return True, f"browser opened (session_id={sid}) — complete sign-in manually"
+    return (True, f"browser opened (session_id={sid}) — complete sign-in manually")
 
 
-def disconnect_provider(provider: str) -> tuple[bool, str]:
+def disconnect_provider(provider):
     code, body = api("POST", f"/api/auth/{provider}/disconnect", {})
     if code not in (200, 204):
-        return False, f"HTTP {code}: {body}"
-    return True, "disconnected"
+        return (False, f"HTTP {code}: {body}")
+    return (True, "disconnected")
 
 
-def run_fetcher(key: str) -> dict[str, object]:
+def run_fetcher(key):
     if not wait_idle(120):
         return {"ok": False, "error": "queue not idle before submit"}
     code, body = api("POST", f"/api/run/{key}", {})
@@ -260,21 +231,15 @@ def run_fetcher(key: str) -> dict[str, object]:
     if not hist:
         return {"ok": False, "run_id": run_id, "error": "timeout waiting for run"}
     exit_code = hist.get("exit_code")
-    return {
-        "ok": exit_code == 0,
-        "run_id": run_id,
-        "exit_code": exit_code,
-        "status": hist.get("status"),
-    }
+    return {"ok": exit_code == 0, "run_id": run_id, "exit_code": exit_code, "status": hist.get("status")}
 
 
-def cmd_preflight(run: TestRun) -> int:
+def cmd_preflight(run):
     ok_server = ping_server()
     ok_chrome = chrome_available()
     pid, profile_msg = (None, "skipped — server down")
     if ok_server:
         pid, profile_msg = ensure_conn_test_profile()
-
     run.profile_id = pid
     run.preflight = {
         "server_up": ok_server,
@@ -282,15 +247,15 @@ def cmd_preflight(run: TestRun) -> int:
         "profile": profile_msg,
         "url": f"{BASE}/#connections",
     }
-    print(f"Server: {'up' if ok_server else 'DOWN'} at {BASE}")
-    print(f"Chrome/Edge: {'found' if ok_chrome else 'NOT FOUND'}")
+    print(f"Server: {('up' if ok_server else 'DOWN')} at {BASE}")
+    print(f"Chrome/Edge: {('found' if ok_chrome else 'NOT FOUND')}")
     print(f"Profile conn-test: {profile_msg}" + (f" (id={pid})" if pid else ""))
     if ok_server and pid:
         print(f"Open: {BASE}/#connections")
     return 0 if ok_server and ok_chrome and pid else 1
 
 
-def cmd_status(run: TestRun) -> int:
+def cmd_status(run):
     if not ping_server():
         print("Server down — run preflight after starting server.py")
         return 1
@@ -310,7 +275,7 @@ def cmd_status(run: TestRun) -> int:
     return 0
 
 
-def wait_connected(provider: str, timeout: float = 300.0) -> bool:
+def wait_connected(provider, timeout=300.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         auth = auth_status_map()
@@ -320,7 +285,7 @@ def wait_connected(provider: str, timeout: float = 300.0) -> bool:
     return False
 
 
-def cmd_fetch(run: TestRun, *, provider: str | None = None, launch_connect: bool, wait_connect: float) -> int:
+def cmd_fetch(run, *, provider=None, launch_connect, wait_connect):
     if not ping_server():
         print("Server down")
         return 1
@@ -331,16 +296,13 @@ def cmd_fetch(run: TestRun, *, provider: str | None = None, launch_connect: bool
     if provider and provider not in CDP_PROVIDERS:
         print(f"Unknown provider {provider!r}")
         return 1
-
     games_root = profile_games_dir(pid or "") if pid else ROOT
     exit_code = 0
-
     for key in keys:
         spec = CDP_PROVIDERS[key]
         pr = ProviderResult(provider=key, label=str(spec["label"]))
         row = auth.get(key) or {}
         pr.auth_status = str(row.get("status") or "missing")
-
         if pr.auth_status != "connected":
             handled = False
             if launch_connect:
@@ -376,20 +338,17 @@ def cmd_fetch(run: TestRun, *, provider: str | None = None, launch_connect: bool
                 print(f"[SKIP] {pr.label} — not connected ({pr.auth_status})")
                 exit_code = 1
                 continue
-
         pr.connect = "connected"
-        for fetcher_key in spec["fetchers"]:  # type: ignore[union-attr]
+        for fetcher_key in spec["fetchers"]:
             print(f"Running fetcher {fetcher_key}…")
             result = run_fetcher(str(fetcher_key))
             pr.fetchers[str(fetcher_key)] = result
             mark = "PASS" if result.get("ok") else "FAIL"
             print(f"  [{mark}] {fetcher_key} exit={result.get('exit_code')} {result.get('error', '')}")
-
-        for gj in spec["games_json"]:  # type: ignore[union-attr]
+        for gj in spec["games_json"]:
             path = games_root / str(gj)
             pr.games_row_counts[str(gj)] = count_games(path)
             print(f"  {gj}: {pr.games_row_counts[str(gj)]} rows")
-
         if spec.get("test_reconnect") and pr.auth_status == "connected":
             print(f"Testing disconnect/reconnect chip for {key}…")
             ok, msg = disconnect_provider(key)
@@ -399,16 +358,14 @@ def cmd_fetch(run: TestRun, *, provider: str | None = None, launch_connect: bool
             pr.notes.append(f"post-disconnect status={(auth2.get(key) or {}).get('status')}")
             if disconnected:
                 ok2, msg2 = start_connect(key)
-                pr.notes.append(f"reconnect start: {msg2 if ok2 else 'failed ' + msg2}")
+                pr.notes.append(f"reconnect start: {(msg2 if ok2 else 'failed ' + msg2)}")
             else:
                 pr.notes.append("disconnect did not flip status — check UI reconnect chip manually")
-
         run.providers.append(pr)
-
     return exit_code
 
 
-def save_results(run: TestRun) -> None:
+def save_results(run):
     run.finished_at = datetime.now(UTC).isoformat()
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -423,12 +380,10 @@ def save_results(run: TestRun) -> None:
     print(f"\nResults written to {RESULTS_PATH.relative_to(ROOT)}")
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command",
-        choices=("preflight", "status", "fetch", "all"),
-        help="preflight | status | fetch | all",
+        "command", choices=("preflight", "status", "fetch", "all"), help="preflight | status | fetch | all"
     )
     parser.add_argument("--provider", help="Single provider key for fetch")
     parser.add_argument(
@@ -444,10 +399,8 @@ def main() -> int:
         help="After --launch-connect, poll auth status up to SECS (default 0 = do not wait)",
     )
     args = parser.parse_args()
-
     run = TestRun(started_at=datetime.now(UTC).isoformat())
     code = 0
-
     if args.command in ("preflight", "all"):
         code = max(code, cmd_preflight(run))
     if args.command in ("status", "all") and ping_server():
@@ -455,14 +408,8 @@ def main() -> int:
     if args.command in ("fetch", "all") and ping_server():
         code = max(
             code,
-            cmd_fetch(
-                run,
-                provider=args.provider,
-                launch_connect=args.launch_connect,
-                wait_connect=args.wait_connect,
-            ),
+            cmd_fetch(run, provider=args.provider, launch_connect=args.launch_connect, wait_connect=args.wait_connect),
         )
-
     save_results(run)
     return code
 

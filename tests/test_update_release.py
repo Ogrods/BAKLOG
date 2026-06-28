@@ -1,11 +1,6 @@
-"""Security tests for trusted release URLs, sha256, and zip extraction."""
-
-from __future__ import annotations
-
 import hashlib
 import io
 import zipfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -24,32 +19,31 @@ from shared.update_release import (
 )
 
 
-def test_is_allowed_download_url_accepts_github_release_asset() -> None:
+def test_is_allowed_download_url_accepts_github_release_asset():
     url = "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-win64.zip"
     assert is_allowed_download_url(url) is True
 
 
-def test_is_allowed_download_url_rejects_evil_host() -> None:
+def test_is_allowed_download_url_rejects_evil_host():
     assert is_allowed_download_url("https://evil.example/BAKLOG-win64.zip") is False
 
 
-def test_is_allowed_download_url_rejects_non_release_path() -> None:
+def test_is_allowed_download_url_rejects_non_release_path():
     url = "https://github.com/Ogrods/BAKLOG/zipball/main"
     assert is_allowed_download_url(url) is False
 
 
-def test_is_allowed_download_url_rejects_unknown_asset_name() -> None:
+def test_is_allowed_download_url_rejects_unknown_asset_name():
     url = "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/evil.exe"
     assert is_allowed_download_url(url) is False
 
 
-def test_parse_sha256_sidecar() -> None:
-    # use valid 64 hex chars
+def test_parse_sha256_sidecar():
     valid = "a" * 64 + "  BAKLOG-win64.zip"
     assert parse_sha256_sidecar(valid) == "a" * 64
 
 
-def test_build_release_artifacts_from_release_json() -> None:
+def test_build_release_artifacts_from_release_json():
     release = {
         "tag_name": "v0.8.26",
         "html_url": "https://github.com/Ogrods/BAKLOG/releases/tag/v0.8.26",
@@ -70,7 +64,7 @@ def test_build_release_artifacts_from_release_json() -> None:
     assert artifacts.zip_url.endswith(STABLE_ZIP_NAME)
 
 
-def test_verify_file_sha256_detects_tamper(tmp_path: Path) -> None:
+def test_verify_file_sha256_detects_tamper(tmp_path):
     target = tmp_path / "file.bin"
     target.write_bytes(b"hello")
     digest = hashlib.sha256(b"hello").hexdigest()
@@ -79,7 +73,7 @@ def test_verify_file_sha256_detects_tamper(tmp_path: Path) -> None:
         verify_file_sha256(target, "0" * 64)
 
 
-def _write_test_bundle_zip(dest: Path) -> None:
+def _write_test_bundle_zip(dest):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as archive:
         archive.writestr("BAKLOG/BAKLOG.exe", b"exe")
@@ -87,7 +81,7 @@ def _write_test_bundle_zip(dest: Path) -> None:
     dest.write_bytes(buf.getvalue())
 
 
-def test_safe_extract_zip_rejects_traversal(tmp_path: Path) -> None:
+def test_safe_extract_zip_rejects_traversal(tmp_path):
     zip_path = tmp_path / "bad.zip"
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as archive:
@@ -97,7 +91,7 @@ def test_safe_extract_zip_rejects_traversal(tmp_path: Path) -> None:
         safe_extract_zip(zip_path, tmp_path / "out")
 
 
-def test_safe_extract_zip_and_locate_bundle_root(tmp_path: Path) -> None:
+def test_safe_extract_zip_and_locate_bundle_root(tmp_path):
     zip_path = tmp_path / "good.zip"
     _write_test_bundle_zip(zip_path)
     root = safe_extract_zip(zip_path, tmp_path / "extract")
@@ -105,12 +99,12 @@ def test_safe_extract_zip_and_locate_bundle_root(tmp_path: Path) -> None:
     assert locate_bundle_root(tmp_path / "extract") == root
 
 
-def test_fetch_url_to_file_rejects_disallowed_url(tmp_path: Path) -> None:
+def test_fetch_url_to_file_rejects_disallowed_url(tmp_path):
     with pytest.raises(UpdateSecurityError):
         fetch_url_to_file("https://evil.example/x.zip", tmp_path / "x.zip")
 
 
-def test_build_release_artifacts_macos_asset() -> None:
+def test_build_release_artifacts_macos_asset():
     release = {
         "tag_name": "v0.8.26",
         "html_url": "https://github.com/Ogrods/BAKLOG/releases/tag/v0.8.26",
@@ -132,7 +126,7 @@ def test_build_release_artifacts_macos_asset() -> None:
     assert artifacts.zip_url.endswith("BAKLOG-macos.zip")
 
 
-def test_build_release_artifacts_macos_missing_asset() -> None:
+def test_build_release_artifacts_macos_missing_asset():
     release = {
         "tag_name": "v0.8.26",
         "html_url": "https://github.com/Ogrods/BAKLOG/releases/tag/v0.8.26",
@@ -140,7 +134,7 @@ def test_build_release_artifacts_macos_missing_asset() -> None:
             {
                 "name": "BAKLOG-win64.zip",
                 "browser_download_url": "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-win64.zip",
-            },
+            }
         ],
     }
     artifacts = build_release_artifacts(release, platform="darwin")

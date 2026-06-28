@@ -1,37 +1,22 @@
-"""Tests for the one-time .env -> encrypted blob migration (default profile)."""
-
-from __future__ import annotations
-
-from pathlib import Path
-
 import pytest
 
 import auth.secrets as secrets
-from auth.manager import (
-    _LEGACY_ENV_ALIASES,
-    get_provider_blob,
-    import_env_credentials,
-    mark_connected,
-)
+from auth.manager import _LEGACY_ENV_ALIASES, get_provider_blob, import_env_credentials, mark_connected
 from auth.registry import PROVIDERS
 from auth.secrets import set_master_password_override
 from shared import profile_paths
 
 
 @pytest.fixture(autouse=True)
-def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Point profile paths at a tmp tree with an explicit default profile dir."""
+def isolated_default_profile(tmp_path, monkeypatch):
     prof_dir = tmp_path / "profiles"
     (prof_dir / "default").mkdir(parents=True)
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof_dir)
     monkeypatch.setattr(profile_paths, "INDEX_FILE", prof_dir / "index.json")
     monkeypatch.delenv("BAKLOG_PROFILE", raising=False)
-    # Deterministic encryption without touching the OS keyring.
     set_master_password_override("test-passphrase-for-env-import")
     secrets._cache = None
-    # Clear every provider env key (and legacy alias) so the real environment /
-    # a developer's .env never leaks into the import under test.
     for spec in PROVIDERS.values():
         for key in spec.env_keys:
             monkeypatch.delenv(key, raising=False)
@@ -43,8 +28,7 @@ def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     secrets._cache = None
 
 
-def _read_default_blob(provider: str) -> dict:
-    """Read a provider blob from the default profile's secrets store."""
+def _read_default_blob(provider):
     target = profile_paths.auth_dir(profile_id="default")
     saved = (secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache)
     secrets.AUTH_DIR = target
@@ -57,13 +41,11 @@ def _read_default_blob(provider: str) -> dict:
         secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache = saved
 
 
-def test_imports_env_into_default_blob(monkeypatch: pytest.MonkeyPatch):
+def test_imports_env_into_default_blob(monkeypatch):
     monkeypatch.setenv("ITCH_API_KEY", "itch-from-env")
     monkeypatch.setenv("STEAM_API_KEY", "steam-key")
     monkeypatch.setenv("STEAM_ID", "76561198000000000")
-
     imported = import_env_credentials(profile_id="default")
-
     assert "itch" in imported
     assert "steam" in imported
     itch = _read_default_blob("itch")
@@ -74,17 +56,14 @@ def test_imports_env_into_default_blob(monkeypatch: pytest.MonkeyPatch):
     assert steam["STEAM_ID"] == "76561198000000000"
 
 
-def test_skips_provider_with_no_env(monkeypatch: pytest.MonkeyPatch):
+def test_skips_provider_with_no_env(monkeypatch):
     monkeypatch.setenv("ITCH_API_KEY", "only-itch")
-
     imported = import_env_credentials(profile_id="default")
-
     assert imported == ["itch"]
     assert _read_default_blob("gog") == {}
 
 
-def test_does_not_overwrite_connected_provider(monkeypatch: pytest.MonkeyPatch):
-    # Pre-connect gog directly in the default blob.
+def test_does_not_overwrite_connected_provider(monkeypatch):
     target = profile_paths.auth_dir(profile_id="default")
     saved = (secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache)
     secrets.AUTH_DIR = target
@@ -95,31 +74,25 @@ def test_does_not_overwrite_connected_provider(monkeypatch: pytest.MonkeyPatch):
         mark_connected("gog", {"GOG_AL": "real-session"})
     finally:
         secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache = saved
-
     monkeypatch.setenv("GOG_AL", "env-session-should-be-ignored")
     imported = import_env_credentials(profile_id="default")
-
     assert "gog" not in imported
     assert _read_default_blob("gog")["GOG_AL"] == "real-session"
 
 
-def test_skips_local_amazon_provider(monkeypatch: pytest.MonkeyPatch):
+def test_skips_local_amazon_provider(monkeypatch):
     monkeypatch.setenv("AMAZON_GAMES_SQL_DIR", "C:/whatever")
     imported = import_env_credentials(profile_id="default")
     assert "amazon" not in imported
 
 
-def test_maybe_import_legacy_env_deletes_env_not_archive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_maybe_import_legacy_env_deletes_env_not_archive(tmp_path, monkeypatch):
     from shared.legacy_env import maybe_import_legacy_env
 
     env_path = tmp_path / ".env"
     env_path.write_text("ITCH_API_KEY=from-dotenv\n", encoding="utf-8")
     monkeypatch.setenv("ITCH_API_KEY", "from-dotenv")
-
     count, err = maybe_import_legacy_env(tmp_path)
-
     assert err is None
     assert count == 1
     assert not env_path.exists()
@@ -127,26 +100,18 @@ def test_maybe_import_legacy_env_deletes_env_not_archive(
     assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
 
 
-def test_maybe_import_legacy_env_preserves_non_credential_config(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_maybe_import_legacy_env_preserves_non_credential_config(tmp_path, monkeypatch):
     from shared.legacy_env import maybe_import_legacy_env
 
     env_path = tmp_path / ".env"
     env_path.write_text(
-        "# header comment\n"
-        "ITCH_API_KEY=from-dotenv\n"
-        "BAKLOG_SUPABASE_URL=https://x.supabase.co\n"
-        "AMAZON_GAMES_SQL_DIR=C:/games\n",
+        "# header comment\nITCH_API_KEY=from-dotenv\nBAKLOG_SUPABASE_URL=https://x.supabase.co\nAMAZON_GAMES_SQL_DIR=C:/games\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("ITCH_API_KEY", "from-dotenv")
-
     count, err = maybe_import_legacy_env(tmp_path)
-
     assert err is None
     assert count == 1
-    # File survives because config remains; the credential line is gone.
     assert env_path.exists()
     surviving = env_path.read_text(encoding="utf-8")
     assert "ITCH_API_KEY" not in surviving
@@ -155,39 +120,28 @@ def test_maybe_import_legacy_env_preserves_non_credential_config(
     assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
 
 
-def test_maybe_import_legacy_env_strips_exported_credential_lines(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    """python-dotenv honors `export KEY=value`; the stripper must too."""
+def test_maybe_import_legacy_env_strips_exported_credential_lines(tmp_path, monkeypatch):
     from shared.legacy_env import maybe_import_legacy_env
 
     env_path = tmp_path / ".env"
-    env_path.write_text(
-        "export ITCH_API_KEY=from-dotenv\n"
-        "BAKLOG_ADMIN=1\n",
-        encoding="utf-8",
-    )
+    env_path.write_text("export ITCH_API_KEY=from-dotenv\nBAKLOG_ADMIN=1\n", encoding="utf-8")
     monkeypatch.setenv("ITCH_API_KEY", "from-dotenv")
-
     count, err = maybe_import_legacy_env(tmp_path)
-
     assert err is None
     assert count == 1
     surviving = env_path.read_text(encoding="utf-8")
-    # Exported credential line removed; non-credential config preserved.
     assert "ITCH_API_KEY" not in surviving
     assert "BAKLOG_ADMIN=1" in surviving
     assert _read_default_blob("itch")["ITCH_API_KEY"] == "from-dotenv"
 
 
-def test_remediates_existing_env_imported_archive(tmp_path: Path):
+def test_remediates_existing_env_imported_archive(tmp_path):
     from shared.legacy_env import maybe_import_legacy_env, remediate_env_imported_archive
 
     stale = tmp_path / ".env.imported"
     stale.write_text("STEAM_API_KEY=leaked\n", encoding="utf-8")
     assert remediate_env_imported_archive(tmp_path) is True
     assert not stale.exists()
-
     stale.write_text("STEAM_API_KEY=leaked\n", encoding="utf-8")
     count, err = maybe_import_legacy_env(tmp_path)
     assert err is None

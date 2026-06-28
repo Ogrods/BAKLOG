@@ -1,15 +1,7 @@
-"""Tests for shared update snooze file."""
-
-from __future__ import annotations
-
-from shared.update_snooze import (
-    is_version_dismissed,
-    read_dismissed_version,
-    write_dismissed_version,
-)
+from shared.update_snooze import is_version_dismissed, read_dismissed_version, write_dismissed_version
 
 
-def test_dismiss_round_trip(tmp_path) -> None:
+def test_dismiss_round_trip(tmp_path):
     root = tmp_path / "data"
     assert read_dismissed_version(root) is None
     write_dismissed_version(root, "0.8.26")

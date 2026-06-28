@@ -1,49 +1,34 @@
-"""Personal doc load/save (personal.json) — extracted from server.py."""
-
-from __future__ import annotations
-
 import json
 import os
 import sys
 import threading
 import time
-from typing import Any
 
 from shared.profile_paths import personal_backup_dir, personal_dir, personal_path
 
 PERSONAL_BACKUP_KEEP = 10
-PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
-
+PERSONAL_MAX_BYTES = 32 * 1024 * 1024
 _personal_lock = threading.RLock()
 _personal_last_backup_at = 0.0
-
 BAKLOG_ALLOW_EMPTY_HEADER = "X-BAKLOG-Allow-Empty"
 
 
 class PersonalCorruptError(RuntimeError):
-    """personal.json is unreadable and no backup could be restored."""
+    pass
 
 
 class PersonalEmptyOverwriteError(RuntimeError):
-    """Refusing to replace a populated personal doc with a fully empty payload."""
+    pass
 
 
-def _empty_personal_doc() -> dict[str, Any]:
-    return {
-        "personal": {},
-        "prefs": {},
-        "manual": [],
-        "libraryFirstSeen": {},
-        "updated_at": None,
-        "schema_version": 1,
-    }
+def _empty_personal_doc():
+    return {"personal": {}, "prefs": {}, "manual": [], "libraryFirstSeen": {}, "updated_at": None, "schema_version": 1}
 
 
-def _personal_doc_is_meaningful(doc: dict[str, Any]) -> bool:
-    """True when the stored doc carries personal edits, manual games, or first-seen stamps."""
+def _personal_doc_is_meaningful(doc):
     personal = doc.get("personal")
     if isinstance(personal, dict):
-        if any(k != "__migrated_v3" for k in personal):
+        if any((k != "__migrated_v3" for k in personal)):
             return True
     manual = doc.get("manual")
     if isinstance(manual, list) and manual:
@@ -54,12 +39,11 @@ def _personal_doc_is_meaningful(doc: dict[str, Any]) -> bool:
     return False
 
 
-def _personal_payload_is_empty(validated: dict[str, Any]) -> bool:
-    """True when the incoming payload has no personal/manual/first-seen data."""
+def _personal_payload_is_empty(validated):
     personal = validated.get("personal") or {}
     if not isinstance(personal, dict):
         return True
-    if any(k != "__migrated_v3" for k in personal):
+    if any((k != "__migrated_v3" for k in personal)):
         return False
     manual = validated.get("manual") or []
     if isinstance(manual, list) and manual:
@@ -70,7 +54,7 @@ def _personal_payload_is_empty(validated: dict[str, Any]) -> bool:
     return True
 
 
-def _normalize_personal_doc(doc: dict[str, Any]) -> dict[str, Any]:
+def _normalize_personal_doc(doc):
     doc.setdefault("personal", {})
     doc.setdefault("prefs", {})
     doc.setdefault("manual", [])
@@ -80,7 +64,7 @@ def _normalize_personal_doc(doc: dict[str, Any]) -> dict[str, Any]:
     return doc
 
 
-def _restore_personal_from_backup() -> dict[str, Any] | None:
+def _restore_personal_from_backup():
     backup_dir = personal_backup_dir()
     if not backup_dir.is_dir():
         return None
@@ -96,7 +80,7 @@ def _restore_personal_from_backup() -> dict[str, Any] | None:
     return None
 
 
-def load_personal_doc() -> dict[str, Any]:
+def load_personal_doc():
     with _personal_lock:
         path = personal_path()
         if not path.exists():
@@ -107,21 +91,15 @@ def load_personal_doc() -> dict[str, Any]:
         except (OSError, json.JSONDecodeError) as exc:
             restored = _restore_personal_from_backup()
             if restored is not None:
-                print(
-                    f"[personal] primary file corrupt ({exc!r}); serving newest backup",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                print(f"[personal] primary file corrupt ({exc!r}); serving newest backup", file=sys.stderr, flush=True)
                 return restored
-            raise PersonalCorruptError(
-                f"personal data at {path} is corrupt and no backup could be read"
-            ) from exc
+            raise PersonalCorruptError(f"personal data at {path} is corrupt and no backup could be read") from exc
         if not isinstance(doc, dict):
             raise PersonalCorruptError(f"personal data at {path} is not a JSON object")
         return _normalize_personal_doc(doc)
 
 
-def _validate_personal_payload(payload: Any) -> dict[str, Any]:
+def _validate_personal_payload(payload):
     if not isinstance(payload, dict):
         raise ValueError("payload must be a JSON object")
     personal = payload.get("personal", {})
@@ -136,16 +114,10 @@ def _validate_personal_payload(payload: Any) -> dict[str, Any]:
         raise ValueError("manual must be an array")
     if not isinstance(library_first_seen, dict):
         raise ValueError("libraryFirstSeen must be an object")
-    return {
-        "personal": personal,
-        "prefs": prefs,
-        "manual": manual,
-        "libraryFirstSeen": library_first_seen,
-    }
+    return {"personal": personal, "prefs": prefs, "manual": manual, "libraryFirstSeen": library_first_seen}
 
 
-def _rotate_personal_backup() -> None:
-    """Keep a rolling set of timestamped backups so a bad save can't wipe edits."""
+def _rotate_personal_backup():
     global _personal_last_backup_at
     now = time.time()
     if now - _personal_last_backup_at < 300:
@@ -171,26 +143,20 @@ def _rotate_personal_backup() -> None:
             pass
 
 
-def _rebind_after_save() -> None:
-    """Refresh server module paths after personal.json write (profile switch tests)."""
+def _rebind_after_save():
     import server as mod
 
     mod._refresh_personal_paths()
 
 
-def save_personal_doc(payload: dict[str, Any], *, allow_empty: bool = False) -> dict[str, Any]:
-    """Atomic write: temp file + os.replace(). Never partial; never corrupted."""
+def save_personal_doc(payload, *, allow_empty=False):
     with _personal_lock:
         validated = _validate_personal_payload(payload)
         if not allow_empty and _personal_payload_is_empty(validated):
             existing = load_personal_doc()
             if _personal_doc_is_meaningful(existing):
                 path = personal_path()
-                print(
-                    f"[personal] refusing empty overwrite of populated doc at {path}",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                print(f"[personal] refusing empty overwrite of populated doc at {path}", file=sys.stderr, flush=True)
                 raise PersonalEmptyOverwriteError("refusing empty overwrite")
         doc = _empty_personal_doc()
         doc.update(validated)

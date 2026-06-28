@@ -1,7 +1,3 @@
-"""Dev-port ownership checks for frozen smoke tests (127.0.0.1:8765)."""
-
-from __future__ import annotations
-
 import subprocess
 import sys
 import time
@@ -12,18 +8,12 @@ from shared.dev_server_pids import DEFAULT_HOST, DEFAULT_PORT, pid_listening_on_
 from shared.subprocess_guard import related_pids
 
 
-def port_listener_pid(
-    host: str = DEFAULT_HOST, port: int = DEFAULT_PORT
-) -> int | None:
+def port_listener_pid(host=DEFAULT_HOST, port=DEFAULT_PORT):
     if sys.platform == "win32":
         return pid_listening_on_port(host, port)
     try:
         out = subprocess.run(
-            ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
+            ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"], capture_output=True, text=True, timeout=10, check=False
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -33,12 +23,7 @@ def port_listener_pid(
     return None
 
 
-def proc_owns_dev_port(
-    proc: subprocess.Popen,
-    *,
-    host: str = DEFAULT_HOST,
-    port: int = DEFAULT_PORT,
-) -> bool:
+def proc_owns_dev_port(proc, *, host=DEFAULT_HOST, port=DEFAULT_PORT):
     if proc.poll() is not None:
         return False
     listener = port_listener_pid(host, port)
@@ -47,17 +32,9 @@ def proc_owns_dev_port(
     return listener in related_pids(proc.pid)
 
 
-def wait_for_owned_server(
-    proc: subprocess.Popen,
-    base: str,
-    *,
-    timeout_sec: float = 25.0,
-    host: str = DEFAULT_HOST,
-    port: int = DEFAULT_PORT,
-) -> tuple[bool, str | None]:
-    """Wait until /api/config responds from the spawned process tree."""
+def wait_for_owned_server(proc, base, *, timeout_sec=25.0, host=DEFAULT_HOST, port=DEFAULT_PORT):
     deadline = time.monotonic() + timeout_sec
-    collision_holder: int | None = None
+    collision_holder = None
     while time.monotonic() < deadline:
         listener = port_listener_pid(host, port)
         if listener is not None and proc.poll() is None:
@@ -67,23 +44,17 @@ def wait_for_owned_server(
             try:
                 with urllib.request.urlopen(f"{base}/api/config", timeout=2) as resp:
                     if resp.status == 200:
-                        return True, None
+                        return (True, None)
             except (urllib.error.URLError, TimeoutError, OSError):
                 pass
         time.sleep(0.4)
     if collision_holder is not None:
         return (
             False,
-            f"port {host}:{port} held by pid {collision_holder}, not spawned smoke process "
-            f"(pid {proc.pid}); run scripts/stop_baklog.py",
+            f"port {host}:{port} held by pid {collision_holder}, not spawned smoke process (pid {proc.pid}); run scripts/stop_baklog.py",
         )
-    return False, f"server did not respond within {timeout_sec}s"
+    return (False, f"server did not respond within {timeout_sec}s")
 
 
-def port_collision_message(
-    holder: int, *, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT
-) -> str:
-    return (
-        f"port {host}:{port} already in use by pid {holder}; "
-        "run scripts/stop_baklog.py --dedupe"
-    )
+def port_collision_message(holder, *, host=DEFAULT_HOST, port=DEFAULT_PORT):
+    return f"port {host}:{port} already in use by pid {holder}; run scripts/stop_baklog.py --dedupe"

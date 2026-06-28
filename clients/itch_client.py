@@ -1,55 +1,31 @@
-"""itch.io personal API client.
-
-Uses an API key from https://itch.io/user/settings/api-keys with the
-endpoint base ``https://itch.io/api/1/<KEY>/...``.
-
-Only the read endpoints we need:
-
-- ``my-owned-keys?page=N`` — paginated list of games the signed-in user owns
-  (purchases + claimed bundle items + free downloads they've grabbed).
-- ``game/<id>`` — extra metadata for a single game.
-
-itch.io's API is lightly documented (see
-https://itch.io/docs/api/serverside). Rate limits are not published; we
-self-throttle to be polite.
-"""
-
-from __future__ import annotations
-
 import json
 import time
-from pathlib import Path
 
 import requests
 
 from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
 
 BASE_URL = "https://itch.io/api/1"
-DEFAULT_PAGE_SIZE_FALLBACK = 50  # itch may return up to 50 keys per page
+DEFAULT_PAGE_SIZE_FALLBACK = 50
 REQUEST_DELAY_SEC = 0.4
 
 
 class ItchAuthError(Exception):
-    """Raised when the itch.io API rejects the supplied key."""
+    pass
 
 
 class ItchApiError(Exception):
-    """Raised on transport or unexpected response errors."""
+    pass
 
 
-def _default_itch_cache_dir() -> Path:
+def _default_itch_cache_dir():
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "itch"
 
 
 class ItchClient:
-    def __init__(
-        self,
-        api_key: str,
-        cache_dir: Path | None = None,
-        timeout: int = 30,
-    ) -> None:
+    def __init__(self, api_key, cache_dir=None, timeout=30):
         if cache_dir is None:
             cache_dir = _default_itch_cache_dir()
         if not api_key:
@@ -62,15 +38,13 @@ class ItchClient:
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "steam-backlog/1.0 (+itch)"
 
-    # ---- transport ----
-
-    def _throttle(self) -> None:
+    def _throttle(self):
         elapsed = time.time() - self._last_call
         if elapsed < REQUEST_DELAY_SEC:
             time.sleep(REQUEST_DELAY_SEC - elapsed)
         self._last_call = time.time()
 
-    def _get(self, path: str, params: dict | None = None) -> dict:
+    def _get(self, path, params=None):
         self._throttle()
         url = f"{BASE_URL}/{self.api_key}/{path}"
         try:
@@ -78,7 +52,9 @@ class ItchClient:
         except requests.RequestException as e:
             raise ItchApiError(f"itch.io request failed: {e}") from e
         if resp.status_code in (401, 403):
-            raise ItchAuthError("itch.io rejected the API key (401/403). Regenerate at https://itch.io/user/settings/api-keys")
+            raise ItchAuthError(
+                "itch.io rejected the API key (401/403). Regenerate at https://itch.io/user/settings/api-keys"
+            )
         if resp.status_code >= 400:
             raise ItchApiError(f"itch.io HTTP {resp.status_code}: {resp.text[:200]}")
         try:
@@ -89,24 +65,20 @@ class ItchClient:
             raise ItchApiError(f"itch.io error: {data['errors']}")
         return data
 
-    # ---- endpoints ----
-
-    def me(self) -> dict:
+    def me(self):
         return self._get("me").get("user", {})
 
-    def owned_keys_page(self, page: int) -> list[dict]:
-        """One page of ``download_keys``. Empty list means the end."""
+    def owned_keys_page(self, page):
         data = self._get("my-owned-keys", {"page": page})
         keys = data.get("owned_keys") or data.get("download_keys") or []
         if not isinstance(keys, list):
             return []
         return keys
 
-    def all_owned_keys(self) -> list[dict]:
-        """Walk every page until itch returns an empty result."""
+    def all_owned_keys(self):
         hb = HeartbeatTimer(interval=25.0)
-        out: list[dict] = []
-        seen_ids: set[int] = set()
+        out = []
+        seen_ids = set()
         page = 1
         while True:
             hb.tick_progress(page, 0, "itch owned-keys", f"{len(out)} games")
@@ -122,16 +94,15 @@ class ItchClient:
                 seen_ids.add(gid)
                 out.append(entry)
                 new_in_page += 1
-            # Stop if the API returns a page that's all duplicates (defensive).
             if new_in_page == 0:
                 break
             heartbeat(progress_line(page, 0, "itch owned-keys", f"{len(out)} games"))
             page += 1
-            if page > 200:  # hard safety cap (~10k games)
+            if page > 200:
                 break
         return out
 
-    def game(self, game_id: int) -> dict:
+    def game(self, game_id):
         cache_path = self.cache_dir / "games" / f"{game_id}.json"
         if cache_path.exists():
             try:

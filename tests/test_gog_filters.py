@@ -1,7 +1,3 @@
-"""Tests for shared GOG name filters (gog_filters.py)."""
-
-from __future__ import annotations
-
 import fetchers.fetch_gog as fg
 from clients.gog_filters import (
     apply_gog_name_filters,
@@ -12,33 +8,25 @@ from clients.gog_filters import (
 )
 
 
-def test_should_skip_voucher_and_name_dlc() -> None:
+def test_should_skip_voucher_and_name_dlc():
     assert should_skip_gog_title("Freedom to buy games")
     assert should_skip_gog_title("Brigador: Deluxe DLC Upgrade")
     assert not should_skip_gog_title("Ashworld")
 
 
-def test_build_game_row_tags_non_game_title() -> None:
-    row = fg._build_game_row(
-        {"id": 1, "title": "Freedom to buy games", "mediaType": 1},
-        None,
-        None,
-    )
+def test_build_game_row_tags_non_game_title():
+    row = fg._build_game_row({"id": 1, "title": "Freedom to buy games", "mediaType": 1}, None, None)
     assert row is not None
     assert "noise" in row["tags"]
 
 
-def test_build_game_row_tags_non_game_media_type() -> None:
-    row = fg._build_game_row(
-        {"id": 2, "title": "Soundtrack", "mediaType": 3},
-        None,
-        None,
-    )
+def test_build_game_row_tags_non_game_media_type():
+    row = fg._build_game_row({"id": 2, "title": "Soundtrack", "mediaType": 3}, None, None)
     assert row is not None
     assert "noise" in row["tags"]
 
 
-def test_forgotten_realms_pack_dropped_when_components_present() -> None:
+def test_forgotten_realms_pack_dropped_when_components_present():
     rows = [
         {"name": "Forgotten Realms: The Archives - Collection One", "gog_id": 1},
         {"name": "Eye of the Beholder", "gog_id": 2},
@@ -47,10 +35,10 @@ def test_forgotten_realms_pack_dropped_when_components_present() -> None:
     ]
     out = collapse_pack_dupes(rows)
     assert len(out) == 3
-    assert all("Collection One" not in r["name"] for r in out)
+    assert all(("Collection One" not in r["name"] for r in out))
 
 
-def test_post_merge_drops_pack_with_different_gog_id() -> None:
+def test_post_merge_drops_pack_with_different_gog_id():
     games = [
         {"name": "Silver Box Classics", "gog_id": 9001, "source": "web"},
         {"name": "Heroes of the Lance", "gog_id": 9002, "source": "local"},
@@ -60,20 +48,17 @@ def test_post_merge_drops_pack_with_different_gog_id() -> None:
     ]
     out = filter_gog_game_rows(games)
     assert len(out) == 4
-    assert not any(g["gog_id"] == 9001 for g in out)
+    assert not any((g["gog_id"] == 9001 for g in out))
 
 
-def test_apply_promo_collapse_on_web_style_rows() -> None:
-    rows = [
-        {"name": "Ashworld", "gog_id": 1},
-        {"name": "Ashworld - Amazon Luna", "gog_id": 2},
-    ]
+def test_apply_promo_collapse_on_web_style_rows():
+    rows = [{"name": "Ashworld", "gog_id": 1}, {"name": "Ashworld - Amazon Luna", "gog_id": 2}]
     out = apply_gog_name_filters(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1
 
 
-def test_prime_giveaway_dropped_when_populated_twin_exists() -> None:
+def test_prime_giveaway_dropped_when_populated_twin_exists():
     rows = [
         {
             "name": "XCOM® 2",
@@ -81,19 +66,14 @@ def test_prime_giveaway_dropped_when_populated_twin_exists() -> None:
             "header_image": "https://images.gog.com/xcom2.jpg",
             "genres": ["Strategy"],
         },
-        {
-            "name": "XCOM® 2 - Prime Giveaway",
-            "gog_id": 1259310057,
-            "header_image": None,
-            "genres": [],
-        },
+        {"name": "XCOM® 2 - Prime Giveaway", "gog_id": 1259310057, "header_image": None, "genres": []},
     ]
     out = apply_gog_name_filters(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1482002159
 
 
-def test_exact_name_barren_duplicate_dropped() -> None:
+def test_exact_name_barren_duplicate_dropped():
     rows = [
         {
             "name": "Mafia II: Definitive Edition",
@@ -101,19 +81,14 @@ def test_exact_name_barren_duplicate_dropped() -> None:
             "header_image": "https://images.gog.com/mafia.jpg",
             "genres": ["Adventure"],
         },
-        {
-            "name": "Mafia II: Definitive Edition",
-            "gog_id": 1943447848,
-            "header_image": None,
-            "genres": [],
-        },
+        {"name": "Mafia II: Definitive Edition", "gog_id": 1943447848, "header_image": None, "genres": []},
     ]
     out = collapse_metadata_barren_dupes(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1449710114
 
 
-def test_year_qualifier_barren_duplicate_dropped() -> None:
+def test_year_qualifier_barren_duplicate_dropped():
     rows = [
         {
             "name": "Legacy of Kain: Defiance (2003)",
@@ -121,26 +96,16 @@ def test_year_qualifier_barren_duplicate_dropped() -> None:
             "header_image": "https://images.gog.com/lok.jpg",
             "genres": ["Adventure"],
         },
-        {
-            "name": "Legacy of Kain: Defiance",
-            "gog_id": 2042523187,
-            "header_image": None,
-            "genres": [],
-        },
+        {"name": "Legacy of Kain: Defiance", "gog_id": 2042523187, "header_image": None, "genres": []},
     ]
     out = collapse_metadata_barren_dupes(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1207659088
 
 
-def test_populated_sequels_not_collapsed() -> None:
+def test_populated_sequels_not_collapsed():
     rows = [
-        {
-            "name": "DOOM 3",
-            "gog_id": 1,
-            "header_image": "https://images.gog.com/doom3.jpg",
-            "genres": ["Shooter"],
-        },
+        {"name": "DOOM 3", "gog_id": 1, "header_image": "https://images.gog.com/doom3.jpg", "genres": ["Shooter"]},
         {
             "name": "DOOM 3: BFG Edition",
             "gog_id": 2,
@@ -152,21 +117,14 @@ def test_populated_sequels_not_collapsed() -> None:
     assert len(out) == 2
 
 
-def test_barren_solo_kept() -> None:
-    rows = [
-        {
-            "name": "Stray Gods: Orpheus Edition",
-            "gog_id": 1098723469,
-            "header_image": None,
-            "genres": [],
-        },
-    ]
+def test_barren_solo_kept():
+    rows = [{"name": "Stray Gods: Orpheus Edition", "gog_id": 1098723469, "header_image": None, "genres": []}]
     out = collapse_metadata_barren_dupes(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1098723469
 
 
-def test_edition_variant_barren_dropped_when_populated_sibling_exists() -> None:
+def test_edition_variant_barren_dropped_when_populated_sibling_exists():
     rows = [
         {
             "name": "Stray Gods: The Roleplaying Musical",
@@ -174,19 +132,14 @@ def test_edition_variant_barren_dropped_when_populated_sibling_exists() -> None:
             "header_image": "https://images.gog.com/stray.jpg",
             "genres": ["Adventure"],
         },
-        {
-            "name": "Stray Gods: Orpheus Edition",
-            "gog_id": 1098723469,
-            "header_image": None,
-            "genres": [],
-        },
+        {"name": "Stray Gods: Orpheus Edition", "gog_id": 1098723469, "header_image": None, "genres": []},
     ]
     out = apply_gog_name_filters(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1624007757
 
 
-def test_brigador_deluxe_barren_dropped_when_edition_populated() -> None:
+def test_brigador_deluxe_barren_dropped_when_edition_populated():
     rows = [
         {
             "name": "Brigador: Up-Armored Edition",
@@ -194,19 +147,14 @@ def test_brigador_deluxe_barren_dropped_when_edition_populated() -> None:
             "header_image": "https://images.gog.com/brig.jpg",
             "genres": ["Action"],
         },
-        {
-            "name": "Brigador: Up-Armored Deluxe",
-            "gog_id": 1744995009,
-            "header_image": None,
-            "genres": [],
-        },
+        {"name": "Brigador: Up-Armored Deluxe", "gog_id": 1744995009, "header_image": None, "genres": []},
     ]
     out = apply_gog_name_filters(rows)
     assert len(out) == 1
     assert out[0]["gog_id"] == 1356485086
 
 
-def test_alone_in_the_dark_trilogy_dropped_when_components_owned() -> None:
+def test_alone_in_the_dark_trilogy_dropped_when_components_owned():
     rows = [
         {"name": "Alone in the Dark: The Trilogy 1+2+3", "gog_id": 1207658923},
         {"name": "Alone in the Dark 1", "gog_id": 1207660923},
@@ -216,15 +164,10 @@ def test_alone_in_the_dark_trilogy_dropped_when_components_owned() -> None:
     out = apply_gog_name_filters(rows)
     names = {r["name"] for r in out}
     assert "Alone in the Dark: The Trilogy 1+2+3" not in names
-    assert names == {
-        "Alone in the Dark 1",
-        "Alone in the Dark 2",
-        "Alone in the Dark 3",
-    }
+    assert names == {"Alone in the Dark 1", "Alone in the Dark 2", "Alone in the Dark 3"}
 
 
-def test_sequel_subtitles_not_grouped_by_franchise_prefix() -> None:
-    """Tomb Raider sequels must not collapse via edition-variant family key."""
+def test_sequel_subtitles_not_grouped_by_franchise_prefix():
     rows = [
         {
             "name": "Tomb Raider: Anniversary",
@@ -232,18 +175,13 @@ def test_sequel_subtitles_not_grouped_by_franchise_prefix() -> None:
             "header_image": "https://images.gog.com/a.jpg",
             "genres": ["Action"],
         },
-        {
-            "name": "Tomb Raider: Legend",
-            "gog_id": 2,
-            "header_image": None,
-            "genres": [],
-        },
+        {"name": "Tomb Raider: Legend", "gog_id": 2, "header_image": None, "genres": []},
     ]
     out = collapse_metadata_barren_dupes(rows)
     assert len(out) == 2
 
 
-def test_all_populated_same_name_both_kept() -> None:
+def test_all_populated_same_name_both_kept():
     rows = [
         {
             "name": "Mafia II: Definitive Edition",

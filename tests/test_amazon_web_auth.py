@@ -1,7 +1,3 @@
-"""Unit tests for Prime Gaming web connect navigation helpers (no browser)."""
-
-from __future__ import annotations
-
 import json
 import tempfile
 from pathlib import Path
@@ -29,10 +25,10 @@ from fetchers.fetch_amazon import _read_raw_dump_claims, _web_outcome_kind_from_
 
 
 class _FakeCookieJar:
-    def __init__(self, cookies: list[dict]) -> None:
+    def __init__(self, cookies):
         self._cookies = cookies
 
-    def cookies(self) -> list[dict]:
+    def cookies(self):
         return self._cookies
 
 
@@ -90,9 +86,7 @@ def test_is_luna_error_page():
 
 def test_collection_page_ready_rejects_error_page():
     url = "https://luna.amazon.com/claims/my-collection"
-    assert not collection_page_ready(
-        "<p>We're having technical difficulties.</p>", url,
-    )
+    assert not collection_page_ready("<p>We're having technical difficulties.</p>", url)
     assert collection_page_ready("<html>My Collection</html>", url)
 
 
@@ -104,13 +98,7 @@ def test_try_parse_claims_from_text_empty_list_is_success():
 
 
 def test_try_parse_claims_from_html_embedded_json():
-    payload = {
-        "data": {
-            "claims": {
-                "claims": [{"itemTitle": "Lake", "itemId": "amzn1.pg.item.lake"}],
-            }
-        }
-    }
+    payload = {"data": {"claims": {"claims": [{"itemTitle": "Lake", "itemId": "amzn1.pg.item.lake"}]}}}
     html = f"<html><script>window.__STATE__ = {json.dumps(payload)};</script></html>"
     items = try_parse_claims_from_html(html)
     assert items is not None
@@ -118,51 +106,31 @@ def test_try_parse_claims_from_html_embedded_json():
     assert items[0]["itemTitle"] == "Lake"
 
 
-def test_empty_collection_success_mapping() -> None:
+def test_empty_collection_success_mapping():
     outcome = {"capture_ok": True, "signed_in": True}
     kind = _web_outcome_kind_from_capture(raw_claims=[], outcome=outcome)
     assert kind == "signed_in_empty"
 
 
-def test_signed_out_auth_path_classification() -> None:
-    assert (
-        classify_sniff_capture(capture_ok=False, signed_in=False) == "signed_out"
-    )
+def test_signed_out_auth_path_classification():
+    assert classify_sniff_capture(capture_ok=False, signed_in=False) == "signed_out"
 
 
-def test_raw_dump_fallback_builds_records() -> None:
-    # Minimal Amazon-fulfilled claim (passes codeless filter).
+def test_raw_dump_fallback_builds_records():
     raw_claim = {
         "itemTitle": "Lake",
         "itemId": "amzn1.pg.item.lake",
         "orderId": "amzn1.pg.order.1",
         "orderState": "FULFILLED",
     }
-
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "amazon_web_raw.json"
-        path.write_text(
-            json.dumps(
-                {
-                    "raw_claim_count": 1,
-                    "raw_claims": [raw_claim],
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
+        path.write_text(json.dumps({"raw_claim_count": 1, "raw_claims": [raw_claim]}, indent=2), encoding="utf-8")
         fallback_claims = _read_raw_dump_claims(path=path)
         assert fallback_claims == [raw_claim]
-
         sniff_outcome = {"capture_ok": False, "signed_in": True}
-        kind = _web_outcome_kind_from_capture(
-            raw_claims=[],
-            outcome=sniff_outcome,
-            fallback_claims=fallback_claims,
-        )
+        kind = _web_outcome_kind_from_capture(raw_claims=[], outcome=sniff_outcome, fallback_claims=fallback_claims)
         assert kind == "raw_dump_fallback"
-
         records = filter_codeless_claims(fallback_claims)
         assert len(records) == 1
         assert records[0]["name"] == "Lake"

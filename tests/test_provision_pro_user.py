@@ -1,15 +1,10 @@
-"""Tests for scripts/provision_pro_user.py."""
-
-from __future__ import annotations
-
 import scripts.provision_pro_user as provision
 
 
-def test_provision_dry_run_new_user(monkeypatch, capsys) -> None:
+def test_provision_dry_run_new_user(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
     monkeypatch.setattr(provision, "find_user_by_email", lambda *_a, **_k: None)
-
     rc = provision.main(["--email", "new@example.com"])
     out = capsys.readouterr().out
     assert rc == 0
@@ -17,10 +12,10 @@ def test_provision_dry_run_new_user(monkeypatch, capsys) -> None:
     assert "create + plan=pro" in out
 
 
-def test_provision_apply_creates_user(monkeypatch, capsys) -> None:
+def test_provision_apply_creates_user(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
-    calls: list[tuple] = []
+    calls = []
 
     def fake_create(base, key, email, *, plan, email_confirm):
         calls.append((email, plan, email_confirm))
@@ -28,7 +23,6 @@ def test_provision_apply_creates_user(monkeypatch, capsys) -> None:
 
     monkeypatch.setattr(provision, "find_user_by_email", lambda *_a, **_k: None)
     monkeypatch.setattr(provision, "create_user_by_email", fake_create)
-
     rc = provision.main(["--email", "new@example.com", "--apply"])
     out = capsys.readouterr().out
     assert rc == 0
@@ -36,15 +30,13 @@ def test_provision_apply_creates_user(monkeypatch, capsys) -> None:
     assert calls == [("new@example.com", "pro", True)]
 
 
-def test_provision_existing_upgrades(monkeypatch, capsys) -> None:
+def test_provision_existing_upgrades(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
     existing = {"id": "uid-1", "email": "beta@example.com", "app_metadata": {"plan": "free"}}
-    writes: list[tuple] = []
-
+    writes = []
     monkeypatch.setattr(provision, "find_user_by_email", lambda *_a, **_k: existing)
     monkeypatch.setattr(provision, "set_user_plan", lambda *a: writes.append(a))
-
     rc = provision.main(["--email", "beta@example.com", "--apply"])
     out = capsys.readouterr().out
     assert rc == 0
@@ -52,38 +44,31 @@ def test_provision_existing_upgrades(monkeypatch, capsys) -> None:
     assert writes
 
 
-def test_provision_from_invitees(monkeypatch, capsys, tmp_path) -> None:
+def test_provision_from_invitees(monkeypatch, capsys, tmp_path):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
     pro_file = tmp_path / "pro_invitees.txt"
     pro_file.write_text("paid@example.com\n", encoding="utf-8")
     monkeypatch.setattr("shared.comp_pro.COMP_PRO_EMAILS_PATH", pro_file)
     monkeypatch.setattr(provision, "find_user_by_email", lambda *_a, **_k: None)
-
     rc = provision.main(["--from-invitees"])
     out = capsys.readouterr().out
     assert rc == 0
     assert "paid@example.com" in out
 
 
-def test_provision_delete_requires_apply(monkeypatch) -> None:
+def test_provision_delete_requires_apply(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
     rc = provision.main(["--email", "gone@example.com", "--delete"])
     assert rc == 2
 
 
-def test_provision_delete_user(monkeypatch, capsys) -> None:
+def test_provision_delete_user(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
-    deleted: list[str] = []
-
-    monkeypatch.setattr(
-        provision,
-        "delete_user_by_email",
-        lambda _b, _k, email: deleted.append(email) or True,
-    )
-
+    deleted = []
+    monkeypatch.setattr(provision, "delete_user_by_email", lambda _b, _k, email: deleted.append(email) or True)
     rc = provision.main(["--email", "gone@example.com", "--delete", "--apply"])
     out = capsys.readouterr().out
     assert rc == 0

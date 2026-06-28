@@ -1,12 +1,7 @@
-"""Disk persistence for verified update packages and apply script results."""
-
-from __future__ import annotations
-
 import json
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from shared.update_release import UpdateSecurityError, verify_file_sha256
 
@@ -15,19 +10,11 @@ APPLY_RESULT_FILENAME = "apply-result.json"
 PACKAGE_NAME = "package.zip"
 
 
-def default_work_root() -> Path:
+def default_work_root():
     return (Path(tempfile.gettempdir()) / "BAKLOG-update").resolve()
 
 
-def write_ready_state(
-    work_root: Path,
-    *,
-    version: str,
-    sha256: str,
-    zip_path: Path,
-    zip_url: str | None = None,
-    html_url: str | None = None,
-) -> None:
+def write_ready_state(work_root, *, version, sha256, zip_path, zip_url=None, html_url=None):
     version_dir = work_root / version
     version_dir.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -41,7 +28,7 @@ def write_ready_state(
     (version_dir / READY_FILENAME).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def clear_ready_state(work_root: Path, version: str | None = None) -> None:
+def clear_ready_state(work_root, version=None):
     if version:
         version_dir = work_root / version
         if version_dir.is_dir():
@@ -59,7 +46,7 @@ def clear_ready_state(work_root: Path, version: str | None = None) -> None:
             clear_ready_state(work_root, child.name)
 
 
-def read_apply_result(work_root: Path | None = None) -> dict[str, Any] | None:
+def read_apply_result(work_root=None):
     root = (work_root or default_work_root()).resolve()
     path = root / APPLY_RESULT_FILENAME
     if not path.is_file():
@@ -71,16 +58,15 @@ def read_apply_result(work_root: Path | None = None) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def clear_apply_result(work_root: Path | None = None) -> None:
+def clear_apply_result(work_root=None):
     path = (work_root or default_work_root()) / APPLY_RESULT_FILENAME
     path.unlink(missing_ok=True)
 
 
-def scan_ready_state(work_root: Path) -> dict[str, Any] | None:
-    """Return the newest valid ready.json + verified package.zip, or None."""
+def scan_ready_state(work_root):
     if not work_root.is_dir():
         return None
-    candidates: list[tuple[str, Path, dict[str, Any]]] = []
+    candidates = []
     for version_dir in work_root.iterdir():
         if not version_dir.is_dir():
             continue

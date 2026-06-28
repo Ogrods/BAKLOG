@@ -1,24 +1,11 @@
-"""Dev server refuses a second bind when the port is already in use."""
-
-from __future__ import annotations
-
-import pytest
-
 import server
 
 
-def test_baklog_dev_server_disallows_reuse() -> None:
+def test_baklog_dev_server_disallows_reuse():
     assert server.BaklogDevServer.allow_reuse_address is False
 
 
-# Single-instance reclaim + port-busy logic now lives in shared/dev_server_pids.py;
-# see tests/test_dev_server_pids.py. This file keeps the server-level guarantees
-# (no socket reuse) plus the Windows pid-liveness probe wired through server.py.
-
-
-def test_pid_alive_windows_uses_tasklist_not_signal_zero(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_pid_alive_windows_uses_tasklist_not_signal_zero(monkeypatch):
     monkeypatch.setattr(server.sys, "platform", "win32")
 
     def _kill_raises(*_a, **_k):

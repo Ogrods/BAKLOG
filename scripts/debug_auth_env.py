@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-"""Local helper: check BAKLOG auth env alignment and JWT verification (no secrets printed)."""
-from __future__ import annotations
-
 import base64
 import json
 import os
@@ -16,8 +12,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-def _parse_env(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
+def _parse_env(path):
+    out = {}
     if not path.is_file():
         return out
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -32,7 +28,7 @@ def _parse_env(path: Path) -> dict[str, str]:
     return out
 
 
-def _anon_ref(anon: str) -> str:
+def _anon_ref(anon):
     try:
         payload = json.loads(base64.urlsafe_b64decode(anon.split(".")[1] + "=="))
         return str(payload.get("ref") or "")
@@ -40,12 +36,12 @@ def _anon_ref(anon: str) -> str:
         return ""
 
 
-def main() -> int:
+def main():
     local = Path(os.environ.get("LOCALAPPDATA", ""))
     install_env = local / "BAKLOG" / ".env"
     data_env = local / "BAKLOG-Data" / ".env"
-    print(f"install .env: {install_env} ({'present' if install_env.is_file() else 'MISSING'})")
-    print(f"data .env:    {data_env} ({'present' if data_env.is_file() else 'MISSING'})")
+    print(f"install .env: {install_env} ({('present' if install_env.is_file() else 'MISSING')})")
+    print(f"data .env:    {data_env} ({('present' if data_env.is_file() else 'MISSING')})")
     data = _parse_env(data_env)
     install = _parse_env(install_env)
     url = data.get("BAKLOG_SUPABASE_URL") or install.get("BAKLOG_SUPABASE_URL") or ""
@@ -88,7 +84,7 @@ def main() -> int:
             algorithm="HS256",
         )
         ok = supabase_auth.verify_bearer_user(f"Bearer {raw}") is not None
-        print(f"HS256 test token verify:          {'OK' if ok else 'FAIL'}")
+        print(f"HS256 test token verify:          {('OK' if ok else 'FAIL')}")
     return 0
 
 

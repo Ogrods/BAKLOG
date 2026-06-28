@@ -1,7 +1,3 @@
-"""Tests for env-gated internal admin dashboard API."""
-
-from __future__ import annotations
-
 import json
 import threading
 import urllib.error
@@ -16,18 +12,11 @@ import server
 from shared import profile_paths
 
 
-def _profile_sponsors_path(tmp_path: Path) -> Path:
-    """Active profile sponsors.json under an isolated test data root."""
+def _profile_sponsors_path(tmp_path):
     return tmp_path / "profiles" / "default" / "sponsors.json"
 
 
-def _request(
-    base: str,
-    method: str,
-    path: str,
-    *,
-    body: dict | None = None,
-) -> tuple[int, dict | str]:
+def _request(base, method, path, *, body=None):
     headers = {}
     data = None
     if method != "GET":
@@ -35,29 +24,24 @@ def _request(
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(
-        f"{base}{path}",
-        method=method,
-        headers=headers,
-        data=data,
-    )
+    req = urllib.request.Request(f"{base}{path}", method=method, headers=headers, data=data)
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             raw = resp.read().decode("utf-8")
             try:
-                return resp.status, json.loads(raw)
+                return (resp.status, json.loads(raw))
             except json.JSONDecodeError:
-                return resp.status, raw
+                return (resp.status, raw)
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8")
         try:
-            return exc.code, json.loads(raw)
+            return (exc.code, json.loads(raw))
         except json.JSONDecodeError:
-            return exc.code, raw
+            return (exc.code, raw)
 
 
 @pytest.fixture()
-def admin_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def admin_server(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     claims_input = tmp_path / "free-claims.input.json"
     claims_input.write_text(json.dumps({"items": []}), encoding="utf-8")
@@ -75,22 +59,18 @@ def admin_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     default_dir.mkdir(parents=True, exist_ok=True)
     (default_dir / ".migration_complete").write_text("", encoding="utf-8")
     (prof / "index.json").write_text(
-        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}),
-        encoding="utf-8",
+        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}), encoding="utf-8"
     )
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
     monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
     monkeypatch.setattr(server, "ROOT", tmp_path)
-    httpd = ThreadingHTTPServer(
-        ("127.0.0.1", 0),
-        partial(server.Handler, directory=str(server.ROOT)),
-    )
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
     port = httpd.server_address[1]
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{port}", claims_input
+        yield (f"http://127.0.0.1:{port}", claims_input)
     finally:
         server.MANAGER.shutdown()
         httpd.shutdown()
@@ -99,12 +79,9 @@ def admin_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture()
-def admin_off_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def admin_off_server(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "ADMIN_ENABLED", False)
-    httpd = ThreadingHTTPServer(
-        ("127.0.0.1", 0),
-        partial(server.Handler, directory=str(server.ROOT)),
-    )
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
     port = httpd.server_address[1]
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
@@ -116,7 +93,7 @@ def admin_off_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         thread.join(timeout=5)
 
 
-def test_admin_disabled_returns_404(admin_off_server: str) -> None:
+def test_admin_disabled_returns_404(admin_off_server):
     base = admin_off_server
     code, _ = _request(base, "GET", "/api/internal/jobs")
     assert code == 404
@@ -128,7 +105,7 @@ def test_admin_disabled_returns_404(admin_off_server: str) -> None:
         assert exc.code == 404
 
 
-def test_admin_lists_builtin_jobs(admin_server: tuple[str, Path]) -> None:
+def test_admin_lists_builtin_jobs(admin_server):
     base, _ = admin_server
     code, data = _request(base, "GET", "/api/internal/jobs")
     assert code == 200
@@ -136,55 +113,33 @@ def test_admin_lists_builtin_jobs(admin_server: tuple[str, Path]) -> None:
     assert keys == {"claimSources", "buildClaims"}
 
 
-def test_internal_run_rejects_unknown_option(admin_server: tuple[str, Path]) -> None:
+def test_internal_run_rejects_unknown_option(admin_server):
     base, _ = admin_server
-    code, data = _request(
-        base,
-        "POST",
-        "/api/internal/run/claimSources",
-        body={"args": {"--bogus": True}},
-    )
+    code, data = _request(base, "POST", "/api/internal/run/claimSources", body={"args": {"--bogus": True}})
     assert code == 400
     assert "unknown option" in str(data.get("error", ""))
 
 
-def test_internal_run_rejects_bad_enum(admin_server: tuple[str, Path]) -> None:
+def test_internal_run_rejects_bad_enum(admin_server):
     base, _ = admin_server
-    code, data = _request(
-        base,
-        "POST",
-        "/api/internal/run/claimSources",
-        body={"args": {"--source": "nope"}},
-    )
+    code, data = _request(base, "POST", "/api/internal/run/claimSources", body={"args": {"--source": "nope"}})
     assert code == 400
     assert "invalid value" in str(data.get("error", ""))
 
 
-def test_internal_run_unknown_key(admin_server: tuple[str, Path]) -> None:
+def test_internal_run_unknown_key(admin_server):
     base, _ = admin_server
     code, data = _request(base, "POST", "/api/internal/run/notAJob", body={"args": {}})
     assert code == 404
     assert "unknown internal job" in str(data.get("error", ""))
 
 
-def test_internal_job_skips_fetcher_key_collision(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_internal_job_skips_fetcher_key_collision(monkeypatch):
     monkeypatch.setitem(server.FETCHERS, "customJob", server.FETCHERS["claims"])
     overlay = server.INTERNAL_JOBS_OVERLAY
     overlay.parent.mkdir(parents=True, exist_ok=True)
     overlay.write_text(
-        json.dumps(
-            {
-                "jobs": [
-                    {
-                        "key": "customJob",
-                        "label": "Should skip",
-                        "script": "fetchers/fetch_free_claims.py",
-                    }
-                ]
-            }
-        ),
+        json.dumps({"jobs": [{"key": "customJob", "label": "Should skip", "script": "fetchers/fetch_free_claims.py"}]}),
         encoding="utf-8",
     )
     try:
@@ -195,40 +150,26 @@ def test_internal_job_skips_fetcher_key_collision(
             overlay.unlink()
 
 
-def test_free_claims_put_validation(admin_server: tuple[str, Path]) -> None:
+def test_free_claims_put_validation(admin_server):
     base, _ = admin_server
-    code, data = _request(
-        base,
-        "PUT",
-        "/api/internal/free-claims",
-        body={"items": [{"id": "x", "store": "steam"}]},
-    )
+    code, data = _request(base, "PUT", "/api/internal/free-claims", body={"items": [{"id": "x", "store": "steam"}]})
     assert code == 400
     assert "missing" in str(data.get("error", ""))
 
 
-def test_free_claims_put_rejects_bad_claim_url(admin_server: tuple[str, Path]) -> None:
+def test_free_claims_put_rejects_bad_claim_url(admin_server):
     base, _ = admin_server
     code, data = _request(
         base,
         "PUT",
         "/api/internal/free-claims",
-        body={
-            "items": [
-                {
-                    "id": "bad-url",
-                    "store": "steam",
-                    "title": "Bad",
-                    "claim_url": "javascript:alert(1)",
-                }
-            ]
-        },
+        body={"items": [{"id": "bad-url", "store": "steam", "title": "Bad", "claim_url": "javascript:alert(1)"}]},
     )
     assert code == 400
     assert "claim_url" in str(data.get("error", ""))
 
 
-def test_internal_enrich_requires_local_header(admin_server: tuple[str, Path]) -> None:
+def test_internal_enrich_requires_local_header(admin_server):
     base, _ = admin_server
     payload = json.dumps({"items": []}).encode("utf-8")
     req = urllib.request.Request(
@@ -242,23 +183,15 @@ def test_internal_enrich_requires_local_header(admin_server: tuple[str, Path]) -
     assert exc.value.code == 403
 
 
-def test_internal_enrich_rejects_oversized_batch(
-    admin_server: tuple[str, Path],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_internal_enrich_rejects_oversized_batch(admin_server, monkeypatch):
     base, _ = admin_server
     monkeypatch.setattr(server, "MAX_ADMIN_ENRICH_BATCH", 2)
-    code, data = _request(
-        base,
-        "POST",
-        "/api/internal/free-claims/enrich",
-        body={"items": [{}, {}, {}]},
-    )
+    code, data = _request(base, "POST", "/api/internal/free-claims/enrich", body={"items": [{}, {}, {}]})
     assert code == 400
     assert "maximum" in str(data.get("error", ""))
 
 
-def test_free_claims_put_writes_file(admin_server: tuple[str, Path]) -> None:
+def test_free_claims_put_writes_file(admin_server):
     base, claims_input = admin_server
     payload = {
         "items": [
@@ -277,7 +210,7 @@ def test_free_claims_put_writes_file(admin_server: tuple[str, Path]) -> None:
     assert saved["items"][0]["title"] == "Test Game"
 
 
-def test_free_claims_get_returns_approved(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+def test_free_claims_get_returns_approved(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     approved_path.parent.mkdir(parents=True, exist_ok=True)
@@ -288,7 +221,7 @@ def test_free_claims_get_returns_approved(admin_server: tuple[str, Path], tmp_pa
     assert data.get("field_overrides") == {}
 
 
-def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+def test_free_claims_get_returns_field_overrides(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     approved_path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,10 +230,7 @@ def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path],
             {
                 "ids": ["epic-a"],
                 "field_overrides": {
-                    "epic-a": {
-                        "title": "Custom Title",
-                        "claim_url": "https://store.epicgames.com/en-US/p/custom",
-                    }
+                    "epic-a": {"title": "Custom Title", "claim_url": "https://store.epicgames.com/en-US/p/custom"}
                 },
             }
         ),
@@ -309,26 +239,18 @@ def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path],
     code, data = _request(base, "GET", "/api/internal/free-claims")
     assert code == 200
     assert data.get("field_overrides") == {
-        "epic-a": {
-            "title": "Custom Title",
-            "claim_url": "https://store.epicgames.com/en-US/p/custom",
-        }
+        "epic-a": {"title": "Custom Title", "claim_url": "https://store.epicgames.com/en-US/p/custom"}
     }
 
 
-def test_free_claims_approved_put_validation(admin_server: tuple[str, Path]) -> None:
+def test_free_claims_approved_put_validation(admin_server):
     base, _ = admin_server
-    code, data = _request(
-        base,
-        "PUT",
-        "/api/internal/free-claims/approved",
-        body={"ids": ["ok", ""]},
-    )
+    code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["ok", ""]})
     assert code == 400
     assert "ids[1]" in str(data.get("error", ""))
 
 
-def test_free_claims_approved_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+def test_free_claims_approved_put_writes_file(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     payload = {"ids": ["epic-approved", "gamerpower-42"]}
@@ -339,10 +261,7 @@ def test_free_claims_approved_put_writes_file(admin_server: tuple[str, Path], tm
     assert saved["ids"] == ["epic-approved", "gamerpower-42"]
 
 
-def test_free_claims_approved_put_writes_field_overrides(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_approved_put_writes_field_overrides(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     payload = {
@@ -369,10 +288,7 @@ def test_free_claims_approved_put_writes_field_overrides(
     }
 
 
-def test_free_claims_approved_put_writes_claim_urls_field_overrides(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_approved_put_writes_claim_urls_field_overrides(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     payload = {
@@ -382,82 +298,56 @@ def test_free_claims_approved_put_writes_claim_urls_field_overrides(
                 "claim_urls": {
                     "ios": "https://apps.apple.com/app/id123",
                     "android": "https://play.google.com/store/apps/details?id=abc",
-                },
-            },
+                }
+            }
         },
     }
     code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
     assert code == 200, data
     saved = json.loads(approved_path.read_text(encoding="utf-8"))
-    assert saved["field_overrides"]["itad-f520d9928848"]["claim_urls"]["ios"].startswith(
-        "https://apps.apple.com/",
-    )
+    assert saved["field_overrides"]["itad-f520d9928848"]["claim_urls"]["ios"].startswith("https://apps.apple.com/")
 
 
-def test_free_claims_get_returns_dismissed(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+def test_free_claims_get_returns_dismissed(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     approved_path.parent.mkdir(parents=True, exist_ok=True)
-    approved_path.write_text(
-        json.dumps({"ids": ["epic-a"], "dismissed": ["gamerpower-junk"]}),
-        encoding="utf-8",
-    )
+    approved_path.write_text(json.dumps({"ids": ["epic-a"], "dismissed": ["gamerpower-junk"]}), encoding="utf-8")
     code, data = _request(base, "GET", "/api/internal/free-claims")
     assert code == 200
     assert data.get("dismissed") == ["gamerpower-junk"]
 
 
-def test_free_claims_approved_put_writes_dismissed(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_approved_put_writes_dismissed(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
-    payload = {
-        "ids": ["epic-approved"],
-        "dismissed": ["gamerpower-junk", "gamerpower-junk", "epic-approved"],
-    }
+    payload = {"ids": ["epic-approved"], "dismissed": ["gamerpower-junk", "gamerpower-junk", "epic-approved"]}
     code, data = _request(base, "PUT", "/api/internal/free-claims/approved", body=payload)
     assert code == 200
     saved = json.loads(approved_path.read_text(encoding="utf-8"))
-    # Deduped, and ids that are also approved are excluded.
     assert saved["dismissed"] == ["gamerpower-junk"]
 
 
-def test_free_claims_approved_put_dismissed_validation(
-    admin_server: tuple[str, Path],
-) -> None:
+def test_free_claims_approved_put_dismissed_validation(admin_server):
     base, _ = admin_server
     code, data = _request(
-        base,
-        "PUT",
-        "/api/internal/free-claims/approved",
-        body={"ids": ["epic-a"], "dismissed": ["ok", ""]},
+        base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["epic-a"], "dismissed": ["ok", ""]}
     )
     assert code == 400
     assert "dismissed[1]" in str(data.get("error", ""))
 
 
-def test_free_claims_get_returns_premium_only_ids(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_get_returns_premium_only_ids(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     approved_path.parent.mkdir(parents=True, exist_ok=True)
-    approved_path.write_text(
-        json.dumps({"ids": ["epic-a"], "premium_only_ids": ["epic-a"]}),
-        encoding="utf-8",
-    )
+    approved_path.write_text(json.dumps({"ids": ["epic-a"], "premium_only_ids": ["epic-a"]}), encoding="utf-8")
     code, data = _request(base, "GET", "/api/internal/free-claims")
     assert code == 200
     assert data.get("premium_only_ids") == ["epic-a"]
 
 
-def test_free_claims_approved_put_writes_premium_only_ids(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_approved_put_writes_premium_only_ids(admin_server, tmp_path):
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"
     payload = {
@@ -470,32 +360,22 @@ def test_free_claims_approved_put_writes_premium_only_ids(
     assert saved["premium_only_ids"] == ["epic-approved", "gamerpower-42"]
 
 
-def test_free_claims_approved_put_premium_only_validation(
-    admin_server: tuple[str, Path],
-) -> None:
+def test_free_claims_approved_put_premium_only_validation(admin_server):
     base, _ = admin_server
     code, data = _request(
-        base,
-        "PUT",
-        "/api/internal/free-claims/approved",
-        body={"ids": ["epic-a"], "premium_only_ids": ["ok", ""]},
+        base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["epic-a"], "premium_only_ids": ["ok", ""]}
     )
     assert code == 400
     assert "premium_only_ids[1]" in str(data.get("error", ""))
 
 
-def test_free_claims_preview_stamps_premium_only(
-    admin_server: tuple[str, Path],
-) -> None:
+def test_free_claims_preview_stamps_premium_only(admin_server):
     base, _ = admin_server
     payload = {
         "manual_items": [],
-        "auto_items": [{
-            "id": "auto-pro",
-            "store": "steam",
-            "title": "Bonus DLC",
-            "claim_url": "https://example.com/bonus",
-        }],
+        "auto_items": [
+            {"id": "auto-pro", "store": "steam", "title": "Bonus DLC", "claim_url": "https://example.com/bonus"}
+        ],
         "approved_ids": ["auto-pro"],
         "premium_only_ids": ["auto-pro"],
     }
@@ -506,24 +386,19 @@ def test_free_claims_preview_stamps_premium_only(
     assert items[0].get("premium_only") is True
 
 
-def test_free_claims_approved_put_field_overrides_validation(
-    admin_server: tuple[str, Path],
-) -> None:
+def test_free_claims_approved_put_field_overrides_validation(admin_server):
     base, _ = admin_server
     code, data = _request(
         base,
         "PUT",
         "/api/internal/free-claims/approved",
-        body={
-            "ids": ["epic-a"],
-            "field_overrides": {"epic-a": {"bad_key": "nope"}},
-        },
+        body={"ids": ["epic-a"], "field_overrides": {"epic-a": {"bad_key": "nope"}}},
     )
     assert code == 400
     assert "unknown key" in str(data.get("error", ""))
 
 
-def test_sponsors_put_validation(admin_server: tuple[str, Path]) -> None:
+def test_sponsors_put_validation(admin_server):
     base, _ = admin_server
     code, data = _request(
         base,
@@ -535,7 +410,7 @@ def test_sponsors_put_validation(admin_server: tuple[str, Path]) -> None:
     assert "url must start with http" in str(data.get("error", ""))
 
 
-def test_sponsors_put_rejects_bad_cover(admin_server: tuple[str, Path]) -> None:
+def test_sponsors_put_rejects_bad_cover(admin_server):
     base, _ = admin_server
     code, data = _request(
         base,
@@ -547,9 +422,7 @@ def test_sponsors_put_rejects_bad_cover(admin_server: tuple[str, Path]) -> None:
     assert "cover must be" in str(data.get("error", ""))
 
 
-def test_sponsors_put_accepts_cover_and_placements(
-    admin_server: tuple[str, Path], tmp_path: Path
-) -> None:
+def test_sponsors_put_accepts_cover_and_placements(admin_server, tmp_path):
     base, _ = admin_server
     sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
@@ -574,9 +447,7 @@ def test_sponsors_put_accepts_cover_and_placements(
     assert saved["items"][0]["placements"] == "spotlight, picks"
 
 
-def test_sponsors_put_accepts_dash_deal_rail_placement(
-    admin_server: tuple[str, Path], tmp_path: Path
-) -> None:
+def test_sponsors_put_accepts_dash_deal_rail_placement(admin_server, tmp_path):
     base, _ = admin_server
     sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
@@ -599,7 +470,7 @@ def test_sponsors_put_accepts_dash_deal_rail_placement(
     assert saved["items"][0]["placements"] == "dash-deal-rail"
 
 
-def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+def test_sponsors_put_writes_file(admin_server, tmp_path):
     base, _ = admin_server
     sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
@@ -625,9 +496,7 @@ def test_sponsors_put_writes_file(admin_server: tuple[str, Path], tmp_path: Path
     assert saved["items"][0]["title"] == "Back BAKLOG"
 
 
-def test_sponsors_put_accepts_v2_schema(
-    admin_server: tuple[str, Path], tmp_path: Path
-) -> None:
+def test_sponsors_put_accepts_v2_schema(admin_server, tmp_path):
     base, _ = admin_server
     sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
@@ -653,7 +522,7 @@ def test_sponsors_put_accepts_v2_schema(
     assert saved["locations"]["dash-spotlight"] == ["ad-hero"]
 
 
-def test_sponsors_put_rejects_unknown_location(admin_server: tuple[str, Path]) -> None:
+def test_sponsors_put_rejects_unknown_location(admin_server):
     base, _ = admin_server
     payload = {
         "version": 2,
@@ -665,20 +534,17 @@ def test_sponsors_put_rejects_unknown_location(admin_server: tuple[str, Path]) -
     assert "unknown key" in str(data.get("error", ""))
 
 
-def test_sponsors_get_returns_input(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+def test_sponsors_get_returns_input(admin_server, tmp_path):
     base, _ = admin_server
     sponsors_path = _profile_sponsors_path(tmp_path)
     sponsors_path.parent.mkdir(parents=True, exist_ok=True)
-    sponsors_path.write_text(
-        json.dumps({"items": [{"id": "a", "title": "Existing"}]}),
-        encoding="utf-8",
-    )
+    sponsors_path.write_text(json.dumps({"items": [{"id": "a", "title": "Existing"}]}), encoding="utf-8")
     code, data = _request(base, "GET", "/api/internal/sponsors")
     assert code == 200
     assert data["input"]["items"][0]["id"] == "a"
 
 
-def test_validate_internal_args_bool_and_enum() -> None:
+def test_validate_internal_args_bool_and_enum():
     spec = server.INTERNAL_JOBS["claimSources"]
     argv = server.validate_internal_args(spec, {"--dry-run": True, "--source": "epic"})
     assert argv == ["--dry-run", "--source", "epic"]
@@ -686,10 +552,7 @@ def test_validate_internal_args_bool_and_enum() -> None:
     assert argv_default == []
 
 
-def test_free_claims_enrich_returns_items_without_writing_feed(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_enrich_returns_items_without_writing_feed(admin_server, tmp_path):
     base, _ = admin_server
     built_path = tmp_path / "landing" / "free-claims.json"
     fallback_path = tmp_path / "curated" / "free_claims.fallback.json"
@@ -719,11 +582,7 @@ def test_free_claims_enrich_returns_items_without_writing_feed(
     assert not fallback_path.is_file()
 
 
-def test_free_claims_enrich_persists_auto_feed(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_free_claims_enrich_persists_auto_feed(admin_server, tmp_path, monkeypatch):
     base, _ = admin_server
     auto_path = tmp_path / "curated" / "free_claims.auto.json"
     auto_path.parent.mkdir(parents=True, exist_ok=True)
@@ -743,31 +602,19 @@ def test_free_claims_enrich_persists_auto_feed(
         ),
         encoding="utf-8",
     )
-
     import fetchers.build_free_claims as bfc
 
-    def fake_enrich(raw: dict, last_call: list[float], cover_lookup=None, **kwargs) -> dict:
-        return {
-            **raw,
-            "header_image": bfc._steam_portrait_cover(729000),
-            "steam_appid": 729000,
-            "review_percent": 93,
-        }
+    def fake_enrich(raw, last_call, cover_lookup=None, **kwargs):
+        return {**raw, "header_image": bfc._steam_portrait_cover(729000), "steam_appid": 729000, "review_percent": 93}
 
     monkeypatch.setattr(bfc, "_enrich_item", fake_enrich)
-
     code, data = _request(
         base,
         "POST",
         "/api/internal/free-claims/enrich",
         body={
             "items": [
-                {
-                    "id": "itad-b07aac9ebd26",
-                    "store": "epic",
-                    "title": "Wytchwood",
-                    "claim_url": "https://example.com/w",
-                }
+                {"id": "itad-b07aac9ebd26", "store": "epic", "title": "Wytchwood", "claim_url": "https://example.com/w"}
             ]
         },
     )
@@ -780,22 +627,14 @@ def test_free_claims_enrich_persists_auto_feed(
     assert row["review_percent"] == 93
 
 
-def test_free_claims_enrich_rejects_bad_payload(admin_server: tuple[str, Path]) -> None:
+def test_free_claims_enrich_rejects_bad_payload(admin_server):
     base, _ = admin_server
-    code, data = _request(
-        base,
-        "POST",
-        "/api/internal/free-claims/enrich",
-        body={"items": "not-a-list"},
-    )
+    code, data = _request(base, "POST", "/api/internal/free-claims/enrich", body={"items": "not-a-list"})
     assert code == 400
     assert "items must be a list" in str(data.get("error", ""))
 
 
-def test_free_claims_preview_dry_run_merge(
-    admin_server: tuple[str, Path],
-    tmp_path: Path,
-) -> None:
+def test_free_claims_preview_dry_run_merge(admin_server, tmp_path):
     base, _ = admin_server
     built_path = tmp_path / "landing" / "free-claims.json"
     payload = {
@@ -837,10 +676,7 @@ def test_free_claims_preview_dry_run_merge(
     assert not built_path.is_file()
 
 
-def test_free_claims_preview_excludes_dismissed_key_matched_duplicate(
-    admin_server: tuple[str, Path],
-) -> None:
-    """Dismissed hidden row must not re-enter preview via stale approved title key."""
+def test_free_claims_preview_excludes_dismissed_key_matched_duplicate(admin_server):
     base, _ = admin_server
     payload = {
         "manual_items": [],
@@ -862,10 +698,7 @@ def test_free_claims_preview_excludes_dismissed_key_matched_duplicate(
     assert data.get("items") == []
 
 
-def test_free_claims_preview_excludes_blocked_ids(
-    admin_server: tuple[str, Path],
-) -> None:
-    """Blocked ids must not appear in preview (same as build dismissed filter)."""
+def test_free_claims_preview_excludes_blocked_ids(admin_server):
     base, _ = admin_server
     payload = {
         "manual_items": [],
@@ -886,11 +719,7 @@ def test_free_claims_preview_excludes_blocked_ids(
     assert data.get("items") == []
 
 
-def test_free_claims_preview_bypasses_supabase_auth(
-    admin_server: tuple[str, Path],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Internal preview must not require a Supabase JWT when BAKLOG_ADMIN=1."""
+def test_free_claims_preview_bypasses_supabase_auth(admin_server, monkeypatch):
     import shared.supabase_auth as supabase_auth
 
     base, _ = admin_server
@@ -905,12 +734,7 @@ def test_free_claims_preview_bypasses_supabase_auth(
     assert isinstance(data.get("items"), list)
 
 
-def test_runs_status_bypasses_supabase_auth_under_admin(
-    admin_server: tuple[str, Path],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The admin Jobs run-console polls /api/runs without an account JWT; under
-    BAKLOG_ADMIN=1 it must not 401 when Supabase auth is enabled."""
+def test_runs_status_bypasses_supabase_auth_under_admin(admin_server, monkeypatch):
     import shared.supabase_auth as supabase_auth
 
     base, _ = admin_server
@@ -920,10 +744,7 @@ def test_runs_status_bypasses_supabase_auth_under_admin(
     assert "history" in data
 
 
-def test_unknown_internal_post_returns_404_not_401(
-    admin_server: tuple[str, Path],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_unknown_internal_post_returns_404_not_401(admin_server, monkeypatch):
     import shared.supabase_auth as supabase_auth
 
     base, _ = admin_server
@@ -932,9 +753,7 @@ def test_unknown_internal_post_returns_404_not_401(
     assert code == 404
 
 
-def test_free_claims_preview_trailing_slash(
-    admin_server: tuple[str, Path],
-) -> None:
+def test_free_claims_preview_trailing_slash(admin_server):
     base, _ = admin_server
     code, data = _request(
         base,

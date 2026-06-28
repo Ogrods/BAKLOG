@@ -1,15 +1,10 @@
-"""Single-instance guard for the BAKLOG tray launcher."""
-
-from __future__ import annotations
-
 import atexit
 import sys
 
-_LOCK_HANDLE: object | None = None
+_LOCK_HANDLE = None
 
 
-def release_tray_lock() -> None:
-    """Release the tray single-instance lock (best-effort)."""
+def release_tray_lock():
     global _LOCK_HANDLE
     handle = _LOCK_HANDLE
     _LOCK_HANDLE = None
@@ -19,18 +14,17 @@ def release_tray_lock() -> None:
         if sys.platform == "win32":
             import ctypes
 
-            ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
+            ctypes.windll.kernel32.CloseHandle(handle)
         else:
             import fcntl
 
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[union-attr]
-            handle.close()  # type: ignore[union-attr]
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
     except OSError:
         pass
 
 
-def acquire_tray_lock() -> bool:
-    """Return False when another tray instance already holds the lock."""
+def acquire_tray_lock():
     global _LOCK_HANDLE
     if _LOCK_HANDLE is not None:
         return True
@@ -45,7 +39,7 @@ def acquire_tray_lock() -> bool:
         handle = CreateMutexW(None, True, "Global\\BAKLOG.Tray.SingleInstance")
         if handle == 0:
             return True
-        if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        if ctypes.get_last_error() == 183:
             kernel32.CloseHandle(handle)
             return False
         _LOCK_HANDLE = handle

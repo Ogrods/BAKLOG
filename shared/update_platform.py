@@ -1,64 +1,46 @@
-"""Platform-specific in-app update constants and apply launcher."""
-
-from __future__ import annotations
-
 import subprocess
 import sys
-from pathlib import Path
 
-_PLATFORM_ARTIFACTS: dict[str, tuple[str, str]] = {
+_PLATFORM_ARTIFACTS = {
     "win32": ("BAKLOG-win64.zip", "BAKLOG-win64.sha256"),
     "darwin": ("BAKLOG-macos.zip", "BAKLOG-macos.sha256"),
 }
-
-_PLATFORM_BUNDLE_FILES: dict[str, tuple[str, ...]] = {
-    "win32": ("BAKLOG.exe", "BAKLOG Tray.exe"),
-    "darwin": ("BAKLOG", "BAKLOG Tray"),
-}
-
-_PLATFORM_APPLY_SCRIPT: dict[str, str] = {
-    "win32": "apply_update.ps1",
-    "darwin": "apply_update.sh",
-}
-
+_PLATFORM_BUNDLE_FILES = {"win32": ("BAKLOG.exe", "BAKLOG Tray.exe"), "darwin": ("BAKLOG", "BAKLOG Tray")}
+_PLATFORM_APPLY_SCRIPT = {"win32": "apply_update.ps1", "darwin": "apply_update.sh"}
 _SUPPORTED_APPLY_PLATFORMS = frozenset({"win32", "darwin"})
 
 
-def release_platform(platform: str | None = None) -> str:
-    """Platform key for GitHub release zip/sha256 names (win32 or darwin).
-
-    Linux dev/CI has no release bundle; callers fall back to win32 artifact names.
-    """
+def release_platform(platform=None):
     plat = platform or sys.platform
     if plat in _PLATFORM_ARTIFACTS:
         return plat
     return "win32"
 
 
-def current_platform() -> str:
+def current_platform():
     return sys.platform
 
 
-def is_in_app_apply_platform(platform: str | None = None) -> bool:
+def is_in_app_apply_platform(platform=None):
     return (platform or sys.platform) in _SUPPORTED_APPLY_PLATFORMS
 
 
-def stable_zip_name(platform: str | None = None) -> str:
+def stable_zip_name(platform=None):
     plat = platform or sys.platform
     if plat not in _PLATFORM_ARTIFACTS:
         raise ValueError(f"unsupported update platform: {plat}")
     return _PLATFORM_ARTIFACTS[plat][0]
 
 
-def stable_sha256_name(platform: str | None = None) -> str:
+def stable_sha256_name(platform=None):
     plat = platform or sys.platform
     if plat not in _PLATFORM_ARTIFACTS:
         raise ValueError(f"unsupported update platform: {plat}")
     return _PLATFORM_ARTIFACTS[plat][1]
 
 
-def allowed_asset_names() -> frozenset[str]:
-    names: set[str] = set()
+def allowed_asset_names():
+    names = set()
     for zip_name, sha_name in _PLATFORM_ARTIFACTS.values():
         names.add(zip_name)
         names.add(sha_name)
@@ -66,30 +48,29 @@ def allowed_asset_names() -> frozenset[str]:
     return frozenset(names)
 
 
-def apply_script_name(platform: str | None = None) -> str:
+def apply_script_name(platform=None):
     plat = platform or sys.platform
     if plat not in _PLATFORM_APPLY_SCRIPT:
         raise ValueError(f"unsupported update platform: {plat}")
     return _PLATFORM_APPLY_SCRIPT[plat]
 
 
-def required_bundle_files(platform: str | None = None) -> tuple[str, ...]:
+def required_bundle_files(platform=None):
     plat = platform or sys.platform
     if plat not in _PLATFORM_BUNDLE_FILES:
         raise ValueError(f"unsupported update platform: {plat}")
     return _PLATFORM_BUNDLE_FILES[plat]
 
 
-def server_binary_name(platform: str | None = None) -> str:
+def server_binary_name(platform=None):
     return required_bundle_files(platform)[0]
 
 
-def tray_binary_name(platform: str | None = None) -> str:
+def tray_binary_name(platform=None):
     return required_bundle_files(platform)[1]
 
 
-def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: Path) -> subprocess.Popen:
-    """Launch the platform apply helper after server-side security checks."""
+def launch_apply_subprocess(*, script, manifest_path, install_dir):
     platform = sys.platform
     if platform == "win32":
         cmd = [
@@ -103,11 +84,7 @@ def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: P
             str(manifest_path),
         ]
     elif platform == "darwin":
-        cmd = [
-            "/bin/bash",
-            str(script),
-            str(manifest_path),
-        ]
+        cmd = ["/bin/bash", str(script), str(manifest_path)]
     else:
         raise OSError(f"In-app apply is not supported on {platform}")
-    return subprocess.Popen(cmd, cwd=str(install_dir))  # noqa: S603
+    return subprocess.Popen(cmd, cwd=str(install_dir))

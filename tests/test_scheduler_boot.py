@@ -1,13 +1,8 @@
-"""Server boot wiring for the background scheduler."""
-
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import scheduler
 import server
 
@@ -28,5 +23,5 @@ def test_start_background_scheduler_survives_import_error(monkeypatch):
         raise RuntimeError("scheduler unavailable")
 
     monkeypatch.setattr(scheduler, "BackgroundScheduler", _boom)
-    server._start_background_scheduler()  # must not raise
+    server._start_background_scheduler()
     assert server.SCHEDULER is None

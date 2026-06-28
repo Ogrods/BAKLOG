@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Build the published free-claims feed from maintainer input + Steam enrichment."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -39,61 +34,55 @@ STORE_DELAY_SEC = 1.5
 STEAM_STORESEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 STEAM_HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
 FIELD_OVERRIDE_KEYS = frozenset({"title", "claim_url", "claim_urls", "ends_at"})
-ITAD_GAME_SLUG_RE = re.compile(
-    r"isthereanydeal\.com/game/([^/\"'>]+)/info",
-    re.IGNORECASE,
-)
+ITAD_GAME_SLUG_RE = re.compile("isthereanydeal\\.com/game/([^/\\\"'>]+)/info", re.IGNORECASE)
 DEBUG_CLAIMS = os.environ.get("BAKLOG_DEBUG_CLAIMS") == "1"
 
 
-def _debug_claims(msg: str) -> None:
+def _debug_claims(msg):
     if DEBUG_CLAIMS:
         print(f"  [claims-debug] {msg}", flush=True)
 
 
-def _clean_blurb(raw: object) -> str | None:
-    """ITAD blurbs embed raw HTML (anchor tags + literal giveaway URLs + an
-    "expires on … | go to giveaway" suffix). Strip the markup so the published
-    feed never leaks URLs as visible text in the dashboard.
-    Sync pair: js/claim-card.js sanitizeBlurb."""
+def _clean_blurb(raw):
     if not raw:
         return None
-    text = re.sub(r"<[^>]*>", " ", str(raw))
-    for entity, char in (("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"),
-                         ("&quot;", '"'), ("&#39;", "'"), ("&apos;", "'")):
+    text = re.sub("<[^>]*>", " ", str(raw))
+    for entity, char in (
+        ("&amp;", "&"),
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&quot;", '"'),
+        ("&#39;", "'"),
+        ("&apos;", "'"),
+    ):
         text = text.replace(entity, char)
     text = re.sub(
-        r"\s*\|?\s*(unknown expiry|expires on[^|]*)\s*\|?\s*go to giveaway\s*",
-        " ",
-        text,
-        flags=re.IGNORECASE,
+        "\\s*\\|?\\s*(unknown expiry|expires on[^|]*)\\s*\\|?\\s*go to giveaway\\s*", " ", text, flags=re.IGNORECASE
     )
-    text = re.sub(r"https?://\S+", " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub("https?://\\S+", " ", text, flags=re.IGNORECASE)
+    text = re.sub("\\s+", " ", text).strip()
     return text or None
 
 
-def _slug_id(store: str, title: str, appid: int | None = None) -> str:
+def _slug_id(store, title, appid=None):
     if appid:
         return f"{store}-{appid}"
-    base = re.sub(r"[^a-z0-9]+", "-", (title or "game").lower()).strip("-")
+    base = re.sub("[^a-z0-9]+", "-", (title or "game").lower()).strip("-")
     return f"{store}-{base}"[:80] or f"{store}-claim"
 
 
-def _throttle(last_call: list[float]) -> None:
+def _throttle(last_call):
     elapsed = time.time() - last_call[0]
     if elapsed < STORE_DELAY_SEC:
         time.sleep(STORE_DELAY_SEC - elapsed)
     last_call[0] = time.time()
 
 
-def _steam_app_details(appid: int, last_call: list[float]) -> dict | None:
+def _steam_app_details(appid, last_call):
     _throttle(last_call)
     try:
         resp = requests.get(
-            "https://store.steampowered.com/api/appdetails",
-            params={"appids": appid, "l": "english"},
-            timeout=30,
+            "https://store.steampowered.com/api/appdetails", params={"appids": appid, "l": "english"}, timeout=30
         )
         resp.raise_for_status()
         entry = resp.json().get(str(appid), {})
@@ -104,7 +93,7 @@ def _steam_app_details(appid: int, last_call: list[float]) -> dict | None:
         return None
 
 
-def _steam_review_percent(appid: int, last_call: list[float]) -> int | None:
+def _steam_review_percent(appid, last_call):
     _throttle(last_call)
     try:
         resp = requests.get(
@@ -123,17 +112,13 @@ def _steam_review_percent(appid: int, last_call: list[float]) -> int | None:
         return None
 
 
-def _steam_storesearch(term: str, last_call: list[float]) -> list[dict]:
-    """Return storesearch items for a title (empty list on failure)."""
+def _steam_storesearch(term, last_call):
     if not term:
         return []
     _throttle(last_call)
     try:
         resp = requests.get(
-            STEAM_STORESEARCH_URL,
-            params={"term": term, "l": "english", "cc": "us"},
-            headers=STEAM_HEADERS,
-            timeout=30,
+            STEAM_STORESEARCH_URL, params={"term": term, "l": "english", "cc": "us"}, headers=STEAM_HEADERS, timeout=30
         )
         resp.raise_for_status()
         items = resp.json().get("items") or []
@@ -142,20 +127,18 @@ def _steam_storesearch(term: str, last_call: list[float]) -> list[dict]:
         return []
 
 
-def _cover_lookup_key(title: str) -> str:
+def _cover_lookup_key(title):
     return norm_title(strip_giveaway_decorations(title))
 
 
-def _steam_portrait_cover(appid: int) -> str:
-    """2:3 library capsule — fills claim-row portrait slots without letterboxing."""
+def _steam_portrait_cover(appid):
     return f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900_2x.jpg"
 
 
-_verified_portrait_cache: dict[int, bool] = {}
+_verified_portrait_cache = {}
 
 
-def _verified_portrait_cover(appid: int, last_call: list[float]) -> str | None:
-    """Return portrait library_600x900 URL only when the Steam CDN confirms it exists."""
+def _verified_portrait_cover(appid, last_call):
     cached = _verified_portrait_cache.get(appid)
     if cached is not None:
         return _steam_portrait_cover(appid) if cached else None
@@ -171,8 +154,7 @@ def _verified_portrait_cover(appid: int, last_call: list[float]) -> str | None:
     return url if exists else None
 
 
-def _prefer_portrait_cover(header: object, appid: int) -> str | None:
-    """Upgrade landscape thumbnails to Steam portrait art when an appid is known."""
+def _prefer_portrait_cover(header, appid):
     portrait = _steam_portrait_cover(appid)
     if not header:
         return portrait
@@ -184,9 +166,7 @@ def _prefer_portrait_cover(header: object, appid: int) -> str | None:
     return current
 
 
-def _cover_quality(url: str) -> int:
-    """Rank a candidate cover URL: higher wins. Favor Steam CDN art over
-    GamerPower/other thumbnails so the borrow picks the best available cover."""
+def _cover_quality(url):
     u = (url or "").lower()
     if not u:
         return -1
@@ -199,9 +179,8 @@ def _cover_quality(url: str) -> int:
     return 1
 
 
-def _build_cover_lookup(items: list[dict]) -> dict[str, str]:
-    """Map normalized giveaway title → best cover URL from any source that has one."""
-    lookup: dict[str, str] = {}
+def _build_cover_lookup(items):
+    lookup = {}
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -217,15 +196,8 @@ def _build_cover_lookup(items: list[dict]) -> dict[str, str]:
     return lookup
 
 
-def _build_review_lookup(items: list[dict]) -> dict[str, int]:
-    """Map normalized giveaway title → review_percent from any sibling that has one.
-
-    A game's Steam review % is the same regardless of which store grants the
-    freebie, so a store/ITAD copy with no resolved appid can borrow the review
-    its sibling (or a prior published row) already carries — same idea as the
-    cover borrow.
-    """
-    lookup: dict[str, int] = {}
+def _build_review_lookup(items):
+    lookup = {}
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -242,8 +214,7 @@ def _build_review_lookup(items: list[dict]) -> dict[str, int]:
     return lookup
 
 
-def _appid_from_steam_urls(claim_url: str, blurb: object = None) -> int | None:
-    """Extract a Steam appid from giveaway URLs embedded in claim_url or blurb."""
+def _appid_from_steam_urls(claim_url, blurb=None):
     for text in (claim_url, str(blurb or "")):
         appid = appid_from_steam_url(text)
         if appid is not None:
@@ -251,8 +222,7 @@ def _appid_from_steam_urls(claim_url: str, blurb: object = None) -> int | None:
     return None
 
 
-def _itad_slug_from_blurb(blurb: object) -> str | None:
-    """Extract a human title from an ITAD game info link embedded in the blurb."""
+def _itad_slug_from_blurb(blurb):
     match = ITAD_GAME_SLUG_RE.search(str(blurb or ""))
     if not match:
         return None
@@ -260,13 +230,7 @@ def _itad_slug_from_blurb(blurb: object) -> str | None:
     return slug or None
 
 
-def _resolve_steam_appid_by_title(
-    title: str,
-    last_call: list[float],
-    *,
-    blurb: object = None,
-) -> int | None:
-    """Resolve a Steam appid via storesearch on a decoration-stripped title."""
+def _resolve_steam_appid_by_title(title, last_call, *, blurb=None):
     term = strip_giveaway_decorations(title)
     if term:
         items = _steam_storesearch(term, last_call)
@@ -280,15 +244,7 @@ def _resolve_steam_appid_by_title(
     return None
 
 
-def _resolve_steam_appid(
-    *,
-    store: str,
-    title: str,
-    claim_url: str,
-    blurb: object = None,
-    last_call: list[float],
-) -> int | None:
-    """Resolve a Steam appid from URL or decoration-stripped title search."""
+def _resolve_steam_appid(*, store, title, claim_url, blurb=None, last_call):
     appid = _appid_from_steam_urls(claim_url, blurb)
     if appid is not None:
         return appid
@@ -297,17 +253,14 @@ def _resolve_steam_appid(
     return _resolve_steam_appid_by_title(title, last_call, blurb=blurb)
 
 
-_ITCH_HINT = re.compile(r"itch\.?io", re.IGNORECASE)
-_INDIEGALA_HINT = re.compile(r"indiegala", re.IGNORECASE)
-_MOBILE_EPIC_HINT = re.compile(r"mobile", re.IGNORECASE)
-_EGS_EPIC_HINT = re.compile(r"\b(epic|egs)\b", re.IGNORECASE)
+_ITCH_HINT = re.compile("itch\\.?io", re.IGNORECASE)
+_INDIEGALA_HINT = re.compile("indiegala", re.IGNORECASE)
+_MOBILE_EPIC_HINT = re.compile("mobile", re.IGNORECASE)
+_EGS_EPIC_HINT = re.compile("\\b(epic|egs)\\b", re.IGNORECASE)
 
 
-def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str) -> str:
-    """GamerPower often tags itch.io/IndieGala giveaways as store='other'. Infer from text."""
-    haystack = " ".join(
-        part for part in (title, str(blurb or ""), claim_url) if part
-    )
+def _infer_store_from_text(store, title, blurb, claim_url):
+    haystack = " ".join((part for part in (title, str(blurb or ""), claim_url) if part))
     if _MOBILE_EPIC_HINT.search(haystack) and _EGS_EPIC_HINT.search(haystack):
         return EPIC_MOBILE_STORE
     if store and store != "other":
@@ -323,8 +276,7 @@ DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower", "itad"})
 DEFAULT_EXPIRY_DAYS = 14
 
 
-def _claim_links_payload(raw: dict, store: str) -> dict[str, object]:
-    """Outbound link fields for a published claim row."""
+def _claim_links_payload(raw, store):
     if is_epic_mobile_store(store):
         urls = normalize_claim_urls(raw.get("claim_urls"))
         return {"claim_urls": urls} if urls else {}
@@ -332,8 +284,8 @@ def _claim_links_payload(raw: dict, store: str) -> dict[str, object]:
     return {"claim_url": claim_url} if claim_url else {}
 
 
-def _clean_field_override_entry(val: dict) -> dict[str, object]:
-    cleaned: dict[str, object] = {}
+def _clean_field_override_entry(val):
+    cleaned = {}
     for field in FIELD_OVERRIDE_KEYS:
         if field not in val:
             continue
@@ -348,60 +300,32 @@ def _clean_field_override_entry(val: dict) -> dict[str, object]:
     return cleaned
 
 
-def _enrich_item_publish_skip(
-    store: str,
-    appid: int | None,
-    header: object,
-    genres: list,
-    review: object,
-) -> bool:
-    """True when a publish rebuild can reuse existing metadata without Steam calls."""
+def _enrich_item_publish_skip(store, appid, header, genres, review):
     header_str = str(header or "").strip()
     if not header_str or review is None or appid is None:
         return False
-    if store in ("steam", "") and not genres:
+    if store in ("steam", "") and (not genres):
         return False
     return True
 
 
-def _enrich_item(
-    raw: dict,
-    last_call: list[float],
-    cover_lookup: dict[str, str] | None = None,
-    *,
-    now: datetime | None = None,
-    upgrade_covers: bool = True,
-    prior_row: dict | None = None,
-    is_manual: bool = False,
-) -> dict:
+def _enrich_item(raw, last_call, cover_lookup=None, *, now=None, upgrade_covers=True, prior_row=None, is_manual=False):
     claim_url = str(raw.get("claim_url") or "").strip()
     title = (raw.get("title") or "").strip()
-    store = _infer_store_from_text(
-        str(raw.get("store") or "").strip().lower(),
-        title,
-        raw.get("blurb"),
-        claim_url,
-    )
+    store = _infer_store_from_text(str(raw.get("store") or "").strip().lower(), title, raw.get("blurb"), claim_url)
     appid = raw.get("steam_appid")
     if appid is not None:
         try:
             appid = int(appid)
         except (TypeError, ValueError):
             appid = None
-
     header = raw.get("header_image")
     genres = raw.get("genres") or []
     review = raw.get("review_percent")
-
     if appid is None:
         appid = _resolve_steam_appid(
-            store=store,
-            title=title,
-            claim_url=claim_url,
-            blurb=raw.get("blurb"),
-            last_call=last_call,
+            store=store, title=title, claim_url=claim_url, blurb=raw.get("blurb"), last_call=last_call
         )
-
     if cover_lookup:
         borrow_key = _cover_lookup_key(title)
         borrowed = cover_lookup.get(borrow_key)
@@ -409,29 +333,20 @@ def _enrich_item(
             current = str(header or "").strip()
             if not current or _cover_quality(borrowed) > _cover_quality(current):
                 header = borrowed
-
-    if appid is None and (not header or review is None) and store != "steam":
+    if appid is None and (not header or review is None) and (store != "steam"):
         appid = _resolve_steam_appid_by_title(title, last_call, blurb=raw.get("blurb"))
-
     needs_details = False
     needs_portrait = False
     publish_skip = False
     if appid:
         header_str = str(header or "").strip()
-        publish_skip = not upgrade_covers and _enrich_item_publish_skip(
-            store, appid, header_str, genres, review
-        )
+        publish_skip = not upgrade_covers and _enrich_item_publish_skip(store, appid, header_str, genres, review)
         if publish_skip:
             needs_details = False
             needs_portrait = False
         else:
-            needs_details = (
-                review is None
-                or not header_str
-                or (store in ("steam", "") and not genres)
-            )
+            needs_details = review is None or not header_str or (store in ("steam", "") and (not genres))
             needs_portrait = upgrade_covers and _cover_quality(header_str) < 4
-
         real_header = None
         if needs_details:
             details = _steam_app_details(appid, last_call)
@@ -440,22 +355,16 @@ def _enrich_item(
                     store = store or "steam"
                     title = title or (details.get("name") or "").strip()
                 if not genres and store in ("steam", ""):
-                    genres = [
-                        g.get("description")
-                        for g in (details.get("genres") or [])
-                        if g.get("description")
-                    ]
+                    genres = [g.get("description") for g in details.get("genres") or [] if g.get("description")]
                 if review is None:
                     review = _steam_review_percent(appid, last_call)
                 raw_header = (details.get("header_image") or "").strip()
                 if raw_header:
                     real_header = raw_header
-
         verified_portrait = None
         if needs_portrait:
             verified_portrait = _verified_portrait_cover(appid, last_call)
         header = verified_portrait or real_header or header
-
     item_id = (raw.get("id") or "").strip() or _slug_id(store, title, appid)
     out = {
         "id": item_id,
@@ -474,18 +383,13 @@ def _enrich_item(
     source = raw.get("source")
     if source:
         out["source"] = source
-    first_seen = _resolve_first_seen(
-        raw,
-        prior_row=prior_row,
-        now=now,
-        is_manual=is_manual,
-    )
+    first_seen = _resolve_first_seen(raw, prior_row=prior_row, now=now, is_manual=is_manual)
     if first_seen:
         out["first_seen"] = first_seen
     return out
 
 
-def _load_auto_items(path: Path) -> list[dict]:
+def _load_auto_items(path):
     if not path.is_file():
         return []
     try:
@@ -496,14 +400,8 @@ def _load_auto_items(path: Path) -> list[dict]:
     return items if isinstance(items, list) else []
 
 
-def _load_prior_published_rows(paths: list[Path]) -> dict[str, dict]:
-    """Map id -> last published row from prior feed files (earlier paths win).
-
-    Used to carry an approved claim forward when it momentarily falls out of the
-    freshly fetched auto feed (upstream source hiccup) so it isn't silently
-    dropped from the published feed before it actually expires or is dismissed.
-    """
-    by_id: dict[str, dict] = {}
+def _load_prior_published_rows(paths):
+    by_id = {}
     for path in paths:
         if not path.is_file():
             continue
@@ -520,27 +418,13 @@ def _load_prior_published_rows(paths: list[Path]) -> dict[str, dict]:
     return by_id
 
 
-def _carry_forward_missing_approved(
-    published_items: list[dict],
-    *,
-    approved_ids: set[str],
-    dismissed_ids: set[str],
-    prior_rows_by_id: dict[str, dict],
-    now: datetime,
-) -> list[dict]:
-    """Return prior published rows for approved claims missing from this build.
-
-    A claim is carried only when it is still approved, not dismissed, not already
-    represented in ``published_items`` (by id or dedup key — covers a game that
-    came back under a new source id), and not expired.
-    """
+def _carry_forward_missing_approved(published_items, *, approved_ids, dismissed_ids, prior_rows_by_id, now):
     published_ids = {str(it.get("id") or "").strip() for it in published_items}
-    published_keys: set[str] = set()
+    published_keys = set()
     for it in published_items:
         published_keys |= claim_match_keys(it)
-
-    carried: list[dict] = []
-    seen_keys: set[str] = set()
+    carried = []
+    seen_keys = set()
     for item_id in approved_ids:
         if item_id in dismissed_ids or item_id in published_ids:
             continue
@@ -557,7 +441,7 @@ def _carry_forward_missing_approved(
     return carried
 
 
-def _load_approved_ids(path: Path) -> set[str]:
+def _load_approved_ids(path):
     if not path.is_file():
         return set()
     try:
@@ -570,7 +454,7 @@ def _load_approved_ids(path: Path) -> set[str]:
     return {str(item_id).strip() for item_id in ids if str(item_id).strip()}
 
 
-def _load_id_list(path: Path, key: str) -> set[str]:
+def _load_id_list(path, key):
     if not path.is_file():
         return set()
     try:
@@ -583,16 +467,15 @@ def _load_id_list(path: Path, key: str) -> set[str]:
     return {str(item_id).strip() for item_id in values if str(item_id).strip()}
 
 
-def _load_dismissed_ids(path: Path) -> set[str]:
+def _load_dismissed_ids(path):
     return _load_id_list(path, "dismissed")
 
 
-def _load_blocked_ids(path: Path) -> set[str]:
-    """Permanently blocked claim ids — hidden from the feed and the review modal."""
+def _load_blocked_ids(path):
     return _load_id_list(path, "blocked")
 
 
-def _load_premium_only_ids(path: Path) -> set[str]:
+def _load_premium_only_ids(path):
     if not path.is_file():
         return set()
     try:
@@ -605,8 +488,8 @@ def _load_premium_only_ids(path: Path) -> set[str]:
     return {str(item_id).strip() for item_id in premium_only if str(item_id).strip()}
 
 
-def _manual_premium_only_ids(manual_items: list[dict]) -> set[str]:
-    out: set[str] = set()
+def _manual_premium_only_ids(manual_items):
+    out = set()
     for item in manual_items:
         if not isinstance(item, dict):
             continue
@@ -616,8 +499,7 @@ def _manual_premium_only_ids(manual_items: list[dict]) -> set[str]:
     return out
 
 
-def require_manual_approval_enabled(*, env: bool | None = None, cli_flag: bool = False) -> bool:
-    """True when manual rows need an explicit ``approved: true`` to publish."""
+def require_manual_approval_enabled(*, env=None, cli_flag=False):
     if cli_flag:
         return True
     if env is not None:
@@ -625,8 +507,7 @@ def require_manual_approval_enabled(*, env: bool | None = None, cli_flag: bool =
     return os.environ.get("BAKLOG_REQUIRE_MANUAL_APPROVAL") == "1"
 
 
-def manual_row_publishable(item: dict, *, require_manual_approval: bool) -> bool:
-    """Whether a manual input row should reach the published feed."""
+def manual_row_publishable(item, *, require_manual_approval):
     if not isinstance(item, dict):
         return False
     if require_manual_approval:
@@ -634,27 +515,15 @@ def manual_row_publishable(item: dict, *, require_manual_approval: bool) -> bool
     return item.get("approved") is not False
 
 
-def filter_manual_items_for_publish(
-    manual_items: list[dict],
-    *,
-    require_manual_approval: bool,
-) -> list[dict]:
+def filter_manual_items_for_publish(manual_items, *, require_manual_approval):
     return [
         item
         for item in manual_items
-        if isinstance(item, dict) and manual_row_publishable(
-            item, require_manual_approval=require_manual_approval
-        )
+        if isinstance(item, dict) and manual_row_publishable(item, require_manual_approval=require_manual_approval)
     ]
 
 
-def _apply_premium_only(
-    items: list[dict],
-    *,
-    premium_only_ids: set[str],
-    manual_items: list[dict],
-) -> None:
-    """Stamp or clear premium_only on published rows from approval + manual flags."""
+def _apply_premium_only(items, *, premium_only_ids, manual_items):
     manual_premium = _manual_premium_only_ids(manual_items)
     for item in items:
         item_id = str(item.get("id") or "").strip()
@@ -664,7 +533,7 @@ def _apply_premium_only(
             item.pop("premium_only", None)
 
 
-def _load_store_overrides(path: Path) -> dict[str, str]:
+def _load_store_overrides(path):
     if not path.is_file():
         return {}
     try:
@@ -674,7 +543,7 @@ def _load_store_overrides(path: Path) -> dict[str, str]:
     raw = doc.get("store_overrides") or {}
     if not isinstance(raw, dict):
         return {}
-    out: dict[str, str] = {}
+    out = {}
     for key, val in raw.items():
         k = str(key).strip()
         v = str(val or "").strip().lower()
@@ -683,7 +552,7 @@ def _load_store_overrides(path: Path) -> dict[str, str]:
     return out
 
 
-def _load_field_overrides(path: Path) -> dict[str, dict[str, str]]:
+def _load_field_overrides(path):
     if not path.is_file():
         return {}
     try:
@@ -693,12 +562,12 @@ def _load_field_overrides(path: Path) -> dict[str, dict[str, str]]:
     raw = doc.get("field_overrides") or {}
     if not isinstance(raw, dict):
         return {}
-    out: dict[str, dict[str, str]] = {}
+    out = {}
     for key, val in raw.items():
         item_id = str(key).strip()
         if not item_id or not isinstance(val, dict):
             continue
-        cleaned: dict[str, object] = {}
+        cleaned = {}
         for field in FIELD_OVERRIDE_KEYS:
             if field not in val:
                 continue
@@ -715,7 +584,7 @@ def _load_field_overrides(path: Path) -> dict[str, dict[str, str]]:
     return out
 
 
-def _auto_items_by_id(auto_items_all: list[dict]) -> dict[str, dict]:
+def _auto_items_by_id(auto_items_all):
     return {
         str(item.get("id") or "").strip(): item
         for item in auto_items_all
@@ -723,13 +592,7 @@ def _auto_items_by_id(auto_items_all: list[dict]) -> dict[str, dict]:
     }
 
 
-def _keys_for_approved_id(
-    item_id: str,
-    *,
-    auto_by_id: dict[str, dict],
-    field_overrides: dict[str, dict[str, str]],
-) -> set[str]:
-    """Resolve stable match keys for an approved id (row in feed or field_overrides title)."""
+def _keys_for_approved_id(item_id, *, auto_by_id, field_overrides):
     row = auto_by_id.get(item_id)
     if row:
         keys = claim_match_keys(row)
@@ -744,38 +607,19 @@ def _keys_for_approved_id(
     return set()
 
 
-def _resolve_approved_keys(
-    approved_ids: set[str],
-    auto_items_all: list[dict],
-    field_overrides: dict[str, dict[str, str]],
-) -> set[str]:
+def _resolve_approved_keys(approved_ids, auto_items_all, field_overrides):
     auto_by_id = _auto_items_by_id(auto_items_all)
-    keys: set[str] = set()
+    keys = set()
     for item_id in approved_ids:
-        keys |= _keys_for_approved_id(
-            item_id,
-            auto_by_id=auto_by_id,
-            field_overrides=field_overrides,
-        )
+        keys |= _keys_for_approved_id(item_id, auto_by_id=auto_by_id, field_overrides=field_overrides)
     return keys
 
 
-def _build_key_override_maps(
-    approved_ids: set[str],
-    *,
-    auto_by_id: dict[str, dict],
-    store_overrides: dict[str, str],
-    field_overrides: dict[str, dict[str, str]],
-) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
-    """Re-key store/field overrides so they follow a game across feed id flips."""
-    store_by_key: dict[str, str] = {}
-    field_by_key: dict[str, dict[str, str]] = {}
+def _build_key_override_maps(approved_ids, *, auto_by_id, store_overrides, field_overrides):
+    store_by_key = {}
+    field_by_key = {}
     for item_id in approved_ids:
-        keys = _keys_for_approved_id(
-            item_id,
-            auto_by_id=auto_by_id,
-            field_overrides=field_overrides,
-        )
+        keys = _keys_for_approved_id(item_id, auto_by_id=auto_by_id, field_overrides=field_overrides)
         store_val = store_overrides.get(item_id)
         field_val = field_overrides.get(item_id)
         for key in keys:
@@ -783,15 +627,10 @@ def _build_key_override_maps(
                 store_by_key[key] = store_val
             if field_val and key not in field_by_key:
                 field_by_key[key] = field_val
-    return store_by_key, field_by_key
+    return (store_by_key, field_by_key)
 
 
-def _is_approved_item(
-    item: dict,
-    *,
-    approved_ids: set[str],
-    approved_keys: set[str],
-) -> bool:
+def _is_approved_item(item, *, approved_ids, approved_keys):
     item_id = str(item.get("id") or "").strip()
     if item_id in approved_ids:
         return True
@@ -800,12 +639,7 @@ def _is_approved_item(
     return False
 
 
-def _lookup_store_override(
-    item: dict,
-    *,
-    store_overrides: dict[str, str],
-    store_overrides_by_key: dict[str, str],
-) -> str | None:
+def _lookup_store_override(item, *, store_overrides, store_overrides_by_key):
     item_id = str(item.get("id") or "").strip()
     override = store_overrides.get(item_id)
     if override:
@@ -817,12 +651,7 @@ def _lookup_store_override(
     return None
 
 
-def _lookup_field_overrides(
-    item: dict,
-    *,
-    field_overrides: dict[str, dict[str, str]],
-    field_overrides_by_key: dict[str, dict[str, str]],
-) -> dict[str, str] | None:
+def _lookup_field_overrides(item, *, field_overrides, field_overrides_by_key):
     item_id = str(item.get("id") or "").strip()
     overrides = field_overrides.get(item_id)
     if overrides:
@@ -834,34 +663,21 @@ def _lookup_field_overrides(
     return None
 
 
-def _apply_store_overrides(
-    items: list[dict],
-    *,
-    store_overrides: dict[str, str],
-    store_overrides_by_key: dict[str, str] | None = None,
-) -> None:
+def _apply_store_overrides(items, *, store_overrides, store_overrides_by_key=None):
     store_overrides_by_key = store_overrides_by_key or {}
     for item in items:
         override = _lookup_store_override(
-            item,
-            store_overrides=store_overrides,
-            store_overrides_by_key=store_overrides_by_key,
+            item, store_overrides=store_overrides, store_overrides_by_key=store_overrides_by_key
         )
         if override:
             item["store"] = override
 
 
-def _apply_field_overrides(
-    items: list[dict],
-    field_overrides: dict[str, dict[str, str]],
-    field_overrides_by_key: dict[str, dict[str, str]] | None = None,
-) -> None:
+def _apply_field_overrides(items, field_overrides, field_overrides_by_key=None):
     field_overrides_by_key = field_overrides_by_key or {}
     for item in items:
         overrides = _lookup_field_overrides(
-            item,
-            field_overrides=field_overrides,
-            field_overrides_by_key=field_overrides_by_key,
+            item, field_overrides=field_overrides, field_overrides_by_key=field_overrides_by_key
         )
         if not overrides:
             continue
@@ -869,17 +685,9 @@ def _apply_field_overrides(
             item[field] = value
 
 
-def _effective_ends_at(
-    item: dict,
-    *,
-    field_overrides: dict[str, dict[str, str]] | None = None,
-    field_overrides_by_key: dict[str, dict[str, str]] | None = None,
-) -> object:
-    """ends_at after admin field overrides (used before expiry filtering/prune)."""
+def _effective_ends_at(item, *, field_overrides=None, field_overrides_by_key=None):
     overrides = _lookup_field_overrides(
-        item,
-        field_overrides=field_overrides or {},
-        field_overrides_by_key=field_overrides_by_key or {},
+        item, field_overrides=field_overrides or {}, field_overrides_by_key=field_overrides_by_key or {}
     )
     if overrides and "ends_at" in overrides:
         return overrides["ends_at"]
@@ -887,45 +695,38 @@ def _effective_ends_at(
 
 
 def _select_approved_auto_items(
-    auto_items_all: list[dict],
+    auto_items_all,
     *,
-    approved_ids: set[str],
-    approved_keys: set[str],
-    now: datetime,
-    dismissed_ids: set[str] | None = None,
-    field_overrides: dict[str, dict[str, str]] | None = None,
-    field_overrides_by_key: dict[str, dict[str, str]] | None = None,
-) -> tuple[list[dict], set[str]]:
-    """Return live approved auto rows and expired approved ids eligible for pruning."""
+    approved_ids,
+    approved_keys,
+    now,
+    dismissed_ids=None,
+    field_overrides=None,
+    field_overrides_by_key=None,
+):
     dismissed_ids = dismissed_ids or set()
-    expired_approved_ids: set[str] = set()
-    auto_items: list[dict] = []
+    expired_approved_ids = set()
+    auto_items = []
     for item in auto_items_all:
         if not isinstance(item, dict):
             continue
         item_id = str(item.get("id") or "").strip()
         if item_id and item_id in dismissed_ids:
             continue
-        if not _is_approved_item(
-            item,
-            approved_ids=approved_ids,
-            approved_keys=approved_keys,
-        ):
+        if not _is_approved_item(item, approved_ids=approved_ids, approved_keys=approved_keys):
             continue
         ends_at = _effective_ends_at(
-            item,
-            field_overrides=field_overrides,
-            field_overrides_by_key=field_overrides_by_key,
+            item, field_overrides=field_overrides, field_overrides_by_key=field_overrides_by_key
         )
         if _is_expired(ends_at, now):
             if item_id in approved_ids:
                 expired_approved_ids.add(item_id)
             continue
         auto_items.append(dict(item))
-    return auto_items, expired_approved_ids
+    return (auto_items, expired_approved_ids)
 
 
-def _parse_ends_at(ends_at: object) -> datetime | None:
+def _parse_ends_at(ends_at):
     if ends_at is None:
         return None
     text = str(ends_at).strip()
@@ -942,13 +743,7 @@ def _parse_ends_at(ends_at: object) -> datetime | None:
     return parsed
 
 
-def _normalize_ends_at(ends_at: object) -> str | None:
-    """Canonicalize an ends_at value to UTC ISO-8601 with a ``Z`` suffix.
-
-    Auto sources, manual ``free-claims.input.json`` entries, and admin
-    ``field_overrides`` all funnel through here, so the published feed never
-    mixes naive/offset/``Z`` formats. Unparseable but non-empty values are kept
-    as-is rather than dropped."""
+def _normalize_ends_at(ends_at):
     parsed = _parse_ends_at(ends_at)
     if parsed is None:
         text = str(ends_at or "").strip()
@@ -956,8 +751,7 @@ def _normalize_ends_at(ends_at: object) -> str | None:
     return parsed.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _resolve_ends_at(raw: dict, *, now: datetime | None = None) -> str | None:
-    """Normalize ends_at or assign a 2-week default for dated giveaway sources."""
+def _resolve_ends_at(raw, *, now=None):
     raw_val = raw.get("ends_at")
     if raw_val is not None and str(raw_val).strip():
         return _normalize_ends_at(raw_val)
@@ -972,14 +766,7 @@ def _resolve_ends_at(raw: dict, *, now: datetime | None = None) -> str | None:
     return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _resolve_first_seen(
-    raw: dict,
-    *,
-    prior_row: dict | None,
-    now: datetime | None,
-    is_manual: bool,
-) -> str | None:
-    """Resolve first_seen for publish output; stamp manual rows on first publish."""
+def _resolve_first_seen(raw, *, prior_row, now, is_manual):
     existing = _normalize_ends_at(raw.get("first_seen"))
     if existing:
         return existing
@@ -995,15 +782,15 @@ def _resolve_first_seen(
     return clock.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _is_expired(ends_at: object, now: datetime) -> bool:
+def _is_expired(ends_at, now):
     parsed = _parse_ends_at(ends_at)
     if parsed is None:
         return False
     return parsed < now
 
 
-def _live_items_by_id(live_items: list[dict] | None) -> dict[str, dict]:
-    out: dict[str, dict] = {}
+def _live_items_by_id(live_items):
+    out = {}
     for item in live_items or []:
         if not isinstance(item, dict):
             continue
@@ -1014,31 +801,17 @@ def _live_items_by_id(live_items: list[dict] | None) -> dict[str, dict]:
 
 
 def _enrich_item_light(
-    raw: dict,
-    cover_lookup: dict[str, str] | None = None,
-    live_item: dict | None = None,
-    review_lookup: dict[str, int] | None = None,
-    *,
-    now: datetime | None = None,
-    prior_row: dict | None = None,
-    is_manual: bool = False,
-) -> dict:
-    """Fast enrich for admin preview — no Steam/network calls."""
+    raw, cover_lookup=None, live_item=None, review_lookup=None, *, now=None, prior_row=None, is_manual=False
+):
     claim_url = str(raw.get("claim_url") or "").strip()
     title = (raw.get("title") or "").strip()
-    store = _infer_store_from_text(
-        str(raw.get("store") or "").strip().lower(),
-        title,
-        raw.get("blurb"),
-        claim_url,
-    )
+    store = _infer_store_from_text(str(raw.get("store") or "").strip().lower(), title, raw.get("blurb"), claim_url)
     appid = raw.get("steam_appid")
     if appid is not None:
         try:
             appid = int(appid)
         except (TypeError, ValueError):
             appid = None
-
     header = raw.get("header_image")
     genres = raw.get("genres") or []
     review = raw.get("review_percent")
@@ -1052,8 +825,6 @@ def _enrich_item_light(
             live_review = live_item.get("review_percent")
             if live_review is not None:
                 review = live_review
-    # Title-keyed fallback: a re-keyed copy (e.g. ITAD id kept over the Epic
-    # sibling) won't id-match the live row, so borrow the review by title.
     if review is None and review_lookup:
         borrowed_review = review_lookup.get(_cover_lookup_key(title))
         if borrowed_review is not None:
@@ -1064,12 +835,10 @@ def _enrich_item_light(
             current = str(header or "").strip()
             if not current or _cover_quality(borrowed) > _cover_quality(current):
                 header = borrowed
-
-    if appid and not header:
+    if appid and (not header):
         header = _steam_portrait_cover(appid)
-
     item_id = (raw.get("id") or "").strip() or _slug_id(store, title, appid)
-    out: dict = {
+    out = {
         "id": item_id,
         "store": store,
         "title": title or item_id,
@@ -1086,12 +855,7 @@ def _enrich_item_light(
     source = raw.get("source")
     if source:
         out["source"] = source
-    first_seen = _resolve_first_seen(
-        raw,
-        prior_row=prior_row or live_item,
-        now=now,
-        is_manual=is_manual,
-    )
+    first_seen = _resolve_first_seen(raw, prior_row=prior_row or live_item, now=now, is_manual=is_manual)
     if first_seen:
         out["first_seen"] = first_seen
     return out
@@ -1099,30 +863,25 @@ def _enrich_item_light(
 
 def preview_publish_items(
     *,
-    manual_items: list[dict],
-    auto_items_all: list[dict],
-    approved_ids: set[str],
-    store_overrides: dict[str, str] | None = None,
-    field_overrides: dict[str, dict[str, str]] | None = None,
-    dismissed_ids: set[str] | None = None,
-    live_items: list[dict] | None = None,
-    premium_only_ids: set[str] | None = None,
-    require_manual_approval: bool = False,
-    now: datetime | None = None,
-) -> list[dict]:
-    """Dry-run merge + prune for admin preview (no disk writes, no Steam API)."""
+    manual_items,
+    auto_items_all,
+    approved_ids,
+    store_overrides=None,
+    field_overrides=None,
+    dismissed_ids=None,
+    live_items=None,
+    premium_only_ids=None,
+    require_manual_approval=False,
+    now=None,
+):
     store_overrides = store_overrides or {}
     field_overrides = field_overrides or {}
     now = now or datetime.now(UTC)
     live_by_id = _live_items_by_id(live_items)
-
     auto_by_id = _auto_items_by_id(auto_items_all)
     approved_keys = _resolve_approved_keys(approved_ids, auto_items_all, field_overrides)
     store_by_key, field_by_key = _build_key_override_maps(
-        approved_ids,
-        auto_by_id=auto_by_id,
-        store_overrides=store_overrides,
-        field_overrides=field_overrides,
+        approved_ids, auto_by_id=auto_by_id, store_overrides=store_overrides, field_overrides=field_overrides
     )
     auto_items, _ = _select_approved_auto_items(
         auto_items_all,
@@ -1133,33 +892,16 @@ def preview_publish_items(
         field_overrides=field_overrides,
         field_overrides_by_key=field_by_key,
     )
-
     if store_overrides or store_by_key:
-        _apply_store_overrides(
-            auto_items,
-            store_overrides=store_overrides,
-            store_overrides_by_key=store_by_key,
-        )
+        _apply_store_overrides(auto_items, store_overrides=store_overrides, store_overrides_by_key=store_by_key)
     if field_overrides or field_by_key:
-        _apply_field_overrides(
-            auto_items,
-            field_overrides,
-            field_overrides_by_key=field_by_key,
-        )
-
-    publish_manual = filter_manual_items_for_publish(
-        manual_items,
-        require_manual_approval=require_manual_approval,
-    )
-    manual_ids = {
-        str(it.get("id") or "").strip()
-        for it in publish_manual
-        if str(it.get("id") or "").strip()
-    }
+        _apply_field_overrides(auto_items, field_overrides, field_overrides_by_key=field_by_key)
+    publish_manual = filter_manual_items_for_publish(manual_items, require_manual_approval=require_manual_approval)
+    manual_ids = {str(it.get("id") or "").strip() for it in publish_manual if str(it.get("id") or "").strip()}
     raw_items = merge_manual_and_auto(publish_manual, auto_items)
     cover_lookup = _build_cover_lookup(auto_items_all)
     review_lookup = _build_review_lookup(list(live_by_id.values()) + auto_items_all)
-    items: list[dict] = []
+    items = []
     for raw in raw_items:
         if not isinstance(raw, dict):
             continue
@@ -1179,32 +921,20 @@ def preview_publish_items(
                 is_manual=item_id in manual_ids,
             )
         )
-    # Mirror the build's carry-forward: an approved claim that momentarily falls
-    # out of the fresh auto feed is kept in the published feed from the prior
-    # build, so the preview must do the same or it falsely reports "removed".
     carried = _carry_forward_missing_approved(
-        items,
-        approved_ids=approved_ids,
-        dismissed_ids=dismissed_ids or set(),
-        prior_rows_by_id=live_by_id,
-        now=now,
+        items, approved_ids=approved_ids, dismissed_ids=dismissed_ids or set(), prior_rows_by_id=live_by_id, now=now
     )
     items.extend(carried)
-    _apply_premium_only(
-        items,
-        premium_only_ids=premium_only_ids or set(),
-        manual_items=manual_items,
-    )
+    _apply_premium_only(items, premium_only_ids=premium_only_ids or set(), manual_items=manual_items)
     return items
 
 
-def _apply_enrich_fields_to_item(target: dict, source: dict) -> bool:
-    """Merge enrichment fields from source onto target; returns True when target changed."""
+def _apply_enrich_fields_to_item(target, source):
     changed = False
     for field in CLAIM_ENRICH_FIELDS:
         if field == "genres":
             src_genres = source.get("genres")
-            if isinstance(src_genres, list) and src_genres and target.get("genres") != src_genres:
+            if isinstance(src_genres, list) and src_genres and (target.get("genres") != src_genres):
                 target["genres"] = src_genres
                 changed = True
             continue
@@ -1223,11 +953,7 @@ def _apply_enrich_fields_to_item(target: dict, source: dict) -> bool:
     return changed
 
 
-def merge_enriched_items_into_auto_feed(
-    auto_path: Path,
-    enriched_items: list[dict],
-) -> int:
-    """Persist enrichment onto the on-disk auto feed matched by item id."""
+def merge_enriched_items_into_auto_feed(auto_path, enriched_items):
     if not auto_path.is_file():
         return 0
     try:
@@ -1237,7 +963,6 @@ def merge_enriched_items_into_auto_feed(
     items = doc.get("items") or []
     if not isinstance(items, list):
         return 0
-
     by_id = {
         str(item.get("id") or "").strip(): item
         for item in enriched_items
@@ -1245,7 +970,6 @@ def merge_enriched_items_into_auto_feed(
     }
     if not by_id:
         return 0
-
     updated = 0
     for item in items:
         if not isinstance(item, dict):
@@ -1256,18 +980,13 @@ def merge_enriched_items_into_auto_feed(
             continue
         if _apply_enrich_fields_to_item(item, enriched):
             updated += 1
-
     if updated:
         doc["items"] = items
         safe_write_text(auto_path, json.dumps(doc, indent=2, ensure_ascii=False))
     return updated
 
 
-def merge_enriched_items_into_input_feed(
-    input_path: Path,
-    enriched_items: list[dict],
-) -> int:
-    """Persist enrichment onto manual rows in free-claims.input.json matched by id."""
+def merge_enriched_items_into_input_feed(input_path, enriched_items):
     if not input_path.is_file():
         return 0
     try:
@@ -1277,7 +996,6 @@ def merge_enriched_items_into_input_feed(
     items = doc.get("items") or []
     if not isinstance(items, list):
         return 0
-
     by_id = {
         str(item.get("id") or "").strip(): item
         for item in enriched_items
@@ -1285,7 +1003,6 @@ def merge_enriched_items_into_input_feed(
     }
     if not by_id:
         return 0
-
     updated = 0
     for item in items:
         if not isinstance(item, dict):
@@ -1300,7 +1017,6 @@ def merge_enriched_items_into_input_feed(
         if src_fs and item.get("first_seen") != src_fs:
             item["first_seen"] = src_fs
             updated += 1
-
     if updated:
         doc["items"] = items
         safe_write_text(input_path, json.dumps(doc, indent=2, ensure_ascii=False))
@@ -1308,18 +1024,11 @@ def merge_enriched_items_into_input_feed(
 
 
 def rekey_approved_state(
-    *,
-    ids: list[str],
-    store_overrides: dict[str, str],
-    field_overrides: dict[str, dict[str, str]],
-    premium_only_ids: set[str],
-    auto_items_all: list[dict],
-    prior_rows_by_id: dict[str, dict] | None = None,
-) -> tuple[list[str], dict[str, str], dict[str, dict[str, str]], set[str]]:
-    """Migrate approved ids/overrides when a game re-keys across feed id churn."""
+    *, ids, store_overrides, field_overrides, premium_only_ids, auto_items_all, prior_rows_by_id=None
+):
     prior_rows_by_id = prior_rows_by_id or {}
     auto_by_id = _auto_items_by_id(auto_items_all)
-    key_to_auto_id: dict[str, str] = {}
+    key_to_auto_id = {}
     for row in auto_items_all:
         if not isinstance(row, dict):
             continue
@@ -1328,14 +1037,13 @@ def rekey_approved_state(
             continue
         for key in claim_match_keys(row):
             key_to_auto_id.setdefault(key, row_id)
+    new_ids = []
+    seen_ids = set()
+    new_store = {}
+    new_field = {}
+    new_premium = set()
 
-    new_ids: list[str] = []
-    seen_ids: set[str] = set()
-    new_store: dict[str, str] = {}
-    new_field: dict[str, dict[str, str]] = {}
-    new_premium: set[str] = set()
-
-    def migrate_maps(old_id: str, new_id: str) -> None:
+    def migrate_maps(old_id, new_id):
         if old_id in store_overrides and new_id not in new_store:
             new_store[new_id] = store_overrides[old_id]
         if old_id in field_overrides and new_id not in new_field:
@@ -1349,11 +1057,7 @@ def rekey_approved_state(
             continue
         new_id = old_id
         if old_id not in auto_by_id:
-            keys = _keys_for_approved_id(
-                old_id,
-                auto_by_id=auto_by_id,
-                field_overrides=field_overrides,
-            )
+            keys = _keys_for_approved_id(old_id, auto_by_id=auto_by_id, field_overrides=field_overrides)
             if not keys and old_id in prior_rows_by_id:
                 keys = claim_match_keys(prior_rows_by_id[old_id])
             resolved = None
@@ -1371,21 +1075,19 @@ def rekey_approved_state(
         seen_ids.add(new_id)
         new_ids.append(new_id)
         migrate_maps(old_id, new_id)
+    return (new_ids, new_store, new_field, new_premium)
 
-    return new_ids, new_store, new_field, new_premium
 
-
-def parse_approved_put_payload(payload: dict) -> dict:
-    """Normalize admin approved PUT body into prepare_approved_document kwargs."""
+def parse_approved_put_payload(payload):
     ids = [str(item_id).strip() for item_id in payload.get("ids") or [] if str(item_id).strip()]
     id_set = set(ids)
-    store_overrides: dict[str, str] = {}
+    store_overrides = {}
     for key, val in (payload.get("store_overrides") or {}).items():
         k = str(key).strip()
         v = str(val or "").strip().lower()
         if k and v:
             store_overrides[k] = v
-    field_overrides: dict[str, dict[str, object]] = {}
+    field_overrides = {}
     for key, val in (payload.get("field_overrides") or {}).items():
         k = str(key).strip()
         if not k or not isinstance(val, dict):
@@ -1393,23 +1095,21 @@ def parse_approved_put_payload(payload: dict) -> dict:
         cleaned = _clean_field_override_entry(val)
         if cleaned:
             field_overrides[k] = cleaned
-    # Blocked wins over dismissed: a permanently blocked id never lingers in the
-    # reviewable dismissed list. Neither list may shadow an approved id.
-    blocked: list[str] = []
-    seen_blocked: set[str] = set()
+    blocked = []
+    seen_blocked = set()
     for item_id in payload.get("blocked") or []:
         b = str(item_id).strip()
-        if b and b not in id_set and b not in seen_blocked:
+        if b and b not in id_set and (b not in seen_blocked):
             blocked.append(b)
             seen_blocked.add(b)
-    dismissed: list[str] = []
-    seen_dismissed: set[str] = set()
+    dismissed = []
+    seen_dismissed = set()
     for item_id in payload.get("dismissed") or []:
         d = str(item_id).strip()
-        if d and d not in id_set and d not in seen_blocked and d not in seen_dismissed:
+        if d and d not in id_set and (d not in seen_blocked) and (d not in seen_dismissed):
             dismissed.append(d)
             seen_dismissed.add(d)
-    premium_only_ids: set[str] = set()
+    premium_only_ids = set()
     for item_id in payload.get("premium_only_ids") or []:
         p = str(item_id).strip()
         if p:
@@ -1426,21 +1126,15 @@ def parse_approved_put_payload(payload: dict) -> dict:
 
 def prepare_approved_document(
     *,
-    ids: list[str],
-    store_overrides: dict[str, str],
-    field_overrides: dict[str, dict[str, str]],
-    premium_only_ids: set[str],
-    dismissed: list[str],
-    auto_items: list[dict],
-    blocked: list[str] | None = None,
-    prior_rows_by_id: dict[str, dict] | None = None,
-) -> dict:
-    """Re-key approved state and shape the on-disk approved.json document.
-
-    Soft-hidden (``dismissed``) ids that no longer exist in the source feed are
-    orphan-pruned here so the reviewable hidden list self-cycles; ``blocked`` ids
-    (a permanent kill list) are kept verbatim so a re-listed claim never returns.
-    """
+    ids,
+    store_overrides,
+    field_overrides,
+    premium_only_ids,
+    dismissed,
+    auto_items,
+    blocked=None,
+    prior_rows_by_id=None,
+):
     rekeyed_ids, store, fields, premium = rekey_approved_state(
         ids=ids,
         store_overrides=store_overrides,
@@ -1451,23 +1145,18 @@ def prepare_approved_document(
     )
     id_set = set(rekeyed_ids)
     store = {k: v for k, v in store.items() if k in id_set}
-    premium_list = sorted(p for p in premium if p in id_set)
+    premium_list = sorted((p for p in premium if p in id_set))
     merged_fields = dict(field_overrides)
     merged_fields.update(fields)
     blocked_list = list(blocked or [])
     blocked_set = set(blocked_list)
     auto_ids = {
         str(it.get("id") or "").strip()
-        for it in (auto_items or [])
+        for it in auto_items or []
         if isinstance(it, dict) and str(it.get("id") or "").strip()
     }
-    # Orphan-prune dismissed ids: keep only those still in the feed (so the
-    # hidden modal stays meaningful). Drop any that became blocked.
-    pruned_dismissed = [
-        d for d in dismissed
-        if d not in blocked_set and (not auto_ids or d in auto_ids)
-    ]
-    out: dict = {"ids": rekeyed_ids}
+    pruned_dismissed = [d for d in dismissed if d not in blocked_set and (not auto_ids or d in auto_ids)]
+    out = {"ids": rekeyed_ids}
     if store:
         out["store_overrides"] = store
     if merged_fields:
@@ -1481,7 +1170,7 @@ def prepare_approved_document(
     return out
 
 
-def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
+def _prune_expired_from_approved(path, expired_ids):
     if not expired_ids or not path.is_file():
         return 0
     try:
@@ -1495,33 +1184,25 @@ def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
     doc["ids"] = kept_ids
     store_overrides = doc.get("store_overrides")
     if isinstance(store_overrides, dict):
-        doc["store_overrides"] = {
-            k: v for k, v in store_overrides.items() if str(k).strip() not in expired_ids
-        }
+        doc["store_overrides"] = {k: v for k, v in store_overrides.items() if str(k).strip() not in expired_ids}
     field_overrides = doc.get("field_overrides")
     if isinstance(field_overrides, dict):
-        doc["field_overrides"] = {
-            k: v for k, v in field_overrides.items() if str(k).strip() not in expired_ids
-        }
+        doc["field_overrides"] = {k: v for k, v in field_overrides.items() if str(k).strip() not in expired_ids}
     safe_write_text(path, json.dumps(doc, indent=2, ensure_ascii=False))
     return len(ids) - len(kept_ids)
 
 
-def main() -> int:
+def main():
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=INPUT_PATH)
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH)
     parser.add_argument(
-        "--no-profile",
-        action="store_true",
-        help="Skip writing the active profile's free_claims.json (publish-only)",
+        "--no-profile", action="store_true", help="Skip writing the active profile's free_claims.json (publish-only)"
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
-        "--allow-empty",
-        action="store_true",
-        help="Allow overwriting the published feed with zero items",
+        "--allow-empty", action="store_true", help="Allow overwriting the published feed with zero items"
     )
     parser.add_argument(
         "--require-manual-approval",
@@ -1530,35 +1211,28 @@ def main() -> int:
     )
     args = parser.parse_args()
     require_manual_approval = require_manual_approval_enabled(cli_flag=args.require_manual_approval)
-
     stats = RunStats()
     t0 = started("build_free_claims.py")
-
     if not args.input.is_file():
         stats.error(f"missing input file: {args.input}")
         return stats.finish("build_free_claims", t0, exit_code=1)
-
     try:
         doc = json.loads(args.input.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         stats.error(f"could not read input: {exc}")
         return stats.finish("build_free_claims", t0, exit_code=1)
-
     manual_items = doc.get("items") or []
     if not isinstance(manual_items, list):
         stats.error("input.items must be a list")
         return stats.finish("build_free_claims", t0, exit_code=1)
-
     auto_items_all = _load_auto_items(AUTO_PATH)
     if DEBUG_CLAIMS:
-        by_source: dict[str, int] = {}
+        by_source = {}
         for row in auto_items_all:
             src = str(row.get("source") or "unknown")
             by_source[src] = by_source.get(src, 0) + 1
         _debug_claims(f"auto feed: {len(auto_items_all)} item(s) by source {by_source}")
     approved_ids = _load_approved_ids(APPROVED_PATH)
-    # Blocked ids are a permanent kill list; fold them into the dismissed filter
-    # so they are excluded from the feed exactly like a soft-hidden claim.
     dismissed_ids = _load_dismissed_ids(APPROVED_PATH) | _load_blocked_ids(APPROVED_PATH)
     premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
     store_overrides = _load_store_overrides(APPROVED_PATH)
@@ -1567,12 +1241,7 @@ def main() -> int:
     orig_field_overrides = {k: dict(v) for k, v in field_overrides.items()}
     orig_premium_only_ids = set(premium_only_ids)
     orig_approved_ids = set(approved_ids)
-    # Snapshot the previously published rows BEFORE we overwrite the output, so an
-    # approved claim that briefly drops out of the source feed can be carried
-    # forward instead of silently vanishing.
-    prior_published_rows = _load_prior_published_rows(
-        [args.output, FALLBACK_PATH, free_claims_path()]
-    )
+    prior_published_rows = _load_prior_published_rows([args.output, FALLBACK_PATH, free_claims_path()])
     rekeyed_ids, store_overrides, field_overrides, premium_only_ids = rekey_approved_state(
         ids=sorted(approved_ids),
         store_overrides=store_overrides,
@@ -1586,7 +1255,7 @@ def main() -> int:
         approved_ids != orig_approved_ids
         or store_overrides != orig_store_overrides
         or field_overrides != orig_field_overrides
-        or premium_only_ids != orig_premium_only_ids
+        or (premium_only_ids != orig_premium_only_ids)
     )
     if not args.dry_run and approved_changed and APPROVED_PATH.is_file():
         try:
@@ -1611,10 +1280,7 @@ def main() -> int:
     auto_by_id = _auto_items_by_id(auto_items_all)
     approved_keys = _resolve_approved_keys(approved_ids, auto_items_all, field_overrides)
     store_by_key, field_by_key = _build_key_override_maps(
-        approved_ids,
-        auto_by_id=auto_by_id,
-        store_overrides=store_overrides,
-        field_overrides=field_overrides,
+        approved_ids, auto_by_id=auto_by_id, store_overrides=store_overrides, field_overrides=field_overrides
     )
     auto_items, expired_approved_ids = _select_approved_auto_items(
         auto_items_all,
@@ -1626,17 +1292,9 @@ def main() -> int:
         field_overrides_by_key=field_by_key,
     )
     if store_overrides or store_by_key:
-        _apply_store_overrides(
-            auto_items,
-            store_overrides=store_overrides,
-            store_overrides_by_key=store_by_key,
-        )
+        _apply_store_overrides(auto_items, store_overrides=store_overrides, store_overrides_by_key=store_by_key)
     if field_overrides or field_by_key:
-        _apply_field_overrides(
-            auto_items,
-            field_overrides,
-            field_overrides_by_key=field_by_key,
-        )
+        _apply_field_overrides(auto_items, field_overrides, field_overrides_by_key=field_by_key)
     if expired_approved_ids:
         stats.warn(f"skipped {len(expired_approved_ids)} expired approved auto item(s)")
         if not args.dry_run:
@@ -1644,54 +1302,39 @@ def main() -> int:
             if pruned:
                 stats.warn(f"pruned {pruned} expired item(s) from approved list")
     if auto_items_all:
-        stats.warn(
-            f"auto feed: {len(auto_items)} approved of {len(auto_items_all)} available"
-        )
+        stats.warn(f"auto feed: {len(auto_items)} approved of {len(auto_items_all)} available")
     if DEBUG_CLAIMS:
         _debug_claims(
-            f"approved selection: {len(auto_items)} of {len(auto_items_all)} auto; "
-            f"dismissed={len(dismissed_ids)} expired_approved={len(expired_approved_ids)}"
+            f"approved selection: {len(auto_items)} of {len(auto_items_all)} auto; dismissed={len(dismissed_ids)} expired_approved={len(expired_approved_ids)}"
         )
-    publish_manual = filter_manual_items_for_publish(
-        manual_items,
-        require_manual_approval=require_manual_approval,
-    )
+    publish_manual = filter_manual_items_for_publish(manual_items, require_manual_approval=require_manual_approval)
     skipped_manual = max(0, len(manual_items) - len(publish_manual))
     if skipped_manual:
         stats.warn(
-            f"skipped {skipped_manual} unapproved manual item(s) "
-            f"(require_manual_approval={require_manual_approval})"
+            f"skipped {skipped_manual} unapproved manual item(s) (require_manual_approval={require_manual_approval})"
         )
     if publish_manual:
         shipped_manual_ids = [
-            str(item.get("id") or "").strip()
-            for item in publish_manual
-            if str(item.get("id") or "").strip()
+            str(item.get("id") or "").strip() for item in publish_manual if str(item.get("id") or "").strip()
         ]
         if shipped_manual_ids:
-            stats.warn(
-                f"manual rows publishing ({len(shipped_manual_ids)}): "
-                + ", ".join(shipped_manual_ids)
-            )
+            stats.warn(f"manual rows publishing ({len(shipped_manual_ids)}): " + ", ".join(shipped_manual_ids))
     raw_items = merge_manual_and_auto(publish_manual, auto_items)
     if auto_items:
         stats.warn(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")
-
-    manual_ids = {
-        str(it.get("id") or "").strip()
-        for it in publish_manual
-        if str(it.get("id") or "").strip()
-    }
+    manual_ids = {str(it.get("id") or "").strip() for it in publish_manual if str(it.get("id") or "").strip()}
     cover_lookup = _build_cover_lookup(auto_items_all)
     last_call = [0.0]
-    items: list[dict] = []
+    items = []
     enrich_total = sum(
-        1
-        for raw in raw_items
-        if isinstance(raw, dict)
-        and has_valid_claim_links(raw)
-        and raw.get("store")
-        and not _is_expired(_resolve_ends_at(raw, now=now), now)
+        (
+            1
+            for raw in raw_items
+            if isinstance(raw, dict)
+            and has_valid_claim_links(raw)
+            and raw.get("store")
+            and (not _is_expired(_resolve_ends_at(raw, now=now), now))
+        )
     )
     enrich_hb = HeartbeatTimer(interval=45.0)
     enrich_idx = 0
@@ -1719,55 +1362,31 @@ def main() -> int:
                 is_manual=item_id in manual_ids,
             )
         )
-
     carried = _carry_forward_missing_approved(
-        items,
-        approved_ids=approved_ids,
-        dismissed_ids=dismissed_ids,
-        prior_rows_by_id=prior_published_rows,
-        now=now,
+        items, approved_ids=approved_ids, dismissed_ids=dismissed_ids, prior_rows_by_id=prior_published_rows, now=now
     )
     if carried:
         stats.warn(
-            f"carried forward {len(carried)} approved claim(s) missing from the "
-            f"source feed: {', '.join(str(c.get('id')) for c in carried)}"
+            f"carried forward {len(carried)} approved claim(s) missing from the source feed: {', '.join((str(c.get('id')) for c in carried))}"
         )
         if DEBUG_CLAIMS:
-            _debug_claims(
-                f"carry-forward ids: {', '.join(str(c.get('id')) for c in carried)}"
-            )
+            _debug_claims(f"carry-forward ids: {', '.join((str(c.get('id')) for c in carried))}")
         items.extend(carried)
-
-    _apply_premium_only(
-        items,
-        premium_only_ids=premium_only_ids,
-        manual_items=manual_items,
-    )
-
+    _apply_premium_only(items, premium_only_ids=premium_only_ids, manual_items=manual_items)
     if not args.dry_run:
         auto_ids = {str(it.get("id") or "").strip() for it in auto_items}
         manual_ids = {str(it.get("id") or "").strip() for it in publish_manual}
-        to_persist_auto = [
-            it for it in items
-            if str(it.get("id") or "").strip() in auto_ids
-        ]
-        to_persist_manual = [
-            it for it in items
-            if str(it.get("id") or "").strip() in manual_ids
-        ]
+        to_persist_auto = [it for it in items if str(it.get("id") or "").strip() in auto_ids]
+        to_persist_manual = [it for it in items if str(it.get("id") or "").strip() in manual_ids]
         persisted_auto = merge_enriched_items_into_auto_feed(AUTO_PATH, to_persist_auto)
         if persisted_auto:
             stats.warn(f"persisted enrichment onto {persisted_auto} auto feed row(s)")
         persisted_manual = merge_enriched_items_into_input_feed(args.input, to_persist_manual)
         if persisted_manual:
             stats.warn(f"persisted enrichment onto {persisted_manual} manual input row(s)")
-
     generated_at = datetime.now(UTC).isoformat()
-    has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
-    payload = {
-        "generated_at": generated_at,
-        "items": items,
-    }
+    has_gamerpower = any((item.get("source") == "gamerpower" for item in items))
+    payload = {"generated_at": generated_at, "items": items}
     if has_gamerpower:
         payload["attribution"] = [GAMERPOWER_ATTRIBUTION]
     profile_payload = {
@@ -1779,38 +1398,28 @@ def main() -> int:
     if has_gamerpower:
         profile_payload["attribution"] = [GAMERPOWER_ATTRIBUTION]
     if DEBUG_CLAIMS:
-        pub_by_source: dict[str, int] = {}
+        pub_by_source = {}
         for row in items:
             src = str(row.get("source") or "unknown")
             pub_by_source[src] = pub_by_source.get(src, 0) + 1
-        title_keys: dict[str, list[str]] = {}
+        title_keys = {}
         for row in items:
             title = norm_title(row.get("title"))
             if not title:
                 continue
             title_keys.setdefault(title, []).append(str(row.get("id") or ""))
-        dup_titles = sum(1 for ids in title_keys.values() if len(ids) > 1)
-        _debug_claims(
-            f"publish: {len(items)} item(s) by source {pub_by_source}; "
-            f"title collisions={dup_titles}"
-        )
+        dup_titles = sum((1 for ids in title_keys.values() if len(ids) > 1))
+        _debug_claims(f"publish: {len(items)} item(s) by source {pub_by_source}; title collisions={dup_titles}")
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     profile_text = json.dumps(profile_payload, indent=2, ensure_ascii=False)
-
     if args.dry_run:
         targets = [args.output, FALLBACK_PATH]
         if not args.no_profile:
             targets.append(free_claims_path())
-        print(
-            f"dry-run: would write {len(items)} item(s) to {', '.join(str(t) for t in targets)}",
-            flush=True,
-        )
+        print(f"dry-run: would write {len(items)} item(s) to {', '.join((str(t) for t in targets))}", flush=True)
     else:
         empty_code = refuse_empty_result(
-            items,
-            label="build_free_claims publish set",
-            allow_empty=args.allow_empty,
-            output_path=args.output,
+            items, label="build_free_claims publish set", allow_empty=args.allow_empty, output_path=args.output
         )
         if empty_code:
             stats.error("refusing empty publish — re-run with --allow-empty if intentional")
@@ -1824,11 +1433,7 @@ def main() -> int:
             profile_out = free_claims_path()
             safe_write_text(profile_out, profile_text)
             written.append(profile_out)
-        print(
-            f"Wrote {len(items)} item(s) to {', '.join(str(p) for p in written)}.",
-            flush=True,
-        )
-
+        print(f"Wrote {len(items)} item(s) to {', '.join((str(p) for p in written))}.", flush=True)
     stats.ok = len(items)
     return stats.finish("build_free_claims", t0, exit_code=0, extra=f"{len(items)} item(s)")
 

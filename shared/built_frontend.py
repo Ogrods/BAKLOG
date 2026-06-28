@@ -1,10 +1,5 @@
-"""Built-frontend index rewriting and immutable asset detection."""
-
-from __future__ import annotations
-
 import re
 from http import HTTPStatus
-from http.server import SimpleHTTPRequestHandler
 
 from shared.install_paths import (
     built_immutable_assets,
@@ -15,19 +10,18 @@ from shared.install_paths import (
     serve_built_frontend,
 )
 
-_BUILT_INDEX_HTML_CACHE: str | None = None
-_BUILT_INDEX_MANIFEST_MTIME: float | None = None
+_BUILT_INDEX_HTML_CACHE = None
+_BUILT_INDEX_MANIFEST_MTIME = None
 
 
-def _built_index_manifest_mtime() -> float | None:
+def _built_index_manifest_mtime():
     try:
         return built_manifest_path().stat().st_mtime
     except OSError:
         return None
 
 
-def built_index_html() -> str | None:
-    """index.html with hashed dist/ asset URLs when serving built frontend."""
+def built_index_html():
     global _BUILT_INDEX_HTML_CACHE, _BUILT_INDEX_MANIFEST_MTIME
     if not serve_built_frontend():
         return None
@@ -42,9 +36,6 @@ def built_index_html() -> str | None:
     app_css = manifest.get("app.css")
     if not entry:
         return None
-    # Frozen builds ship hashed CSS with immutable cache. Dev built mode keeps
-    # source CSS URLs so app.css/tailwind.css edits show on reload without
-    # npm run build:css and without long-lived browser cache on dist/*.css.
     if is_frozen() and (not tailwind or not app_css):
         return None
     html = (bundle_root() / "index.html").read_text(encoding="utf-8")
@@ -57,7 +48,7 @@ def built_index_html() -> str | None:
     return html
 
 
-def is_immutable_built_asset(path_only: str) -> bool:
+def is_immutable_built_asset(path_only):
     clean = path_only.lstrip("/").replace("\\", "/")
     if not clean.startswith("dist/"):
         return False
@@ -67,12 +58,10 @@ def is_immutable_built_asset(path_only: str) -> bool:
         return True
     if rel.startswith("js/chunks/") and rel in immutable:
         return True
-    return bool(re.search(r"\.[a-f0-9]{8}\.", rel))
+    return bool(re.search("\\.[a-f0-9]{8}\\.", rel))
 
 
-def maybe_serve_built_index(
-    handler: SimpleHTTPRequestHandler, path_only: str
-) -> bool:
+def maybe_serve_built_index(handler, path_only):
     if path_only not in ("/", "/index.html"):
         return False
     html = built_index_html()
@@ -88,8 +77,7 @@ def maybe_serve_built_index(
     return True
 
 
-def invalidate_built_index_cache() -> None:
-    """Clear cached rewritten index (tests)."""
+def invalidate_built_index_cache():
     global _BUILT_INDEX_HTML_CACHE, _BUILT_INDEX_MANIFEST_MTIME
     _BUILT_INDEX_HTML_CACHE = None
     _BUILT_INDEX_MANIFEST_MTIME = None

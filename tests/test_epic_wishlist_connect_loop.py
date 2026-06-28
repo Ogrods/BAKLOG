@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from urllib.parse import urlparse
 
 import pytest
@@ -8,12 +6,11 @@ import auth.runner as runner
 
 
 class _FakeTime:
-    def __init__(self, step_s: float = 1.0) -> None:
+    def __init__(self, step_s=1.0):
         self.t = 0.0
         self.step_s = step_s
 
-    def time(self) -> float:
-        # Advance on each query so loops that depend on timeouts terminate fast.
+    def time(self):
         self.t += self.step_s
         return self.t
 
@@ -22,32 +19,28 @@ class _FakeGraphQLResponse:
     url = "https://store.epicgames.com/graphql"
     status = 200
 
-    def json(self) -> dict:
+    def json(self):
         return {"data": {"Wishlist": {"wishlistItems": {"elements": []}}}}
 
 
 class _FakePage:
     def __init__(
-        self,
-        *,
-        url: str = "https://www.epicgames.com/id/login",
-        stays_on_wishlist: bool = False,
-        emit_wishlist_graphql: bool = False,
-    ) -> None:
+        self, *, url="https://www.epicgames.com/id/login", stays_on_wishlist=False, emit_wishlist_graphql=False
+    ):
         self.url = url
         self.stays_on_wishlist = stays_on_wishlist
         self.emit_wishlist_graphql = emit_wishlist_graphql
-        self.goto_calls: int = 0
-        self._listeners: dict[str, list] = {}
+        self.goto_calls = 0
+        self._listeners = {}
 
-    def on(self, event: str, callback) -> None:
+    def on(self, event, callback):
         self._listeners.setdefault(event, []).append(callback)
 
-    def _emit_wishlist_graphql(self) -> None:
+    def _emit_wishlist_graphql(self):
         for callback in self._listeners.get("response", []):
             callback(_FakeGraphQLResponse())
 
-    def goto(self, _url: str, *, wait_until: str | None = None, timeout: int | None = None) -> None:
+    def goto(self, _url, *, wait_until=None, timeout=None):
         self.goto_calls += 1
         ul = (_url or "").lower()
         if "id/login" in ul or "id.epicgames.com" in ul:
@@ -59,36 +52,33 @@ class _FakePage:
                 self._emit_wishlist_graphql()
             return
         if "wishlist" in ul:
-            # Signed-out wishlist attempt bounces to store home.
             self.url = "https://store.epicgames.com/en-US/"
             return
         self.url = _url
 
-    def bring_to_front(self) -> None:
+    def bring_to_front(self):
         return None
 
-    def wait_for_timeout(self, _ms: int) -> None:
+    def wait_for_timeout(self, _ms):
         return None
 
 
 class _FakeLoginThenStorePage:
-    """Simulates login -> store home -> post-login wishlist open."""
-
-    def __init__(self) -> None:
+    def __init__(self):
         self.url = "https://www.epicgames.com/id/login"
         self.goto_calls = 0
-        self._listeners: dict[str, list] = {}
+        self._listeners = {}
         self._polls = 0
         self._saw_login = False
 
-    def on(self, event: str, callback) -> None:
+    def on(self, event, callback):
         self._listeners.setdefault(event, []).append(callback)
 
-    def _emit_wishlist_graphql(self) -> None:
+    def _emit_wishlist_graphql(self):
         for callback in self._listeners.get("response", []):
             callback(_FakeGraphQLResponse())
 
-    def goto(self, _url: str, *, wait_until: str | None = None, timeout: int | None = None) -> None:
+    def goto(self, _url, *, wait_until=None, timeout=None):
         self.goto_calls += 1
         ul = (_url or "").lower()
         if "id/login" in ul or "id.epicgames.com" in ul:
@@ -99,71 +89,58 @@ class _FakeLoginThenStorePage:
             self.url = _url
             self._emit_wishlist_graphql()
 
-    def wait_for_timeout(self, _ms: int) -> None:
+    def wait_for_timeout(self, _ms):
         self._polls += 1
         path = urlparse(self.url or "").path.lower()
-        if self._saw_login and self._polls == 1 and "wishlist" not in path:
+        if self._saw_login and self._polls == 1 and ("wishlist" not in path):
             self.url = "https://store.epicgames.com/en-US/"
 
-    def bring_to_front(self) -> None:
+    def bring_to_front(self):
         return None
 
 
 class _FakeContext:
-    def __init__(self, *, signed_in: bool = False) -> None:
+    def __init__(self, *, signed_in=False):
         self._signed_in = signed_in
 
-    def cookies(self) -> list[dict]:
+    def cookies(self):
         if not self._signed_in:
             return []
-        return [
-            {
-                "name": "epic_session_diesel",
-                "value": "test-session",
-                "domain": ".epicgames.com",
-            }
-        ]
+        return [{"name": "epic_session_diesel", "value": "test-session", "domain": ".epicgames.com"}]
 
 
 class _FakeSession:
-    def emit(self, _event: str, _data: dict) -> None:
+    def emit(self, _event, _data):
         return None
 
 
-def test_epic_wishlist_inline_times_out_on_login_without_wishlist_graphql(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_epic_wishlist_inline_times_out_on_login_without_wishlist_graphql(monkeypatch):
     page = _FakePage()
     context = _FakeContext()
     session = _FakeSession()
-
     fake_time = _FakeTime(step_s=6.0)
     monkeypatch.setattr(runner.time, "time", fake_time.time)
     monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
     monkeypatch.setattr(runner, "POLL_SEC", 0.1)
-
     with pytest.raises(RuntimeError, match="Could not detect Epic wishlist sign-in"):
-        runner._extract_epic_wishlist_inline(page, context, session)  # type: ignore[attr-defined]
-
+        runner._extract_epic_wishlist_inline(page, context, session)
     assert page.goto_calls == 1
 
 
 class _FakeSignedInRedirectPage:
-    """Epic auto-redirects an already-signed-in user from login to wishlist."""
-
-    def __init__(self) -> None:
+    def __init__(self):
         self.url = "https://www.epicgames.com/id/login"
         self.goto_calls = 0
-        self._listeners: dict[str, list] = {}
+        self._listeners = {}
 
-    def on(self, event: str, callback) -> None:
+    def on(self, event, callback):
         self._listeners.setdefault(event, []).append(callback)
 
-    def _emit_wishlist_graphql(self) -> None:
+    def _emit_wishlist_graphql(self):
         for callback in self._listeners.get("response", []):
             callback(_FakeGraphQLResponse())
 
-    def goto(self, _url: str, *, wait_until: str | None = None, timeout: int | None = None) -> None:
+    def goto(self, _url, *, wait_until=None, timeout=None):
         self.goto_calls += 1
         ul = (_url or "").lower()
         if "/id/login" in ul or "id.epicgames.com" in ul:
@@ -172,63 +149,50 @@ class _FakeSignedInRedirectPage:
             return
         self.url = _url
 
-    def wait_for_timeout(self, _ms: int) -> None:
+    def wait_for_timeout(self, _ms):
         return None
 
-    def bring_to_front(self) -> None:
+    def bring_to_front(self):
         return None
 
 
-def test_epic_wishlist_inline_accepts_wishlist_graphql_without_extra_goto(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_epic_wishlist_inline_accepts_wishlist_graphql_without_extra_goto(monkeypatch):
     page = _FakeSignedInRedirectPage()
     context = _FakeContext()
     session = _FakeSession()
-
     fake_time = _FakeTime(step_s=1.0)
     monkeypatch.setattr(runner.time, "time", fake_time.time)
     monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 300.0)
     monkeypatch.setattr(runner, "POLL_SEC", 0.1)
-
-    creds = runner._extract_epic_wishlist_inline(page, context, session)  # type: ignore[attr-defined]
-
+    creds = runner._extract_epic_wishlist_inline(page, context, session)
     assert creds == {"EPIC_STORE_COOKIE": "ready"}
     assert page.goto_calls == 1
 
 
-def test_epic_wishlist_inline_post_login_goto_then_graphql(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_epic_wishlist_inline_post_login_goto_then_graphql(monkeypatch):
     page = _FakeLoginThenStorePage()
     context = _FakeContext()
     session = _FakeSession()
-
     fake_time = _FakeTime(step_s=1.0)
     monkeypatch.setattr(runner.time, "time", fake_time.time)
     monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 300.0)
     monkeypatch.setattr(runner, "POLL_SEC", 0.1)
-
-    creds = runner._extract_epic_wishlist_inline(page, context, session)  # type: ignore[attr-defined]
-
+    creds = runner._extract_epic_wishlist_inline(page, context, session)
     assert creds == {"EPIC_STORE_COOKIE": "ready"}
     assert page.goto_calls == 2
 
 
-def test_epic_wishlist_inline_post_login_goto_without_graphql_times_out(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_epic_wishlist_inline_post_login_goto_without_graphql_times_out(monkeypatch):
     page = _FakePage(url="https://store.epicgames.com/en-US/")
     context = _FakeContext(signed_in=True)
     session = _FakeSession()
     page.url = "https://www.epicgames.com/id/login"
-
     fake_time = _FakeTime(step_s=6.0)
     monkeypatch.setattr(runner.time, "time", fake_time.time)
     monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
     monkeypatch.setattr(runner, "POLL_SEC", 0.1)
 
-    def _goto(url: str, *, wait_until: str | None = None, timeout: int | None = None) -> None:
+    def _goto(url, *, wait_until=None, timeout=None):
         page.goto_calls += 1
         ul = (url or "").lower()
         if "id/login" in ul or "id.epicgames.com" in ul:
@@ -237,15 +201,13 @@ def test_epic_wishlist_inline_post_login_goto_without_graphql_times_out(
         if "wishlist" in ul:
             page.url = "https://store.epicgames.com/en-US/"
 
-    page.goto = _goto  # type: ignore[method-assign]
+    page.goto = _goto
 
-    def _wait(_ms: int) -> None:
+    def _wait(_ms):
         if "/id/login" in (page.url or "") or "id.epicgames.com" in (page.url or ""):
             page.url = "https://store.epicgames.com/en-US/"
 
-    page.wait_for_timeout = _wait  # type: ignore[method-assign]
-
+    page.wait_for_timeout = _wait
     with pytest.raises(RuntimeError, match="Could not detect Epic wishlist sign-in"):
-        runner._extract_epic_wishlist_inline(page, context, session)  # type: ignore[attr-defined]
-
+        runner._extract_epic_wishlist_inline(page, context, session)
     assert page.goto_calls == 2

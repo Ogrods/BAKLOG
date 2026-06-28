@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch Ubisoft Connect library via public-ubiservices.ubi.com."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import time
@@ -34,17 +29,15 @@ from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_UBISOFT_JSON = Path("games_ubisoft.json")
 UBISOFT_RAW_DUMP = profile_raw_dump_path("ubisoft_raw.json")
-
 HLTB_DELAY_SEC = 1.0
-
 _TM_CHARS = "".maketrans({"®": "", "™": "", "©": ""})
 
 
-def _clean_name(raw: str) -> str:
+def _clean_name(raw):
     return " ".join((raw or "").translate(_TM_CHARS).split()).strip()
 
 
-def _last_played_from_games_played(entry: dict) -> str | None:
+def _last_played_from_games_played(entry):
     lp = entry.get("lastPlayed")
     if isinstance(lp, dict):
         return lp.get("updatedAt") or lp.get("createdAt")
@@ -53,9 +46,8 @@ def _last_played_from_games_played(entry: dict) -> str | None:
     return None
 
 
-def _application_id_names(catalog: list[dict]) -> dict[str, str]:
-    """Map applicationId → displayName using catalog platform entries."""
-    out: dict[str, str] = {}
+def _application_id_names(catalog):
+    out = {}
     for game in catalog:
         name = _clean_name(str(game.get("displayName") or ""))
         if not name:
@@ -79,26 +71,21 @@ def _application_id_names(catalog: list[dict]) -> dict[str, str]:
     return out
 
 
-def _extract_records(payload) -> list[dict]:
-    """Turn the merged Ubisoft client payload into flat game dicts."""
+def _extract_records(payload):
     if not isinstance(payload, dict) or "catalog" not in payload:
         return []
-
-    catalog = [g for g in (payload.get("catalog") or []) if isinstance(g, dict)]
-    games_played = [g for g in (payload.get("gamesPlayed") or []) if isinstance(g, dict)]
-    applications = [a for a in (payload.get("applications") or []) if isinstance(a, dict)]
-
-    last_by_space: dict[str, str] = {}
+    catalog = [g for g in payload.get("catalog") or [] if isinstance(g, dict)]
+    games_played = [g for g in payload.get("gamesPlayed") or [] if isinstance(g, dict)]
+    applications = [a for a in payload.get("applications") or [] if isinstance(a, dict)]
+    last_by_space = {}
     for gp in games_played:
         sid = gp.get("spaceId")
         if isinstance(sid, str):
             lp = _last_played_from_games_played(gp)
             if lp:
                 last_by_space[sid] = lp
-
     app_names = _application_id_names(catalog)
-    seen: dict[str, dict] = {}
-
+    seen = {}
     for game in catalog:
         name = _clean_name(str(game.get("displayName") or ""))
         sid = game.get("spaceId")
@@ -113,7 +100,6 @@ def _extract_records(payload) -> list[dict]:
                 "last_played": last_by_space.get(str(sid)),
                 "displayName": name,
             }
-
     for app in applications:
         aid = app.get("applicationId")
         if not isinstance(aid, str):
@@ -124,28 +110,15 @@ def _extract_records(payload) -> list[dict]:
         key = name.lower()
         lp = app.get("lastDatePlayed")
         if key in seen:
-            if lp and not seen[key].get("last_played"):
+            if lp and (not seen[key].get("last_played")):
                 seen[key]["last_played"] = lp
             continue
-        seen[key] = {
-            "name": name,
-            "id": aid,
-            "applicationId": aid,
-            "last_played": lp if isinstance(lp, str) else None,
-        }
-
+        seen[key] = {"name": name, "id": aid, "applicationId": aid, "last_played": lp if isinstance(lp, str) else None}
     return list(seen.values())
 
 
-def _name_of(item: dict) -> str:
-    for k in (
-        "name",
-        "title",
-        "displayName",
-        "productName",
-        "applicationName",
-        "spaceName",
-    ):
+def _name_of(item):
+    for k in ("name", "title", "displayName", "productName", "applicationName", "spaceName"):
         v = item.get(k)
         if isinstance(v, str) and v.strip():
             return _clean_name(v)
@@ -157,33 +130,16 @@ def _name_of(item: dict) -> str:
     return ""
 
 
-def _id_of(item: dict, fallback: str) -> str:
-    for k in (
-        "spaceId",
-        "applicationId",
-        "appId",
-        "productId",
-        "uplayId",
-        "id",
-        "uuid",
-    ):
+def _id_of(item, fallback):
+    for k in ("spaceId", "applicationId", "appId", "productId", "uplayId", "id", "uuid"):
         v = item.get(k)
         if v not in (None, ""):
             return str(v)
     return fallback or ""
 
 
-def _image_of(item: dict) -> str | None:
-    for k in (
-        "thumbImage",
-        "thumbnail",
-        "imageUrl",
-        "image",
-        "boxArt",
-        "coverImage",
-        "hero",
-        "logo",
-    ):
+def _image_of(item):
+    for k in ("thumbImage", "thumbnail", "imageUrl", "image", "boxArt", "coverImage", "hero", "logo"):
         v = item.get(k)
         if isinstance(v, str) and v.startswith("http"):
             return v
@@ -195,7 +151,7 @@ def _image_of(item: dict) -> str | None:
     return None
 
 
-def _last_played_iso(item: dict) -> str | None:
+def _last_played_iso(item):
     v = item.get("last_played")
     if isinstance(v, str) and v:
         return v
@@ -210,22 +166,21 @@ def _last_played_iso(item: dict) -> str | None:
     return None
 
 
-def _store_url(item: dict, name: str) -> str:
+def _store_url(item, name):
     space_id = item.get("spaceId") or item.get("space_id")
     if isinstance(space_id, str) and space_id:
-        # Ubisoft store deep-links typically take a space id; if not, fall back to search.
         return f"https://store.ubisoft.com/us/search?q={quote(name)}"
     return f"https://store.ubisoft.com/us/search?q={quote(name)}"
 
 
-def load_existing() -> dict[str, dict]:
+def load_existing():
     if not catalog_file(GAMES_UBISOFT_JSON).exists():
         return {}
     data = json.loads(catalog_file(GAMES_UBISOFT_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
-def _build_row(item: dict, hltb: dict | None) -> dict:
+def _build_row(item, hltb):
     name = _name_of(item) or "Unknown Ubisoft title"
     uid = _id_of(item, name)
     image = _image_of(item)
@@ -269,16 +224,14 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
     return row
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch Ubisoft Connect library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
     add_only_new_arg(parser)
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     parser.add_argument(
-        "--dump-raw",
-        action="store_true",
-        help=f"Also write the raw API response to {UBISOFT_RAW_DUMP} for debugging.",
+        "--dump-raw", action="store_true", help=f"Also write the raw API response to {UBISOFT_RAW_DUMP} for debugging."
     )
     args = parser.parse_args()
     configure_stdout()
@@ -290,15 +243,9 @@ def main() -> int:
     app_id = resolve_env("UBISOFT_APP_ID", provider="ubisoft") or None
     if not auth or not session_id:
         stats.error(
-            "Set UBISOFT_AUTH and UBISOFT_SESSION_ID in .env. To get them:\n"
-            "  1. Sign in at https://connect.ubisoft.com/ and open your library\n"
-            "  2. DevTools → Network → click any request to public-ubiservices.ubi.com\n"
-            "  3. Copy the 'Authorization' value (starts with 'Ubi_v1 t=')\n"
-            "     and the 'Ubi-SessionId' value\n"
-            "  4. Paste into .env as UBISOFT_AUTH and UBISOFT_SESSION_ID"
+            "Set UBISOFT_AUTH and UBISOFT_SESSION_ID in .env. To get them:\n  1. Sign in at https://connect.ubisoft.com/ and open your library\n  2. DevTools → Network → click any request to public-ubiservices.ubi.com\n  3. Copy the 'Authorization' value (starts with 'Ubi_v1 t=')\n     and the 'Ubi-SessionId' value\n  4. Paste into .env as UBISOFT_AUTH and UBISOFT_SESSION_ID"
         )
         return stats.finish("fetch_ubisoft", t0, exit_code=1)
-
     try:
         client = UbisoftClient(auth, session_id, app_id=app_id)
         raw, endpoint = run_with_heartbeat(client.get_library, "Ubisoft library API")
@@ -306,18 +253,13 @@ def main() -> int:
         mark_invalid("ubisoft", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_ubisoft", t0, exit_code=EXIT_CODE_AUTH)
-
     print(f"Hit Ubisoft endpoint: {endpoint}", flush=True)
-
     if args.dump_raw:
         UBISOFT_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
-        UBISOFT_RAW_DUMP.write_text(
-            json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        UBISOFT_RAW_DUMP.write_text(json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote raw response to {UBISOFT_RAW_DUMP}.")
-
     raw_games = _extract_records(raw)
-    seen: dict[str, dict] = {}
+    seen = {}
     for item in raw_games:
         name = _name_of(item)
         if not name:
@@ -327,23 +269,17 @@ def main() -> int:
             seen[key] = item
     deduped = list(seen.values())
     print(f"Found {len(deduped)} unique Ubisoft entries (from {len(raw_games)} raw).", flush=True)
-
     empty_exit = refuse_empty_result(
-        deduped,
-        label="Ubisoft library",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_UBISOFT_JSON,
+        deduped, label="Ubisoft library", allow_empty=args.allow_empty, output_path=GAMES_UBISOFT_JSON
     )
     if empty_exit is not None:
         stats.error(
-            "No game records found in the response. Re-run with --dump-raw and "
-            f"inspect {UBISOFT_RAW_DUMP} to confirm the endpoint hit your library."
+            f"No game records found in the response. Re-run with --dump-raw and inspect {UBISOFT_RAW_DUMP} to confirm the endpoint hit your library."
         )
         return stats.finish("fetch_ubisoft", t0, exit_code=empty_exit)
-
     hltb_client = HltbClient()
     existing = load_existing()
-    games_out: list[dict] = []
+    games_out = []
     loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(deduped, 1):
         name = _name_of(item)
@@ -365,31 +301,15 @@ def main() -> int:
             except Exception as e:
                 print(f"  HLTB warning: {e}", flush=True)
         games_out.append(
-            merge_cached_row(
-                _build_row(item, hltb),
-                cached,
-                authoritative=UBISOFT,
-                hltb_updated=hltb_updated,
-            )
+            merge_cached_row(_build_row(item, hltb), cached, authoritative=UBISOFT, hltb_updated=hltb_updated)
         )
         loop_hb.tick_progress(i, len(deduped), "Ubisoft library", (name or "")[:40])
-
     drift_exit = refuse_drift_result(
-        games_out,
-        label="Ubisoft library rows",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_UBISOFT_JSON,
+        games_out, label="Ubisoft library rows", allow_drift=args.allow_drift, output_path=GAMES_UBISOFT_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_ubisoft", t0, exit_code=drift_exit)
-
-    games_out = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_id,
-        no_carry=args.no_carry,
-    )
-
+    games_out = apply_carry_forward(games_out, existing, key_fn=row_key_by_id, no_carry=args.no_carry)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "ubisoft",

@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch Battle.net library via the unofficial games-and-subs endpoint."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -35,13 +30,9 @@ from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_wit
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_BATTLENET_JSON = Path("games_battlenet.json")
-
-
 BATTLENET_RAW_DUMP = profile_raw_dump_path("battlenet_raw.json")
 HLTB_DELAY_SEC = 1.0
-
-# Map Blizzard's franchise icon filename to the canonical game site.
-FRANCHISE_STORE_URLS: dict[str, str] = {
+FRANCHISE_STORE_URLS = {
     "world-of-warcraft.svg": "https://worldofwarcraft.blizzard.com/",
     "hearthstone.svg": "https://hearthstone.blizzard.com/",
     "overwatch-2.svg": "https://overwatch.blizzard.com/",
@@ -54,19 +45,15 @@ FRANCHISE_STORE_URLS: dict[str, str] = {
     "warcraft-rumble.svg": "https://warcraftrumble.blizzard.com/",
     "heroes-of-the-storm.svg": "https://heroesofthestorm.blizzard.com/",
 }
-
-
-# Strip the trademark glyphs Blizzard sprinkles into every title.
 _TM_CHARS = "".maketrans({"®": "", "™": "", "©": ""})
 
 
-def _clean_name(raw: str) -> str:
+def _clean_name(raw):
     return " ".join((raw or "").translate(_TM_CHARS).split()).strip()
 
 
-def _extract_records(payload: dict) -> list[dict]:
-    """Pull the entries we care about from the live response shape."""
-    out: list[dict] = []
+def _extract_records(payload):
+    out = []
     if not isinstance(payload, dict):
         return out
     for section in ("gameAccounts", "classicGames", "modernGames", "consoleGames"):
@@ -77,7 +64,7 @@ def _extract_records(payload: dict) -> list[dict]:
     return out
 
 
-def _name(item: dict) -> str:
+def _name(item):
     for k in ("localizedGameName", "title", "displayName", "name"):
         v = item.get(k)
         if isinstance(v, str) and v.strip():
@@ -85,7 +72,7 @@ def _name(item: dict) -> str:
     return ""
 
 
-def _id(item: dict, fallback: str) -> str:
+def _id(item, fallback):
     for k in ("titleId", "productId", "id"):
         v = item.get(k)
         if v not in (None, ""):
@@ -93,31 +80,31 @@ def _id(item: dict, fallback: str) -> str:
     return fallback or "battlenet-unknown"
 
 
-def _store_url(item: dict, name: str) -> str:
+def _store_url(item, name):
     icon = (item.get("regionalGameFranchiseIconFilename") or "").lower()
     if icon in FRANCHISE_STORE_URLS:
         return FRANCHISE_STORE_URLS[icon]
     return f"https://shop.battle.net/?search={quote(name)}"
 
 
-def _last_played_iso(item: dict) -> str | None:
+def _last_played_iso(item):
     ms = item.get("lastPlayedDateMillis")
     if not isinstance(ms, (int, float)) or ms <= 0:
         return None
     return datetime.fromtimestamp(ms / 1000, tz=UTC).isoformat()
 
 
-def load_existing() -> dict[str, dict]:
+def load_existing():
     if not catalog_file(GAMES_BATTLENET_JSON).exists():
         return {}
     data = json.loads(catalog_file(GAMES_BATTLENET_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
-def _build_row(item: dict, hltb: dict | None) -> dict:
+def _build_row(item, hltb):
     name = _name(item) or "Unknown Battle.net title"
     bid = _id(item, name)
-    tags: list[str] = []
+    tags = []
     if item.get("titleHasGameTime") or item.get("titleHasSubscriptions"):
         tags.append("subscription")
     if (item.get("gameAccountStatus") or "").lower() == "good":
@@ -162,32 +149,23 @@ def _build_row(item: dict, hltb: dict | None) -> dict:
     return row
 
 
-def _build_client(browser: str, env_cookie: str) -> BattleNetClient:
-    """Resolve Battle.net session: browser jar first, BATTLENET_COOKIE fallback."""
+def _build_client(browser, env_cookie):
     if browser == "env":
         if not env_cookie:
-            raise BattleNetAuthError(
-                "--browser env was requested but BATTLENET_COOKIE is empty in .env."
-            )
+            raise BattleNetAuthError("--browser env was requested but BATTLENET_COOKIE is empty in .env.")
         return BattleNetClient(env_cookie)
-
     try:
         return BattleNetClient.from_browser(browser)
     except BattleNetAuthError as e:
         if env_cookie:
-            print(
-                f"warning: {e}\nFalling back to BATTLENET_COOKIE from .env.",
-                file=sys.stderr,
-            )
+            print(f"warning: {e}\nFalling back to BATTLENET_COOKIE from .env.", file=sys.stderr)
             return BattleNetClient(env_cookie)
         raise BattleNetAuthError(
-            f"{e}\nAs a fallback, set BATTLENET_COOKIE in .env "
-            "(DevTools → Network → /api/games-and-subs → Cookie header), "
-            "or run with --browser env after setting it."
+            f"{e}\nAs a fallback, set BATTLENET_COOKIE in .env (DevTools → Network → /api/games-and-subs → Cookie header), or run with --browser env after setting it."
         ) from e
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch Battle.net library (unofficial)")
     parser.add_argument("--skip-hltb", action="store_true")
     add_only_new_arg(parser)
@@ -212,14 +190,12 @@ def main() -> int:
     t0 = started("fetch_battlenet")
     stats = RunStats()
     env_cookie = resolve_env("BATTLENET_COOKIE", provider="battlenet")
-
     try:
         client = _build_client(args.browser, env_cookie)
     except BattleNetAuthError as e:
         mark_invalid("battlenet", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
-
     raw = None
     try:
         raw = run_with_heartbeat(client.get_raw_account, "Battle.net library API")
@@ -235,15 +211,14 @@ def main() -> int:
                 client = BattleNetClient.from_browser(fallback_browser)
                 raw = client.get_raw_account()
                 print(
-                    f"warning: stored BATTLENET_COOKIE was rejected; "
-                    f"using {fallback_browser} browser session instead.",
+                    f"warning: stored BATTLENET_COOKIE was rejected; using {fallback_browser} browser session instead.",
                     file=sys.stderr,
                 )
                 cookie_header = (client.session.headers.get("Cookie") or "").strip()
                 if cookie_header:
                     try:
                         mark_connected("battlenet", {"BATTLENET_COOKIE": cookie_header})
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         pass
             except BattleNetAuthError:
                 mark_invalid("battlenet", error=err)
@@ -253,16 +228,12 @@ def main() -> int:
             mark_invalid("battlenet", error=err)
             stats.error(err)
             return stats.finish("fetch_battlenet", t0, exit_code=EXIT_CODE_AUTH)
-
     if args.dump_raw:
         BATTLENET_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
-        BATTLENET_RAW_DUMP.write_text(
-            json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        BATTLENET_RAW_DUMP.write_text(json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote raw response to {BATTLENET_RAW_DUMP}.")
-
     raw_games = _extract_records(raw)
-    seen: dict[str, dict] = {}
+    seen = {}
     for item in raw_games:
         name = _name(item)
         if not name:
@@ -272,23 +243,17 @@ def main() -> int:
             seen[key] = item
     deduped = list(seen.values())
     print(f"Found {len(deduped)} unique Battle.net entries (from {len(raw_games)} raw).", flush=True)
-
     empty_exit = refuse_empty_result(
-        deduped,
-        label="Battle.net library",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_BATTLENET_JSON,
+        deduped, label="Battle.net library", allow_empty=args.allow_empty, output_path=GAMES_BATTLENET_JSON
     )
     if empty_exit is not None:
         stats.error(
-            "No game records found in the response. Re-run with --dump-raw and inspect "
-            f"{BATTLENET_RAW_DUMP} to confirm the cookie hit the right account."
+            f"No game records found in the response. Re-run with --dump-raw and inspect {BATTLENET_RAW_DUMP} to confirm the cookie hit the right account."
         )
         return stats.finish("fetch_battlenet", t0, exit_code=empty_exit)
-
     hltb_client = HltbClient()
     existing = load_existing()
-    games_out: list[dict] = []
+    games_out = []
     loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(deduped, 1):
         name = _name(item)
@@ -310,32 +275,14 @@ def main() -> int:
             except Exception as e:
                 print(f"  HLTB warning: {e}", flush=True)
         row = _build_row(item, hltb)
-        games_out.append(
-            merge_cached_row(
-                row,
-                cached,
-                authoritative=BATTLENET,
-                hltb_updated=hltb_updated,
-            )
-        )
+        games_out.append(merge_cached_row(row, cached, authoritative=BATTLENET, hltb_updated=hltb_updated))
         loop_hb.tick_progress(i, len(deduped), "Battle.net library", (name or "")[:40])
-
     drift_exit = refuse_drift_result(
-        games_out,
-        label="Battle.net library rows",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_BATTLENET_JSON,
+        games_out, label="Battle.net library rows", allow_drift=args.allow_drift, output_path=GAMES_BATTLENET_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_battlenet", t0, exit_code=drift_exit)
-
-    games_out = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_id,
-        no_carry=args.no_carry,
-    )
-
+    games_out = apply_carry_forward(games_out, existing, key_fn=row_key_by_id, no_carry=args.no_carry)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "battlenet",

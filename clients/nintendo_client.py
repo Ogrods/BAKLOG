@@ -1,26 +1,5 @@
-"""Nintendo eShop purchase history via ec.nintendo.com (Savanna GraphQL).
-
-The legacy REST endpoint ``/api/my/transactions`` was removed when Nintendo
-redesigned the transactions site. Purchase history is now loaded from:
-
-  GET https://wb.lp1.savanna.srv.nintendo.net/graphql
-      ?operationName=TransactionsClientRootClient
-      (persisted query + idToken from /api/auth/session)
-
-Those GraphQL calls only succeed from a logged-in browser context (correct
-headers / token binding). We reuse the Connections CDP profile
-(``cache/auth/profiles/nintendo``) headlessly: open the transactions page,
-capture GraphQL responses, and paginate via the on-page controls.
-
-History is limited to ~2 years per Nintendo support.
-"""
-
-from __future__ import annotations
-
 import json
 import time
-from pathlib import Path
-from typing import Any
 from urllib.parse import urlencode
 
 import requests
@@ -28,39 +7,29 @@ import requests
 GRAPHQL_URL = "https://wb.lp1.savanna.srv.nintendo.net/graphql"
 SESSION_URL = "https://ec.nintendo.com/api/auth/session"
 TRANSACTIONS_PAGE = "https://ec.nintendo.com/my/transactions/"
-PERSISTED_QUERY_HASH = (
-    "5cd77203b74514954049c93f6e3a5ed66d5647eb2714bd6bf72ebd470a25a08e"
-)
+PERSISTED_QUERY_HASH = "5cd77203b74514954049c93f6e3a5ed66d5647eb2714bd6bf72ebd470a25a08e"
 PAGE_SIZE = 10
 LEGACY_TRANSACTIONS_URL = "https://ec.nintendo.com/api/my/transactions"
 NINTENDO_SESSION_COOKIE_NAMES = frozenset(
-    {
-        "MIST",
-        "JViDD",
-        "_gh_sess",
-        "NASID",
-        "ecsid",
-        "__Secure-next-auth.session-token",
-    }
+    {"MIST", "JViDD", "_gh_sess", "NASID", "ecsid", "__Secure-next-auth.session-token"}
 )
-# Playwright APIRequestContext.get timeout is milliseconds; requests uses seconds.
-PLAYWRIGHT_REQUEST_TIMEOUT_MS = 30_000
+PLAYWRIGHT_REQUEST_TIMEOUT_MS = 30000
 REQUESTS_TIMEOUT_SEC = 30
 
 
 class NintendoAuthError(Exception):
-    """Cookie/session expired or missing — reconnect Nintendo in Connections."""
+    pass
 
 
 class NintendoCaptureError(Exception):
-    """Logged-in session present but purchase history could not be captured."""
+    pass
 
 
 class NintendoEndpointError(Exception):
-    """Unexpected API shape (should not occur with the browser path)."""
+    pass
 
 
-def _looks_like_html(resp: requests.Response) -> bool:
+def _looks_like_html(resp):
     ctype = (resp.headers.get("Content-Type") or "").lower()
     if "text/html" in ctype:
         return True
@@ -68,30 +37,20 @@ def _looks_like_html(resp: requests.Response) -> bool:
     return head.startswith("<!doctype") or head.startswith("<html")
 
 
-def _is_transactions_graphql_url(url: str) -> bool:
+def _is_transactions_graphql_url(url):
     u = url or ""
     return "graphql" in u and "TransactionsClientRootClient" in u
 
 
-def _response_text(resp: Any) -> str:
-    """Body text from CDP (.text()) or plain mocks (.text attribute)."""
+def _response_text(resp):
     text_attr = getattr(resp, "text", "")
     if callable(text_attr):
         return text_attr() or ""
     return text_attr or ""
 
 
-def _merge_graphql_payload(
-    payload: dict[str, Any],
-    collected: list[dict[str, Any]],
-    seen_ids: set[str],
-) -> int:
-    """Merge transactionHistories batch into collected; return number of new rows."""
-    histories = (
-        payload.get("data", {})
-        .get("account", {})
-        .get("transactionHistories", {})
-    )
+def _merge_graphql_payload(payload, collected, seen_ids):
+    histories = payload.get("data", {}).get("account", {}).get("transactionHistories", {})
     batch = histories.get("transactionHistories")
     if not isinstance(batch, list):
         return 0
@@ -109,12 +68,7 @@ def _merge_graphql_payload(
     return added
 
 
-def _drain_graphql_candidates(
-    candidates: list[Any],
-    collected: list[dict[str, Any]],
-    seen_ids: set[str],
-) -> int:
-    """Parse queued CDP responses on the main thread (not the network reader)."""
+def _drain_graphql_candidates(candidates, collected, seen_ids):
     added = 0
     while candidates:
         resp = candidates.pop(0)
@@ -126,14 +80,8 @@ def _drain_graphql_candidates(
     return added
 
 
-def probe_session_id_token(http_get, *, timeout: float = REQUESTS_TIMEOUT_SEC) -> dict[str, Any]:
-    """Probe /api/auth/session; return {ok, status, id_token_present, error}."""
-    out: dict[str, Any] = {
-        "ok": False,
-        "status": None,
-        "id_token_present": False,
-        "error": None,
-    }
+def probe_session_id_token(http_get, *, timeout=REQUESTS_TIMEOUT_SEC):
+    out = {"ok": False, "status": None, "id_token_present": False, "error": None}
     try:
         resp = http_get(SESSION_URL, timeout=timeout)
         status = int(getattr(resp, "status", 0) or 0)
@@ -151,37 +99,26 @@ def probe_session_id_token(http_get, *, timeout: float = REQUESTS_TIMEOUT_SEC) -
 
 
 class NintendoClient:
-    def __init__(
-        self,
-        cookie_header: str = "",
-        *,
-        profile_path: Path | None = None,
-        user_agent: str | None = None,
-        headless: bool = True,
-        dump_debug_path: Path | None = None,
-    ) -> None:
+    def __init__(self, cookie_header="", *, profile_path=None, user_agent=None, headless=True, dump_debug_path=None):
         self._cookie = (cookie_header or "").strip()
         self._profile_path = profile_path
-        self._user_agent = user_agent or (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        self._user_agent = (
+            user_agent
+            or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         )
         self._headless = headless
         self._dump_debug_path = dump_debug_path
 
-    def fetch_all_transactions(self) -> list[dict]:
-        """Return raw transaction dicts compatible with fetch_nintendo merge logic."""
+    def fetch_all_transactions(self):
         if self._profile_path and self._profile_path.exists():
             return self._fetch_via_browser_profile(self._profile_path)
         if self._cookie:
             return self._fetch_via_cookie_requests()
         raise NintendoAuthError(
-            "Nintendo is not connected. Open Connections, connect Nintendo, "
-            "and complete sign-in on ec.nintendo.com (transactions page)."
+            "Nintendo is not connected. Open Connections, connect Nintendo, and complete sign-in on ec.nintendo.com (transactions page)."
         )
 
-    def _fetch_via_cookie_requests(self) -> list[dict]:
-        """Legacy path: cookie jar only (often incomplete after the site redesign)."""
+    def _fetch_via_cookie_requests(self):
         session = requests.Session()
         session.headers.update(
             {
@@ -196,52 +133,32 @@ class NintendoClient:
         auth = session.get(SESSION_URL, timeout=REQUESTS_TIMEOUT_SEC)
         if auth.status_code in (401, 403):
             raise NintendoAuthError(
-                f"Nintendo rejected the session ({auth.status_code}). "
-                "Reconnect Nintendo in Connections."
+                f"Nintendo rejected the session ({auth.status_code}). Reconnect Nintendo in Connections."
             )
         if not auth.ok:
             raise NintendoAuthError(
-                f"Could not load Nintendo session ({auth.status_code}). "
-                "Reconnect Nintendo in Connections."
+                f"Could not load Nintendo session ({auth.status_code}). Reconnect Nintendo in Connections."
             )
         try:
             body = auth.json()
         except ValueError as exc:
-            raise NintendoAuthError(
-                "Nintendo session response was not JSON — reconnect in Connections."
-            ) from exc
+            raise NintendoAuthError("Nintendo session response was not JSON — reconnect in Connections.") from exc
         if not body.get("idToken"):
             raise NintendoAuthError(
-                "Nintendo cookie is incomplete (no idToken). Reconnect Nintendo in "
-                "Connections so the full eShop session is saved to the browser profile."
+                "Nintendo cookie is incomplete (no idToken). Reconnect Nintendo in Connections so the full eShop session is saved to the browser profile."
             )
         raise NintendoAuthError(
-            "Nintendo now requires the saved browser profile for purchase history. "
-            "Reconnect Nintendo in Connections, then run the fetcher again."
+            "Nintendo now requires the saved browser profile for purchase history. Reconnect Nintendo in Connections, then run the fetcher again."
         )
 
-    def _graphql_batch_len(self, payload: dict[str, Any]) -> int:
-        batch = (
-            payload.get("data", {})
-            .get("account", {})
-            .get("transactionHistories", {})
-            .get("transactionHistories")
-        )
+    def _graphql_batch_len(self, payload):
+        batch = payload.get("data", {}).get("account", {}).get("transactionHistories", {}).get("transactionHistories")
         return len(batch) if isinstance(batch, list) else 0
 
-    def _fetch_via_direct_graphql(
-        self,
-        context,
-        collected: list[dict[str, Any]],
-        seen_ids: set[str],
-    ) -> int:
-        """Page Savanna GraphQL via session idToken; merge into shared collected."""
-        probe = probe_session_id_token(
-            context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
-        )
+    def _fetch_via_direct_graphql(self, context, collected, seen_ids):
+        probe = probe_session_id_token(context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
         if not probe.get("ok"):
             return 0
-
         session_resp = context.request.get(SESSION_URL, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
         try:
             session_body = json.loads(session_resp.text())
@@ -250,7 +167,6 @@ class NintendoClient:
         id_token = session_body.get("idToken")
         if not id_token:
             return 0
-
         headers = {
             "Accept": "application/json",
             "Accept-Language": "en-US,en;q=0.9",
@@ -264,15 +180,10 @@ class NintendoClient:
         for _ in range(200):
             variables = json.dumps({"page": page_num, "limit": PAGE_SIZE}, separators=(",", ":"))
             extensions = json.dumps(
-                {"persistedQuery": {"version": 1, "sha256Hash": PERSISTED_QUERY_HASH}},
-                separators=(",", ":"),
+                {"persistedQuery": {"version": 1, "sha256Hash": PERSISTED_QUERY_HASH}}, separators=(",", ":")
             )
             query = urlencode(
-                {
-                    "operationName": "TransactionsClientRootClient",
-                    "variables": variables,
-                    "extensions": extensions,
-                }
+                {"operationName": "TransactionsClientRootClient", "variables": variables, "extensions": extensions}
             )
             url = f"{GRAPHQL_URL}?{query}"
             resp = context.request.get(url, headers=headers, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
@@ -284,33 +195,28 @@ class NintendoClient:
                 break
             batch_len = self._graphql_batch_len(payload)
             _merge_graphql_payload(payload, collected, seen_ids)
-            # Stop on an empty API page — not when every row was already captured
-            # from the UI path (added==0 but batch_len>0).
             if batch_len == 0:
                 break
             page_num += 1
             time.sleep(0.3)
         return len(collected) - rows_before
 
-    def _write_debug(self, debug: dict[str, Any]) -> None:
+    def _write_debug(self, debug):
         if not self._dump_debug_path:
             return
         try:
             self._dump_debug_path.parent.mkdir(parents=True, exist_ok=True)
-            self._dump_debug_path.write_text(
-                json.dumps(debug, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
+            self._dump_debug_path.write_text(json.dumps(debug, indent=2, ensure_ascii=False), encoding="utf-8")
         except OSError:
             pass
 
-    def _fetch_via_browser_profile(self, profile_path: Path) -> list[dict]:
+    def _fetch_via_browser_profile(self, profile_path):
         from auth.cdp_browser import launch_persistent_profile
 
-        collected: list[dict[str, Any]] = []
-        seen_ids: set[str] = set()
-        candidates: list[Any] = []
-        debug: dict[str, Any] = {
+        collected = []
+        seen_ids = set()
+        candidates = []
+        debug = {
             "profile": str(profile_path),
             "headless": self._headless,
             "graphql_candidates_seen": 0,
@@ -322,8 +228,7 @@ class NintendoClient:
             "direct_fallback_rows": 0,
         }
 
-        def on_response(resp) -> None:
-            # Reader thread: queue only — never call resp.text() here (CDP deadlock).
+        def on_response(resp):
             url = getattr(resp, "url", "") or ""
             if not _is_transactions_graphql_url(url):
                 return
@@ -336,42 +241,23 @@ class NintendoClient:
             page = context.pages[0] if context.pages else context.new_page()
             page.on("response", on_response)
             try:
-                page.goto(
-                    TRANSACTIONS_PAGE,
-                    wait_until="domcontentloaded",
-                    timeout=60_000,
-                )
+                page.goto(TRANSACTIONS_PAGE, wait_until="domcontentloaded", timeout=60000)
             except Exception as exc:
-                raise NintendoAuthError(
-                    f"Could not open Nintendo transactions page: {exc}"
-                ) from exc
+                raise NintendoAuthError(f"Could not open Nintendo transactions page: {exc}") from exc
             time.sleep(6)
-            debug["graphql_rows_merged"] = _drain_graphql_candidates(
-                candidates, collected, seen_ids
-            )
+            debug["graphql_rows_merged"] = _drain_graphql_candidates(candidates, collected, seen_ids)
             time.sleep(6)
-            debug["graphql_rows_merged"] += _drain_graphql_candidates(
-                candidates, collected, seen_ids
-            )
+            debug["graphql_rows_merged"] += _drain_graphql_candidates(candidates, collected, seen_ids)
             self._paginate_transactions_ui(page)
             time.sleep(3)
-            debug["graphql_rows_merged"] += _drain_graphql_candidates(
-                candidates, collected, seen_ids
-            )
-
-            debug["session_probe"] = probe_session_id_token(
-                context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS
-            )
+            debug["graphql_rows_merged"] += _drain_graphql_candidates(candidates, collected, seen_ids)
+            debug["session_probe"] = probe_session_id_token(context.request.get, timeout=PLAYWRIGHT_REQUEST_TIMEOUT_MS)
             try:
                 debug["final_url"] = page.url
                 debug["page_title"] = page.title()
             except Exception:
                 pass
-
-            debug["direct_fallback_rows"] = self._fetch_via_direct_graphql(
-                context, collected, seen_ids
-            )
-
+            debug["direct_fallback_rows"] = self._fetch_via_direct_graphql(context, collected, seen_ids)
             if not collected:
                 html = ""
                 try:
@@ -381,50 +267,33 @@ class NintendoClient:
                 debug["login_page_detected"] = "log in" in html or "sign up" in html
                 self._write_debug(debug)
                 if debug["login_page_detected"]:
-                    raise NintendoAuthError(
-                        "Nintendo session expired — open Connections and reconnect Nintendo."
-                    )
+                    raise NintendoAuthError("Nintendo session expired — open Connections and reconnect Nintendo.")
                 raise NintendoCaptureError(
-                    "Purchase history could not be captured from the transactions page. "
-                    "Try: python fetch_nintendo.py --skip-hltb --headed --dump-debug "
-                    "(see cache/nintendo/fetch_debug.json). Reconnect in Connections if "
-                    "the headed browser shows a sign-in page."
+                    "Purchase history could not be captured from the transactions page. Try: python fetch_nintendo.py --skip-hltb --headed --dump-debug (see cache/nintendo/fetch_debug.json). Reconnect in Connections if the headed browser shows a sign-in page."
                 )
-
         self._write_debug(debug)
         return [_map_graphql_item(item) for item in collected]
 
-    def _paginate_transactions_ui(self, page) -> None:
-        """Click numeric pagination buttons to load additional GraphQL pages."""
+    def _paginate_transactions_ui(self, page):
         try:
             labels = page.evaluate(
-                """() => [...document.querySelectorAll('button, a')]
-                    .map(el => (el.innerText || '').trim())
-                    .filter(t => /^\\d+$/.test(t))
-                    .map(t => parseInt(t, 10))
-                    .filter(n => n > 1)"""
+                "() => [...document.querySelectorAll('button, a')]\n                    .map(el => (el.innerText || '').trim())\n                    .filter(t => /^\\d+$/.test(t))\n                    .map(t => parseInt(t, 10))\n                    .filter(n => n > 1)"
             )
         except Exception:
             return
         if not isinstance(labels, list):
             return
-        for page_num in sorted(set(int(x) for x in labels if isinstance(x, (int, float)))):
+        for page_num in sorted(set((int(x) for x in labels if isinstance(x, (int, float))))):
             try:
                 page.evaluate(
-                    f"""() => {{
-                        const want = {page_num};
-                        const el = [...document.querySelectorAll('button, a')]
-                            .find(n => (n.innerText || '').trim() === String(want));
-                        if (el) el.click();
-                    }}"""
+                    f"() => {{\n                        const want = {page_num};\n                        const el = [...document.querySelectorAll('button, a')]\n                            .find(n => (n.innerText || '').trim() === String(want));\n                        if (el) el.click();\n                    }}"
                 )
             except Exception:
                 continue
             time.sleep(2.5)
 
 
-def _map_graphql_item(item: dict[str, Any]) -> dict[str, Any]:
-    """Map Savanna GraphQL row to the legacy REST-shaped dict fetch_nintendo expects."""
+def _map_graphql_item(item):
     title = (item.get("title") or "").strip()
     dt = (item.get("datetime") or "").strip()
     date = dt[:10] if len(dt) >= 10 else dt

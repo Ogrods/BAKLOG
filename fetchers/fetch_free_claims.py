@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Download the maintainer-curated free-claimable games feed."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -20,7 +15,7 @@ DEFAULT_URL = "https://baklog.app/free-claims.json"
 USER_AGENT = "BAKLOG-fetch_free_claims/1.0"
 
 
-def _fetch_url(url: str, *, timeout: int = 30) -> dict:
+def _fetch_url(url, *, timeout=30):
     req = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     with urlopen(req, timeout=timeout) as resp:
         raw = resp.read().decode("utf-8")
@@ -33,7 +28,7 @@ def _fetch_url(url: str, *, timeout: int = 30) -> dict:
     return data
 
 
-def main() -> int:
+def main():
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -48,39 +43,32 @@ def main() -> int:
         help="Allow writing an empty claims file (e.g. genuinely no live giveaways).",
     )
     args = parser.parse_args()
-
     stats = RunStats()
     t0 = started("fetch_free_claims.py")
-
     try:
         data = _fetch_url(args.url)
     except (URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
         stats.error(f"could not load feed: {exc}")
         return stats.finish("fetch_free_claims", t0, exit_code=1)
-
     raw_items = data.get("items") or []
-    valid_items: list[dict] = []
+    valid_items = []
     invalid = 0
     for item in raw_items:
         if not isinstance(item, dict):
             invalid += 1
             continue
-        if not item.get("id") or not item.get("store") or not has_valid_claim_links(item):
+        if not item.get("id") or not item.get("store") or (not has_valid_claim_links(item)):
             invalid += 1
             continue
         valid_items.append(item)
     valid = len(valid_items)
     if invalid:
         stats.warn(f"dropped {invalid} malformed claim row(s) (need id, store, and valid claim link(s))")
-
-    # Refuse to overwrite the user's claims with nothing unless explicitly allowed.
-    if valid == 0 and not args.allow_empty:
+    if valid == 0 and (not args.allow_empty):
         stats.error(
-            "feed produced 0 valid claim(s) (need id, store, and valid claim link(s)) — refusing to "
-            "overwrite. Re-run with --allow-empty if there are genuinely no live giveaways."
+            "feed produced 0 valid claim(s) (need id, store, and valid claim link(s)) — refusing to overwrite. Re-run with --allow-empty if there are genuinely no live giveaways."
         )
         return stats.finish("fetch_free_claims", t0, exit_code=2)
-
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "source_url": args.url,
@@ -90,14 +78,12 @@ def main() -> int:
     attribution = data.get("attribution")
     if isinstance(attribution, list) and attribution:
         payload["attribution"] = attribution
-
     out = free_claims_path()
     if args.dry_run:
         print(f"dry-run: would write {valid} claim(s) to {out}", flush=True)
     else:
         safe_write_text(out, json.dumps(payload, indent=2, ensure_ascii=False))
         print(f"Wrote {valid} claim(s) to {out}.", flush=True)
-
     stats.ok = valid
     return stats.finish("fetch_free_claims", t0, exit_code=0, extra=f"{valid} claim(s)")
 

@@ -1,7 +1,3 @@
-"""PyInstaller hiddenimports must cover every fetchers/manifest.json script."""
-
-from __future__ import annotations
-
 import json
 import re
 import sys
@@ -14,13 +10,13 @@ MANIFEST = ROOT / "fetchers" / "manifest.json"
 SPEC = ROOT / "packaging" / "baklog.spec"
 
 
-def _script_to_module(script: str) -> str:
+def _script_to_module(script):
     return Path(script).with_suffix("").as_posix().replace("/", ".")
 
 
-def _manifest_script_modules() -> set[str]:
+def _manifest_script_modules():
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    modules: set[str] = set()
+    modules = set()
     for entry in data.get("fetchers") or []:
         script = entry.get("script")
         if script:
@@ -29,8 +25,7 @@ def _manifest_script_modules() -> set[str]:
     return modules
 
 
-def _spec_resolved_hiddenimports() -> set[str]:
-    """Mirror packaging/baklog.spec dynamic hiddenimports assembly."""
+def _spec_resolved_hiddenimports():
     fetcher_scripts = sorted((ROOT / "fetchers").glob("fetch_*.py"))
     enricher_scripts = sorted((ROOT / "enrichers").glob("enrich_*.py"))
     extra_fetchers = [
@@ -40,7 +35,7 @@ def _spec_resolved_hiddenimports() -> set[str]:
     ]
     client_scripts = [p for p in (ROOT / "clients").glob("*.py") if p.name != "__init__.py"]
 
-    def mod(path: Path) -> str:
+    def mod(path):
         rel = path.relative_to(ROOT).with_suffix("")
         return rel.as_posix().replace("/", ".")
 
@@ -64,46 +59,38 @@ def _spec_resolved_hiddenimports() -> set[str]:
         "shared.built_frontend",
         "shared.legacy_env",
         "shared.uninstall_cleanup",
-        (
-            "keyring.backends.macOS"
-            if sys.platform == "darwin"
-            else "keyring.backends.Windows"
-        ),
+        "keyring.backends.macOS" if sys.platform == "darwin" else "keyring.backends.Windows",
         "cryptography.hazmat.primitives.ciphers.aead",
     }
     return out
 
 
-def test_manifest_scripts_in_pyinstaller_hiddenimports() -> None:
+def test_manifest_scripts_in_pyinstaller_hiddenimports():
     modules = _manifest_script_modules()
     hidden = _spec_resolved_hiddenimports()
     missing = sorted(modules - hidden)
-    assert not missing, (
-        "packaging/baklog.spec hiddenimports missing manifest scripts: "
-        + ", ".join(missing)
-    )
+    assert not missing, "packaging/baklog.spec hiddenimports missing manifest scripts: " + ", ".join(missing)
 
 
-def test_pyinstaller_hiddenimports_include_tray_deps() -> None:
+def test_pyinstaller_hiddenimports_include_tray_deps():
     text = SPEC.read_text(encoding="utf-8")
     for mod in ("pystray", "PIL", "PIL.Image", "PIL.ImageDraw"):
         assert mod in text, f"packaging/baklog.spec tray_hiddenimports missing {mod}"
 
 
-def test_pyinstaller_hiddenimports_include_data_dir_migration() -> None:
+def test_pyinstaller_hiddenimports_include_data_dir_migration():
     hidden = _spec_resolved_hiddenimports()
     assert "shared.data_dir_migration" in hidden
 
 
-def test_pyinstaller_datas_include_curated_feeds() -> None:
+def test_pyinstaller_datas_include_curated_feeds():
     text = SPEC.read_text(encoding="utf-8")
-    assert '("curated"), "curated")' in text.replace(" ", "") or (
-        'root / "curated"' in text and '"curated"' in text
-    ), "packaging/baklog.spec datas must bundle curated/ (free_claims.fallback.json offline)"
+    assert '("curated"), "curated")' in text.replace(" ", "") or ('root / "curated"' in text and '"curated"' in text), (
+        "packaging/baklog.spec datas must bundle curated/ (free_claims.fallback.json offline)"
+    )
 
 
-def test_inno_installer_branding_assets() -> None:
-    """Inno Setup wizard/icon files must exist with expected dimensions."""
+def test_inno_installer_branding_assets():
     packaging = ROOT / "packaging"
     iss = (packaging / "baklog.iss").read_text(encoding="utf-8")
     for key in (
@@ -113,12 +100,12 @@ def test_inno_installer_branding_assets() -> None:
     ):
         assert key in iss, f"packaging/baklog.iss missing {key}"
 
-    def bmp_size(path: Path) -> tuple[int, int]:
+    def bmp_size(path):
         with path.open("rb") as handle:
             handle.read(18)
             width = int.from_bytes(handle.read(4), "little", signed=True)
             height = int.from_bytes(handle.read(4), "little", signed=True)
-        return abs(width), abs(height)
+        return (abs(width), abs(height))
 
     large_path = packaging / "installer-wizard-large.bmp"
     small_path = packaging / "installer-wizard-small.bmp"
@@ -133,7 +120,7 @@ def test_inno_installer_branding_assets() -> None:
     assert 'Source: "BAKLOG.ico"; DestDir: "{app}"' in iss_text
 
 
-def test_inno_installer_uninstall_data_choice() -> None:
+def test_inno_installer_uninstall_data_choice():
     iss = (ROOT / "packaging" / "baklog.iss").read_text(encoding="utf-8")
     assert "function InitializeUninstall(): Boolean;" in iss
     assert "--uninstall-wipe-user-data" in iss
@@ -143,7 +130,7 @@ def test_inno_installer_uninstall_data_choice() -> None:
     assert "DelTree(ExpandConstant('{localappdata}\\BAKLOG-Data')" not in iss
 
 
-def test_inno_installer_finish_page_and_export_nudge() -> None:
+def test_inno_installer_finish_page_and_export_nudge():
     iss = (ROOT / "packaging" / "baklog.iss").read_text(encoding="utf-8")
     assert "procedure InitializeWizard();" in iss
     assert "CreateOutputMsgPage" in iss
@@ -154,19 +141,18 @@ def test_inno_installer_finish_page_and_export_nudge() -> None:
     assert "portable.txt" in iss
     assert "Export bundle" in iss
     assert "Export a backup first?" in iss
-    # {app} must not be expanded during install wizard (runtime error before wpSelectDir).
     install_wiz = iss.split("procedure InitializeWizard();", 1)[1].split("function InitializeUninstall", 1)[0]
-    install_wiz = re.sub(r"\{[^}]*\}", "", install_wiz)
+    install_wiz = re.sub("\\{[^}]*\\}", "", install_wiz)
     assert "ExpandConstant('{app}')" not in install_wiz
 
 
-def test_build_script_ships_uninstall_bat() -> None:
+def test_build_script_ships_uninstall_bat():
     text = (ROOT / "packaging" / "build_windows.ps1").read_text(encoding="utf-8")
     assert "Uninstall BAKLOG.bat" in text
     assert (ROOT / "packaging" / "Uninstall BAKLOG.bat").is_file()
 
 
-def test_build_macos_script_exists() -> None:
+def test_build_macos_script_exists():
     script = ROOT / "packaging" / "build_macos.sh"
     assert script.is_file()
     text = script.read_text(encoding="utf-8")
@@ -174,13 +160,13 @@ def test_build_macos_script_exists() -> None:
     assert "apply_update.sh" in text
 
 
-def test_release_workflow_includes_macos_job() -> None:
+def test_release_workflow_includes_macos_job():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     assert "build-macos:" in workflow
     assert "BAKLOG-macos.zip" in workflow
 
 
-def test_build_script_generates_assets_before_pyinstaller() -> None:
+def test_build_script_generates_assets_before_pyinstaller():
     text = (ROOT / "packaging" / "build_windows.ps1").read_text(encoding="utf-8")
     gen = text.index("generate_installer_assets.py")
     pyi = text.index("PyInstaller packaging/baklog.spec")
@@ -200,7 +186,7 @@ def _installer_assets_module():
     return mod
 
 
-def test_ico_contains_standard_sizes() -> None:
+def test_ico_contains_standard_sizes():
     pytest.importorskip("PIL")
     mod = _installer_assets_module()
     ico_path = ROOT / "packaging" / "BAKLOG.ico"

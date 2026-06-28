@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-"""Static audit: classify every fetcher from catalogs, run history, and Connections status.
-
-Console table by default. Optional --json, --profile, --all-profiles, --live <key>.
-"""
-from __future__ import annotations
-
 import argparse
 import json
 import sys
@@ -19,16 +12,10 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-
-from auth.manager import get_status  # noqa: E402
-from auth.registry import PROVIDERS  # noqa: E402
-from fetchers.registry import (  # noqa: E402
-    AUTH_PROVIDER_BY_KEY,
-    LIBRARY_JSON_BY_KEY,
-    WISHLIST_JSON_BY_KEY,
-    manifest_entries,
-)
-from shared.profile_paths import (  # noqa: E402
+from auth.manager import get_status
+from auth.registry import PROVIDERS
+from fetchers.registry import AUTH_PROVIDER_BY_KEY, LIBRARY_JSON_BY_KEY, WISHLIST_JSON_BY_KEY, manifest_entries
+from shared.profile_paths import (
     cache_json_path,
     catalog_path,
     get_active_profile_id,
@@ -40,61 +27,57 @@ from shared.profile_paths import (  # noqa: E402
 )
 
 BASE = "http://127.0.0.1:8765"
-
 FRESH_MS_DEFAULT = 7 * 86400 * 1000
 RECENT_MS_DEFAULT = 30 * 86400 * 1000
 FRESH_MS_ITAD = 60 * 60 * 1000
 RECENT_MS_ITAD = 6 * 60 * 60 * 1000
-
-ENRICH_CACHE_BY_KEY: dict[str, str] = {
+ENRICH_CACHE_BY_KEY = {
     "hltb": "hltb_map.json",
     "steamReviews": "steam_review_map.json",
     "steamCovers": "cross_store_images_meta.json",
     "steamTags": "steam_tags_meta.json",
     "protondb": "protondb_map.json",
 }
-
 GROUP_ORDER = ("library", "wishlist", "prices", "enrich")
 
 
 @dataclass
 class ArtifactInfo:
-    path: str | None = None
-    exists: bool = False
-    size_bytes: int | None = None
-    mtime_iso: str | None = None
-    fetched_at: str | None = None
-    game_count: int | None = None
+    path: "Any" = None
+    exists: "Any" = False
+    size_bytes: "Any" = None
+    mtime_iso: "Any" = None
+    fetched_at: "Any" = None
+    game_count: "Any" = None
 
 
 @dataclass
 class RunInfo:
-    status: str | None = None
-    exit_code: int | None = None
-    ended_at: str | None = None
-    failure_kind: str | None = None
+    status: "Any" = None
+    exit_code: "Any" = None
+    ended_at: "Any" = None
+    failure_kind: "Any" = None
 
 
 @dataclass
 class FetcherRow:
-    key: str
-    label: str
-    group: str
-    status: str
-    games: str
-    age: str
-    last_run: str
-    provider: str
-    artifact: ArtifactInfo = field(default_factory=ArtifactInfo)
-    last_run_detail: RunInfo | None = None
-    providers: list[str] = field(default_factory=list)
-    provider_states: dict[str, str] = field(default_factory=dict)
+    key: "Any"
+    label: "Any"
+    group: "Any"
+    status: "Any"
+    games: "Any"
+    age: "Any"
+    last_run: "Any"
+    provider: "Any"
+    artifact: "Any" = field(default_factory=ArtifactInfo)
+    last_run_detail: "Any" = None
+    providers: "Any" = field(default_factory=list)
+    provider_states: "Any" = field(default_factory=dict)
 
 
-def providers_for_fetcher(key: str) -> list[str]:
-    """All Connections providers that satisfy this fetcher (primary + fetcher_keys)."""
-    seen: set[str] = set()
-    out: list[str] = []
+def providers_for_fetcher(key):
+    seen = set()
+    out = []
     primary = AUTH_PROVIDER_BY_KEY.get(key)
     if primary and primary not in seen:
         seen.add(primary)
@@ -106,7 +89,7 @@ def providers_for_fetcher(key: str) -> list[str]:
     return out
 
 
-def parse_iso(ts: str | None) -> datetime | None:
+def parse_iso(ts):
     if not ts:
         return None
     try:
@@ -119,25 +102,25 @@ def parse_iso(ts: str | None) -> datetime | None:
         return None
 
 
-def age_label(fetched_at: str | None, *, key: str) -> str:
+def age_label(fetched_at, *, key):
     dt = parse_iso(fetched_at)
     if not dt:
         return "-"
     age_ms = (datetime.now(UTC) - dt).total_seconds() * 1000
-    if age_ms < 3600_000:
-        return f"{int(age_ms / 60_000)}m"
-    if age_ms < 86400_000:
-        return f"{int(age_ms / 3600_000)}h"
-    return f"{int(age_ms / 86400_000)}d"
+    if age_ms < 3600000:
+        return f"{int(age_ms / 60000)}m"
+    if age_ms < 86400000:
+        return f"{int(age_ms / 3600000)}h"
+    return f"{int(age_ms / 86400000)}d"
 
 
-def stale_thresholds_ms(key: str) -> tuple[int, int]:
+def stale_thresholds_ms(key):
     if key == "itad":
-        return FRESH_MS_ITAD, RECENT_MS_ITAD
-    return FRESH_MS_DEFAULT, RECENT_MS_DEFAULT
+        return (FRESH_MS_ITAD, RECENT_MS_ITAD)
+    return (FRESH_MS_DEFAULT, RECENT_MS_DEFAULT)
 
 
-def is_stale(fetched_at: str | None, key: str) -> bool:
+def is_stale(fetched_at, key):
     dt = parse_iso(fetched_at)
     if not dt:
         return False
@@ -146,7 +129,7 @@ def is_stale(fetched_at: str | None, key: str) -> bool:
     return age_ms >= recent_ms
 
 
-def load_json_file(path: Path) -> dict[str, Any] | None:
+def load_json_file(path):
     if not path.is_file():
         return None
     try:
@@ -156,7 +139,7 @@ def load_json_file(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def enrich_count(key: str, data: dict[str, Any]) -> int | None:
+def enrich_count(key, data):
     if key == "itad":
         by_key = data.get("by_key")
         return len(by_key) if isinstance(by_key, dict) else None
@@ -171,7 +154,7 @@ def enrich_count(key: str, data: dict[str, Any]) -> int | None:
     return None
 
 
-def enrich_fetched_at(key: str, data: dict[str, Any]) -> str | None:
+def enrich_fetched_at(key, data):
     if data.get("fetched_at"):
         return str(data["fetched_at"])
     if key == "steamCovers" and data.get("last_updated"):
@@ -179,7 +162,7 @@ def enrich_fetched_at(key: str, data: dict[str, Any]) -> str | None:
     return None
 
 
-def artifact_path_for(key: str, group: str, profile_id: str) -> Path | None:
+def artifact_path_for(key, group, profile_id):
     if group == "library" and key in LIBRARY_JSON_BY_KEY:
         return catalog_path(LIBRARY_JSON_BY_KEY[key], profile_id=profile_id)
     if group == "wishlist" and key in WISHLIST_JSON_BY_KEY:
@@ -191,7 +174,7 @@ def artifact_path_for(key: str, group: str, profile_id: str) -> Path | None:
     return None
 
 
-def read_artifact(key: str, group: str, profile_id: str) -> ArtifactInfo:
+def read_artifact(key, group, profile_id):
     path = artifact_path_for(key, group, profile_id)
     if path is None:
         return ArtifactInfo()
@@ -220,7 +203,7 @@ def read_artifact(key: str, group: str, profile_id: str) -> ArtifactInfo:
     return info
 
 
-def load_history_by_key(profile_id: str) -> dict[str, dict[str, Any]]:
+def load_history_by_key(profile_id):
     hist_path = runs_dir(profile_id=profile_id) / "history.json"
     if not hist_path.is_file():
         return {}
@@ -230,7 +213,7 @@ def load_history_by_key(profile_id: str) -> dict[str, dict[str, Any]]:
         return {}
     if not isinstance(rows, list):
         return {}
-    by_key: dict[str, dict[str, Any]] = {}
+    by_key = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -248,11 +231,11 @@ def load_history_by_key(profile_id: str) -> dict[str, dict[str, Any]]:
     return by_key
 
 
-def provider_status_map() -> dict[str, str]:
+def provider_status_map():
     return {p["key"]: p.get("status") or "disconnected" for p in get_status()}
 
 
-def summarize_providers(states: dict[str, str]) -> str:
+def summarize_providers(states):
     if not states:
         return "-"
     uniq = sorted(set(states.values()))
@@ -261,70 +244,54 @@ def summarize_providers(states: dict[str, str]) -> str:
     return "/".join(uniq)
 
 
-def classify_fetcher(
-    key: str,
-    group: str,
-    artifact: ArtifactInfo,
-    last_run: RunInfo | None,
-    provider_states: dict[str, str],
-) -> str:
+def classify_fetcher(key, group, artifact, last_run, provider_states):
     states = list(provider_states.values()) if provider_states else []
     has_catalog = artifact.exists and artifact.fetched_at is not None
     count = artifact.game_count if artifact.game_count is not None else 0
-
-    if states and all(s == "unavailable" for s in states):
+    if states and all((s == "unavailable" for s in states)):
         return "UNAVAILABLE"
-
-    if not has_catalog and states and all(s == "disconnected" for s in states):
+    if not has_catalog and states and all((s == "disconnected" for s in states)):
         return "DISCONNECTED"
-
-    if any(s == "expired" for s in states):
+    if any((s == "expired" for s in states)):
         return "BROKEN/expired"
-
     if last_run and last_run.status == "failed":
         if last_run.exit_code == 4 or last_run.failure_kind == "auth":
             return "BROKEN/auth"
         return "BROKEN"
-
     if not has_catalog and last_run is None:
         return "NEVER_RUN"
-
     if has_catalog and count == 0:
         return "EMPTY"
-
     if has_catalog and is_stale(artifact.fetched_at, key):
         return "STALE"
-
     if has_catalog and count > 0:
         return "HEALTHY"
-
     if has_catalog:
         return "STALE" if is_stale(artifact.fetched_at, key) else "EMPTY"
-
     return "NEVER_RUN"
 
 
-def format_last_run(run: RunInfo | None) -> str:
+def format_last_run(run):
     if not run or not run.status:
         return "-"
     exit_bit = f" exit {run.exit_code}" if run.exit_code is not None else ""
     return f"{run.status}{exit_bit}"
 
 
-def format_games(artifact: ArtifactInfo, group: str) -> str:
-    if group == "enrich" and artifact.game_count is None and not artifact.exists:
+def format_games(artifact, group):
+    if group == "enrich" and artifact.game_count is None and (not artifact.exists):
         return "N/A"
     if artifact.game_count is None:
         return "-"
     return str(artifact.game_count)
 
 
-def build_rows(profile_id: str) -> list[FetcherRow]:
+def build_rows(profile_id):
     set_request_profile_id(profile_id)
     try:
         pstatus = provider_status_map()
         history = load_history_by_key(profile_id)
-        rows: list[FetcherRow] = []
+        rows = []
         for entry in manifest_entries():
             key = entry.get("key")
             if not key:
@@ -358,20 +325,20 @@ def build_rows(profile_id: str) -> list[FetcherRow]:
                     last_run_detail=run_info,
                     providers=provs,
                     provider_states=prov_states,
-                ),
+                )
             )
         return rows
     finally:
         set_request_profile_id(None)
 
 
-def print_table(rows: list[FetcherRow], profile_id: str) -> None:
+def print_table(rows, profile_id):
     label = profile_label(profile_id)
     print(f"\n=== Fetcher audit — profile {profile_id} ({label}) ===\n")
     header = f"{'KEY':<16} {'STATUS':<14} {'GAMES':<8} {'AGE':<8} {'LAST RUN':<22} {'PROVIDER':<16}"
     print(header)
     print("-" * len(header))
-    by_group: dict[str, list[FetcherRow]] = defaultdict(list)
+    by_group = defaultdict(list)
     for r in rows:
         by_group[r.group].append(r)
     for group in GROUP_ORDER:
@@ -380,19 +347,16 @@ def print_table(rows: list[FetcherRow], profile_id: str) -> None:
             continue
         print(f"\n[{group}]")
         for r in sorted(group_rows, key=lambda x: x.key):
-            print(
-                f"{r.key:<16} {r.status:<14} {r.games:<8} {r.age:<8} "
-                f"{r.last_run:<22} {r.provider:<16}"
-            )
-    counts: dict[str, int] = defaultdict(int)
+            print(f"{r.key:<16} {r.status:<14} {r.games:<8} {r.age:<8} {r.last_run:<22} {r.provider:<16}")
+    counts = defaultdict(int)
     for r in rows:
         base = r.status.split("/")[0]
         counts[base] += 1
     parts = [f"{counts[k]} {k.lower()}" for k in sorted(counts.keys())]
-    print(f"\nSummary: {', '.join(parts) if parts else 'no fetchers'}")
+    print(f"\nSummary: {(', '.join(parts) if parts else 'no fetchers')}")
 
 
-def rows_to_json(rows: list[FetcherRow], profile_id: str) -> dict[str, Any]:
+def rows_to_json(rows, profile_id):
     return {
         "profile_id": profile_id,
         "profile_label": profile_label(profile_id),
@@ -408,24 +372,24 @@ def rows_to_json(rows: list[FetcherRow], profile_id: str) -> dict[str, Any]:
     }
 
 
-def api(method: str, path: str, timeout: float = 30.0) -> tuple[int, dict | str]:
+def api(method, path, timeout=30.0):
     req = urllib.request.Request(f"{BASE}{path}", method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode()
             try:
-                return resp.status, json.loads(body)
+                return (resp.status, json.loads(body))
             except json.JSONDecodeError:
-                return resp.status, body
+                return (resp.status, body)
     except urllib.error.HTTPError as e:
         body = e.read().decode()
         try:
-            return e.code, json.loads(body)
+            return (e.code, json.loads(body))
         except json.JSONDecodeError:
-            return e.code, body
+            return (e.code, body)
 
 
-def wait_done(run_id: str, timeout: float = 600.0) -> dict | None:
+def wait_done(run_id, timeout=600.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         code, data = api("GET", "/api/runs")
@@ -439,7 +403,7 @@ def wait_done(run_id: str, timeout: float = 600.0) -> dict | None:
     return None
 
 
-def run_live(key: str, profile_id: str) -> int:
+def run_live(key, profile_id):
     entries = {e["key"]: e for e in manifest_entries()}
     if key not in entries:
         print(f"Unknown fetcher key: {key}", file=sys.stderr)
@@ -448,7 +412,7 @@ def run_live(key: str, profile_id: str) -> int:
     before_count = before.game_count
     print(f"POST /api/run/{key} …")
     code, body = api("POST", f"/api/run/{key}")
-    if code not in (200, 202) or not isinstance(body, dict) or not body.get("run_id"):
+    if code not in (200, 202) or not isinstance(body, dict) or (not body.get("run_id")):
         print(f"Submit failed: HTTP {code} {body}", file=sys.stderr)
         return 1
     run_id = body["run_id"]
@@ -466,7 +430,7 @@ def run_live(key: str, profile_id: str) -> int:
     return 0 if hist.get("exit_code") == 0 else 1
 
 
-def audit_profile(profile_id: str, *, as_json: bool) -> list[FetcherRow]:
+def audit_profile(profile_id, *, as_json):
     rows = build_rows(profile_id)
     if as_json:
         print(json.dumps(rows_to_json(rows, profile_id), indent=2))
@@ -475,18 +439,16 @@ def audit_profile(profile_id: str, *, as_json: bool) -> list[FetcherRow]:
     return rows
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Audit fetcher catalogs, runs, and Connections.")
     parser.add_argument("--profile", help="Profile id to audit (default: active from index)")
     parser.add_argument("--all-profiles", action="store_true", help="Audit every profile in index")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     parser.add_argument("--live", metavar="KEY", help="Run one fetcher via server API and re-audit")
     args = parser.parse_args()
-
     if args.live:
         pid = args.profile or get_active_profile_id()
         return run_live(args.live, pid)
-
     if args.all_profiles:
         profiles = list_profiles()
         if not profiles:
@@ -502,7 +464,6 @@ def main() -> int:
             if {r.key for r in rows} != manifest_keys:
                 all_ok = False
         return 0 if all_ok else 1
-
     pid = args.profile or get_active_profile_id()
     rows = audit_profile(pid, as_json=args.json)
     manifest_keys = {e["key"] for e in manifest_entries()}

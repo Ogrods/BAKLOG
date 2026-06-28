@@ -1,17 +1,8 @@
-"""Tests for Battle.net session client and probe helper."""
-
-from __future__ import annotations
-
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from clients.battlenet_client import (
-    ACCOUNT_URL,
-    BattleNetAuthError,
-    BattleNetClient,
-    probe_session,
-)
+from clients.battlenet_client import ACCOUNT_URL, BattleNetAuthError, BattleNetClient, probe_session
 
 
 def test_xsrf_token_header_from_cookie():
@@ -31,7 +22,6 @@ def test_get_raw_account_401(mock_session_cls):
     resp = MagicMock()
     resp.status_code = 401
     session.get.return_value = resp
-
     client = BattleNetClient("session=old")
     with pytest.raises(BattleNetAuthError, match="Connections tab"):
         client.get_raw_account()
@@ -46,7 +36,6 @@ def test_get_raw_account_success(mock_session_cls):
     resp.status_code = 200
     resp.json.return_value = {"gameAccounts": []}
     session.get.return_value = resp
-
     client = BattleNetClient("session=ok")
     data = client.get_raw_account()
     assert data == {"gameAccounts": []}

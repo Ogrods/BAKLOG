@@ -1,5 +1,3 @@
-"""Unified credential store and browser-based sign-in for store fetchers."""
-
 from auth.manager import (
     disconnect,
     get_credentials,

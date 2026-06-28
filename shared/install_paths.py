@@ -1,30 +1,24 @@
-"""Resolve bundle (read-only) vs data (writable) roots for dev and PyInstaller builds."""
-
-from __future__ import annotations
-
 import json
 import os
 import sys
 from pathlib import Path
 
-_BUILT_MANIFEST_CACHE: dict | None = None
-_BUILT_MANIFEST_MTIME_NS: int | None = None
-_FROZEN_DATA_ROOT: Path | None = None
+_BUILT_MANIFEST_CACHE = None
+_BUILT_MANIFEST_MTIME_NS = None
+_FROZEN_DATA_ROOT = None
 _FROZEN_MIGRATION_ATTEMPTED = False
-
 PORTABLE_MARKER = "portable.txt"
 
 
-def is_frozen() -> bool:
+def is_frozen():
     return bool(getattr(sys, "frozen", False))
 
 
-def frozen_bundle_dir() -> Path:
-    """Directory containing BAKLOG.exe and BAKLOG Tray.exe in a frozen onedir build."""
+def frozen_bundle_dir():
     return Path(sys.executable).resolve().parent
 
 
-def frozen_server_exe() -> Path:
+def frozen_server_exe():
     root = frozen_bundle_dir()
     for name in ("BAKLOG.exe", "BAKLOG"):
         candidate = root / name
@@ -33,7 +27,7 @@ def frozen_server_exe() -> Path:
     return root / "BAKLOG.exe"
 
 
-def frozen_tray_exe() -> Path:
+def frozen_tray_exe():
     root = frozen_bundle_dir()
     for name in ("BAKLOG Tray.exe", "BAKLOG Tray"):
         candidate = root / name
@@ -42,20 +36,17 @@ def frozen_tray_exe() -> Path:
     return root / "BAKLOG Tray.exe"
 
 
-def legacy_frozen_data_dir() -> Path:
-    """Writable root used before the app/data split (co-located with the exe)."""
+def legacy_frozen_data_dir():
     return frozen_bundle_dir()
 
 
-def is_portable_frozen() -> bool:
-    """True when the user opted into single-folder portable mode beside the exe."""
+def is_portable_frozen():
     if os.environ.get("BAKLOG_PORTABLE", "").strip().lower() in ("1", "true", "yes"):
         return True
     return (frozen_bundle_dir() / PORTABLE_MARKER).is_file()
 
 
-def default_frozen_data_dir() -> Path:
-    """OS-default writable data directory for frozen builds."""
+def default_frozen_data_dir():
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA", "").strip()
         if base:
@@ -69,8 +60,7 @@ def default_frozen_data_dir() -> Path:
     return (Path.home() / ".local" / "share" / "baklog").resolve()
 
 
-def resolved_data_dir_for_uninstall() -> Path:
-    """Writable data root targeted by frozen uninstall wipe (portable-aware)."""
+def resolved_data_dir_for_uninstall():
     override = os.environ.get("BAKLOG_DATA_DIR", "").strip()
     if override:
         return Path(override).expanduser().resolve()
@@ -79,8 +69,7 @@ def resolved_data_dir_for_uninstall() -> Path:
     return default_frozen_data_dir()
 
 
-def runtime_label() -> str:
-    """UI-facing runtime mode: dev, installed, or portable."""
+def runtime_label():
     if not is_frozen():
         return "dev"
     if is_portable_frozen():
@@ -88,8 +77,7 @@ def runtime_label() -> str:
     return "installed"
 
 
-def _maybe_migrate_legacy_to(target: Path) -> None:
-    """Move co-located install-dir data into *target* when frozen and not portable."""
+def _maybe_migrate_legacy_to(target):
     if is_portable_frozen():
         return
     legacy = legacy_frozen_data_dir()
@@ -101,14 +89,10 @@ def _maybe_migrate_legacy_to(target: Path) -> None:
     for note in migrate_legacy_colocated_data(legacy, target):
         print(f"[data_dir] {note}", file=sys.stderr, flush=True)
     if sync_bundled_auth_env_to_data_dir(legacy, target):
-        print(
-            "[data_dir] synced bundled auth .env into data dir (upgrade path)",
-            file=sys.stderr,
-            flush=True,
-        )
+        print("[data_dir] synced bundled auth .env into data dir (upgrade path)", file=sys.stderr, flush=True)
 
 
-def _resolve_frozen_data_root() -> Path:
+def _resolve_frozen_data_root():
     if is_portable_frozen():
         return legacy_frozen_data_dir()
     target = default_frozen_data_dir()
@@ -116,20 +100,18 @@ def _resolve_frozen_data_root() -> Path:
     return target
 
 
-def bundle_root() -> Path:
-    """Read-only app assets (UI, manifest, packaged scripts)."""
+def bundle_root():
     if is_frozen():
         return Path(getattr(sys, "_MEIPASS"))
     return Path(__file__).resolve().parents[1]
 
 
-def data_root() -> Path:
-    """Writable user data: profiles, games_*.json, cache, .env."""
+def data_root():
     global _FROZEN_DATA_ROOT, _FROZEN_MIGRATION_ATTEMPTED
     override = os.environ.get("BAKLOG_DATA_DIR", "").strip()
     if override:
         target = Path(override).expanduser().resolve()
-        if is_frozen() and not _FROZEN_MIGRATION_ATTEMPTED:
+        if is_frozen() and (not _FROZEN_MIGRATION_ATTEMPTED):
             _FROZEN_MIGRATION_ATTEMPTED = True
             _maybe_migrate_legacy_to(target)
         return target
@@ -140,40 +122,26 @@ def data_root() -> Path:
             _FROZEN_MIGRATION_ATTEMPTED = True
             _FROZEN_DATA_ROOT = _resolve_frozen_data_root()
         else:
-            _FROZEN_DATA_ROOT = (
-                legacy_frozen_data_dir()
-                if is_portable_frozen()
-                else default_frozen_data_dir()
-            )
+            _FROZEN_DATA_ROOT = legacy_frozen_data_dir() if is_portable_frozen() else default_frozen_data_dir()
         return _FROZEN_DATA_ROOT
     return bundle_root()
 
 
-def built_manifest_path() -> Path:
+def built_manifest_path():
     return bundle_root() / "dist" / "manifest.json"
 
 
-def _env_serve_built() -> bool:
-    return os.environ.get("BAKLOG_SERVE_BUILT", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+def _env_serve_built():
+    return os.environ.get("BAKLOG_SERVE_BUILT", "").strip().lower() in ("1", "true", "yes")
 
 
-def serve_built_frontend() -> bool:
-    """True when dist/manifest.json exists and built mode is enabled.
-
-    Dev requires BAKLOG_SERVE_BUILT=1; frozen PyInstaller builds auto-serve when
-    dist/manifest.json is bundled beside index.html.
-    """
+def serve_built_frontend():
     if not built_manifest_path().is_file():
         return False
     return is_frozen() or _env_serve_built()
 
 
-def load_built_manifest() -> dict:
-    """Parsed dist/manifest.json; empty dict when not serving built frontend."""
+def load_built_manifest():
     global _BUILT_MANIFEST_CACHE, _BUILT_MANIFEST_MTIME_NS
     if not serve_built_frontend():
         return {}
@@ -192,22 +160,20 @@ def load_built_manifest() -> dict:
     return _BUILT_MANIFEST_CACHE
 
 
-def built_immutable_assets() -> frozenset[str]:
-    """Basenames/paths of hashed production assets (immutable cache)."""
+def built_immutable_assets():
     manifest = load_built_manifest()
     if not manifest:
         return frozenset()
-    out: set[str] = set()
+    out = set()
     for key, val in manifest.items():
         if key in ("builtAt", "version"):
             continue
         if key == "js/chunks" and isinstance(val, list):
-            out.update(str(v) for v in val)
+            out.update((str(v) for v in val))
         elif isinstance(val, str) and val:
             out.add(val.replace("\\", "/"))
     return frozenset(out)
 
 
-def static_root() -> Path:
-    """HTTP static file root (index.html, js/, css/)."""
+def static_root():
     return bundle_root()

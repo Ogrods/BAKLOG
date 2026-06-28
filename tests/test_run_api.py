@@ -1,6 +1,3 @@
-"""HTTP integration tests for fetcher run API."""
-from __future__ import annotations
-
 import json
 import threading
 import time
@@ -8,7 +5,6 @@ import urllib.error
 import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
-from pathlib import Path
 
 import pytest
 
@@ -16,7 +12,7 @@ import server
 
 
 @pytest.fixture()
-def run_api_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def run_api_server(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
@@ -62,24 +58,24 @@ def run_api_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         thread.join(timeout=5)
 
 
-def _request(base: str, method: str, path: str) -> tuple[int, dict]:
+def _request(base, method, path):
     headers = {}
     if method != "GET":
         headers[server._BAKLOG_LOCAL_HEADER] = "1"
     req = urllib.request.Request(f"{base}{path}", method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
+            return (resp.status, json.loads(resp.read().decode("utf-8")))
     except urllib.error.HTTPError as exc:
         payload = exc.read().decode("utf-8")
         try:
             parsed = json.loads(payload)
         except json.JSONDecodeError:
             parsed = {"error": payload}
-        return exc.code, parsed
+        return (exc.code, parsed)
 
 
-def test_runs_cancel_all(run_api_server: str):
+def test_runs_cancel_all(run_api_server):
     base = run_api_server
     _request(base, "POST", "/api/run/demo")
     status, data = _request(base, "POST", "/api/runs/cancel")
@@ -95,8 +91,8 @@ def test_runs_cancel_all(run_api_server: str):
         pytest.fail("runs not cleared after cancel")
 
 
-def test_runs_snapshot_shape(run_api_server: str):
+def test_runs_snapshot_shape(run_api_server):
     base = run_api_server
     status, snap = _request(base, "GET", "/api/runs")
     assert status == 200
-    assert "active" in snap and "queue" in snap and "history" in snap
+    assert "active" in snap and "queue" in snap and ("history" in snap)

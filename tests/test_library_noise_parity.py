@@ -1,7 +1,3 @@
-"""Cross-implementation parity for library noise rules (shared fixture)."""
-
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
@@ -17,7 +13,7 @@ from shared.library_noise import (
 _FIXTURE = Path(__file__).resolve().parent / "fixtures" / "library_noise.json"
 
 
-def test_library_noise_parity_vectors() -> None:
+def test_library_noise_parity_vectors():
     vectors = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     for row in vectors:
         title = row["title"]

@@ -1,9 +1,4 @@
-"""Currency helpers for fetchers and ITAD — deterministic, no locale dependency."""
-
-from __future__ import annotations
-
-# ISO 3166-1 alpha-2 country -> ISO 4217 currency (common storefronts).
-_COUNTRY_CURRENCY: dict[str, str] = {
+_COUNTRY_CURRENCY = {
     "US": "USD",
     "GB": "GBP",
     "UK": "GBP",
@@ -24,7 +19,6 @@ _COUNTRY_CURRENCY: dict[str, str] = {
     "RU": "RUB",
     "TR": "TRY",
     "ZA": "ZAR",
-    # Eurozone (ITAD / storefronts use these country codes)
     "DE": "EUR",
     "FR": "EUR",
     "IT": "EUR",
@@ -37,9 +31,7 @@ _COUNTRY_CURRENCY: dict[str, str] = {
     "FI": "EUR",
     "GR": "EUR",
 }
-
-# Steam API currency codes (lowercase) -> ISO 4217
-_STEAM_CURRENCY: dict[str, str] = {
+_STEAM_CURRENCY = {
     "usd": "USD",
     "eur": "EUR",
     "gbp": "GBP",
@@ -61,33 +53,31 @@ _STEAM_CURRENCY: dict[str, str] = {
     "try": "TRY",
     "zar": "ZAR",
 }
-
-_SYMBOLS: dict[str, str] = {
+_SYMBOLS = {
     "USD": "$",
-    "EUR": "\u20ac",
-    "GBP": "\u00a3",
+    "EUR": "€",
+    "GBP": "£",
     "CAD": "C$",
     "AUD": "A$",
     "NZD": "NZ$",
-    "JPY": "\u00a5",
-    "KRW": "\u20a9",
-    "CNY": "\u00a5",
-    "INR": "\u20b9",
+    "JPY": "¥",
+    "KRW": "₩",
+    "CNY": "¥",
+    "INR": "₹",
     "BRL": "R$",
     "MXN": "MX$",
     "NOK": "kr",
     "SEK": "kr",
     "DKK": "kr",
-    "PLN": "z\u0142",
+    "PLN": "zł",
     "CHF": "CHF ",
-    "RUB": "\u20bd",
-    "TRY": "\u20ba",
+    "RUB": "₽",
+    "TRY": "₺",
     "ZAR": "R",
 }
 
 
-def normalize_currency_code(code: str | None, *, country: str | None = None) -> str:
-    """Resolve a currency code from explicit code, Steam-style code, or country."""
+def normalize_currency_code(code, *, country=None):
     if code:
         raw = str(code).strip()
         if not raw:
@@ -108,14 +98,14 @@ def normalize_currency_code(code: str | None, *, country: str | None = None) -> 
     return "USD"
 
 
-def country_to_currency(country: str | None) -> str:
+def country_to_currency(country):
     if not country:
         return "USD"
     key = str(country).strip().upper()
     return _COUNTRY_CURRENCY.get(key, "USD")
 
 
-def currency_symbol(code: str | None) -> str:
+def currency_symbol(code):
     c = normalize_currency_code(code)
     sym = _SYMBOLS.get(c)
     if sym:
@@ -123,14 +113,14 @@ def currency_symbol(code: str | None) -> str:
     return f"{c} "
 
 
-def format_price(amount: float | int | None, code: str | None = None, *, country: str | None = None) -> str | None:
+def format_price(amount, code=None, *, country=None):
     if amount is None:
         return None
     try:
         num = float(amount)
     except (TypeError, ValueError):
         return None
-    if not num == num:  # NaN
+    if not num == num:
         return None
     cur = normalize_currency_code(code, country=country)
     sym = currency_symbol(cur)

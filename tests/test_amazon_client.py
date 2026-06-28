@@ -1,19 +1,13 @@
-"""Tests for amazon_client launcher filtering (Windows-only module)."""
-
-from __future__ import annotations
-
 import sys
 
 import pytest
 
 if sys.platform != "win32":
     pytest.skip("amazon_client requires Windows (DPAPI)", allow_module_level=True)
-
 import clients.amazon_client as amazon_client
 
 
-def _fuel_ent(sku: str = "the_secret_of_monkey_island_special_edition_game") -> dict:
-    """A Prime Gaming Fuel promo: Twitch line + bare-UUID product id."""
+def _fuel_ent(sku="the_secret_of_monkey_island_special_edition_game"):
     return {
         "ProductTitle": "The Secret of Monkey Island: Special Edition",
         "ProductLine": "Twitch:FuelGame",
@@ -23,8 +17,7 @@ def _fuel_ent(sku: str = "the_secret_of_monkey_island_special_edition_game") -> 
     }
 
 
-def _native_ent() -> dict:
-    """A real Amazon Games title: Sonic line + amzn1.adg.product id."""
+def _native_ent():
     return {
         "ProductTitle": "The Curse of Monkey Island",
         "ProductLine": "Sonic:Game",
@@ -35,23 +28,22 @@ def _native_ent() -> dict:
 
 
 class TestIsExternalPrimeClaim:
-    def test_fuel_promo_is_external(self) -> None:
+    def test_fuel_promo_is_external(self):
         assert amazon_client._is_external_prime_claim(_fuel_ent()) is True
 
-    def test_native_adg_title_is_kept(self) -> None:
+    def test_native_adg_title_is_kept(self):
         assert amazon_client._is_external_prime_claim(_native_ent()) is False
 
-    def test_non_twitch_line_is_kept(self) -> None:
+    def test_non_twitch_line_is_kept(self):
         ent = _fuel_ent()
         ent["ProductLine"] = "Sonic:Game"
         assert amazon_client._is_external_prime_claim(ent) is False
 
-    def test_twitch_line_with_adg_id_is_kept(self) -> None:
-        """Defensive: a Twitch line that is still a native ADG product stays."""
+    def test_twitch_line_with_adg_id_is_kept(self):
         ent = _fuel_ent()
         ent["ProductIdStr"] = "amzn1.adg.product.abc"
         ent["ProductId"] = {"Id": "amzn1.adg.product.abc"}
         assert amazon_client._is_external_prime_claim(ent) is False
 
-    def test_missing_product_line_is_kept(self) -> None:
+    def test_missing_product_line_is_kept(self):
         assert amazon_client._is_external_prime_claim({"ProductTitle": "X"}) is False

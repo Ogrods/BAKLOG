@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-"""
-Render the BAKLOG Open Graph image (1200x630) straight from the canonical
-favicon.svg geometry: three white rounded-pill bricks with circular knockouts,
-the BAKLOG wordmark, and the tagline, on the blue-on-blue brand background.
-
-Requires: Pillow
-Run:
-  python tools/make_og_image.py
-Output:
-  landing/assets/og.png
-"""
-
-from __future__ import annotations
-
 import os
 from pathlib import Path
 
@@ -20,42 +5,26 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "landing" / "assets" / "og.png"
-
-# Final dimensions and supersample factor (for crisp, anti-aliased edges).
-OUT_W, OUT_H = 1200, 630
+OUT_W, OUT_H = (1200, 630)
 SS = 3
-CW, CH = OUT_W * SS, OUT_H * SS
-
-# --- Canonical mark geometry (favicon.svg, viewBox 0 0 100 100) ---------------
-PILLS = ((2, 52, 46, 24), (52, 52, 46, 24), (27, 24, 46, 24))  # x, y, w, h
-KNOBS = ((14, 64), (64, 64), (39, 36))  # cx, cy
+CW, CH = (OUT_W * SS, OUT_H * SS)
+PILLS = ((2, 52, 46, 24), (52, 52, 46, 24), (27, 24, 46, 24))
+KNOBS = ((14, 64), (64, 64), (39, 36))
 PILL_RADIUS = 12
 KNOB_R = 8
-MARK_MINX, MARK_MINY, MARK_MAXX, MARK_MAXY = 2, 24, 98, 76  # tight bounds
-MARK_VW = MARK_MAXX - MARK_MINX  # 96
-MARK_VH = MARK_MAXY - MARK_MINY  # 52
-
-# --- Brand colors -------------------------------------------------------------
-BG_TOP = (15, 23, 42)      # #0f172a
-BG_BOTTOM = (8, 14, 30)    # #080e1e
-SKY = (56, 189, 248)       # #38bdf8
-VIOLET = (168, 85, 247)    # #a855f7
+MARK_MINX, MARK_MINY, MARK_MAXX, MARK_MAXY = (2, 24, 98, 76)
+MARK_VW = MARK_MAXX - MARK_MINX
+MARK_VH = MARK_MAXY - MARK_MINY
+BG_TOP = (15, 23, 42)
+BG_BOTTOM = (8, 14, 30)
+SKY = (56, 189, 248)
+VIOLET = (168, 85, 247)
 WHITE = (255, 255, 255)
-
 WORDMARK = "BAKLOG"
 TAGLINE = "One honest backlog across every store."
-
 WIN = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
-BOLD_FONTS = (
-    ROOT / "assets" / "fonts" / "SpaceGrotesk-Bold.ttf",
-    WIN / "segoeuib.ttf",
-    WIN / "arialbd.ttf",
-)
-REG_FONTS = (
-    ROOT / "assets" / "fonts" / "SpaceGrotesk-Medium.ttf",
-    WIN / "segoeui.ttf",
-    WIN / "arial.ttf",
-)
+BOLD_FONTS = (ROOT / "assets" / "fonts" / "SpaceGrotesk-Bold.ttf", WIN / "segoeuib.ttf", WIN / "arialbd.ttf")
+REG_FONTS = (ROOT / "assets" / "fonts" / "SpaceGrotesk-Medium.ttf", WIN / "segoeui.ttf", WIN / "arial.ttf")
 
 
 def load_font(candidates, size):
@@ -73,19 +42,18 @@ def vertical_gradient(w, h, top, bottom):
     px = base.load()
     for y in range(h):
         t = y / max(h - 1, 1)
-        c = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
+        c = tuple((int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)))
         for x in range(w):
             px[x, y] = c
     return base
 
 
 def gradient_fast(w, h, top, bottom):
-    # 1px-wide column gradient stretched horizontally (fast + smooth).
     col = Image.new("RGB", (1, h))
     d = col.load()
     for y in range(h):
         t = y / max(h - 1, 1)
-        d[0, y] = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
+        d[0, y] = tuple((int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)))
     return col.resize((w, h))
 
 
@@ -108,13 +76,12 @@ def draw_mark(scale, ox, oy):
     layer = Image.new("RGBA", (CW, CH), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     r = PILL_RADIUS * scale
-    for (x, y, w, h) in PILLS:
+    for x, y, w, h in PILLS:
         x0, y0 = map_pt(x, y, scale, ox, oy)
         x1, y1 = map_pt(x + w, y + h, scale, ox, oy)
         d.rounded_rectangle((x0, y0, x1, y1), radius=r, fill=WHITE + (255,))
-    # Punch transparent knockouts (matches the SVG mask holes).
     kr = KNOB_R * scale
-    for (cx, cy) in KNOBS:
+    for cx, cy in KNOBS:
         px, py = map_pt(cx, cy, scale, ox, oy)
         d.ellipse((px - kr, py - kr, px + kr, py + kr), fill=(0, 0, 0, 0))
     return layer
@@ -133,12 +100,9 @@ def draw_tracked_text(base, text, font, fill, center_x, top_y, tracking):
 
 def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
-
     img = gradient_fast(CW, CH, BG_TOP, BG_BOTTOM).convert("RGBA")
-    img.alpha_composite(radial_glow((CW, CH), (CW // 2, int(CH * 0.30)), int(CW * 0.30), SKY, 70))
+    img.alpha_composite(radial_glow((CW, CH), (CW // 2, int(CH * 0.3)), int(CW * 0.3), SKY, 70))
     img.alpha_composite(radial_glow((CW, CH), (int(CW * 0.74), int(CH * 0.12)), int(CW * 0.22), VIOLET, 48))
-
-    # Mark: centered horizontally, in the upper portion.
     mark_h = int(CH * 0.34)
     scale = mark_h / MARK_VH
     mark_w = MARK_VW * scale
@@ -146,16 +110,11 @@ def main():
     oy = int(CH * 0.14)
     mark = draw_mark(scale, ox, oy)
     img.alpha_composite(mark)
-
     mark_bottom = oy + mark_h
-
-    # Wordmark
     word_fs = int(CH * 0.135)
     word_font = load_font(BOLD_FONTS, word_fs)
     word_top = mark_bottom + int(CH * 0.06)
     draw_tracked_text(img, WORDMARK, word_font, WHITE + (255,), CW / 2, word_top, word_fs * 0.14)
-
-    # Tagline
     tag_fs = int(CH * 0.046)
     tag_font = load_font(REG_FONTS, tag_fs)
     d = ImageDraw.Draw(img)
@@ -163,7 +122,6 @@ def main():
     tag_w = tb[2] - tb[0]
     tag_top = word_top + word_fs * 1.35
     d.text(((CW - tag_w) / 2, tag_top), TAGLINE, font=tag_font, fill=SKY + (255,))
-
     final = img.convert("RGB").resize((OUT_W, OUT_H), Image.Resampling.LANCZOS)
     final.save(OUT, "PNG")
     print(f"Wrote {OUT} ({OUT_W}x{OUT_H})")

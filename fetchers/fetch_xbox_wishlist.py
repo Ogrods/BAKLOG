@@ -1,34 +1,8 @@
-#!/usr/bin/env python3
-"""Fetch the Xbox Store wishlist into games_wishlist_xbox.json.
-
-The Xbox wishlist isn't surfaced by OpenXBL (its XBL endpoints cover play
-history, achievements, friends, etc., but not the storefront wishlist that
-lives behind your MSA account on ``xbox.com``). What ``xbox.com/wishlist``
-serves is a fully server-rendered React shell with the wishlist data baked
-into ``window.__PRELOADED_STATE__``. That global gets consumed + deleted by
-React after hydration, so we never see it via JS — we always parse it
-straight from the SSR HTML response, which is also what makes this fast and
-JS-free for the fetcher (no full browser render required after the request
-lands).
-
-Like ``fetch_ubisoft_wishlist.py`` we piggyback on the persistent Chrome/Edge
-profile the Connections page already established (``cache/auth/profiles/
-xbox_wishlist``). One headless ``context.request.get()`` call to the wishlist
-URL with that profile yields the SSR HTML; we carve out
-``core2.wishlist.wishlists`` (the canonical wishlist branch) and pair each
-wishlist item with its catalog summary from ``core2.products`` (the same SSR
-payload hydrates product titles, images, prices, and store URLs in one
-shot).
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import re
 import sys
 import time
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,10 +12,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 
 from auth import mark_invalid
-from auth.xbox_wishlist_session import (
-    capture_xbox_wishlist_preloaded_state,
-    validate_xbox_wishlist_state,
-)
+from auth.xbox_wishlist_session import capture_xbox_wishlist_preloaded_state, validate_xbox_wishlist_state
 from clients.hltb_client import HltbClient
 from fetchers._base import (
     add_allow_empty_arg,
@@ -59,37 +30,34 @@ from shared.raw_dumps import raw_dumps_enabled
 GAMES_XBOX_WISHLIST_JSON = Path("games_wishlist_xbox.json")
 
 
-def wishlist_state_dump() -> Path:
+def wishlist_state_dump():
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "xbox" / "wishlist_state.json"
-HLTB_DELAY_SEC = 1.0
 
-# Microsoft Store product ids ("BigIds") are 10–16-char all-caps alphanumeric
-# strings starting with a digit (e.g. "9N16JD2DGTLB", "9NBLGGH4PMVH"). The
-# strict pattern avoids matching ISO dates, GUIDs, or title slugs while we
-# walk the wishlist subtree for product references.
-_BIGID_RE = re.compile(r"[0-9][A-Z0-9]{9,15}")
+
+HLTB_DELAY_SEC = 1.0
+_BIGID_RE = re.compile("[0-9][A-Z0-9]{9,15}")
 
 
 @dataclass
 class WishlistItem:
-    product_id: str            # MS Store BigId (e.g. 9N16JD2DGTLB)
-    title: str
-    image_url: str | None
-    store_url: str
-    publisher: str | None
-    developer: str | None
-    genres: list[str]
-    release_date: str | None
-    price: str | None
-    price_initial: str | None
-    discount_percent: int | None
-    currency: str | None
-    added_at: str | None
+    product_id: "Any"
+    title: "Any"
+    image_url: "Any"
+    store_url: "Any"
+    publisher: "Any"
+    developer: "Any"
+    genres: "Any"
+    release_date: "Any"
+    price: "Any"
+    price_initial: "Any"
+    discount_percent: "Any"
+    currency: "Any"
+    added_at: "Any"
 
 
-def _https(url: str | None) -> str | None:
+def _https(url):
     if not url:
         return None
     u = str(url).strip()
@@ -100,16 +68,15 @@ def _https(url: str | None) -> str | None:
     return u if u.startswith("https://") else None
 
 
-def _store_url(product_id: str, title: str | None) -> str:
+def _store_url(product_id, title):
     if product_id:
-        # The xbox.com store route accepts ``_/<bigid>`` and resolves the slug.
         return f"https://www.xbox.com/en-us/games/store/_/{product_id}"
     if title:
         return f"https://www.xbox.com/en-us/search/results?q={quote(title)}"
     return "https://www.xbox.com/en-us/games"
 
 
-def _walk(node: Any, depth: int = 0, max_depth: int = 12) -> Iterable[Any]:
+def _walk(node, depth=0, max_depth=12):
     if depth > max_depth or node is None:
         return
     yield node
@@ -121,22 +88,11 @@ def _walk(node: Any, depth: int = 0, max_depth: int = 12) -> Iterable[Any]:
             yield from _walk(v, depth + 1, max_depth)
 
 
-def _extract_wishlist_ids(state: dict) -> tuple[list[tuple[str, str | None]], dict]:
-    """Return ``[(product_id, added_at), ...]`` and the raw wishlists branch.
-
-    The Xbox wishlist React store keys items by product BigId. The exact
-    container path has shifted historically — sometimes ``wishlists`` is a
-    flat list of product ids, sometimes a dict of ``{wishlistId: {items:
-    [{productId, addedAt}, ...]}}``. We tolerate both shapes by walking the
-    ``core2.wishlist.wishlists`` subtree and collecting any product-id
-    fields we find.
-    """
+def _extract_wishlist_ids(state):
     wishlists = ((state.get("core2") or {}).get("wishlist") or {}).get("wishlists") or {}
-    found: dict[str, str | None] = {}
+    found = {}
 
-    def _pid(value: Any) -> str | None:
-        # MS Store BigIds: 12-char uppercase alphanumeric (e.g. 9N16JD2DGTLB).
-        # Strict pattern keeps date strings / GUIDs / titles from leaking in.
+    def _pid(value):
         if isinstance(value, str) and _BIGID_RE.fullmatch(value):
             return value
         return None
@@ -147,34 +103,27 @@ def _extract_wishlist_ids(state: dict) -> tuple[list[tuple[str, str | None]], di
                 pid = _pid(node.get(key))
                 if pid and pid not in found:
                     found[pid] = (
-                        node.get("addedAt")
-                        or node.get("AddedAt")
-                        or node.get("dateAdded")
-                        or node.get("createdDate")
+                        node.get("addedAt") or node.get("AddedAt") or node.get("dateAdded") or node.get("createdDate")
                     )
         elif isinstance(node, str):
             pid = _pid(node)
             if pid and pid not in found:
                 found[pid] = None
+    return (list(found.items()), wishlists)
 
-    return list(found.items()), wishlists
 
-
-def _index_products(state: dict) -> dict[str, dict]:
-    """Build ``{productId: catalog_dict}`` from every catalog branch xbox.com
-    ships in the same SSR payload. We scan a few well-known roots first (fast
-    path) and then walk the rest of ``core2`` as a fallback for shape drift.
-    """
-    catalog: dict[str, dict] = {}
+def _index_products(state):
+    catalog = {}
     core2 = state.get("core2") or {}
 
-    def _looks_like_product(v: dict) -> bool:
-        return any(
-            field in v
-            for field in ("title", "Title", "displayName", "productTitle", "productSummary")
-        ) or "image" in v or "images" in v
+    def _looks_like_product(v):
+        return (
+            any((field in v for field in ("title", "Title", "displayName", "productTitle", "productSummary")))
+            or "image" in v
+            or "images" in v
+        )
 
-    def _ingest(container: Any) -> None:
+    def _ingest(container):
         if not isinstance(container, dict):
             return
         for k, v in container.items():
@@ -188,38 +137,25 @@ def _index_products(state: dict) -> dict[str, dict]:
 
     for root_key in ("products", "productSummaries", "productDetails", "catalog"):
         _ingest(core2.get(root_key))
-
     for node in _walk(core2, max_depth=10):
         if not isinstance(node, dict):
             continue
         pid = node.get("productId") or node.get("ProductId") or node.get("bigId") or node.get("BigId")
-        if isinstance(pid, str) and _BIGID_RE.fullmatch(pid) and pid not in catalog and _looks_like_product(node):
+        if isinstance(pid, str) and _BIGID_RE.fullmatch(pid) and (pid not in catalog) and _looks_like_product(node):
             catalog[pid] = node
-
     return catalog
 
 
-def _pick_image(product: dict) -> str | None:
-    """Prefer a poster/box-art image; xbox.com ships a few size variants.
-
-    The catalog ``images`` field arrives in two shapes: a *list* of
-    ``{url, purpose, width}`` dicts (older shape), or — current xbox.com SSR —
-    a *dict keyed by purpose*, e.g.
-    ``{"poster": {url,width,height}, "boxArt": {...}, "superHeroArt": {...}}``.
-    Only the list shape used to be handled, so every row came back image-less
-    and fell through to (often dead) Steam-search covers. Handle both, and
-    prefer the vertical ``poster`` so the library cover keeps a 2:3 aspect.
-    """
+def _pick_image(product):
     images = product.get("images") or product.get("Images")
-    img_list: list[dict] = []
+    img_list = []
     if isinstance(images, list):
         img_list = [i for i in images if isinstance(i, dict)]
     elif isinstance(images, dict):
         for purpose_key, val in images.items():
             if isinstance(val, dict):
                 img_list.append({**val, "purpose": val.get("purpose") or purpose_key})
-
-    candidates: list[tuple[int, str]] = []
+    candidates = []
     for img in img_list:
         url = img.get("url") or img.get("Url") or img.get("uri")
         purpose = (img.get("purpose") or img.get("imagePurpose") or "").lower()
@@ -230,8 +166,6 @@ def _pick_image(product: dict) -> str | None:
             width = 0
         if not url:
             continue
-        # Vertical poster first (matches the 2:3 library cover), then box art,
-        # then tiles / wide hero art / logos.
         if "poster" in purpose:
             rank = 110
         elif "boxart" in purpose:
@@ -248,8 +182,6 @@ def _pick_image(product: dict) -> str | None:
     if candidates:
         candidates.sort(reverse=True)
         return _https(candidates[0][1])
-
-    # Flat fields seen on some catalog branches
     for key in ("posterImage", "boxArt", "tileImage", "image"):
         url = product.get(key)
         if isinstance(url, str):
@@ -261,7 +193,7 @@ def _pick_image(product: dict) -> str | None:
     return None
 
 
-def _pick_price(product: dict) -> tuple[str | None, str | None, int | None, str | None]:
+def _pick_price(product):
     price = (
         product.get("specificPrices")
         or product.get("price")
@@ -272,7 +204,7 @@ def _pick_price(product: dict) -> tuple[str | None, str | None, int | None, str 
     msrp = None
     currency = None
 
-    def _scan(obj: Any) -> None:
+    def _scan(obj):
         nonlocal list_price, msrp, currency
         if isinstance(obj, dict):
             lp = obj.get("listPrice") or obj.get("ListPrice")
@@ -291,10 +223,9 @@ def _pick_price(product: dict) -> tuple[str | None, str | None, int | None, str 
                 _scan(v)
 
     _scan(price)
-
     cur_norm = normalize_currency_code(currency)
 
-    def _fmt(v: float | None) -> str | None:
+    def _fmt(v):
         if v is None:
             return None
         if v == 0:
@@ -302,13 +233,12 @@ def _pick_price(product: dict) -> tuple[str | None, str | None, int | None, str 
         return format_price(v, cur_norm)
 
     discount = None
-    if list_price is not None and msrp is not None and msrp > 0 and list_price < msrp:
+    if list_price is not None and msrp is not None and (msrp > 0) and (list_price < msrp):
         discount = round(100 * (1 - list_price / msrp))
+    return (_fmt(list_price), _fmt(msrp), discount, cur_norm)
 
-    return _fmt(list_price), _fmt(msrp), discount, cur_norm
 
-
-def _to_item(product_id: str, added_at: str | None, product: dict | None) -> WishlistItem:
+def _to_item(product_id, added_at, product):
     product = product or {}
     title = (
         product.get("title")
@@ -318,23 +248,18 @@ def _to_item(product_id: str, added_at: str | None, product: dict | None) -> Wis
         or product_id
     )
     genres_raw = product.get("categories") or product.get("genres") or product.get("Categories")
-    genres: list[str] = []
+    genres = []
     if isinstance(genres_raw, list):
         for g in genres_raw:
             if isinstance(g, str) and g.strip():
                 genres.append(g.strip())
-    release = (
-        product.get("releaseDate")
-        or product.get("ReleaseDate")
-        or product.get("originalReleaseDate")
-    )
+    release = product.get("releaseDate") or product.get("ReleaseDate") or product.get("originalReleaseDate")
     if isinstance(release, dict):
         release = release.get("date") or release.get("Date")
     if isinstance(release, str):
         release = release[:10]
     else:
         release = None
-
     price, price_initial, discount, currency = _pick_price(product)
     return WishlistItem(
         product_id=product_id,
@@ -353,11 +278,10 @@ def _to_item(product_id: str, added_at: str | None, product: dict | None) -> Wis
     )
 
 
-def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
-    tags: list[str] = []
+def _build_row(item, hltb):
+    tags = []
     if item.publisher:
         tags.append(item.publisher)
-
     return {
         "store": "wishlist",
         "wishlist_store": "xbox",
@@ -391,7 +315,7 @@ def _build_row(item: WishlistItem, hltb: dict | None) -> dict:
     }
 
 
-def _load_existing() -> dict[str, dict]:
+def _load_existing():
     if not catalog_file(GAMES_XBOX_WISHLIST_JSON).exists():
         return {}
     try:
@@ -401,10 +325,8 @@ def _load_existing() -> dict[str, dict]:
     return {g["id"]: g for g in data.get("games", []) if isinstance(g, dict) and g.get("id")}
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Fetch Xbox Store wishlist into games_wishlist_xbox.json",
-    )
+def main():
+    parser = argparse.ArgumentParser(description="Fetch Xbox Store wishlist into games_wishlist_xbox.json")
     parser.add_argument("--hltb", action="store_true", help="Look up HowLongToBeat hours (slow)")
     add_only_new_arg(parser)
     parser.add_argument(
@@ -426,15 +348,12 @@ def main() -> int:
     mode_label = "headed" if args.headed else "headless"
     print(f"Fetching Xbox wishlist via {mode_label} xbox.com SSR...", flush=True)
 
-    def _capture() -> dict:
-        return capture_xbox_wishlist_preloaded_state(
-            headless=False if args.headed else "legacy",
-            timeout_s=30,
-        )
+    def _capture():
+        return capture_xbox_wishlist_preloaded_state(headless=False if args.headed else "legacy", timeout_s=30)
 
     try:
         state = run_with_heartbeat(_capture, "Xbox wishlist capture")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         err = str(exc)
         if "No saved Xbox wishlist profile" in err:
             hint = "profile missing — connect Xbox Store wishlist in Connections first"
@@ -448,7 +367,6 @@ def main() -> int:
         mark_invalid("xbox_wishlist", error=msg)
         stats.error(msg)
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
     user = state.get("user") or {}
     session_err = validate_xbox_wishlist_state(state, headless=not args.headed)
     if args.dump_state:
@@ -472,11 +390,8 @@ def main() -> int:
         mark_invalid("xbox_wishlist", error=session_err)
         stats.error(session_err)
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=EXIT_CODE_AUTH)
-
     ids, wishlists_branch = _extract_wishlist_ids(state)
     if args.dump_state or (not ids and raw_dumps_enabled()):
-        # Dumping the wishlist + sample catalog branch makes shape-drift
-        # debugging trivial on a fresh sign-in (opt-in for zero-item wishlist).
         wishlist_state_dump().parent.mkdir(parents=True, exist_ok=True)
         wishlist_state_dump().write_text(
             json.dumps(
@@ -496,33 +411,23 @@ def main() -> int:
             print(f"  wrote raw wishlist branch to {wishlist_state_dump()}", flush=True)
         else:
             print(f"  wrote raw wishlist branch to {wishlist_state_dump()} (--dump-state)", flush=True)
-
     catalog = _index_products(state)
     items = [_to_item(pid, added_at, catalog.get(pid)) for pid, added_at in ids]
-    with_meta = sum(1 for it in items if catalog.get(it.product_id))
+    with_meta = sum((1 for it in items if catalog.get(it.product_id)))
     print(f"  parsed {len(items)} wishlist items ({with_meta} with catalog metadata)", flush=True)
-
     empty_exit = refuse_empty_result(
-        items,
-        label="Xbox wishlist",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_XBOX_WISHLIST_JSON,
+        items, label="Xbox wishlist", allow_empty=args.allow_empty, output_path=GAMES_XBOX_WISHLIST_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        items,
-        label="Xbox wishlist",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_XBOX_WISHLIST_JSON,
+        items, label="Xbox wishlist", allow_drift=args.allow_drift, output_path=GAMES_XBOX_WISHLIST_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_xbox_wishlist", t0, exit_code=drift_exit)
-
     hltb_client = HltbClient() if args.hltb else None
     existing = _load_existing()
-    rows: list[dict] = []
-
+    rows = []
     for i, item in enumerate(items, 1):
         row_id = f"xbox-{item.product_id}"
         cached = existing.get(row_id)
@@ -544,10 +449,9 @@ def main() -> int:
                 try:
                     time.sleep(HLTB_DELAY_SEC)
                     hltb = hltb_client.lookup(item.title)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     print(f"  HLTB warning: {exc}", flush=True)
         rows.append(_build_row(item, hltb))
-
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist_xbox",
@@ -555,10 +459,7 @@ def main() -> int:
         "games": sorted(rows, key=lambda g: (g.get("name") or "").lower()),
     }
     write_catalog_text(GAMES_XBOX_WISHLIST_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
-    print(
-        f"\nWrote {len(rows)} games to {GAMES_XBOX_WISHLIST_JSON}.",
-        flush=True,
-    )
+    print(f"\nWrote {len(rows)} games to {GAMES_XBOX_WISHLIST_JSON}.", flush=True)
     stats.ok = len(rows)
     return stats.finish("fetch_xbox_wishlist", t0, exit_code=0)
 

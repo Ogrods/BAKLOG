@@ -1,17 +1,6 @@
-"""Silent connection health probes for Pro-tier background scheduling.
-
-Verifies cheap/no-browser sessions without enqueueing a fetch or touching catalogs.
-After two consecutive auth rejections, flips the connection status light to
-``expired`` via :func:`auth.manager.mark_invalid`.
-"""
-
-from __future__ import annotations
-
 import json
 import time
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
 
 from auth.manager import _with_profile_secrets, get_status, mark_invalid, mark_verified
 from auth.session_probe import PROBEABLE_QUIET, probe_provider_quiet
@@ -23,7 +12,7 @@ PROBE_INTERVAL_SEC = 3600
 AUTH_COOLDOWN_SEC = 60 * 60
 
 
-def _as_epoch(value: Any) -> float | None:
+def _as_epoch(value):
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str) and value.strip():
@@ -38,11 +27,11 @@ def _as_epoch(value: Any) -> float | None:
     return None
 
 
-def _state_path(profile_id: str) -> Path:
+def _state_path(profile_id):
     return runs_dir(profile_id=profile_id) / "connection_probe_state.json"
 
 
-def load_probe_state(profile_id: str) -> dict[str, Any]:
+def load_probe_state(profile_id):
     path = _state_path(profile_id)
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
@@ -60,7 +49,7 @@ def load_probe_state(profile_id: str) -> dict[str, Any]:
     return {"last_probe": last_probe, "strikes": dict(strikes)}
 
 
-def save_probe_state(profile_id: str, state: dict[str, Any]) -> None:
+def save_probe_state(profile_id, state):
     path = _state_path(profile_id)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,8 +58,7 @@ def save_probe_state(profile_id: str, state: dict[str, Any]) -> None:
         pass
 
 
-def clear_probe_strike(profile_id: str, provider: str) -> None:
-    """Drop accumulated auth-fail strikes after a successful reconnect."""
+def clear_probe_strike(profile_id, provider):
     if provider not in PROBEABLE_QUIET:
         return
     state = load_probe_state(profile_id)
@@ -83,21 +71,14 @@ def clear_probe_strike(profile_id: str, provider: str) -> None:
     save_probe_state(profile_id, state)
 
 
-def probe_due(profile_id: str, now: float, interval_sec: float = PROBE_INTERVAL_SEC) -> bool:
-    """True when the hourly cadence allows another probe pass."""
+def probe_due(profile_id, now, interval_sec=PROBE_INTERVAL_SEC):
     state = load_probe_state(profile_id)
     last = float(state.get("last_probe", 0))
     return now - last >= interval_sec
 
 
-def providers_in_auth_cooldown(
-    history: list[dict[str, Any]],
-    now: float,
-    *,
-    cooldown_sec: float = AUTH_COOLDOWN_SEC,
-) -> set[str]:
-    """Provider keys to skip after a recent fetcher auth failure."""
-    out: set[str] = set()
+def providers_in_auth_cooldown(history, now, *, cooldown_sec=AUTH_COOLDOWN_SEC):
+    out = set()
     for entry in history:
         if entry.get("failure_kind") != "auth":
             continue
@@ -113,7 +94,7 @@ def providers_in_auth_cooldown(
     return out
 
 
-def _load_history(profile_id: str) -> list[dict[str, Any]]:
+def _load_history(profile_id):
     path = runs_dir(profile_id=profile_id) / "history.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -122,29 +103,15 @@ def _load_history(profile_id: str) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
-def run_connection_probe(
-    profile_id: str,
-    *,
-    now: float | None = None,
-    history: list[dict[str, Any]] | None = None,
-) -> dict[str, str]:
-    """Probe connected cheap providers; update status light only (no fetch).
-
-    Returns per-provider outcomes: ``ok``, ``auth_fail``, ``unreachable``,
-    or ``skipped_cooldown``. Providers not currently ``connected`` are omitted.
-    """
+def run_connection_probe(profile_id, *, now=None, history=None):
     now = time.time() if now is None else now
     if history is None:
         history = _load_history(profile_id)
-
     cooldown = providers_in_auth_cooldown(history, now)
     state = load_probe_state(profile_id)
-    strikes: dict[str, int] = {
-        k: int(v) for k, v in (state.get("strikes") or {}).items() if isinstance(v, (int, float))
-    }
-    results: dict[str, str] = {}
+    strikes = {k: int(v) for k, v in (state.get("strikes") or {}).items() if isinstance(v, (int, float))}
+    results = {}
     probed = False
-
     with _with_profile_secrets(profile_id):
         status_by_key = {row["key"]: row for row in get_status()}
         for provider in sorted(PROBEABLE_QUIET):
@@ -154,11 +121,9 @@ def run_connection_probe(
             if provider in cooldown:
                 results[provider] = "skipped_cooldown"
                 continue
-
             outcome = probe_provider_quiet(provider)
             results[provider] = outcome
             probed = True
-
             if outcome == "ok":
                 strikes[provider] = 0
                 mark_verified(provider)
@@ -168,8 +133,6 @@ def run_connection_probe(
                 if count >= STRIKE_THRESHOLD:
                     mark_invalid(provider, error="Session rejected by provider")
                     strikes[provider] = 0
-            # unreachable: leave strikes and status untouched
-
     state["strikes"] = strikes
     if probed:
         state["last_probe"] = now

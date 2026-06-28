@@ -1,7 +1,3 @@
-"""Static URL classification and filesystem containment (audit 2026-06-09)."""
-
-from __future__ import annotations
-
 import os
 import re
 from pathlib import Path
@@ -9,11 +5,10 @@ from urllib.parse import unquote
 
 from shared.profile_paths import PROFILE_CACHE_JSON_FILES
 
-LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
+LIBRARY_JSON_RE = re.compile("^/games_[a-z0-9_]+\\.json$", re.I)
 
 
-def normalize_static_path(path_only: str) -> str:
-    """Canonical URL path for static classification (decode + casefold segments)."""
+def normalize_static_path(path_only):
     clean = path_only.split("?", 1)[0]
     if not clean.startswith("/"):
         clean = "/" + clean.lstrip("/")
@@ -21,7 +16,7 @@ def normalize_static_path(path_only: str) -> str:
         decoded = unquote(clean, encoding="utf-8", errors="strict")
     except UnicodeDecodeError:
         decoded = clean
-    segments: list[str] = []
+    segments = []
     for seg in decoded.split("/"):
         if not seg or seg == ".":
             continue
@@ -33,8 +28,7 @@ def normalize_static_path(path_only: str) -> str:
     return "/" + "/".join(segments) if segments else "/"
 
 
-def static_class(path_only: str, *, admin_enabled: bool | None = None) -> str:
-    """Classify a non-API path: public | data | deny."""
+def static_class(path_only, *, admin_enabled=None):
     clean = normalize_static_path(path_only)
     parts = [p for p in clean.split("/") if p]
     if parts and parts[-1] == "tracker.html":
@@ -45,7 +39,7 @@ def static_class(path_only: str, *, admin_enabled: bool | None = None) -> str:
         if not admin_enabled:
             return "deny"
         return "public"
-    if any(p.startswith(".") for p in parts):
+    if any((p.startswith(".") for p in parts)):
         return "deny"
     if parts and parts[0] == "profiles":
         return "deny"
@@ -57,17 +51,12 @@ def static_class(path_only: str, *, admin_enabled: bool | None = None) -> str:
         if parts[1] in PROFILE_CACHE_JSON_FILES:
             return "data"
         return "deny"
-    if LIBRARY_JSON_RE.match(clean) or clean.lower() in (
-        "/itad_prices.json",
-        "/free_claims.json",
-        "/sponsors.json",
-    ):
+    if LIBRARY_JSON_RE.match(clean) or clean.lower() in ("/itad_prices.json", "/free_claims.json", "/sponsors.json"):
         return "data"
     return "public"
 
 
-def resolved_static_path_allowed(resolved: str) -> bool:
-    """False when a resolved filesystem path must not be served as static content."""
+def resolved_static_path_allowed(resolved):
     try:
         real = Path(resolved).resolve()
     except OSError:
@@ -77,7 +66,7 @@ def resolved_static_path_allowed(resolved: str) -> bool:
     from shared.install_paths import bundle_root
     from shared.profile_paths import ROOT as profile_data_root
 
-    rel_posix: str | None = None
+    rel_posix = None
     for root in (profile_data_root.resolve(), bundle_root().resolve()):
         try:
             rel_posix = real.relative_to(root).as_posix()
@@ -86,15 +75,12 @@ def resolved_static_path_allowed(resolved: str) -> bool:
             continue
     if rel_posix is None:
         return False
-    # Classify sensitive on-disk paths directly. Do NOT reuse static_class on the
-    # filesystem-relative path: on disk, profiles/<id>/games_*.json is normal layout
-    # while static_class denies URL paths starting with /profiles/.
     parts = [p.casefold() for p in rel_posix.split("/") if p and p != "."]
     if not parts:
         return True
     if parts[-1] in (".env", "tracker.html"):
         return False
-    if any(p.startswith(".") for p in parts):
+    if any((p.startswith(".") for p in parts)):
         return False
     if "data" in parts:
         return False

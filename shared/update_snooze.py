@@ -1,19 +1,13 @@
-"""Shared per-version update dismiss state (UI + tray)."""
-
-from __future__ import annotations
-
 import json
-from pathlib import Path
-from typing import Any
 
 _SNOOZE_FILE = "update-dismiss.json"
 
 
-def snooze_path(data_root: Path) -> Path:
+def snooze_path(data_root):
     return data_root / _SNOOZE_FILE
 
 
-def read_dismissed_version(data_root: Path) -> str | None:
+def read_dismissed_version(data_root):
     path = snooze_path(data_root)
     if not path.is_file():
         return None
@@ -29,14 +23,14 @@ def read_dismissed_version(data_root: Path) -> str | None:
     return None
 
 
-def write_dismissed_version(data_root: Path, version: str) -> None:
+def write_dismissed_version(data_root, version):
     data_root.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, Any] = {"dismissed_version": version.strip()}
+    payload = {"dismissed_version": version.strip()}
     path = snooze_path(data_root)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def is_version_dismissed(data_root: Path, latest_version: str | None) -> bool:
+def is_version_dismissed(data_root, latest_version):
     if not latest_version:
         return False
     dismissed = read_dismissed_version(data_root)

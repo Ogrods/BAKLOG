@@ -1,7 +1,3 @@
-"""Tests for silent Pro connection probes (auth/connection_probe.py)."""
-
-from __future__ import annotations
-
 import json
 import time
 from contextlib import contextmanager
@@ -21,20 +17,17 @@ from auth.connection_probe import (
 
 
 @contextmanager
-def _noop_profile_secrets(_profile_id: str):
+def _noop_profile_secrets(_profile_id):
     yield
 
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "auth.connection_probe.runs_dir",
-        lambda *, profile_id=None: tmp_path / "runs",
-    )
+    monkeypatch.setattr("auth.connection_probe.runs_dir", lambda *, profile_id=None: tmp_path / "runs")
     monkeypatch.setattr("auth.connection_probe._with_profile_secrets", _noop_profile_secrets)
 
 
-def _status_rows(*providers: str) -> list[dict]:
+def _status_rows(*providers):
     return [{"key": p, "status": "connected", "label": p} for p in providers]
 
 
@@ -61,7 +54,6 @@ def test_two_strikes_flip_to_expired(tmp_path):
                     assert invalid.call_count == 0
                     state = load_probe_state(pid)
                     assert state["strikes"]["gog"] == 1
-
                     run_connection_probe(pid, now=200.0, history=[])
                     invalid.assert_called_once_with("gog", error="Session rejected by provider")
                     state = load_probe_state(pid)
@@ -122,12 +114,10 @@ def test_does_not_write_catalog_or_run_history(tmp_path, monkeypatch):
     runs.mkdir(parents=True)
     catalog = tmp_path / "games_gog.json"
     catalog.write_text(json.dumps({"fetched_at": 1, "games": []}), encoding="utf-8")
-
     with patch("auth.connection_probe.get_status", return_value=_status_rows("gog")):
         with patch("auth.connection_probe.probe_provider_quiet", return_value="ok"):
             with patch("auth.connection_probe.mark_verified"):
                 run_connection_probe(pid, now=100.0, history=[])
-
     assert json.loads(catalog.read_text(encoding="utf-8"))["fetched_at"] == 1
     assert not (runs / "history.json").exists()
 
@@ -164,28 +154,23 @@ def test_mark_connected_clears_probe_strike(tmp_path, monkeypatch):
     pid = "prof"
     monkeypatch.setattr("auth.manager.get_active_profile_id", lambda: pid)
     save_probe_state(pid, {"last_probe": 0, "strikes": {"gog": 1}})
-
     with patch("auth.manager.get_provider_blob", return_value={}):
         with patch("auth.manager.set_provider_blob"):
             from auth.manager import mark_connected
 
             mark_connected("gog", {"GOG_AL": "cookie"})
-
     assert "gog" not in load_probe_state(pid)["strikes"]
 
 
 def test_one_strike_after_reconnect_requires_two_fails_again(tmp_path):
-    """After reconnect clears strikes, expiry needs two auth_fails again."""
     pid = "prof"
     save_probe_state(pid, {"last_probe": 0, "strikes": {"gog": 1}})
     clear_probe_strike(pid, "gog")
-
     with patch("auth.connection_probe.get_status", return_value=_status_rows("gog")):
         with patch("auth.connection_probe.probe_provider_quiet", return_value="auth_fail"):
             with patch("auth.connection_probe.mark_invalid") as invalid:
                 run_connection_probe(pid, now=100.0, history=[])
                 assert invalid.call_count == 0
                 assert load_probe_state(pid)["strikes"]["gog"] == 1
-
                 run_connection_probe(pid, now=200.0, history=[])
                 invalid.assert_called_once()

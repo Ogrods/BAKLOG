@@ -1,28 +1,24 @@
-"""SSE stream resume cursor (?since=, Last-Event-ID) and replay filtering."""
-from __future__ import annotations
-
-from pathlib import Path
-
 import pytest
 
 import server
 
 
 class _FakeHandler:
-    def __init__(self, path: str, headers: dict[str, str] | None = None) -> None:
+    def __init__(self, path, headers=None):
         self.path = path
         _hdrs = headers or {}
 
         class _Hdrs:
-            def get(self, key: str, default: str | None = None) -> str | None:
+            def get(self, key, default=None):
                 return _hdrs.get(key, default)
 
         self.headers = _Hdrs()
 
 
 @pytest.fixture()
-def runs_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def runs_env(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
+
     def _runs_dir_fn(*, profile_id=None):
         return runs_dir
 
@@ -53,7 +49,7 @@ def test_replay_lines_filters_since(runs_env):
     replay = run.replay_lines(since=3)
     texts = [m["text"] for m in replay]
     assert texts == ["line3", "line4"]
-    assert all(m.get("seq", 0) > 3 for m in replay)
+    assert all((m.get("seq", 0) > 3 for m in replay))
 
 
 def test_line_count_reflects_total_not_ring_buffer(runs_env):
@@ -73,7 +69,7 @@ def test_attach_listener_replay_respects_since(runs_env):
     _q, replay, _done = run.attach_listener(since=3)
     texts = [m["text"] for m in replay]
     assert texts == ["l3", "l4"]
-    assert all(int(m["seq"]) > 3 for m in replay)
+    assert all((int(m["seq"]) > 3 for m in replay))
 
 
 def test_stream_resume_since_query_and_header():

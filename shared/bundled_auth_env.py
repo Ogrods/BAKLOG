@@ -1,9 +1,4 @@
-"""Shipped Supabase auth env beside the frozen exe vs writable data dir."""
-
-from __future__ import annotations
-
 import os
-from pathlib import Path
 
 AUTH_ENV_KEYS = (
     "BAKLOG_SUPABASE_URL",
@@ -11,17 +6,11 @@ AUTH_ENV_KEYS = (
     "BAKLOG_SUPABASE_JWT_SECRET",
     "BAKLOG_LOCAL_PROFILES",
 )
-
-# JWT secret stays install-bundle-only — never copy into writable BAKLOG-Data/.env.
-DATA_DIR_AUTH_ENV_KEYS = (
-    "BAKLOG_SUPABASE_URL",
-    "BAKLOG_SUPABASE_ANON_KEY",
-    "BAKLOG_LOCAL_PROFILES",
-)
+DATA_DIR_AUTH_ENV_KEYS = ("BAKLOG_SUPABASE_URL", "BAKLOG_SUPABASE_ANON_KEY", "BAKLOG_LOCAL_PROFILES")
 
 
-def parse_env_file(path: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
+def parse_env_file(path):
+    out = {}
     if not path.is_file():
         return out
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -36,7 +25,7 @@ def parse_env_file(path: Path) -> dict[str, str]:
     return out
 
 
-def render_env_lines(values: dict[str, str]) -> list[str]:
+def render_env_lines(values):
     lines = [
         "# BAKLOG account auth (data dir).",
         "# Anon key is public; included so the local app can require sign-in.",
@@ -47,20 +36,14 @@ def render_env_lines(values: dict[str, str]) -> list[str]:
     return lines
 
 
-def bundled_auth_values(install_dir: Path) -> dict[str, str]:
-    """Auth keys shipped beside the frozen exe (source of truth for beta builds)."""
+def bundled_auth_values(install_dir):
     bundled = parse_env_file(install_dir / ".env")
     if not bundled.get("BAKLOG_SUPABASE_URL") or not bundled.get("BAKLOG_SUPABASE_ANON_KEY"):
         return {}
     return {k: bundled[k] for k in AUTH_ENV_KEYS if bundled.get(k)}
 
 
-def sync_bundled_auth_env_to_data_dir(install_dir: Path, data_dir: Path) -> bool:
-    """Align data_dir/.env auth keys with the install-dir bundle.
-
-    Fills missing keys and overwrites stale values left by older installers or
-    partial migrations (upgrade path where BAKLOG-Data kept a wrong .env).
-    """
+def sync_bundled_auth_env_to_data_dir(install_dir, data_dir):
     bundled = bundled_auth_values(install_dir)
     if not bundled:
         return False
@@ -84,12 +67,7 @@ def sync_bundled_auth_env_to_data_dir(install_dir: Path, data_dir: Path) -> bool
     return True
 
 
-def apply_install_dir_auth_env() -> None:
-    """Load auth keys from the install folder.
-
-    Frozen builds: install-dir bundle always wins so a stale data-dir .env
-    cannot block JWT verification after an in-place upgrade.
-    """
+def apply_install_dir_auth_env():
     from shared.install_paths import frozen_bundle_dir, is_frozen
 
     if not is_frozen():
@@ -101,8 +79,7 @@ def apply_install_dir_auth_env() -> None:
         os.environ[key] = val
 
 
-def bootstrap_server_env(data_root: Path) -> None:
-    """Load data-dir .env, then apply install-dir auth (frozen wins on conflicts)."""
+def bootstrap_server_env(data_root):
     ensure_ssl_cert_bundle()
     try:
         from dotenv import load_dotenv
@@ -114,8 +91,7 @@ def bootstrap_server_env(data_root: Path) -> None:
     warmup_auth_verification()
 
 
-def ensure_ssl_cert_bundle() -> None:
-    """PyInstaller onefile/onedir: make HTTPS (Supabase JWKS) use certifi roots."""
+def ensure_ssl_cert_bundle():
     try:
         import certifi
     except ImportError:
@@ -124,8 +100,7 @@ def ensure_ssl_cert_bundle() -> None:
     os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
 
 
-def warmup_auth_verification() -> None:
-    """Prime JWKS fetch at boot so the first sign-in probe is not a cold HTTPS miss."""
+def warmup_auth_verification():
     try:
         from shared.supabase_auth import warmup_jwks_client
 

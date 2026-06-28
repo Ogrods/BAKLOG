@@ -1,9 +1,3 @@
-"""Platform parity for in-app update artifacts and apply launcher."""
-
-from __future__ import annotations
-
-from pathlib import Path
-
 import pytest
 
 from shared.update_platform import (
@@ -26,7 +20,7 @@ from shared.update_release import is_allowed_download_url
         ("darwin", "BAKLOG-macos.zip", "BAKLOG-macos.sha256", "BAKLOG", "BAKLOG Tray", "apply_update.sh"),
     ],
 )
-def test_platform_constants(platform, zip_name, sha_name, server, tray, script) -> None:
+def test_platform_constants(platform, zip_name, sha_name, server, tray, script):
     assert stable_zip_name(platform) == zip_name
     assert stable_sha256_name(platform) == sha_name
     assert server_binary_name(platform) == server
@@ -35,22 +29,19 @@ def test_platform_constants(platform, zip_name, sha_name, server, tray, script) 
     assert required_bundle_files(platform) == (server, tray)
 
 
-@pytest.mark.parametrize(
-    "platform",
-    ["win32", "darwin"],
-)
-def test_is_in_app_apply_platform(platform, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_is_in_app_apply_platform(platform, monkeypatch):
     monkeypatch.setattr("sys.platform", platform)
     assert is_in_app_apply_platform() is True
 
 
-def test_allowed_download_urls_for_macos_asset() -> None:
+def test_allowed_download_urls_for_macos_asset():
     url = "https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-macos.zip"
     assert is_allowed_download_url(url) is True
 
 
 @pytest.mark.no_leak_check
-def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_launch_apply_subprocess_darwin(monkeypatch, tmp_path):
     monkeypatch.setattr("shared.update_platform.sys.platform", "darwin")
     script = tmp_path / "apply_update.sh"
     script.write_text("#!/bin/bash\n", encoding="utf-8")
@@ -58,7 +49,7 @@ def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_pat
     manifest.write_text("{}", encoding="utf-8")
     install = tmp_path / "install"
     install.mkdir()
-    calls: list[list[str]] = []
+    calls = []
 
     class FakePopen:
         def __init__(self, cmd, **kwargs):
@@ -78,7 +69,7 @@ def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
 
 @pytest.mark.no_leak_check
-def test_launch_apply_subprocess_win32(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_launch_apply_subprocess_win32(monkeypatch, tmp_path):
     monkeypatch.setattr("shared.update_platform.sys.platform", "win32")
     script = tmp_path / "apply_update.ps1"
     script.write_text("param()", encoding="utf-8")
@@ -86,7 +77,7 @@ def test_launch_apply_subprocess_win32(monkeypatch: pytest.MonkeyPatch, tmp_path
     manifest.write_text("{}", encoding="utf-8")
     install = tmp_path / "install"
     install.mkdir()
-    calls: list[list[str]] = []
+    calls = []
 
     class FakePopen:
         def __init__(self, cmd, **kwargs):

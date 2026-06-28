@@ -1,18 +1,12 @@
-"""Regression smoke: fetcher registry + auth platform matrix."""
-
-from __future__ import annotations
-
 import importlib
 import sys
-
-import pytest
 
 from auth.registry import PROVIDERS
 from fetchers.registry import entries_by_key
 from shared.platform_support import platform_supported
 
 
-def test_manifest_loads_all_fetcher_scripts() -> None:
+def test_manifest_loads_all_fetcher_scripts():
     entries = entries_by_key()
     assert len(entries) >= 20
     for key, entry in entries.items():
@@ -23,7 +17,7 @@ def test_manifest_loads_all_fetcher_scripts() -> None:
         assert callable(getattr(mod, "main", None)), f"{key} missing main()"
 
 
-def test_amazon_launcher_blocked_off_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_amazon_launcher_blocked_off_windows(monkeypatch):
     import fetchers.fetch_amazon as fetch_amazon
 
     monkeypatch.setattr(sys, "platform", "darwin")
@@ -32,12 +26,12 @@ def test_amazon_launcher_blocked_off_windows(monkeypatch: pytest.MonkeyPatch) ->
     assert fetch_amazon.main() == 1
 
 
-def test_gog_galaxy_supported_on_darwin() -> None:
+def test_gog_galaxy_supported_on_darwin():
     gog = PROVIDERS["gog_galaxy"]
     assert "darwin" in gog.platforms
 
 
-def test_browser_providers_available_everywhere() -> None:
+def test_browser_providers_available_everywhere():
     for key in ("steam", "epic", "gog"):
         provider = PROVIDERS[key]
         assert provider.platforms == () or platform_supported(provider.platforms)

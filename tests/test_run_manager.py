@@ -1,6 +1,3 @@
-"""Tests for RunManager queue, cancel, and persistence."""
-from __future__ import annotations
-
 import json
 import threading
 import time
@@ -10,15 +7,13 @@ import pytest
 
 import server
 
-# Whole module is subprocess/timing-heavy (real Popen spawns + watchdog polling).
-# It dominates CI wall time, so it runs on the dedicated Ubuntu "slow" lane and is
-# excluded from the Windows/macOS smoke jobs. Run locally with `-m slow`.
 pytestmark = pytest.mark.slow
 
 
 @pytest.fixture()
-def runs_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def runs_env(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
+
     def _runs_dir_fn(*, profile_id=None):
         return runs_dir
 
@@ -68,7 +63,7 @@ def runs_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         },
     )
     mgr = server.RunManager(runs_dir=runs_dir, enable_watchdog=False)
-    yield mgr, runs_dir
+    yield (mgr, runs_dir)
     try:
         mgr.cancel_all()
     except Exception:
@@ -87,8 +82,7 @@ def test_submit_rejects_duplicate_key(runs_env):
         mgr.submit("demo")
 
 
-def test_submit_rejects_active_after_removed_from_pending(runs_env) -> None:
-    """cancel() drops a run from _pending while _active is still finishing."""
+def test_submit_rejects_active_after_removed_from_pending(runs_env):
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
     run.status = "cancelling"
@@ -118,8 +112,7 @@ def test_cancel_all_clears_active_and_queue(runs_env):
     assert snap["queue"] == []
 
 
-def test_resync_stalled_queue_recovers_dead_worker(runs_env) -> None:
-    """Queued runs in _pending with an empty worker queue must execute after resync."""
+def test_resync_stalled_queue_recovers_dead_worker(runs_env):
     mgr, runs_dir = runs_env
     dead = threading.Thread(target=lambda: None)
     dead.start()
@@ -134,18 +127,18 @@ def test_resync_stalled_queue_recovers_dead_worker(runs_env) -> None:
     deadline = time.time() + 10
     while time.time() < deadline:
         snap = mgr.snapshot()
-        if not snap["active"] and not snap["queue"]:
-            if any(h.get("id") == run.id for h in snap["history"]):
+        if not snap["active"] and (not snap["queue"]):
+            if any((h.get("id") == run.id for h in snap["history"])):
                 break
         time.sleep(0.05)
     else:
         pytest.fail(f"resynced run did not finish: {mgr.snapshot()}")
 
 
-def test_cancel_all_returns_before_async_kill(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cancel_all_returns_before_async_kill(runs_env, monkeypatch):
     mgr, _ = runs_env
 
-    def slow_kill(pid: int) -> None:
+    def slow_kill(pid):
         time.sleep(2)
 
     monkeypatch.setattr(server, "_terminate_pid", slow_kill)
@@ -161,13 +154,10 @@ def test_cancel_all_returns_before_async_kill(runs_env, monkeypatch: pytest.Monk
     assert summaries
 
 
-def test_cancel_schedules_sync_completion_when_worker_dead(
-    runs_env, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When the worker thread is dead, cancel must not rely on it to finalize."""
-    completed: list[str] = []
+def test_cancel_schedules_sync_completion_when_worker_dead(runs_env, monkeypatch):
+    completed = []
 
-    def _record_complete(_mgr: server.RunManager, run: server.Run) -> None:
+    def _record_complete(_mgr, run):
         completed.append(run.id)
         run.status = "cancelled"
         run.exit_code = -1
@@ -178,11 +168,7 @@ def test_cancel_schedules_sync_completion_when_worker_dead(
 
     mgr, runs_dir = runs_env
     monkeypatch.setattr(server, "_kill_pids_async", lambda _pids: None)
-    monkeypatch.setattr(
-        mgr,
-        "_complete_cancel_after_kill",
-        lambda run: _record_complete(mgr, run),
-    )
+    monkeypatch.setattr(mgr, "_complete_cancel_after_kill", lambda run: _record_complete(mgr, run))
     dead = threading.Thread(target=lambda: None)
     dead.start()
     dead.join()
@@ -191,10 +177,10 @@ def test_cancel_schedules_sync_completion_when_worker_dead(
     class _FakeProc:
         pid = 424242
 
-        def poll(self) -> None:
+        def poll(self):
             return None
 
-        def wait(self, timeout: float | None = None) -> int:
+        def wait(self, timeout=None):
             return 0
 
     run = server.Run("demo", runs_dir=runs_dir)
@@ -208,10 +194,10 @@ def test_cancel_schedules_sync_completion_when_worker_dead(
     assert err is None
     assert cancelled is not None
     assert completed == [run.id]
-    assert any(h.get("id") == run.id for h in mgr.snapshot()["history"])
+    assert any((h.get("id") == run.id for h in mgr.snapshot()["history"]))
 
 
-def test_force_reset_clears_queue(runs_env) -> None:
+def test_force_reset_clears_queue(runs_env):
     mgr, _ = runs_env
     mgr.submit("demo")
     try:
@@ -227,7 +213,7 @@ def test_force_reset_clears_queue(runs_env) -> None:
     assert not snap["queue"]
 
 
-def test_force_finalize_stuck_cancelling(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_force_finalize_stuck_cancelling(runs_env, monkeypatch):
     monkeypatch.setattr(server, "CANCEL_STUCK_GRACE_SEC", 0.01)
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
@@ -240,12 +226,10 @@ def test_force_finalize_stuck_cancelling(runs_env, monkeypatch: pytest.MonkeyPat
     mgr._force_finalize_stuck_cancelling()
     snap = mgr.snapshot()
     assert snap["active"] is None
-    assert any(h.get("id") == run.id for h in snap["history"])
+    assert any((h.get("id") == run.id for h in snap["history"]))
 
 
-def test_force_finalize_orphaned_active_run(
-    runs_env, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_force_finalize_orphaned_active_run(runs_env, monkeypatch):
     monkeypatch.setattr(server, "STUCK_NO_PROC_GRACE_SEC", 0.01)
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
@@ -259,15 +243,13 @@ def test_force_finalize_orphaned_active_run(
     mgr._force_finalize_orphaned_runs()
     snap = mgr.snapshot()
     assert snap["active"] is None
-    hist = next(h for h in snap["history"] if h.get("id") == run.id)
+    hist = next((h for h in snap["history"] if h.get("id") == run.id))
     assert hist["status"] == "failed"
     assert hist["exit_code"] == -1
     assert "no live subprocess" in (hist.get("note") or "")
 
 
-def test_orphaned_reaper_spares_live_process(
-    runs_env, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_orphaned_reaper_spares_live_process(runs_env, monkeypatch):
     monkeypatch.setattr(server, "STUCK_NO_PROC_GRACE_SEC", 0.01)
 
     class _LiveProc:
@@ -289,12 +271,10 @@ def test_orphaned_reaper_spares_live_process(
     snap = mgr.snapshot()
     assert snap["active"] is not None
     assert snap["active"]["id"] == run.id
-    assert not any(h.get("id") == run.id for h in snap["history"])
+    assert not any((h.get("id") == run.id for h in snap["history"]))
 
 
-def test_orphaned_reaper_one_cycle_grace(
-    runs_env, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_orphaned_reaper_one_cycle_grace(runs_env, monkeypatch):
     monkeypatch.setattr(server, "STUCK_NO_PROC_GRACE_SEC", 0.01)
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
@@ -312,7 +292,7 @@ def test_orphaned_reaper_one_cycle_grace(
     mgr._force_finalize_orphaned_runs()
     snap = mgr.snapshot()
     assert snap["active"] is None
-    assert any(h.get("id") == run.id for h in snap["history"])
+    assert any((h.get("id") == run.id for h in snap["history"]))
 
 
 def test_cancel_queued_run(runs_env):
@@ -328,14 +308,14 @@ def test_cancel_queued_run(runs_env):
     mgr._queue.put(run)
     deadline = time.time() + 5
     while time.time() < deadline:
-        if any(h.get("id") == run.id for h in mgr.snapshot()["history"]):
+        if any((h.get("id") == run.id for h in mgr.snapshot()["history"])):
             break
         time.sleep(0.05)
     else:
         pytest.fail("cancelled run was not finalized into history")
 
 
-def test_finalize_run_is_idempotent(runs_env) -> None:
+def test_finalize_run_is_idempotent(runs_env):
     mgr, runs_dir = runs_env
     run = mgr.submit("demo")
     run.status = "cancelled"
@@ -344,10 +324,10 @@ def test_finalize_run_is_idempotent(runs_env) -> None:
     run.mark_finished()
     mgr._finalize_run(run)
     hist = server._load_run_history_from(runs_dir / "history.json")
-    assert sum(1 for h in hist if h.get("id") == run.id) == 1
+    assert sum((1 for h in hist if h.get("id") == run.id)) == 1
     mgr._finalize_run(run)
     hist2 = server._load_run_history_from(runs_dir / "history.json")
-    assert sum(1 for h in hist2 if h.get("id") == run.id) == 1
+    assert sum((1 for h in hist2 if h.get("id") == run.id)) == 1
 
 
 def test_history_persisted_on_finish(runs_env):
@@ -356,14 +336,13 @@ def test_history_persisted_on_finish(runs_env):
     deadline = time.time() + 10
     while time.time() < deadline:
         snap = mgr.snapshot()
-        if not snap["active"] and not snap["queue"]:
+        if not snap["active"] and (not snap["queue"]):
             hist = snap["history"]
             if hist and hist[0]["id"] == run.id:
                 break
         time.sleep(0.05)
     else:
         pytest.fail("run did not finish in time")
-
     history_file = runs_dir / "history.json"
     assert history_file.exists()
     saved = json.loads(history_file.read_text(encoding="utf-8"))
@@ -382,7 +361,7 @@ def test_run_log_replay_from_disk(runs_env):
     assert (runs_dir / f"{run.id}.jsonl").exists()
 
 
-def test_stall_watchdog_emits_notice(runs_env, monkeypatch: pytest.MonkeyPatch):
+def test_stall_watchdog_emits_notice(runs_env, monkeypatch):
     monkeypatch.setattr(server, "STALL_FIRST_NOTICE_SEC", 0.2)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
     monkeypatch.setattr(server, "STALL_REPEAT_SEC", 0.5)
@@ -405,7 +384,7 @@ def test_stall_watchdog_emits_notice(runs_env, monkeypatch: pytest.MonkeyPatch):
     poll_deadline = time.time() + 10
     while time.time() < poll_deadline:
         replay = run.replay_lines()
-        if any("no output for" in m.get("text", "") for m in replay):
+        if any(("no output for" in m.get("text", "") for m in replay)):
             saw_stall = True
             break
         time.sleep(0.05)
@@ -415,30 +394,18 @@ def test_stall_watchdog_emits_notice(runs_env, monkeypatch: pytest.MonkeyPatch):
     drain = time.time() + 5
     while time.time() < drain:
         snap = mgr.snapshot()
-        if not snap["active"] and not snap["queue"]:
+        if not snap["active"] and (not snap["queue"]):
             break
         time.sleep(0.05)
     time.sleep(0.2)
 
 
-def test_reap_orphan_on_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_reap_orphan_on_startup(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     active = runs_dir / "active.json"
     active.write_text(
-        json.dumps(
-            {
-                "runs": [
-                    {
-                        "id": "deadbeef",
-                        "pid": 999999,
-                        "key": "demo",
-                        "label": "Demo",
-                        "started_at": 1.0,
-                    }
-                ]
-            }
-        ),
+        json.dumps({"runs": [{"id": "deadbeef", "pid": 999999, "key": "demo", "label": "Demo", "started_at": 1.0}]}),
         encoding="utf-8",
     )
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
@@ -479,11 +446,11 @@ def test_submit_queue_full_returns_error(runs_env):
 
 def test_submit_atomic_under_concurrency(runs_env):
     mgr, runs_dir = runs_env
-    errors: list[str] = []
+    errors = []
     lock = threading.Lock()
     barrier = threading.Barrier(3)
 
-    def worker(key: str) -> None:
+    def worker(key):
         barrier.wait(timeout=5)
         try:
             mgr.submit(key)
@@ -491,14 +458,12 @@ def test_submit_atomic_under_concurrency(runs_env):
             with lock:
                 errors.append(str(exc))
 
-    # Pre-fill the single slot so concurrent submits all race for a full queue.
     running = server.Run("demo", runs_dir=runs_dir)
     running.status = "running"
     with mgr._lock:
         mgr._pending.append(running)
         mgr._runs_by_id[running.id] = running
         mgr._active = running
-
     t1 = threading.Thread(target=worker, args=("demo2",))
     t2 = threading.Thread(target=worker, args=("demo2",))
     t3 = threading.Thread(target=worker, args=("demo2",))
@@ -511,7 +476,7 @@ def test_submit_atomic_under_concurrency(runs_env):
     assert len(errors) == 3
 
 
-def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pytest.MonkeyPatch):
+def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch):
     monkeypatch.setattr(server, "LAUNCH_TIMEOUT_SEC", 0.1)
     mgr, _runs_dir = runs_env
     launch_started = threading.Event()
@@ -524,9 +489,6 @@ def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pyte
 
     def blocking_popen(*args, **kwargs):
         launch_started.set()
-        # LAUNCH_TIMEOUT_SEC is mocked to 0.1s above, so the timeout fires long
-        # before this returns. Keep the sleep short so the abandoned launch thread
-        # does not linger for a full minute after the assertion already passed.
         time.sleep(5)
         return _LateProc()
 
@@ -537,7 +499,7 @@ def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pyte
     while time.time() < deadline:
         snap = mgr.snapshot()
         hist = snap["history"]
-        if hist and hist[0]["id"] == run.id and hist[0]["status"] == "failed":
+        if hist and hist[0]["id"] == run.id and (hist[0]["status"] == "failed"):
             break
         time.sleep(0.05)
     else:
@@ -546,7 +508,7 @@ def test_launch_timeout_marks_failed_and_admits_next(runs_env, monkeypatch: pyte
     assert second.id != run.id
 
 
-def test_cancel_during_launch_does_not_leave_running_status(runs_env, monkeypatch: pytest.MonkeyPatch):
+def test_cancel_during_launch_does_not_leave_running_status(runs_env, monkeypatch):
     mgr, _ = runs_env
     gate = threading.Event()
     real_popen = server.subprocess.Popen
@@ -571,7 +533,7 @@ def test_cancel_during_launch_does_not_leave_running_status(runs_env, monkeypatc
     assert run.status != "running"
 
 
-def test_max_runtime_cap_kills_run(runs_env, monkeypatch: pytest.MonkeyPatch):
+def test_max_runtime_cap_kills_run(runs_env, monkeypatch):
     monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1.5)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
     monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 9999)
@@ -581,11 +543,7 @@ def test_max_runtime_cap_kills_run(runs_env, monkeypatch: pytest.MonkeyPatch):
         "trickle",
         {
             "label": "Trickle",
-            "argv": [
-                server.sys.executable,
-                "-c",
-                "import time\nwhile True:\n print('tick')\n time.sleep(0.2)",
-            ],
+            "argv": [server.sys.executable, "-c", "import time\nwhile True:\n print('tick')\n time.sleep(0.2)"],
             "refreshArgs": [],
             "metaKey": "trickle",
             "group": "library",
@@ -598,7 +556,7 @@ def test_max_runtime_cap_kills_run(runs_env, monkeypatch: pytest.MonkeyPatch):
     deadline = time.time() + 20
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any("maximum runtime" in m.get("text", "") for m in replay):
+        if any(("maximum runtime" in m.get("text", "") for m in replay)):
             saw_cap = True
             break
         time.sleep(0.05)
@@ -608,45 +566,37 @@ def test_max_runtime_cap_kills_run(runs_env, monkeypatch: pytest.MonkeyPatch):
     assert run.exit_code == -1
 
 
-def test_max_run_seconds_for_key_uses_fetcher_override(monkeypatch: pytest.MonkeyPatch):
+def test_max_run_seconds_for_key_uses_fetcher_override(monkeypatch):
     monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1800.0)
-    monkeypatch.setitem(
-        server.FETCHERS,
-        "hltb",
-        {**(server.FETCHERS.get("hltb") or {}), "maxRunSeconds": 7200},
-    )
+    monkeypatch.setitem(server.FETCHERS, "hltb", {**(server.FETCHERS.get("hltb") or {}), "maxRunSeconds": 7200})
     assert server._max_run_seconds_for_key("hltb") == 7200.0
     assert server._max_run_seconds_for_key("steam") == 1800.0
 
 
-def test_max_run_seconds_for_key_enforces_sixty_second_floor(monkeypatch: pytest.MonkeyPatch):
+def test_max_run_seconds_for_key_enforces_sixty_second_floor(monkeypatch):
     monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1800.0)
     monkeypatch.setitem(server.FETCHERS, "fast", {"maxRunSeconds": 5.0})
     assert server._max_run_seconds_for_key("fast") == 60.0
 
 
-def test_max_run_seconds_for_key_zero_means_no_cap(monkeypatch: pytest.MonkeyPatch):
-    # 0 (or negative) is the "no runtime cap" sentinel -> infinity, so a long
-    # HLTB enrich on a big library is never force-killed by the runtime ceiling.
+def test_max_run_seconds_for_key_zero_means_no_cap(monkeypatch):
     monkeypatch.setattr(server, "MAX_RUN_SECONDS", 1800.0)
     monkeypatch.setitem(server.FETCHERS, "hltb", {"maxRunSeconds": 0})
     assert server._max_run_seconds_for_key("hltb") == float("inf")
 
 
 def test_manifest_registration_keeps_zero_cap_sentinel():
-    # The shipped HLTB manifest entry must register as the uncapped sentinel
-    # (0), not get rewritten to the 60s floor.
     assert server.FETCHERS["hltb"]["maxRunSeconds"] == 0
     assert server._max_run_seconds_for_key("hltb") == float("inf")
 
 
-def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPatch):
+def test_per_fetcher_max_runtime_override(runs_env, monkeypatch):
     monkeypatch.setattr(server, "MAX_RUN_SECONDS", 9999.0)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
     monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 9999)
     real_cap = server._max_run_seconds_for_key
 
-    def _cap_for_long_enrich(key: str) -> float:
+    def _cap_for_long_enrich(key):
         if key == "long_enrich":
             return 2.0
         return real_cap(key)
@@ -658,11 +608,7 @@ def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPa
         "long_enrich",
         {
             "label": "Long enrich",
-            "argv": [
-                server.sys.executable,
-                "-c",
-                "print('start'); import time; time.sleep(10)",
-            ],
+            "argv": [server.sys.executable, "-c", "print('start'); import time; time.sleep(10)"],
             "refreshArgs": [],
             "metaKey": "long_enrich",
             "group": "enrich",
@@ -676,7 +622,7 @@ def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPa
     deadline = time.time() + 30
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any("maximum runtime (2" in m.get("text", "") for m in replay):
+        if any(("maximum runtime (2" in m.get("text", "") for m in replay)):
             saw_cap = True
             break
         time.sleep(0.05)
@@ -685,7 +631,7 @@ def test_per_fetcher_max_runtime_override(runs_env, monkeypatch: pytest.MonkeyPa
     assert run.status == "failed"
 
 
-def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.MonkeyPatch):
+def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch):
     monkeypatch.setattr(server, "STALL_FIRST_NOTICE_SEC", 0.2)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
     monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 0.5)
@@ -695,11 +641,7 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.Monke
         "one_line",
         {
             "label": "One line",
-            "argv": [
-                server.sys.executable,
-                "-c",
-                "print('started'); import time; time.sleep(5)",
-            ],
+            "argv": [server.sys.executable, "-c", "print('started'); import time; time.sleep(5)"],
             "refreshArgs": [],
             "metaKey": "one_line",
             "group": "library",
@@ -712,7 +654,7 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.Monke
     deadline = time.time() + 15
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any("force-killing" in m.get("text", "") for m in replay):
+        if any(("force-killing" in m.get("text", "") for m in replay)):
             saw_kill = True
             break
         time.sleep(0.05)
@@ -720,16 +662,7 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch: pytest.Monke
     assert run._finished.wait(timeout=10)
 
 
-def test_heartbeat_keeps_long_run_alive(runs_env, monkeypatch: pytest.MonkeyPatch):
-    """Positive guard for the find_fetcher_heartbeat_loops fix: a run that keeps
-    emitting stdout faster than SILENT_STALL_KILL_SEC must survive past that
-    window. This is exactly what HeartbeatTimer / run_with_heartbeat / per-item
-    progress lines do in the long fetcher + enrich loops, so the watchdog's
-    reset-on-output behavior (last_line_at = now) is what keeps healthy long
-    pulls alive. Mirrors the negative test_stall_kill_after_single_stdout_line."""
-    # Stall window (0.6s) is shorter than the total run (~1.5s) but longer than
-    # each inter-line gap (0.1s): the run only survives if every printed line
-    # resets the stall timer.
+def test_heartbeat_keeps_long_run_alive(runs_env, monkeypatch):
     monkeypatch.setattr(server, "STALL_FIRST_NOTICE_SEC", 0.2)
     monkeypatch.setattr(server, "STALL_POLL_SEC", 0.05)
     monkeypatch.setattr(server, "SILENT_STALL_KILL_SEC", 0.6)
@@ -743,11 +676,7 @@ def test_heartbeat_keeps_long_run_alive(runs_env, monkeypatch: pytest.MonkeyPatc
             "argv": [
                 server.sys.executable,
                 "-c",
-                "import time\n"
-                "for i in range(15):\n"
-                " print('  \u00b7 still working', i, flush=True)\n"
-                " time.sleep(0.1)\n"
-                "print('done', flush=True)",
+                "import time\nfor i in range(15):\n print('  · still working', i, flush=True)\n time.sleep(0.1)\nprint('done', flush=True)",
             ],
             "refreshArgs": [],
             "metaKey": "heartbeating",
@@ -760,37 +689,24 @@ def test_heartbeat_keeps_long_run_alive(runs_env, monkeypatch: pytest.MonkeyPatc
     assert run._finished.wait(timeout=20)
     replay = run.replay_lines()
     texts = [m.get("text", "") for m in replay]
-    assert not any("force-killing" in t for t in texts), (
+    assert not any(("force-killing" in t for t in texts)), (
         "heartbeating run was force-killed despite emitting periodic stdout"
     )
-    assert any("still working" in t for t in texts), "expected heartbeat lines in run log"
-    assert any("done" in t for t in texts), "expected the run to reach completion"
+    assert any(("still working" in t for t in texts)), "expected heartbeat lines in run log"
+    assert any(("done" in t for t in texts)), "expected the run to reach completion"
     assert run.exit_code == 0
     assert run.status == "done"
 
 
-def test_durable_queue_skips_when_key_already_done(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_durable_queue_skips_when_key_already_done(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     hist = runs_dir / "history.json"
     hist.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "finished-1",
-                    "key": "demo",
-                    "status": "done",
-                    "label": "Demo",
-                }
-            ]
-        ),
-        encoding="utf-8",
+        json.dumps([{"id": "finished-1", "key": "demo", "status": "done", "label": "Demo"}]), encoding="utf-8"
     )
     queue_file = runs_dir / "queue.json"
-    queue_file.write_text(
-        json.dumps({"runs": [{"id": "stale", "key": "demo", "refresh": False}]}),
-        encoding="utf-8",
-    )
+    queue_file.write_text(json.dumps({"runs": [{"id": "stale", "key": "demo", "refresh": False}]}), encoding="utf-8")
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
     monkeypatch.setattr(server, "RUN_HISTORY_FILE", hist)
@@ -815,14 +731,11 @@ def test_durable_queue_skips_when_key_already_done(tmp_path: Path, monkeypatch: 
     mgr.shutdown()
 
 
-def test_durable_queue_restored_on_startup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_durable_queue_restored_on_startup(tmp_path, monkeypatch):
     runs_dir = tmp_path / "runs"
     runs_dir.mkdir()
     queue_file = runs_dir / "queue.json"
-    queue_file.write_text(
-        json.dumps({"runs": [{"id": "old", "key": "demo", "refresh": False}]}),
-        encoding="utf-8",
-    )
+    queue_file.write_text(json.dumps({"runs": [{"id": "old", "key": "demo", "refresh": False}]}), encoding="utf-8")
     monkeypatch.setattr(server, "RUNS_DIR", runs_dir)
     monkeypatch.setattr(server, "ACTIVE_RUNS_FILE", runs_dir / "active.json")
     monkeypatch.setattr(server, "RUN_HISTORY_FILE", runs_dir / "history.json")
@@ -846,7 +759,7 @@ def test_durable_queue_restored_on_startup(tmp_path: Path, monkeypatch: pytest.M
     mgr.shutdown()
 
 
-def test_has_runs_for_profile(runs_env) -> None:
+def test_has_runs_for_profile(runs_env):
     mgr, runs_dir = runs_env
     work_run = server.Run("demo", runs_dir=runs_dir, profile_id="work")
     work_run.status = "queued"
@@ -860,7 +773,7 @@ def test_has_runs_for_profile(runs_env) -> None:
     assert mgr.has_runs_for_profile("missing") is False
 
 
-def test_has_runs_for_profile_includes_active_not_in_pending(runs_env) -> None:
+def test_has_runs_for_profile_includes_active_not_in_pending(runs_env):
     mgr, runs_dir = runs_env
     active = server.Run("demo", runs_dir=runs_dir, profile_id="work")
     active.status = "running"
@@ -871,7 +784,7 @@ def test_has_runs_for_profile_includes_active_not_in_pending(runs_env) -> None:
     assert mgr.has_runs_for_profile("play") is False
 
 
-def test_cancel_all_and_wait_finishes_queued(runs_env) -> None:
+def test_cancel_all_and_wait_finishes_queued(runs_env):
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
     with mgr._lock:
@@ -883,7 +796,7 @@ def test_cancel_all_and_wait_finishes_queued(runs_env) -> None:
     assert run._finished.is_set()
 
 
-def test_cancel_all_and_wait_reports_stragglers(runs_env) -> None:
+def test_cancel_all_and_wait_reports_stragglers(runs_env):
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)
     run.status = "cancelling"
@@ -896,7 +809,7 @@ def test_cancel_all_and_wait_reports_stragglers(runs_env) -> None:
     assert not run._finished.is_set()
 
 
-def test_cancel_all_and_wait_includes_active_not_in_pending(runs_env) -> None:
+def test_cancel_all_and_wait_includes_active_not_in_pending(runs_env):
     mgr, runs_dir = runs_env
     active = server.Run("demo", runs_dir=runs_dir)
     active.status = "running"
@@ -909,7 +822,7 @@ def test_cancel_all_and_wait_includes_active_not_in_pending(runs_env) -> None:
     assert active._finished.is_set()
 
 
-def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch):
     mgr, _runs_dir = runs_env
     monkeypatch.setitem(
         server.FETCHERS,
@@ -936,34 +849,22 @@ def test_shutdown_cancels_in_flight_run(runs_env, monkeypatch: pytest.MonkeyPatc
     assert snap["active"] is None
 
 
-def test_manifest_fetcher_argv_uses_absolute_script_path() -> None:
-    """Manifest scripts launch via an absolute path so cwd never matters."""
+def test_manifest_fetcher_argv_uses_absolute_script_path():
     spec = server.FETCHERS["steam"]
     script = spec["argv"][1]
     assert Path(script).is_absolute()
     assert script == str(server.ROOT / "fetchers/fetch_games.py")
 
 
-def test_execute_runs_from_repo_root_for_nondefault_profile(
-    runs_env, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Fetchers must run with cwd=repo root even on a non-default profile.
-
-    Regression guard for the bug where cwd was the profile data dir
-    (profiles/<id>/), which has no fetch_*.py and broke every UI run on
-    Supabase/account profiles. Profile scoping is via BAKLOG_PROFILE, not cwd.
-    """
+def test_execute_runs_from_repo_root_for_nondefault_profile(runs_env, monkeypatch):
     import auth.manager
 
     mgr, _runs_dir = runs_env
     monkeypatch.setattr(server, "get_active_profile_id", lambda: "work")
     monkeypatch.setattr(
-        auth.manager,
-        "subprocess_env_for_profile",
-        lambda pid: {"BAKLOG_PROFILE": pid, "PYTHONUNBUFFERED": "1"},
+        auth.manager, "subprocess_env_for_profile", lambda pid: {"BAKLOG_PROFILE": pid, "PYTHONUNBUFFERED": "1"}
     )
-
-    captured: dict[str, object] = {}
+    captured = {}
     real_popen = server.subprocess.Popen
 
     def capturing_popen(argv, **kwargs):
@@ -981,17 +882,15 @@ def test_execute_runs_from_repo_root_for_nondefault_profile(
         )
 
     monkeypatch.setattr(server, "popen_fetcher", capturing_popen)
-
     run = mgr.submit("steam")
     assert run.profile_id == "work"
     assert run._finished.wait(timeout=10)
-
     assert captured["cwd"] == str(server.ROOT)
     assert captured["argv"][1] == str(server.ROOT / "fetchers/fetch_games.py")
 
 
 @pytest.fixture()
-def internal_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
+def internal_jobs(monkeypatch):
     monkeypatch.setitem(
         server.INTERNAL_JOBS,
         "buildClaims",
@@ -1016,7 +915,7 @@ def internal_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def test_internal_lane_parallel_to_fetcher(runs_env, internal_jobs) -> None:
+def test_internal_lane_parallel_to_fetcher(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
     running = server.Run("demo", runs_dir=runs_dir)
     running.status = "running"
@@ -1024,37 +923,29 @@ def test_internal_lane_parallel_to_fetcher(runs_env, internal_jobs) -> None:
         mgr._pending.append(running)
         mgr._runs_by_id[running.id] = running
         mgr._active = running
-
     internal = mgr.submit_internal("buildClaims")
-
     assert internal._internal
     snap = mgr.snapshot()
     assert snap["active"]["key"] == "demo"
     assert snap["queue"] == []
 
 
-def test_fetcher_lane_parallel_to_internal(runs_env, internal_jobs) -> None:
+def test_fetcher_lane_parallel_to_internal(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
-    internal = server.Run(
-        "buildClaims",
-        runs_dir=runs_dir,
-        internal=True,
-    )
+    internal = server.Run("buildClaims", runs_dir=runs_dir, internal=True)
     internal.status = "running"
     with mgr._lock:
         mgr._pending.append(internal)
         mgr._runs_by_id[internal.id] = internal
         mgr._internal_active = internal
-
     fetcher = mgr.submit("demo")
-
     assert not fetcher._internal
     snap = mgr.snapshot()
     assert snap["internal_active"]["key"] == "buildClaims"
     assert snap["active"]["key"] == "demo"
 
 
-def test_enrich_lane_parallel_to_fetcher(runs_env) -> None:
+def test_enrich_lane_parallel_to_fetcher(runs_env):
     mgr, runs_dir = runs_env
     monkeypatch_item = {
         "label": "Enrich demo",
@@ -1073,7 +964,6 @@ def test_enrich_lane_parallel_to_fetcher(runs_env) -> None:
             mgr._pending.append(running)
             mgr._runs_by_id[running.id] = running
             mgr._active = running
-
         enrich = mgr.submit("enrich_demo")
         assert enrich._enrich
         snap = mgr.snapshot()
@@ -1083,19 +973,14 @@ def test_enrich_lane_parallel_to_fetcher(runs_env) -> None:
         server.FETCHERS.pop("enrich_demo", None)
 
 
-def test_internal_lane_still_serializes_among_itself(runs_env, internal_jobs) -> None:
+def test_internal_lane_still_serializes_among_itself(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
-    running = server.Run(
-        "buildClaims",
-        runs_dir=runs_dir,
-        internal=True,
-    )
+    running = server.Run("buildClaims", runs_dir=runs_dir, internal=True)
     running.status = "running"
     with mgr._lock:
         mgr._pending.append(running)
         mgr._runs_by_id[running.id] = running
         mgr._internal_active = running
-
     with pytest.raises(ValueError, match="admin job"):
         mgr.submit_internal("claimSources")
 
@@ -1110,50 +995,42 @@ def _seed_both_lanes_running(mgr, runs_dir):
         mgr._internal_active = internal
         mgr._runs_by_id[fetcher.id] = fetcher
         mgr._runs_by_id[internal.id] = internal
-    return fetcher, internal
+    return (fetcher, internal)
 
 
-def test_cancel_all_lane_fetcher_spares_internal(runs_env, internal_jobs) -> None:
+def test_cancel_all_lane_fetcher_spares_internal(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
     fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
-
     cancelled = mgr.cancel_all(lane="fetcher")
-
     assert {c["id"] for c in cancelled} == {fetcher.id}
     assert fetcher._finished.is_set()
     assert not internal._finished.is_set()
     assert mgr._internal_active is internal
 
 
-def test_cancel_all_lane_internal_spares_fetcher(runs_env, internal_jobs) -> None:
+def test_cancel_all_lane_internal_spares_fetcher(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
     fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
-
     cancelled = mgr.cancel_all(lane="internal")
-
     assert {c["id"] for c in cancelled} == {internal.id}
     assert internal._finished.is_set()
     assert not fetcher._finished.is_set()
     assert mgr._active is fetcher
 
 
-def test_cancel_all_no_lane_cancels_both(runs_env, internal_jobs) -> None:
+def test_cancel_all_no_lane_cancels_both(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
     fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
-
     cancelled = mgr.cancel_all()
-
     assert {c["id"] for c in cancelled} == {fetcher.id, internal.id}
     assert fetcher._finished.is_set()
     assert internal._finished.is_set()
 
 
-def test_force_reset_lane_fetcher_spares_internal(runs_env, internal_jobs) -> None:
+def test_force_reset_lane_fetcher_spares_internal(runs_env, internal_jobs):
     mgr, runs_dir = runs_env
     fetcher, internal = _seed_both_lanes_running(mgr, runs_dir)
-
     result = mgr.force_reset(lane="fetcher")
-
     assert {c["id"] for c in result["cancelled"]} == {fetcher.id}
     assert fetcher._finished.is_set()
     assert not internal._finished.is_set()
@@ -1171,27 +1048,23 @@ def _seed_fetcher_and_enrich_running(mgr, runs_dir):
         mgr._enrich_active = enrich
         mgr._runs_by_id[fetcher.id] = fetcher
         mgr._runs_by_id[enrich.id] = enrich
-    return fetcher, enrich
+    return (fetcher, enrich)
 
 
-def test_cancel_all_lane_fetcher_spares_enrich(runs_env) -> None:
+def test_cancel_all_lane_fetcher_spares_enrich(runs_env):
     mgr, runs_dir = runs_env
     fetcher, enrich = _seed_fetcher_and_enrich_running(mgr, runs_dir)
-
     cancelled = mgr.cancel_all(lane="fetcher")
-
     assert {c["id"] for c in cancelled} == {fetcher.id}
     assert fetcher._finished.is_set()
     assert not enrich._finished.is_set()
     assert mgr._enrich_active is enrich
 
 
-def test_cancel_all_lane_enrich_spares_fetcher(runs_env) -> None:
+def test_cancel_all_lane_enrich_spares_fetcher(runs_env):
     mgr, runs_dir = runs_env
     fetcher, enrich = _seed_fetcher_and_enrich_running(mgr, runs_dir)
-
     cancelled = mgr.cancel_all(lane="enrich")
-
     assert {c["id"] for c in cancelled} == {enrich.id}
     assert enrich._finished.is_set()
     assert not fetcher._finished.is_set()

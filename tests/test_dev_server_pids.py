@@ -1,31 +1,19 @@
-"""Single-instance guard helpers in shared/dev_server_pids.py.
-
-Covers port-busy detection, stale-pid self-heal, orphan reclaim, and the
-boot-time reclaim_or_exit guard moved out of server.py.
-"""
-
-from __future__ import annotations
-
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from shared import dev_server_pids as dsp
 
-# ---- port_busy ------------------------------------------------------------
 
-
-def test_port_busy_true_when_connect_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_port_busy_true_when_connect_succeeds(monkeypatch):
     monkeypatch.setattr(
-        dsp.socket,
-        "create_connection",
-        lambda *_a, **_k: MagicMock(__enter__=lambda s: s, __exit__=lambda *a: None),
+        dsp.socket, "create_connection", lambda *_a, **_k: MagicMock(__enter__=lambda s: s, __exit__=lambda *a: None)
     )
     assert dsp.port_busy("127.0.0.1", 8765) is True
 
 
-def test_port_busy_false_when_connect_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_port_busy_false_when_connect_refused(monkeypatch):
+
     def _refuse(*_a, **_k):
         raise ConnectionRefusedError
 
@@ -33,12 +21,7 @@ def test_port_busy_false_when_connect_refused(monkeypatch: pytest.MonkeyPatch) -
     assert dsp.port_busy("127.0.0.1", 8765) is False
 
 
-# ---- clear_stale_pid_file -------------------------------------------------
-
-
-def test_clear_stale_pid_file_removes_dead_pid(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_clear_stale_pid_file_removes_dead_pid(monkeypatch, tmp_path):
     pid_file = tmp_path / ".baklog_server.pid"
     pid_file.write_text("99999", encoding="utf-8")
     monkeypatch.setattr(dsp, "pid_is_python_server", lambda _pid: False)
@@ -46,9 +29,7 @@ def test_clear_stale_pid_file_removes_dead_pid(
     assert not pid_file.is_file()
 
 
-def test_clear_stale_pid_file_keeps_live_server(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_clear_stale_pid_file_keeps_live_server(monkeypatch, tmp_path):
     pid_file = tmp_path / ".baklog_server.pid"
     pid_file.write_text("4242", encoding="utf-8")
     monkeypatch.setattr(dsp, "pid_is_python_server", lambda _pid: True)
@@ -56,28 +37,21 @@ def test_clear_stale_pid_file_keeps_live_server(
     assert pid_file.is_file()
 
 
-def test_clear_stale_pid_file_missing_file_is_noop(tmp_path: Path) -> None:
+def test_clear_stale_pid_file_missing_file_is_noop(tmp_path):
     assert dsp.clear_stale_pid_file(tmp_path / "absent.pid") is False
 
 
-# ---- reclaim_stale_server -------------------------------------------------
-
-
-def test_reclaim_stale_server_kills_orphan_from_pid_file(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_reclaim_stale_server_kills_orphan_from_pid_file(monkeypatch, tmp_path):
     pid_file = tmp_path / ".baklog_server.pid"
     pid_file.write_text("4242", encoding="utf-8")
-    killed: list[int] = []
+    killed = []
     monkeypatch.setattr(dsp, "pid_is_python_server", lambda _pid: True)
     monkeypatch.setattr(dsp, "terminate_pid", lambda pid: killed.append(pid))
     assert dsp.reclaim_stale_server("127.0.0.1", 8765, pid_file) is True
     assert killed == [4242]
 
 
-def test_reclaim_stale_server_skips_non_server_pid(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_reclaim_stale_server_skips_non_server_pid(monkeypatch, tmp_path):
     pid_file = tmp_path / ".baklog_server.pid"
     pid_file.write_text("4242", encoding="utf-8")
     monkeypatch.setattr(dsp, "pid_is_python_server", lambda _pid: False)
@@ -86,21 +60,13 @@ def test_reclaim_stale_server_skips_non_server_pid(
     assert dsp.reclaim_stale_server("127.0.0.1", 8765, pid_file) is False
 
 
-# ---- reclaim_or_exit ------------------------------------------------------
-
-
-def test_reclaim_or_exit_returns_when_port_free(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_reclaim_or_exit_returns_when_port_free(monkeypatch, tmp_path):
     monkeypatch.setattr(dsp, "clear_stale_pid_file", lambda _f: False)
     monkeypatch.setattr(dsp, "port_busy", lambda *a, **k: False)
-    # No SystemExit raised.
     dsp.reclaim_or_exit("127.0.0.1", 8765, tmp_path / "pid", "busy")
 
 
-def test_reclaim_or_exit_exits_when_busy_and_no_reclaim(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_reclaim_or_exit_exits_when_busy_and_no_reclaim(monkeypatch, tmp_path):
     monkeypatch.setattr(dsp, "clear_stale_pid_file", lambda _f: False)
     monkeypatch.setattr(dsp, "port_busy", lambda *a, **k: True)
     monkeypatch.setattr(dsp, "reclaim_stale_server", lambda *a, **k: False)
@@ -109,14 +75,12 @@ def test_reclaim_or_exit_exits_when_busy_and_no_reclaim(
     assert exc.value.code == 1
 
 
-def test_reclaim_or_exit_reclaims_then_returns(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_reclaim_or_exit_reclaims_then_returns(monkeypatch, tmp_path):
     calls = {"busy": 0}
 
-    def _busy(*_a, **_k) -> bool:
+    def _busy(*_a, **_k):
         calls["busy"] += 1
-        return calls["busy"] == 1  # busy once, then the orphan's socket closes
+        return calls["busy"] == 1
 
     monkeypatch.setattr(dsp, "clear_stale_pid_file", lambda _f: False)
     monkeypatch.setattr(dsp, "port_busy", _busy)

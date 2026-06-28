@@ -1,7 +1,3 @@
-"""Tests for shared/mirror_session.py."""
-
-from __future__ import annotations
-
 import time
 
 import jwt
@@ -30,7 +26,7 @@ def auth_env(monkeypatch):
     reset_jwks_client_for_tests()
 
 
-def _pro_bearer(secret: str = "unit-test-secret", sub: str = "550e8400-e29b-41d4-a716-446655440000") -> str:
+def _pro_bearer(secret="unit-test-secret", sub="550e8400-e29b-41d4-a716-446655440000"):
     token = jwt.encode(
         {
             "sub": sub,

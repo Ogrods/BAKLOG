@@ -1,11 +1,5 @@
-"""HTTP handlers for /api/update/* POST routes (keeps server.py lean)."""
-
-from __future__ import annotations
-
 import threading
-from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any
 
 from shared.install_paths import data_root
 from shared.update_manager import get_update_manager
@@ -13,33 +7,17 @@ from shared.update_messages import enrich_update_api_payload
 from shared.update_snooze import write_dismissed_version
 
 
-def _mgr(
-    *,
-    current_version: Callable[[], str],
-    has_in_flight_runs: Callable[[], bool],
-    has_active_sessions: Callable[[], bool] | None = None,
-):
+def _mgr(*, current_version, has_in_flight_runs, has_active_sessions=None):
     return get_update_manager(
-        current_version=current_version,
-        has_in_flight_runs=has_in_flight_runs,
-        has_active_sessions=has_active_sessions,
+        current_version=current_version, has_in_flight_runs=has_in_flight_runs, has_active_sessions=has_active_sessions
     )
 
 
 def handle_update_post(
-    path: str,
-    *,
-    current_version: Callable[[], str],
-    has_in_flight_runs: Callable[[], bool],
-    has_active_sessions: Callable[[], bool] | None = None,
-    read_json_body: Callable[[], tuple[dict[str, Any] | None, str | None]],
-    send_json: Callable[[HTTPStatus, dict[str, Any]], None],
-    trigger_shutdown: Callable[[], None],
-) -> None:
+    path, *, current_version, has_in_flight_runs, has_active_sessions=None, read_json_body, send_json, trigger_shutdown
+):
     mgr = _mgr(
-        current_version=current_version,
-        has_in_flight_runs=has_in_flight_runs,
-        has_active_sessions=has_active_sessions,
+        current_version=current_version, has_in_flight_runs=has_in_flight_runs, has_active_sessions=has_active_sessions
     )
     if path == "/api/update/download":
         payload = enrich_update_api_payload(mgr.start_download())
@@ -54,11 +32,7 @@ def handle_update_post(
         status = HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST
         send_json(status, payload)
         if payload.get("ok") and payload.get("applying"):
-            threading.Thread(
-                target=trigger_shutdown,
-                name="update-apply-shutdown",
-                daemon=True,
-            ).start()
+            threading.Thread(target=trigger_shutdown, name="update-apply-shutdown", daemon=True).start()
         return
     if path == "/api/update/discard-ready":
         send_json(HTTPStatus.OK, mgr.discard_ready_update())
@@ -75,21 +49,11 @@ def handle_update_post(
     send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
 
-def handle_update_support_get(
-    path: str,
-    *,
-    current_version: Callable[[], str],
-    has_in_flight_runs: Callable[[], bool],
-    has_active_sessions: Callable[[], bool] | None = None,
-    send_json: Callable[[HTTPStatus, dict[str, Any]], None],
-) -> bool:
-    """Return True if *path* was handled."""
+def handle_update_support_get(path, *, current_version, has_in_flight_runs, has_active_sessions=None, send_json):
     from shared.server_support import build_update_check_payload
 
     mgr = _mgr(
-        current_version=current_version,
-        has_in_flight_runs=has_in_flight_runs,
-        has_active_sessions=has_active_sessions,
+        current_version=current_version, has_in_flight_runs=has_in_flight_runs, has_active_sessions=has_active_sessions
     )
     if path == "/api/update/apply-result":
         send_json(HTTPStatus.OK, {"ok": True, "result": mgr.apply_result_dict()})
@@ -99,9 +63,7 @@ def handle_update_support_get(
         send_json(
             HTTPStatus.OK,
             build_update_check_payload(
-                current_version(),
-                fetchers_in_flight=has_in_flight_runs(),
-                sign_in_active=sign_in_active,
+                current_version(), fetchers_in_flight=has_in_flight_runs(), sign_in_active=sign_in_active
             ),
         )
         return True

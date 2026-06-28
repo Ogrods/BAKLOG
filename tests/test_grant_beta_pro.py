@@ -1,15 +1,11 @@
-"""Tests for scripts/grant_beta_pro.py (hosted Pro bulk grant)."""
-
-from __future__ import annotations
-
 import scripts.grant_beta_pro as grant
 
 
-def test_main_dry_run_lists_users(monkeypatch, capsys) -> None:
+def test_main_dry_run_lists_users(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
 
-    def fake_list(_base: str, _key: str) -> list[dict]:
+    def fake_list(_base, _key):
         return [
             {
                 "id": "11111111-1111-4111-8111-111111111111",
@@ -21,11 +17,8 @@ def test_main_dry_run_lists_users(monkeypatch, capsys) -> None:
 
     monkeypatch.setattr(grant, "list_users", fake_list)
     monkeypatch.setattr(
-        grant,
-        "admin_request",
-        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not write")),
+        grant, "admin_request", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not write"))
     )
-
     rc = grant.main(["--email", "beta@example.com"])
     out = capsys.readouterr().out
     assert rc == 0
@@ -34,12 +27,12 @@ def test_main_dry_run_lists_users(monkeypatch, capsys) -> None:
     assert "'free' -> 'pro'" in out
 
 
-def test_main_apply_updates_user(monkeypatch, capsys) -> None:
+def test_main_apply_updates_user(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
-    writes: list[tuple] = []
+    writes = []
 
-    def fake_list(_base: str, _key: str) -> list[dict]:
+    def fake_list(_base, _key):
         return [
             {
                 "id": "11111111-1111-4111-8111-111111111111",
@@ -55,7 +48,6 @@ def test_main_apply_updates_user(monkeypatch, capsys) -> None:
 
     monkeypatch.setattr(grant, "list_users", fake_list)
     monkeypatch.setattr(grant, "admin_request", fake_request)
-
     rc = grant.main(["--email", "beta@example.com", "--apply"])
     out = capsys.readouterr().out
     assert rc == 0

@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Print per-store live-fetch checklist from fetchers/manifest.json."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import urllib.error
@@ -14,12 +9,12 @@ MANIFEST = ROOT / "fetchers" / "manifest.json"
 BASE = "http://127.0.0.1:8765"
 
 
-def load_fetchers() -> list[dict]:
+def load_fetchers():
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     return list(data.get("fetchers") or [])
 
 
-def ping_server() -> bool:
+def ping_server():
     try:
         with urllib.request.urlopen(f"{BASE}/api/runs", timeout=3) as resp:
             return resp.status == 200
@@ -27,21 +22,18 @@ def ping_server() -> bool:
         return False
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ping", action="store_true", help="Verify server responds on :8765")
     args = parser.parse_args()
-
     if args.ping:
         ok = ping_server()
-        print(f"Server {'up' if ok else 'down'} at {BASE}")
+        print(f"Server {('up' if ok else 'down')} at {BASE}")
         if not ok:
             return 1
-
     fetchers = load_fetchers()
     library = [f for f in fetchers if f.get("group") == "library"]
     other = [f for f in fetchers if f.get("group") != "library"]
-
     print("Pre-go-live per-store fetch checklist")
     print("=" * 40)
     for f in library:

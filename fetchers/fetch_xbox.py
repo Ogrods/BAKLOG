@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""Fetch Xbox / Microsoft Store library via OpenXBL into games_xbox.json."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import time
@@ -35,18 +30,17 @@ GAMES_XBOX_JSON = Path("games_xbox.json")
 HLTB_DELAY_SEC = 1.0
 
 
-def _https(url: str | None) -> str | None:
+def _https(url):
     if not url:
         return None
     u = str(url).strip()
     if u.startswith("http://"):
         u = "https://" + u[7:]
-    # OpenXBL sometimes returns the non-SSL EDS host; cert is on -ssl variant.
     u = u.replace("://images-eds.xboxlive.com/", "://images-eds-ssl.xboxlive.com/")
     return u if u.startswith("https://") else u
 
 
-def _store_url(title: dict) -> str:
+def _store_url(title):
     name = title.get("name") or ""
     tid = title.get("modernTitleId") or title.get("titleId")
     if tid:
@@ -54,23 +48,22 @@ def _store_url(title: dict) -> str:
     return f"https://www.xbox.com/en-us/search/results?q={quote(name)}"
 
 
-def load_existing() -> dict[str, dict]:
+def load_existing():
     if not catalog_file(GAMES_XBOX_JSON).exists():
         return {}
     data = json.loads(catalog_file(GAMES_XBOX_JSON).read_text(encoding="utf-8"))
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
-def _build_row(title: dict, hltb: dict | None) -> dict:
+def _build_row(title, hltb):
     tid = str(title.get("titleId") or title.get("modernTitleId") or "")
     ach = title.get("achievement") or {}
     hist = title.get("titleHistory") or {}
     image = _https(title.get("displayImage"))
-    tags: list[str] = []
+    tags = []
     devices = title.get("devices") or []
     if devices:
-        tags.extend(str(d).lower() for d in devices)
-
+        tags.extend((str(d).lower() for d in devices))
     row = {
         "store": "xbox",
         "id": tid,
@@ -114,7 +107,7 @@ def _build_row(title: dict, hltb: dict | None) -> dict:
     return row
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Fetch Xbox library via OpenXBL")
     parser.add_argument("--skip-hltb", action="store_true")
     add_only_new_arg(parser)
@@ -129,48 +122,33 @@ def main() -> int:
     if not api_key:
         stats.error("Set XBL_API_KEY in .env (https://xbl.io/)")
         return stats.finish("fetch_xbox", t0, exit_code=1)
-
     try:
         client = XboxClient(api_key)
         gt = client.get_gamertag()
         print(f"OpenXBL account: {gt or '(unknown gamertag)'}", flush=True)
         titles = run_with_heartbeat(client.get_title_history, "Xbox title history")
     except XboxRateLimitError as e:
-        # Throttling is transient and key-agnostic — do NOT mark_invalid (that
-        # wrongly flips the connection to "expired", prompts a reconnect, and
-        # the reconnect's own OpenXBL calls burn even more of the hourly quota).
-        # Keep the saved key and fail as a plain error so the chip retries later.
         stats.error(str(e))
         return stats.finish("fetch_xbox", t0, exit_code=1)
     except XboxAuthError as e:
         mark_invalid("xbox", error=str(e))
         stats.error(str(e))
         return stats.finish("fetch_xbox", t0, exit_code=EXIT_CODE_AUTH)
-
     games = [t for t in titles if (t.get("type") or "Game").lower() in ("game", "dlc")]
     print(f"Found {len(games)} Xbox titles in title history.", flush=True)
-
     empty_exit = refuse_empty_result(
-        games,
-        label="Xbox library",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_XBOX_JSON,
+        games, label="Xbox library", allow_empty=args.allow_empty, output_path=GAMES_XBOX_JSON
     )
     if empty_exit is not None:
         return stats.finish("fetch_xbox", t0, exit_code=empty_exit)
     drift_exit = refuse_drift_result(
-        games,
-        label="Xbox library",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_XBOX_JSON,
+        games, label="Xbox library", allow_drift=args.allow_drift, output_path=GAMES_XBOX_JSON
     )
     if drift_exit is not None:
         return stats.finish("fetch_xbox", t0, exit_code=drift_exit)
-
     hltb_client = HltbClient()
     existing = load_existing()
-    games_out: list[dict] = []
-
+    games_out = []
     loop_hb = HeartbeatTimer(interval=25.0)
     for i, title in enumerate(games, 1):
         name = title.get("name") or tid_placeholder(title)
@@ -193,23 +171,11 @@ def main() -> int:
             except Exception as e:
                 stats.warn(f"HLTB for {name!r}: {e}")
         games_out.append(
-            merge_cached_row(
-                _build_row(title, hltb),
-                cached,
-                authoritative=XBOX,
-                hltb_updated=hltb_updated,
-            )
+            merge_cached_row(_build_row(title, hltb), cached, authoritative=XBOX, hltb_updated=hltb_updated)
         )
         stats.ok += 1
         loop_hb.tick_progress(i, len(games), "Xbox library", name[:40])
-
-    games_out = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_id,
-        no_carry=args.no_carry,
-    )
-
+    games_out = apply_carry_forward(games_out, existing, key_fn=row_key_by_id, no_carry=args.no_carry)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "xbox",
@@ -223,7 +189,7 @@ def main() -> int:
     return stats.finish("fetch_xbox", t0, exit_code=0, extra=f"{len(games_out)} games")
 
 
-def tid_placeholder(title: dict) -> str:
+def tid_placeholder(title):
     return str(title.get("titleId") or "unknown")
 
 

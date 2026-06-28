@@ -1,13 +1,9 @@
-"""API auth gate on server.Handler when Supabase env is set."""
-from __future__ import annotations
-
 import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from http.server import ThreadingHTTPServer
-from pathlib import Path
 
 import jwt
 import pytest
@@ -18,7 +14,7 @@ from shared.server_epic_oauth import epic_oauth_states
 from shared.server_stream_tickets import STREAM_TICKET_MAX_USES
 
 
-def _bearer(secret: str, sub: str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") -> str:
+def _bearer(secret, sub="a1b2c3d4-e5f6-7890-abcd-ef1234567890"):
     payload = {
         "sub": sub,
         "aud": "authenticated",
@@ -30,7 +26,7 @@ def _bearer(secret: str, sub: str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") -> s
 
 
 @pytest.fixture()
-def auth_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def auth_server(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
@@ -41,13 +37,12 @@ def auth_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("BAKLOG_AUTH_DISABLED", raising=False)
     supabase_auth.reset_jwks_client_for_tests()
     server._refresh_personal_paths()
-
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
     port = httpd.server_address[1]
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{port}", "unit-test-secret", tmp_path
+        yield (f"http://127.0.0.1:{port}", "unit-test-secret", tmp_path)
     finally:
         httpd.shutdown()
         httpd.server_close()
@@ -55,8 +50,7 @@ def auth_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture()
-def local_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Auth disabled — legacy static serving."""
+def local_server(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
     monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
@@ -66,28 +60,19 @@ def local_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("BAKLOG_SUPABASE_JWT_SECRET", raising=False)
     monkeypatch.delenv("BAKLOG_AUTH_DISABLED", raising=False)
     server._refresh_personal_paths()
-
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
     port = httpd.server_address[1]
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{port}", tmp_path
+        yield (f"http://127.0.0.1:{port}", tmp_path)
     finally:
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=5)
 
 
-def _request(
-    base: str,
-    path: str,
-    *,
-    method: str = "GET",
-    auth: str | None = None,
-    headers: dict[str, str] | None = None,
-    body: bytes | None = None,
-) -> tuple[int, bytes]:
+def _request(base, path, *, method="GET", auth=None, headers=None, body=None):
     import urllib.error
     import urllib.request
 
@@ -97,13 +82,12 @@ def _request(
     req = urllib.request.Request(f"{base}{path}", headers=hdrs, method=method, data=body)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status, resp.read()
+            return (resp.status, resp.read())
     except urllib.error.HTTPError as exc:
-        return exc.code, exc.read()
+        return (exc.code, exc.read())
 
 
-def _stream_open_status(base: str, path: str) -> int:
-    """GET /api/stream/* and return status without reading the SSE body."""
+def _stream_open_status(base, path):
     import http.client
     from urllib.parse import urlparse
 
@@ -116,15 +100,15 @@ def _stream_open_status(base: str, path: str) -> int:
         conn.close()
 
 
-def _get_json(base: str, path: str, *, auth: str | None = None) -> tuple[int, dict]:
+def _get_json(base, path, *, auth=None):
     status, raw = _request(base, path, auth=auth)
     try:
-        return status, json.loads(raw.decode("utf-8"))
+        return (status, json.loads(raw.decode("utf-8")))
     except json.JSONDecodeError:
-        return status, {"error": raw.decode("utf-8", errors="replace")}
+        return (status, {"error": raw.decode("utf-8", errors="replace")})
 
 
-def test_auth_session_returns_profile(auth_server) -> None:
+def test_auth_session_returns_profile(auth_server):
     base, secret, tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     status, data = _get_json(base, "/api/auth/session", auth=_bearer(secret, sub=sub))
@@ -134,7 +118,7 @@ def test_auth_session_returns_profile(auth_server) -> None:
     assert data["email"] == ""
 
 
-def test_auth_session_comp_pro_upgrades(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_auth_session_comp_pro_upgrades(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     token = jwt.encode(
@@ -149,18 +133,14 @@ def test_auth_session_comp_pro_upgrades(auth_server, monkeypatch: pytest.MonkeyP
         secret,
         algorithm="HS256",
     )
-    monkeypatch.setattr(
-        "shared.comp_pro.ensure_comp_pro_on_login",
-        lambda uid, email: (True, True),
-    )
+    monkeypatch.setattr("shared.comp_pro.ensure_comp_pro_on_login", lambda uid, email: (True, True))
     status, data = _get_json(base, "/api/auth/session", auth=f"Bearer {token}")
     assert status == 200
     assert data["plan"] == "pro"
     assert data.get("refreshSession") is True
 
 
-def test_auth_session_comp_pro_without_admin_upgrade(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Frozen builds without service_role: grant pro in response, no refreshSession."""
+def test_auth_session_comp_pro_without_admin_upgrade(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     token = jwt.encode(
@@ -175,17 +155,14 @@ def test_auth_session_comp_pro_without_admin_upgrade(auth_server, monkeypatch: p
         secret,
         algorithm="HS256",
     )
-    monkeypatch.setattr(
-        "shared.comp_pro.ensure_comp_pro_on_login",
-        lambda uid, email: (True, False),
-    )
+    monkeypatch.setattr("shared.comp_pro.ensure_comp_pro_on_login", lambda uid, email: (True, False))
     status, data = _get_json(base, "/api/auth/session", auth=f"Bearer {token}")
     assert status == 200
     assert data["plan"] == "pro"
     assert "refreshSession" not in data
 
 
-def test_config_comp_pro_plan(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_comp_pro_plan(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     token = jwt.encode(
@@ -200,23 +177,20 @@ def test_config_comp_pro_plan(auth_server, monkeypatch: pytest.MonkeyPatch) -> N
         secret,
         algorithm="HS256",
     )
-    monkeypatch.setattr(
-        "shared.comp_pro.is_comp_pro_email",
-        lambda email: email.strip().lower() == "paul@example.com",
-    )
+    monkeypatch.setattr("shared.comp_pro.is_comp_pro_email", lambda email: email.strip().lower() == "paul@example.com")
     status, data = _get_json(base, "/api/config", auth=f"Bearer {token}")
     assert status == 200
     assert data["plan"] == "pro"
 
 
-def test_auth_session_requires_bearer(auth_server) -> None:
+def test_auth_session_requires_bearer(auth_server):
     base, _secret, _tmp = auth_server
     status, data = _get_json(base, "/api/auth/session")
     assert status == 401
     assert "sign in" in data.get("error", "").lower()
 
 
-def test_config_public_without_auth(auth_server) -> None:
+def test_config_public_without_auth(auth_server):
     base, _secret, _tmp = auth_server
     status, data = _get_json(base, "/api/config")
     assert status == 200
@@ -225,18 +199,16 @@ def test_config_public_without_auth(auth_server) -> None:
     assert data.get("localProfiles") is False
 
 
-def test_local_profiles_coexist_with_auth(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_local_profiles_coexist_with_auth(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     monkeypatch.setenv("BAKLOG_LOCAL_PROFILES", "1")
     status, data = _get_json(base, "/api/config")
     assert status == 200
     assert data["localProfiles"] is True
-
     status, data = _get_json(base, "/api/profiles", auth=_bearer(secret))
     assert status == 200
     assert isinstance(data.get("profiles"), list)
     assert len(data["profiles"]) >= 1
-
     body = json.dumps({"label": "Work"}).encode("utf-8")
     import urllib.request
 
@@ -254,46 +226,39 @@ def test_local_profiles_coexist_with_auth(auth_server, monkeypatch: pytest.Monke
         assert resp.status == 201
 
 
-def test_personal_requires_bearer(auth_server) -> None:
+def test_personal_requires_bearer(auth_server):
     base, secret, _tmp = auth_server
     status, data = _get_json(base, "/api/personal")
     assert status == 401
     assert "sign in" in data.get("error", "").lower()
-
     status, data = _get_json(base, "/api/personal", auth=_bearer(secret))
     assert status == 200
 
 
-def test_static_catalog_requires_bearer_when_auth_on(auth_server) -> None:
+def test_static_catalog_requires_bearer_when_auth_on(auth_server):
     base, secret, tmp = auth_server
     uid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     prof_dir = tmp / "profiles" / uid
     prof_dir.mkdir(parents=True)
     (prof_dir / "games_steam.json").write_text(
-        json.dumps({"game_count": 1, "games": [{"id": "1", "name": "Portal"}]}),
-        encoding="utf-8",
+        json.dumps({"game_count": 1, "games": [{"id": "1", "name": "Portal"}]}), encoding="utf-8"
     )
-
     status, _ = _request(base, "/games_steam.json")
     assert status == 401
-
     status, raw = _request(base, "/games_steam.json", auth=_bearer(secret, sub=uid))
     assert status == 200
     data = json.loads(raw.decode("utf-8"))
     assert data["games"][0]["name"] == "Portal"
 
 
-def test_static_catalog_public_when_auth_off(local_server) -> None:
+def test_static_catalog_public_when_auth_off(local_server):
     base, tmp = local_server
-    (tmp / "games_steam.json").write_text(
-        json.dumps({"game_count": 0, "games": []}),
-        encoding="utf-8",
-    )
+    (tmp / "games_steam.json").write_text(json.dumps({"game_count": 0, "games": []}), encoding="utf-8")
     status, _ = _request(base, "/games_steam.json")
     assert status == 200
 
 
-def test_app_shell_public_with_auth_on(auth_server) -> None:
+def test_app_shell_public_with_auth_on(auth_server):
     base, _secret, _tmp = auth_server
     status, _ = _request(base, "/")
     assert status == 200
@@ -301,14 +266,14 @@ def test_app_shell_public_with_auth_on(auth_server) -> None:
     assert status == 200
 
 
-def test_sensitive_paths_denied_always(auth_server, local_server) -> None:
+def test_sensitive_paths_denied_always(auth_server, local_server):
     for base in (auth_server[0], local_server[0]):
         for path in ("/.env", "/cache/auth/secrets.bin", "/data/personal.json"):
             status, _ = _request(base, path)
             assert status == 404, path
 
 
-def test_head_gated_like_get(auth_server) -> None:
+def test_head_gated_like_get(auth_server):
     base, secret, _tmp = auth_server
     status, _ = _request(base, "/games_steam.json", method="HEAD")
     assert status == 401
@@ -316,7 +281,7 @@ def test_head_gated_like_get(auth_server) -> None:
     assert status in (200, 404)
 
 
-def test_csrf_bearer_allows_put_personal(auth_server) -> None:
+def test_csrf_bearer_allows_put_personal(auth_server):
     base, secret, _tmp = auth_server
     body = json.dumps({"profile": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "entries": {}}).encode("utf-8")
     status, _ = _request(
@@ -324,32 +289,26 @@ def test_csrf_bearer_allows_put_personal(auth_server) -> None:
         "/api/personal",
         method="PUT",
         auth=_bearer(secret),
-        headers={
-            "Content-Type": "application/json",
-            "Host": "public.example.com",
-        },
+        headers={"Content-Type": "application/json", "Host": "public.example.com"},
         body=body,
     )
     assert status == 200
 
 
-def test_csrf_without_bearer_blocked_when_exposed(auth_server) -> None:
+def test_csrf_without_bearer_blocked_when_exposed(auth_server):
     base, _secret, _tmp = auth_server
     body = json.dumps({"entries": {}}).encode("utf-8")
     status, raw = _request(
         base,
         "/api/personal",
         method="PUT",
-        headers={
-            "Content-Type": "application/json",
-            "Host": "public.example.com",
-        },
+        headers={"Content-Type": "application/json", "Host": "public.example.com"},
         body=body,
     )
     assert status == 403
 
 
-def test_per_user_isolation(auth_server) -> None:
+def test_per_user_isolation(auth_server):
     base, secret, tmp = auth_server
     uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     uid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -357,20 +316,17 @@ def test_per_user_isolation(auth_server) -> None:
         d = tmp / "profiles" / uid
         d.mkdir(parents=True)
         (d / "games_steam.json").write_text(
-            json.dumps({"game_count": 1, "games": [{"id": "1", "name": name}]}),
-            encoding="utf-8",
+            json.dumps({"game_count": 1, "games": [{"id": "1", "name": name}]}), encoding="utf-8"
         )
-
     status, raw = _request(base, "/games_steam.json", auth=_bearer(secret, sub=uid_a))
     assert status == 200
     assert json.loads(raw.decode("utf-8"))["games"][0]["name"] == "GameA"
-
     status, raw = _request(base, "/games_steam.json", auth=_bearer(secret, sub=uid_b))
     assert status == 200
     assert json.loads(raw.decode("utf-8"))["games"][0]["name"] == "GameB"
 
 
-def test_ensure_profile_concurrent_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ensure_profile_concurrent_index(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     prof.mkdir(parents=True)
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
@@ -378,20 +334,19 @@ def test_ensure_profile_concurrent_index(tmp_path: Path, monkeypatch: pytest.Mon
     monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
     uid = "550e8400-e29b-41d4-a716-446655440000"
 
-    def _once() -> str:
+    def _once():
         return account_profiles.ensure_profile_for_user(uid, "a@example.com")
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         futs = [pool.submit(_once) for _ in range(8)]
         pids = [f.result() for f in as_completed(futs)]
-
     assert len(set(pids)) == 1
     doc = profile_paths.load_index()
     matches = [p for p in doc.get("profiles", []) if p.get("id") == uid]
     assert len(matches) == 1
 
 
-def test_stream_ticket_mint_and_sse_access(auth_server) -> None:
+def test_stream_ticket_mint_and_sse_access(auth_server):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     account_profiles.ensure_profile_for_user(sub, "a@example.com")
@@ -406,15 +361,13 @@ def test_stream_ticket_mint_and_sse_access(auth_server) -> None:
     assert status == 200
     ticket = json.loads(raw.decode("utf-8"))["ticket"]
     assert ticket
-
     status, _ = _request(base, "/api/stream/abc123?ticket=" + ticket)
     assert status != 401
-
     status, _ = _request(base, "/api/stream/abc123")
     assert status == 401
 
 
-def test_stream_ticket_limited_reuse(auth_server) -> None:
+def test_stream_ticket_limited_reuse(auth_server):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     profile_id = sub.lower()
@@ -448,7 +401,7 @@ def test_stream_ticket_limited_reuse(auth_server) -> None:
     assert status_exhausted == 401
 
 
-def test_stream_ticket_not_consumed_on_unknown_run(auth_server) -> None:
+def test_stream_ticket_not_consumed_on_unknown_run(auth_server):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     account_profiles.ensure_profile_for_user(sub, "a@example.com")
@@ -468,7 +421,7 @@ def test_stream_ticket_not_consumed_on_unknown_run(auth_server) -> None:
     assert status_ok != 401
 
 
-def test_epic_callback_without_bearer(auth_server) -> None:
+def test_epic_callback_without_bearer(auth_server):
     base, _secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     account_profiles.ensure_profile_for_user(sub, "a@example.com")
@@ -479,19 +432,19 @@ def test_epic_callback_without_bearer(auth_server) -> None:
     assert status == 400
 
 
-def test_epic_callback_requires_state_when_auth_on(auth_server) -> None:
+def test_epic_callback_requires_state_when_auth_on(auth_server):
     base, _secret, _tmp = auth_server
     status, _ = _request(base, "/oauth/epic/callback")
     assert status == 400
 
 
-def test_epic_callback_rejects_unknown_state(auth_server) -> None:
+def test_epic_callback_rejects_unknown_state(auth_server):
     base, _secret, _tmp = auth_server
     status, _ = _request(base, "/oauth/epic/callback?state=bogus&code=abc123def456")
     assert status == 400
 
 
-def test_epic_oauth_url_endpoint_registers_state(auth_server) -> None:
+def test_epic_oauth_url_endpoint_registers_state(auth_server):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     account_profiles.ensure_profile_for_user(sub, "a@example.com")
@@ -511,7 +464,7 @@ def test_epic_oauth_url_endpoint_registers_state(auth_server) -> None:
     assert data["state"] in epic_oauth_states
 
 
-def test_epic_oauth_url_unknown_provider(auth_server) -> None:
+def test_epic_oauth_url_unknown_provider(auth_server):
     base, secret, _tmp = auth_server
     status, _ = _request(
         base,
@@ -524,27 +477,25 @@ def test_epic_oauth_url_unknown_provider(auth_server) -> None:
     assert status == 404
 
 
-def test_epic_callback_success_binds_profile(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_epic_callback_success_binds_profile(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"
     account_profiles.ensure_profile_for_user(sub, "a@example.com")
-
-    captured: dict[str, str] = {}
+    captured = {}
 
     class _FakeEpic:
-        def __init__(self, *_a: object, **_k: object) -> None:
+        def __init__(self, *_a, **_k):
             pass
 
-        def login(self) -> None:
+        def login(self):
             return None
 
-    def _fake_mark_connected(provider: str, _creds: dict) -> None:
+    def _fake_mark_connected(provider, _creds):
         captured["provider"] = provider
         captured["profile"] = profile_paths.get_active_profile_id()
 
     monkeypatch.setattr("clients.epic_client.EpicClient", _FakeEpic)
     monkeypatch.setattr("auth.manager.mark_connected", _fake_mark_connected)
-
     status, raw = _request(
         base,
         "/api/auth/epic/oauth-url",
@@ -555,14 +506,13 @@ def test_epic_callback_success_binds_profile(auth_server, monkeypatch: pytest.Mo
     )
     assert status == 200
     state = json.loads(raw.decode("utf-8"))["state"]
-
     status, _ = _request(base, f"/oauth/epic/callback?state={state}&code=abcdef0123456789")
     assert status == 200
     assert captured["provider"] == "epic"
     assert captured["profile"] == sub
 
 
-def test_build_epic_oauth_login_url_shape() -> None:
+def test_build_epic_oauth_login_url_shape():
     from clients.epic_client import CLIENT_ID, build_epic_oauth_login_url
 
     url = build_epic_oauth_login_url("http://127.0.0.1:8765/oauth/epic/callback", "st8")
@@ -572,34 +522,29 @@ def test_build_epic_oauth_login_url_shape() -> None:
     assert "st8" in url
 
 
-def test_epic_callback_requires_state_even_when_auth_off(local_server) -> None:
-    """CSRF defense: a server-minted state is mandatory regardless of auth mode."""
+def test_epic_callback_requires_state_even_when_auth_off(local_server):
     base, _tmp = local_server
-    # Missing state — previously accepted when auth was disabled, now rejected.
     status, _ = _request(base, "/oauth/epic/callback?code=abc123def456")
     assert status == 400
-    # Present but unknown/forged state — rejected.
     status2, _ = _request(base, "/oauth/epic/callback?state=forged&code=abc123def456")
     assert status2 == 400
 
 
-def test_epic_callback_consumes_valid_state_when_auth_off(local_server) -> None:
+def test_epic_callback_consumes_valid_state_when_auth_off(local_server):
     base, _tmp = local_server
     state = "epic-local-state-01"
     server._register_epic_oauth_state(state, profile_id="default")
     assert state in epic_oauth_states
-    # A valid minted state is accepted (single-use) even with auth disabled; the
-    # missing code yields 400 but the state is consumed, proving the valid path ran.
     status, _ = _request(base, f"/oauth/epic/callback?state={state}")
     assert status == 400
     assert state not in epic_oauth_states
 
 
-def test_secrets_export_corrupt_returns_400(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_secrets_export_corrupt_returns_400(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     from auth.secrets import SecretsCorruptError
 
-    def _boom(*_a: object, **_k: object) -> bytes:
+    def _boom(*_a, **_k):
         raise SecretsCorruptError("corrupt store")
 
     monkeypatch.setattr("auth.bundle.export_bundle", _boom)
@@ -617,7 +562,7 @@ def test_secrets_export_corrupt_returns_400(auth_server, monkeypatch: pytest.Mon
     assert payload.get("code") == "secrets_corrupt"
 
 
-def test_secrets_reset_requires_corrupt_store(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_secrets_reset_requires_corrupt_store(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     monkeypatch.setattr("auth.secrets.secrets_store_corrupt", lambda: False)
     body = json.dumps({"confirm": True}).encode("utf-8")
@@ -634,7 +579,7 @@ def test_secrets_reset_requires_corrupt_store(auth_server, monkeypatch: pytest.M
     assert payload.get("code") == "not_corrupt"
 
 
-def test_secrets_reset_clears_corrupt_store(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_secrets_reset_clears_corrupt_store(auth_server, monkeypatch):
     base, secret, _tmp = auth_server
     monkeypatch.setattr("auth.secrets.secrets_store_corrupt", lambda: True)
     body = json.dumps({"confirm": True}).encode("utf-8")
@@ -650,7 +595,7 @@ def test_secrets_reset_clears_corrupt_store(auth_server, monkeypatch: pytest.Mon
     assert json.loads(raw.decode("utf-8")).get("ok") is True
 
 
-def test_run_cancel_denied_cross_profile(auth_server) -> None:
+def test_run_cancel_denied_cross_profile(auth_server):
     base, secret, _tmp = auth_server
     uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     uid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -672,7 +617,7 @@ def test_run_cancel_denied_cross_profile(auth_server) -> None:
     assert "unknown run" in json.loads(raw.decode("utf-8")).get("error", "")
 
 
-def test_cancel_all_scoped_to_active_profile(auth_server) -> None:
+def test_cancel_all_scoped_to_active_profile(auth_server):
     base, secret, _tmp = auth_server
     uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     uid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
@@ -703,7 +648,7 @@ def test_cancel_all_scoped_to_active_profile(auth_server) -> None:
     assert run_b.id not in cancelled_ids
 
 
-def test_force_reset_scoped_to_active_profile(auth_server) -> None:
+def test_force_reset_scoped_to_active_profile(auth_server):
     base, secret, _tmp = auth_server
     uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     uid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"

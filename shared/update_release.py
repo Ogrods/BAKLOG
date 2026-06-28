@@ -1,12 +1,7 @@
-"""Trusted GitHub release parsing, download allowlisting, and safe bundle extraction."""
-
-from __future__ import annotations
-
 import hashlib
 import json
 import re
 import zipfile
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -24,33 +19,30 @@ from shared.update_platform import (
 
 _COMMUNITY_JSON = Path(__file__).resolve().parent / "community.json"
 _DEFAULT_REPO_SLUG = "Ogrods/BAKLOG"
-
 STABLE_ZIP_NAME = stable_zip_name("win32")
 STABLE_SHA256_NAME = stable_sha256_name("win32")
-
 REQUIRED_BUNDLE_FILES = required_bundle_files("win32")
-MAX_DOWNLOAD_BYTES = 600 * 1024 * 1024  # 600 MiB hard cap
-
+MAX_DOWNLOAD_BYTES = 600 * 1024 * 1024
 _ALLOWED_DOWNLOAD_HOSTS = frozenset({"github.com", "objects.githubusercontent.com"})
 
 
 class UpdateSecurityError(ValueError):
-    """Raised when update metadata or artifacts fail security validation."""
+    pass
 
 
 @dataclass(frozen=True)
 class ReleaseArtifacts:
-    tag: str
-    version: str
-    html_url: str
-    zip_url: str | None
-    sha256: str
-    sha256_url: str | None = None
-    release_notes: str | None = None
-    published_at: str | None = None
+    tag: "Any"
+    version: "Any"
+    html_url: "Any"
+    zip_url: "Any"
+    sha256: "Any"
+    sha256_url: "Any" = None
+    release_notes: "Any" = None
+    published_at: "Any" = None
 
 
-def github_repo_slug() -> str:
+def github_repo_slug():
     try:
         raw = json.loads(_COMMUNITY_JSON.read_text(encoding="utf-8"))
         repo = str(raw.get("github_repo", "")).strip().rstrip("/")
@@ -63,13 +55,12 @@ def github_repo_slug() -> str:
     return _DEFAULT_REPO_SLUG
 
 
-def _releases_download_prefix() -> str:
+def _releases_download_prefix():
     slug = github_repo_slug().strip("/").lower()
     return f"/{slug}/releases/download/".lower()
 
 
-def is_allowed_download_url(url: str) -> bool:
-    """Allowlist GitHub release asset URLs only — never user-supplied arbitrary hosts."""
+def is_allowed_download_url(url):
     try:
         parsed = urlparse(url.strip())
     except ValueError:
@@ -89,24 +80,23 @@ def is_allowed_download_url(url: str) -> bool:
     return True
 
 
-def parse_sha256_sidecar(text: str, *, zip_name: str | None = None) -> str:
-    """Parse ``<hex>  <zip-name>`` sidecar format."""
+def parse_sha256_sidecar(text, *, zip_name=None):
     expected_name = zip_name or stable_zip_name(release_platform())
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
-        match = re.match(r"^([0-9a-fA-F]{64})\b", stripped)
+        match = re.match("^([0-9a-fA-F]{64})\\b", stripped)
         if match:
             return match.group(1).lower()
         if expected_name in stripped:
             parts = stripped.split()
-            if parts and re.fullmatch(r"[0-9a-fA-F]{64}", parts[0]):
+            if parts and re.fullmatch("[0-9a-fA-F]{64}", parts[0]):
                 return parts[0].lower()
     raise UpdateSecurityError("sha256 sidecar format invalid")
 
 
-def verify_file_sha256(path: Path, expected: str) -> None:
+def verify_file_sha256(path, expected):
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         while True:
@@ -120,8 +110,8 @@ def verify_file_sha256(path: Path, expected: str) -> None:
         raise UpdateSecurityError("downloaded artifact sha256 mismatch")
 
 
-def _asset_map(release: dict[str, Any]) -> dict[str, str]:
-    out: dict[str, str] = {}
+def _asset_map(release):
+    out = {}
     assets = release.get("assets")
     if not isinstance(assets, list):
         return out
@@ -135,7 +125,7 @@ def _asset_map(release: dict[str, Any]) -> dict[str, str]:
     return out
 
 
-def _sanitize_release_notes(body: str | None, *, max_len: int = 4096) -> str | None:
+def _sanitize_release_notes(body, *, max_len=4096):
     if not body or not str(body).strip():
         return None
     text = str(body).strip()
@@ -144,16 +134,14 @@ def _sanitize_release_notes(body: str | None, *, max_len: int = 4096) -> str | N
     return text
 
 
-def build_release_artifacts(release: dict[str, Any], platform: str | None = None) -> ReleaseArtifacts:
+def build_release_artifacts(release, platform=None):
     plat = platform or release_platform()
     zip_asset = stable_zip_name(plat)
     sha_asset = stable_sha256_name(plat)
-
     tag = str(release.get("tag_name", "")).strip()
     version = normalize_version_tag(tag)
     if not version:
         raise UpdateSecurityError("release tag missing")
-
     assets = _asset_map(release)
     zip_url = assets.get(zip_asset)
     if not zip_url and plat == "win32":
@@ -161,18 +149,15 @@ def build_release_artifacts(release: dict[str, Any], platform: str | None = None
         candidate = f"https://github.com/{slug}/releases/download/{tag}/{zip_asset}"
         if is_allowed_download_url(candidate):
             zip_url = candidate
-
     sha256_url = assets.get(sha_asset)
     sha256 = ""
     if sha256_url:
         sidecar = _fetch_text_asset(sha256_url)
         sha256 = parse_sha256_sidecar(sidecar, zip_name=zip_asset)
-
     html_url = str(release.get("html_url", "") or "").strip()
     published_at = release.get("published_at")
     published = str(published_at).strip() if published_at else None
     notes = _sanitize_release_notes(release.get("body"))
-
     return ReleaseArtifacts(
         tag=tag,
         version=version,
@@ -185,16 +170,13 @@ def build_release_artifacts(release: dict[str, Any], platform: str | None = None
     )
 
 
-def _fetch_text_asset(url: str) -> str:
+def _fetch_text_asset(url):
     import urllib.error
     import urllib.request
 
     if not is_allowed_download_url(url):
         raise UpdateSecurityError("sha256 asset url not allowlisted")
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "BAKLOG-local-update-check"},
-    )
+    req = urllib.request.Request(url, headers={"User-Agent": "BAKLOG-local-update-check"})
     try:
         with urllib.request.urlopen(req, timeout=12) as resp:
             raw = resp.read(512)
@@ -203,7 +185,7 @@ def _fetch_text_asset(url: str) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-def fetch_release_artifacts(platform: str | None = None) -> ReleaseArtifacts:
+def fetch_release_artifacts(platform=None):
     from shared.server_support import fetch_latest_github_release
 
     release = fetch_latest_github_release()
@@ -212,27 +194,16 @@ def fetch_release_artifacts(platform: str | None = None) -> ReleaseArtifacts:
     return build_release_artifacts(release, platform=platform)
 
 
-def fetch_url_to_file(
-    url: str,
-    dest: Path,
-    *,
-    max_bytes: int = MAX_DOWNLOAD_BYTES,
-    on_progress: Callable[[int, int | None], None] | None = None,
-) -> int:
-    """Stream an allowlisted URL to *dest*. Returns bytes written."""
+def fetch_url_to_file(url, dest, *, max_bytes=MAX_DOWNLOAD_BYTES, on_progress=None):
     import urllib.error
     import urllib.request
 
     if not is_allowed_download_url(url):
         raise UpdateSecurityError("download url not allowlisted")
-
     dest.parent.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "BAKLOG-local-update-check"},
-    )
+    req = urllib.request.Request(url, headers={"User-Agent": "BAKLOG-local-update-check"})
     total = 0
-    total_hint: int | None = None
+    total_hint = None
     try:
         with urllib.request.urlopen(req, timeout=60) as resp, dest.open("wb") as handle:
             length = resp.headers.get("Content-Length")
@@ -264,18 +235,16 @@ def fetch_url_to_file(
     return total
 
 
-def _zip_member_is_safe(member_name: str) -> bool:
+def _zip_member_is_safe(member_name):
     normalized = member_name.replace("\\", "/")
     if normalized.startswith("/") or ".." in PurePosixPath(normalized).parts:
         return False
     return True
 
 
-def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
-    """Extract *zip_path* into *dest_dir* with path-traversal guards. Returns bundle root."""
+def safe_extract_zip(zip_path, dest_dir):
     dest_resolved = dest_dir.resolve()
     dest_resolved.mkdir(parents=True, exist_ok=True)
-
     with zipfile.ZipFile(zip_path) as archive:
         for info in archive.infolist():
             if not _zip_member_is_safe(info.filename):
@@ -284,28 +253,26 @@ def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
             if dest_resolved not in target.parents and target != dest_resolved:
                 raise UpdateSecurityError(f"zip member escapes target dir: {info.filename}")
         archive.extractall(dest_resolved)
-
     return locate_bundle_root(dest_resolved)
 
 
-def locate_bundle_root(extracted_dir: Path, platform: str | None = None) -> Path:
-    """Find the directory containing required frozen executables."""
+def locate_bundle_root(extracted_dir, platform=None):
     plats = (platform,) if platform is not None else ("win32", "darwin")
     for plat in plats:
         server_name = server_binary_name(plat)
         required = required_bundle_files(plat)
         for binary in extracted_dir.rglob(server_name):
             parent = binary.parent
-            if all((parent / name).is_file() for name in required):
+            if all(((parent / name).is_file() for name in required)):
                 return parent.resolve()
     raise UpdateSecurityError("extracted bundle missing BAKLOG executables")
 
 
-def recommended_artifact(runtime_label: str) -> str:
+def recommended_artifact(runtime_label):
     if runtime_label in {"installed", "portable"}:
         return stable_zip_name(release_platform())
     return "none"
 
 
-def release_api_url() -> str:
+def release_api_url():
     return github_releases_latest_api_url()

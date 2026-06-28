@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-"""Capture README / marketing preview screenshots via headless Chrome.
-
-Requires a running local server with auth disabled, e.g.:
-
-  BAKLOG_AUTH_DISABLED=1 PORT=8766 python server.py
-  python tools/capture_previews.py --url http://127.0.0.1:8766/
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import shutil
@@ -23,16 +12,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-from auth.cdp_browser import find_chromium_executable  # noqa: E402  (needs ROOT on sys.path first)
+from auth.cdp_browser import find_chromium_executable
 
 DASHBOARD_OUT = ROOT / "dashboard.png"
 BOOTSTRAP = "/preview-bootstrap.html"
 
 
 @contextmanager
-def _temporary_dashboard_view(base_url: str):
-    """Force server prefs to dashboard for a clean hero capture, then restore."""
+def _temporary_dashboard_view(base_url):
     url = f"{base_url.rstrip('/')}/api/personal"
     original_view = None
     doc = None
@@ -46,10 +33,7 @@ def _temporary_dashboard_view(base_url: str):
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Origin": base_url.rstrip("/"),
-                },
+                headers={"Content-Type": "application/json", "Origin": base_url.rstrip("/")},
                 method="PUT",
             )
             with urllib.request.urlopen(req, timeout=15):
@@ -64,10 +48,7 @@ def _temporary_dashboard_view(base_url: str):
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Origin": base_url.rstrip("/"),
-                },
+                headers={"Content-Type": "application/json", "Origin": base_url.rstrip("/")},
                 method="PUT",
             )
             try:
@@ -77,7 +58,7 @@ def _temporary_dashboard_view(base_url: str):
                 pass
 
 
-def capture_dashboard(url: str, out: Path, *, width: int = 1400, height: int = 900) -> None:
+def capture_dashboard(url, out, *, width=1400, height=900):
     chrome = find_chromium_executable()
     base = url.rstrip("/")
     bootstrap = f"{base}{BOOTSTRAP}"
@@ -103,7 +84,7 @@ def capture_dashboard(url: str, out: Path, *, width: int = 1400, height: int = 9
         shutil.rmtree(profile, ignore_errors=True)
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(description="Capture BAKLOG preview screenshots.")
     parser.add_argument("--url", default="http://127.0.0.1:8766/", help="Dashboard base URL")
     parser.add_argument("--out", type=Path, default=DASHBOARD_OUT, help="dashboard.png output path")

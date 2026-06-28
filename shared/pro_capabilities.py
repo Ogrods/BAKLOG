@@ -1,11 +1,3 @@
-"""Canonical Pro capability registry and resolution for /api/config.
-
-Single source of truth for which paid-tier features are live vs coming soon.
-Marketing sync pairs: js/sponsored-deals.js PRO_PROMO ↔ landing/index.html.
-"""
-
-from __future__ import annotations
-
 from typing import Any, Literal, TypedDict
 
 from shared.entitlement import PLAN_PRO
@@ -15,23 +7,16 @@ CapabilityStatus = Literal["live", "coming"]
 
 
 class CapabilitySpec(TypedDict, total=False):
-    id: str
-    status: CapabilityStatus
-    requires_plan: bool
-    requires_auth: bool
-    requires_opt_in: bool
-    opt_in_key: str
+    id: "Any"
+    status: "Any"
+    requires_plan: "Any"
+    requires_auth: "Any"
+    requires_opt_in: "Any"
+    opt_in_key: "Any"
 
 
-# Registry order matches PRO_PROMO.features where possible.
-CAPABILITY_REGISTRY: tuple[CapabilitySpec, ...] = (
-    {
-        "id": "no_ads",
-        "status": "live",
-        "requires_plan": True,
-        "requires_auth": False,
-        "requires_opt_in": False,
-    },
+CAPABILITY_REGISTRY = (
+    {"id": "no_ads", "status": "live", "requires_plan": True, "requires_auth": False, "requires_opt_in": False},
     {
         "id": "queue_bulk_refresh",
         "status": "live",
@@ -97,72 +82,45 @@ CAPABILITY_REGISTRY: tuple[CapabilitySpec, ...] = (
         "requires_opt_in": False,
     },
 )
-
-CAPABILITY_IDS: frozenset[str] = frozenset(spec["id"] for spec in CAPABILITY_REGISTRY)
-
-LIVE_CAPABILITY_IDS: frozenset[str] = frozenset(
-    spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "live"
-)
-
-COMING_CAPABILITY_IDS: frozenset[str] = frozenset(
-    spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "coming"
-)
+CAPABILITY_IDS = frozenset((spec["id"] for spec in CAPABILITY_REGISTRY))
+LIVE_CAPABILITY_IDS = frozenset((spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "live"))
+COMING_CAPABILITY_IDS = frozenset((spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "coming"))
 
 
-def _spec_by_id(capability_id: str) -> CapabilitySpec | None:
+def _spec_by_id(capability_id):
     for spec in CAPABILITY_REGISTRY:
         if spec["id"] == capability_id:
             return spec
     return None
 
 
-def resolve_capability(
-    spec: CapabilitySpec,
-    *,
-    plan: str,
-    pro_settings: dict[str, Any],
-) -> dict[str, Any]:
-    """Return {status, enabled} for one capability."""
+def resolve_capability(spec, *, plan, pro_settings):
     status = spec.get("status", "coming")
     enabled = False
     if status != "live":
         return {"status": status, "enabled": False}
-
     if spec.get("requires_plan", True) and plan != PLAN_PRO:
         return {"status": status, "enabled": False}
-
-    if spec.get("requires_auth") and not auth_enabled():
+    if spec.get("requires_auth") and (not auth_enabled()):
         return {"status": status, "enabled": False}
-
     if spec.get("requires_opt_in"):
         key = spec.get("opt_in_key") or ""
         if not pro_settings.get(key):
             return {"status": status, "enabled": False}
-
     enabled = True
     return {"status": status, "enabled": enabled}
 
 
-def resolve_capabilities(
-    *,
-    plan: str,
-    pro_settings: dict[str, Any] | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Resolved capability map for GET /api/config."""
+def resolve_capabilities(*, plan, pro_settings=None):
     settings = pro_settings if isinstance(pro_settings, dict) else {}
-    out: dict[str, dict[str, Any]] = {}
+    out = {}
     for spec in CAPABILITY_REGISTRY:
         cap_id = spec["id"]
         out[cap_id] = resolve_capability(spec, plan=plan, pro_settings=settings)
     return out
 
 
-def capability_enabled(
-    capability_id: str,
-    *,
-    plan: str,
-    pro_settings: dict[str, Any] | None = None,
-) -> bool:
+def capability_enabled(capability_id, *, plan, pro_settings=None):
     spec = _spec_by_id(capability_id)
     if spec is None:
         return False

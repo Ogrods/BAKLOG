@@ -1,9 +1,4 @@
-"""Per-profile opt-in for machine-wide local sources (itch, GOG Galaxy, Amazon)."""
-
-from __future__ import annotations
-
 import json
-from pathlib import Path
 
 import pytest
 
@@ -24,7 +19,7 @@ _LOCAL_PROVIDERS = ("itch_local", "gog_galaxy", "amazon")
 
 
 @pytest.fixture(autouse=True)
-def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def isolated_default_profile(tmp_path, monkeypatch):
     prof_dir = tmp_path / "profiles"
     (prof_dir / "default").mkdir(parents=True)
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
@@ -34,12 +29,7 @@ def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     set_master_password_override("test-passphrase-itch-local-opt-in")
     secrets._cache = None
     target = profile_paths.auth_dir(profile_id="default")
-    saved = (
-        secrets.AUTH_DIR,
-        secrets.SECRETS_FILE,
-        secrets.MASTER_KEY_FILE,
-        secrets._cache,
-    )
+    saved = (secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache)
     secrets.AUTH_DIR = target
     secrets.SECRETS_FILE = target / "secrets.bin"
     secrets.MASTER_KEY_FILE = target / ".master_key"
@@ -48,9 +38,7 @@ def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache = saved
 
 
-def test_itch_local_requires_enabled_even_when_butler_db_present(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_itch_local_requires_enabled_even_when_butler_db_present(monkeypatch):
     monkeypatch.setattr("auth.manager.platform_supported", lambda platforms: True)
     monkeypatch.setattr("auth.manager._local_data_present", lambda provider, blob: True)
     assert _provider_state("itch_local") == "disconnected"
@@ -59,18 +47,16 @@ def test_itch_local_requires_enabled_even_when_butler_db_present(
     assert _provider_state("itch_local") == "connected"
 
 
-def test_seed_new_profile_auth_defaults_disables_itch_local(tmp_path: Path) -> None:
+def test_seed_new_profile_auth_defaults_disables_itch_local(tmp_path):
     profile_id = "work"
     seed_new_profile_auth_defaults(profile_id)
-    # Read back through the same profile-scoped context the seed write used, so
-    # the HKDF subkey is derived for "work" (not the active profile).
     with _with_profile_secrets(profile_id):
         blob = get_provider_blob("itch_local")
         assert blob.get("disabled") is True
         assert "enabled" not in blob
 
 
-def test_seed_new_profile_auth_defaults_disables_all_local_providers() -> None:
+def test_seed_new_profile_auth_defaults_disables_all_local_providers():
     profile_id = "work"
     seed_new_profile_auth_defaults(profile_id)
     with _with_profile_secrets(profile_id):
@@ -81,54 +67,44 @@ def test_seed_new_profile_auth_defaults_disables_all_local_providers() -> None:
                 assert "enabled" not in blob
 
 
-def _write_itch_catalog(profile_id: str, game_count: int) -> None:
+def _write_itch_catalog(profile_id, game_count):
     path = profile_paths.catalog_path("games_itch.json", profile_id=profile_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     games = [{"id": str(i), "name": f"Game {i}"} for i in range(game_count)]
     path.write_text(json.dumps({"game_count": game_count, "games": games}), encoding="utf-8")
 
 
-def test_migration_opts_in_existing_profile_with_itch_library(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_migration_opts_in_existing_profile_with_itch_library(monkeypatch):
     monkeypatch.setattr("auth.manager.platform_supported", lambda platforms: True)
     monkeypatch.setattr("auth.manager._local_data_present", lambda provider, blob: True)
     _write_itch_catalog("default", 12)
-    # Pre-migration: blob has no opt-in decision, so itch is hidden.
     assert _provider_state("itch_local") == "disconnected"
-
     notes = migrate_existing_itch_local_opt_in()
-
-    assert any("default" in n for n in notes)
+    assert any(("default" in n for n in notes))
     secrets._cache = None
     assert get_provider_blob("itch_local").get("enabled") is True
     assert _provider_state("itch_local") == "connected"
 
 
-def test_migration_skips_profile_without_itch_library() -> None:
-    # No games_itch.json on disk -> migration must not opt in.
+def test_migration_skips_profile_without_itch_library():
     notes = migrate_existing_itch_local_opt_in()
-    assert not any("opted in" in n for n in notes)
+    assert not any(("opted in" in n for n in notes))
     secrets._cache = None
     assert "enabled" not in get_provider_blob("itch_local")
 
 
-def test_migration_leaves_explicitly_disconnected_profile_untouched() -> None:
+def test_migration_leaves_explicitly_disconnected_profile_untouched():
     _write_itch_catalog("default", 5)
-    seed_new_profile_auth_defaults("default")  # sets disabled=True, no enabled key
+    seed_new_profile_auth_defaults("default")
     secrets._cache = None
-
     migrate_existing_itch_local_opt_in()
-
     secrets._cache = None
     blob = get_provider_blob("itch_local")
     assert blob.get("disabled") is True
     assert "enabled" not in blob
 
 
-def test_create_profile_local_providers_disconnected(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_create_profile_local_providers_disconnected(monkeypatch):
     monkeypatch.setattr("auth.manager.platform_supported", lambda platforms: True)
     monkeypatch.setattr("auth.manager._local_data_present", lambda provider, blob: True)
     create_profile("Work")

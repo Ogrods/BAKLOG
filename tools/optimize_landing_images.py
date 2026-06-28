@@ -1,16 +1,9 @@
-#!/usr/bin/env python3
-"""Right-size and convert landing spotlight images to WebP for Lighthouse."""
-
-from __future__ import annotations
-
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = ROOT / "landing" / "assets" / "sample"
-
-# Spotlight art referenced by landing/demo.js SPOTLIGHT_GAMES
 LANDSCAPE_HERO = (
     "hero-emberfall",
     "hero-hollow-crown",
@@ -27,13 +20,12 @@ PORTRAIT_COVER = (
     "cover-apex-velocity",
     "cover-quick-byte",
 )
-
-LANDSCAPE_SIZE = (1200, 800)  # ~2x display size for retina
+LANDSCAPE_SIZE = (1200, 800)
 PORTRAIT_SIZE = (600, 900)
 WEBP_QUALITY = 80
 
 
-def optimize_png(slug: str, target_size: tuple[int, int]) -> Path:
+def optimize_png(slug, target_size):
     src = SAMPLE / f"{slug}.png"
     if not src.is_file():
         raise FileNotFoundError(src)
@@ -49,7 +41,7 @@ def optimize_png(slug: str, target_size: tuple[int, int]) -> Path:
     return dst
 
 
-def main() -> None:
+def main():
     total_png = 0.0
     total_webp = 0.0
     for slug in LANDSCAPE_HERO:

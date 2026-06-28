@@ -1,11 +1,3 @@
-"""Tests for the hosted free-claims downloader (fetch_free_claims.py).
-
-Covers the exit-code refusal contract (empty feed), validated-rows-only
-payloads, and attribution passthrough — all offline (no real HTTP).
-"""
-
-from __future__ import annotations
-
 import json
 import sys
 
@@ -52,13 +44,7 @@ def test_empty_feed_allowed_with_flag(monkeypatch, out_path):
 
 
 def test_malformed_rows_are_dropped(monkeypatch, out_path):
-    data = {
-        "items": [
-            _valid_item("good"),
-            {"id": "no-url", "store": "steam"},  # missing claim_url
-            "not-a-dict",
-        ]
-    }
+    data = {"items": [_valid_item("good"), {"id": "no-url", "store": "steam"}, "not-a-dict"]}
     code = _run(monkeypatch, data)
     assert code == 0
     doc = json.loads(out_path.read_text(encoding="utf-8"))
@@ -73,6 +59,7 @@ def test_attribution_passed_through(monkeypatch, out_path):
 
 
 def test_fetch_error_exits_1(monkeypatch, out_path):
+
     def boom(url, **kw):
         raise ValueError("bad feed")
 

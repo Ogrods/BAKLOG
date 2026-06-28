@@ -1,18 +1,10 @@
-"""Single source of truth for fetchers/manifest.json (server + audit tests)."""
-
-from __future__ import annotations
-
 import json
 import re
-from pathlib import Path
-from typing import Any
 
 from shared.install_paths import bundle_root, is_frozen
 
 MANIFEST_PATH = bundle_root() / "fetchers" / "manifest.json"
-
-# Fetcher key -> connections provider id (for reconnect banners).
-AUTH_PROVIDER_BY_KEY: dict[str, str] = {
+AUTH_PROVIDER_BY_KEY = {
     "steam": "steam",
     "gog": "gog",
     "psn": "psn",
@@ -35,8 +27,7 @@ AUTH_PROVIDER_BY_KEY: dict[str, str] = {
     "wishlistHumble": "humble",
     "itad": "itad",
 }
-
-LIBRARY_JSON_BY_KEY: dict[str, str] = {
+LIBRARY_JSON_BY_KEY = {
     "steam": "games_steam.json",
     "gog": "games_gog.json",
     "psn": "games_psn.json",
@@ -50,8 +41,7 @@ LIBRARY_JSON_BY_KEY: dict[str, str] = {
     "humble": "games_humble.json",
     "ea": "games_ea.json",
 }
-
-WISHLIST_JSON_BY_KEY: dict[str, str] = {
+WISHLIST_JSON_BY_KEY = {
     "wishlistSteam": "games_wishlist.json",
     "wishlistGog": "games_wishlist_gog.json",
     "wishlistEpic": "games_wishlist_epic.json",
@@ -61,8 +51,7 @@ WISHLIST_JSON_BY_KEY: dict[str, str] = {
     "wishlistNintendo": "games_wishlist_nintendo.json",
     "wishlistHumble": "games_wishlist_humble.json",
 }
-
-WISHLIST_META_KEY_BY_FETCHER: dict[str, str] = {
+WISHLIST_META_KEY_BY_FETCHER = {
     "wishlistSteam": "wishlist",
     "wishlistGog": "wishlistGog",
     "wishlistEpic": "wishlistEpic",
@@ -72,16 +61,11 @@ WISHLIST_META_KEY_BY_FETCHER: dict[str, str] = {
     "wishlistNintendo": "wishlistNintendo",
     "wishlistHumble": "wishlistHumble",
 }
-
 ENRICH_FETCHER_KEYS = frozenset({"hltb", "steamReviews", "steamCovers", "steamTags", "protondb"})
-
-# Enrich scripts that mutate wishlist JSON on disk — others only touch library
-# catalogs (see enrich_*.py STORE_FILES). reloadAfterFetcher uses this to skip
-# reloadAllWishlistStoreFiles when unnecessary.
 ENRICH_RELOAD_WISHLIST_KEYS = frozenset({"hltb", "steamCovers"})
 
 
-def load_manifest(path: Path | None = None) -> dict[str, Any]:
+def load_manifest(path=None):
     p = path or MANIFEST_PATH
     raw = json.loads(p.read_text(encoding="utf-8"))
     entries = raw.get("fetchers", [])
@@ -90,17 +74,16 @@ def load_manifest(path: Path | None = None) -> dict[str, Any]:
     return raw
 
 
-def manifest_entries(path: Path | None = None) -> list[dict[str, Any]]:
+def manifest_entries(path=None):
     return list(load_manifest(path).get("fetchers", []))
 
 
-def entries_by_key(path: Path | None = None) -> dict[str, dict[str, Any]]:
+def entries_by_key(path=None):
     return {e["key"]: e for e in manifest_entries(path) if e.get("key")}
 
 
-def validate_manifest(path: Path | None = None) -> list[str]:
-    """Return human-readable validation errors (empty if ok)."""
-    errors: list[str] = []
+def validate_manifest(path=None):
+    errors = []
     entries = manifest_entries(path)
     keys = [e.get("key") for e in entries]
     if len(keys) != len(set(keys)):
@@ -111,10 +94,7 @@ def validate_manifest(path: Path | None = None) -> list[str]:
         if not key or not script:
             errors.append(f"entry missing key or script: {entry!r}")
             continue
-        # Frozen builds compile fetch_*.py into the PYZ; the source files are not
-        # shipped as on-disk data, so skip source-file checks there (this is a
-        # dev/CI integrity check, not a runtime gate).
-        if not is_frozen() and not (bundle_root() / script).is_file():
+        if not is_frozen() and (not (bundle_root() / script).is_file()):
             errors.append(f"{key}: missing script {script}")
         group = entry.get("group", "library")
         meta = entry.get("metaKey", key)
@@ -125,10 +105,10 @@ def validate_manifest(path: Path | None = None) -> list[str]:
         if group == "wishlist" and WISHLIST_META_KEY_BY_FETCHER.get(key) != meta:
             errors.append(f"{key}: metaKey {meta!r} != wishlist map {WISHLIST_META_KEY_BY_FETCHER.get(key)!r}")
         requires = entry.get("requires") or []
-        if requires and group in ("library", "wishlist", "prices") and key not in AUTH_PROVIDER_BY_KEY:
+        if requires and group in ("library", "wishlist", "prices") and (key not in AUTH_PROVIDER_BY_KEY):
             errors.append(f"{key}: has requires but no AUTH_PROVIDER_BY_KEY")
         refresh = entry.get("refreshArgs") or []
-        if refresh and not is_frozen():
+        if refresh and (not is_frozen()):
             flags = _script_flags(script)
             for arg in refresh:
                 if arg not in flags:
@@ -145,31 +125,20 @@ def validate_manifest(path: Path | None = None) -> list[str]:
     return errors
 
 
-def _script_flags(script: str) -> set[str]:
+def _script_flags(script):
     path = bundle_root() / script
     text = path.read_text(encoding="utf-8")
-    flags: set[str] = set()
-    for m in re.finditer(r'add_argument\(\s*["\'](--[\w-]+)', text):
+    flags = set()
+    for m in re.finditer("add_argument\\(\\s*[\"\\'](--[\\w-]+)", text):
         flags.add(m.group(1))
     return flags
 
 
-def no_auto_fetch_keys(path: Path | None = None) -> list[str]:
-    """Fetcher keys marked autoFetch:false (local launchers — need the app open).
-
-    Launcher-backed sources (GOG Galaxy, Amazon Games) scan a locally installed
-    client, so they can't refresh unattended like web/API stores. Auto-refresh
-    (browser loop + background scheduler) skips them.
-    """
-    return sorted(
-        e["key"]
-        for e in manifest_entries(path)
-        if e.get("key") and e.get("autoFetch") is False
-    )
+def no_auto_fetch_keys(path=None):
+    return sorted((e["key"] for e in manifest_entries(path) if e.get("key") and e.get("autoFetch") is False))
 
 
-def export_js_registry(out_path: Path | None = None) -> None:
-    """Write js/fetcher-registry.js for the browser bundle."""
+def export_js_registry(out_path=None):
     out = out_path or bundle_root() / "js" / "fetcher-registry.js"
     payload = {
         "libraryStoreJson": LIBRARY_JSON_BY_KEY,
@@ -182,7 +151,7 @@ def export_js_registry(out_path: Path | None = None) -> None:
     }
     lines = [
         "// Generated from fetchers/registry.py — keep in sync with manifest maps.",
-        "// Regenerate: python -c \"from fetchers.registry import export_js_registry; export_js_registry()\"",
+        '// Regenerate: python -c "from fetchers.registry import export_js_registry; export_js_registry()"',
         "",
         f"export const LIBRARY_STORE_JSON = {json.dumps(payload['libraryStoreJson'], indent=2)};",
         "",

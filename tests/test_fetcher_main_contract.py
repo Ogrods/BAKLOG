@@ -1,10 +1,5 @@
-"""Contract tests for fetch_psn, fetch_xbox, fetch_ubisoft main() exit paths."""
-from __future__ import annotations
-
 import sys
 from unittest.mock import patch
-
-import pytest
 
 from clients.psn_client import PsnAuthError
 from clients.ubisoft_client import UbisoftAuthError
@@ -12,7 +7,7 @@ from clients.xbox_client import XboxAuthError
 from fetchers._progress import EXIT_CODE_AUTH
 
 
-def test_fetch_psn_main_missing_npsso_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_psn_main_missing_npsso_exits_1(monkeypatch):
     import fetchers.fetch_psn as fetch_psn
 
     monkeypatch.setattr(fetch_psn, "resolve_env", lambda *_a, **_k: None)
@@ -20,10 +15,10 @@ def test_fetch_psn_main_missing_npsso_exits_1(monkeypatch: pytest.MonkeyPatch) -
     assert fetch_psn.main() == 1
 
 
-def test_fetch_psn_main_auth_failure_exits_4(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_psn_main_auth_failure_exits_4(monkeypatch):
     import fetchers.fetch_psn as fetch_psn
 
-    mark_calls: list = []
+    mark_calls = []
     monkeypatch.setattr(fetch_psn, "resolve_env", lambda *_a, **_k: "npsso-token")
     monkeypatch.setattr(fetch_psn, "mark_invalid", lambda *a, **k: mark_calls.append((a, k)))
     with patch.object(fetch_psn, "PsnClient") as mock_client:
@@ -33,7 +28,7 @@ def test_fetch_psn_main_auth_failure_exits_4(monkeypatch: pytest.MonkeyPatch) ->
     assert mark_calls
 
 
-def test_fetch_xbox_main_missing_api_key_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_xbox_main_missing_api_key_exits_1(monkeypatch):
     import fetchers.fetch_xbox as fetch_xbox
 
     monkeypatch.setattr(fetch_xbox, "resolve_env", lambda *_a, **_k: None)
@@ -41,10 +36,10 @@ def test_fetch_xbox_main_missing_api_key_exits_1(monkeypatch: pytest.MonkeyPatch
     assert fetch_xbox.main() == 1
 
 
-def test_fetch_xbox_main_auth_failure_exits_4(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_xbox_main_auth_failure_exits_4(monkeypatch):
     import fetchers.fetch_xbox as fetch_xbox
 
-    mark_calls: list = []
+    mark_calls = []
     monkeypatch.setattr(fetch_xbox, "resolve_env", lambda *_a, **_k: "xbl-key")
     monkeypatch.setattr(fetch_xbox, "mark_invalid", lambda *a, **k: mark_calls.append((a, k)))
     with patch.object(fetch_xbox, "XboxClient") as mock_client:
@@ -55,7 +50,7 @@ def test_fetch_xbox_main_auth_failure_exits_4(monkeypatch: pytest.MonkeyPatch) -
     assert mark_calls
 
 
-def test_fetch_ubisoft_main_missing_creds_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_ubisoft_main_missing_creds_exits_1(monkeypatch):
     import fetchers.fetch_ubisoft as fetch_ubisoft
 
     monkeypatch.setattr(fetch_ubisoft, "resolve_env", lambda *_a, **_k: None)
@@ -63,16 +58,13 @@ def test_fetch_ubisoft_main_missing_creds_exits_1(monkeypatch: pytest.MonkeyPatc
     assert fetch_ubisoft.main() == 1
 
 
-def test_fetch_ubisoft_main_auth_failure_exits_4(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_ubisoft_main_auth_failure_exits_4(monkeypatch):
     import fetchers.fetch_ubisoft as fetch_ubisoft
 
-    mark_calls: list = []
+    mark_calls = []
 
-    def _resolve(key: str, provider=None) -> str | None:  # noqa: ARG001
-        return {
-            "UBISOFT_AUTH": "Ubi_v1 t=x",
-            "UBISOFT_SESSION_ID": "sess",
-        }.get(key)
+    def _resolve(key, provider=None):
+        return {"UBISOFT_AUTH": "Ubi_v1 t=x", "UBISOFT_SESSION_ID": "sess"}.get(key)
 
     monkeypatch.setattr(fetch_ubisoft, "resolve_env", _resolve)
     monkeypatch.setattr(fetch_ubisoft, "mark_invalid", lambda *a, **k: mark_calls.append((a, k)))

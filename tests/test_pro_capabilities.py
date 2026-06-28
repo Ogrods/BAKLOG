@@ -1,7 +1,3 @@
-"""Tests for shared/pro_capabilities.py."""
-
-from __future__ import annotations
-
 import pytest
 
 from shared.pro_capabilities import (
@@ -53,12 +49,10 @@ def test_cloud_mirror_requires_auth_and_opt_in_when_live(monkeypatch):
     off = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": False})
     assert off["cloud_sync_mirror"]["status"] == "live"
     assert off["cloud_sync_mirror"]["enabled"] is False
-
     monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon")
     still_off = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": False})
     assert still_off["cloud_sync_mirror"]["enabled"] is False
-
     on = resolve_capabilities(plan="pro", pro_settings={"cloudMirrorEnabled": True})
     assert on["cloud_sync_mirror"]["enabled"] is True
 

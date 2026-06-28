@@ -1,7 +1,3 @@
-"""Tests for shared/pro_settings.py and PUT /api/pro-settings."""
-
-from __future__ import annotations
-
 import json
 import threading
 from functools import partial
@@ -28,13 +24,12 @@ def local_server(tmp_path, monkeypatch):
     monkeypatch.delenv("BAKLOG_SUPABASE_ANON_KEY", raising=False)
     monkeypatch.delenv("BAKLOG_SUPABASE_JWT_SECRET", raising=False)
     server._refresh_personal_paths()
-
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(server.ROOT)))
     port = httpd.server_address[1]
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{port}", tmp_path
+        yield (f"http://127.0.0.1:{port}", tmp_path)
     finally:
         httpd.shutdown()
         httpd.server_close()
@@ -46,8 +41,7 @@ def isolated_profile(tmp_path, monkeypatch):
     prof = tmp_path / "profiles"
     prof.mkdir(parents=True)
     (prof / "index.json").write_text(
-        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}),
-        encoding="utf-8",
+        json.dumps({"active": "default", "profiles": [{"id": "default", "label": "Default"}]}), encoding="utf-8"
     )
     (prof / "default" / "data").mkdir(parents=True)
     monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
@@ -103,7 +97,6 @@ def test_pro_settings_put_persists_for_local_pro(local_server, monkeypatch):
     assert status == HTTPStatus.OK
     data = json.loads(raw.decode("utf-8"))
     assert data["proSettings"]["cloudMirrorEnabled"] is True
-
     cfg_status, cfg = _get_json(base, "/api/config")
     assert cfg_status == HTTPStatus.OK
     assert cfg["proSettings"]["cloudMirrorEnabled"] is True
@@ -117,10 +110,7 @@ def test_pro_settings_put_blocked_without_local_header(auth_server):
         base,
         "/api/pro-settings",
         method="PUT",
-        headers={
-            "Content-Type": "application/json",
-            "Host": "public.example.com",
-        },
+        headers={"Content-Type": "application/json", "Host": "public.example.com"},
         body=body,
     )
     assert status == HTTPStatus.FORBIDDEN

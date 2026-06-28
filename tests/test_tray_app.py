@@ -1,12 +1,3 @@
-"""Tests for the system tray launcher (tray_app.py).
-
-Kept light: the pystray UI loop is never started here. We exercise the pure
-helpers (URL, interpreter resolution, argv shape) and the ServerController
-status/lifecycle guards without spawning a real server.
-"""
-
-from __future__ import annotations
-
 import socket
 import subprocess
 import sys
@@ -17,7 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import tray_app
 
 
@@ -72,15 +62,13 @@ def test_controller_not_running_when_port_closed(monkeypatch):
 def test_controller_start_noop_when_already_listening(monkeypatch):
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: True)
     ctl = tray_app.ServerController()
-    # Already up: start() returns True and never spawns a process.
     assert ctl.start() is True
     assert ctl.proc is None
 
 
 def test_controller_start_spawns_and_waits(monkeypatch):
-    calls: list[list[str]] = []
+    calls = []
     port_seq = iter([False, False, True])
-
     proc = MagicMock()
     proc.poll.return_value = None
     proc.pid = 4242
@@ -140,11 +128,7 @@ def test_controller_stop_requests_graceful_shutdown(monkeypatch):
 
     proc = LiveProc()
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: True)
-    monkeypatch.setattr(
-        tray_app,
-        "_request_graceful_shutdown",
-        lambda: graceful.__setitem__("called", True) or True,
-    )
+    monkeypatch.setattr(tray_app, "_request_graceful_shutdown", lambda: graceful.__setitem__("called", True) or True)
     ctl = tray_app.ServerController()
     ctl.proc = proc
     ctl.stop()
@@ -195,7 +179,7 @@ def test_request_graceful_shutdown_true_when_port_closed(monkeypatch):
 
 def test_controller_stop_is_safe_with_no_process():
     ctl = tray_app.ServerController()
-    ctl.stop()  # must not raise
+    ctl.stop()
     assert ctl.proc is None
 
 
@@ -234,7 +218,6 @@ def test_load_icon_image_prefers_existing_asset(monkeypatch, tmp_path):
 
 
 def test_port_open_false_for_unused_port(monkeypatch):
-    # Bind an ephemeral port we never listen on; create_connection should fail.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((tray_app.HOST, 0))
     free_port = s.getsockname()[1]
@@ -244,7 +227,7 @@ def test_port_open_false_for_unused_port(monkeypatch):
 
 
 def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
-    notified: list[tuple[str, str]] = []
+    notified = []
     monkeypatch.setattr(tray_app, "_tray_notify", lambda icon, t, m: notified.append((t, m)))
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
 
@@ -257,14 +240,14 @@ def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
     icon = MagicMock()
     tray_app._start_server_watchdog(icon, ctl)
     deadline = time.monotonic() + 3.0
-    while time.monotonic() < deadline and not notified:
+    while time.monotonic() < deadline and (not notified):
         time.sleep(0.05)
     assert notified
     assert notified[0][0] == "BAKLOG server stopped"
 
 
 def test_open_data_folder_opens_data_root(monkeypatch, tmp_path):
-    opened: dict[str, str] = {}
+    opened = {}
     monkeypatch.setattr(tray_app, "data_root", lambda: tmp_path)
     if sys.platform == "win32":
         monkeypatch.setattr(tray_app.os, "startfile", lambda p: opened.__setitem__("path", p))

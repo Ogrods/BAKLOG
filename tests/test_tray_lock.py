@@ -1,14 +1,9 @@
-"""Tests for tray single-instance lock (shared/tray_lock.py)."""
-
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import shared.tray_lock as tray_lock
 
 
@@ -24,7 +19,7 @@ def test_acquire_and_release_round_trip(monkeypatch, tmp_path):
         if not tray_lock.acquire_tray_lock():
             pytest.skip("another BAKLOG tray instance holds the single-instance mutex")
         assert tray_lock.acquire_tray_lock() is True
-        assert tray_lock.acquire_tray_lock() is True  # same process re-entrant ok
+        assert tray_lock.acquire_tray_lock() is True
         tray_lock.release_tray_lock()
         assert tray_lock.acquire_tray_lock() is True
         return
@@ -40,7 +35,6 @@ def test_second_holder_blocked_on_posix(monkeypatch, tmp_path):
     monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
     lock_path = tmp_path / ".tray.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    # Simulate another process holding the lock before we try to acquire.
     other = lock_path.open("w", encoding="utf-8")
     import fcntl
 

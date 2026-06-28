@@ -217,7 +217,7 @@ def extract_itch(page, context, session=None):
     while time.time() < deadline:
         abort_if_browser_closed(context)
         url = (page.url or "").lower()
-        if any((p in url for p in ("/login", "/register", "captcha", "verify"))):
+        if any(p in url for p in ("/login", "/register", "captcha", "verify")):
             if session and time.time() - last_message > 6:
                 last_message = time.time()
                 session.emit(
@@ -323,7 +323,7 @@ def extract_itad(page, context, session=None):
     while time.time() < deadline:
         abort_if_browser_closed(context)
         url = (page.url or "").lower()
-        if any((p in url for p in ("oauth/login", "auth/login", "captcha", "verify"))):
+        if any(p in url for p in ("oauth/login", "auth/login", "captcha", "verify")):
             if session and time.time() - last_message > 6:
                 last_message = time.time()
                 session.emit(
@@ -387,7 +387,7 @@ def _xbl_signed_in(url):
     u = (url or "").lower()
     if "xbl.io" not in u:
         return False
-    if any((p in u for p in ("/login", "login.live.com", "account.microsoft.com"))):
+    if any(p in u for p in ("/login", "login.live.com", "account.microsoft.com")):
         return False
     return True
 

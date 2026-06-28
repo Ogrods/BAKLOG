@@ -136,7 +136,7 @@ def signed_in(url, context):
     if not has_amazon_session_cookies(context):
         return False
     u = (url or "").lower()
-    return any((marker in u for marker in _AMAZON_HOST_MARKERS))
+    return any(marker in u for marker in _AMAZON_HOST_MARKERS)
 
 
 def is_luna_hub(url):

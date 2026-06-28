@@ -208,7 +208,7 @@ class EaClient:
             owned = (root.get("data") or {}).get("me", {}).get("ownedGameProducts") or {}
             items = owned.get("items") or []
             if isinstance(items, list):
-                out.extend((i for i in items if isinstance(i, dict)))
+                out.extend(i for i in items if isinstance(i, dict))
             offset = owned.get("next")
             if not offset:
                 break

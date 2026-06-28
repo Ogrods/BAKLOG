@@ -135,7 +135,7 @@ def _script_flags(script):
 
 
 def no_auto_fetch_keys(path=None):
-    return sorted((e["key"] for e in manifest_entries(path) if e.get("key") and e.get("autoFetch") is False))
+    return sorted(e["key"] for e in manifest_entries(path) if e.get("key") and e.get("autoFetch") is False)
 
 
 def export_js_registry(out_path=None):

@@ -248,11 +248,11 @@ def classify_fetcher(key, group, artifact, last_run, provider_states):
     states = list(provider_states.values()) if provider_states else []
     has_catalog = artifact.exists and artifact.fetched_at is not None
     count = artifact.game_count if artifact.game_count is not None else 0
-    if states and all((s == "unavailable" for s in states)):
+    if states and all(s == "unavailable" for s in states):
         return "UNAVAILABLE"
-    if not has_catalog and states and all((s == "disconnected" for s in states)):
+    if not has_catalog and states and all(s == "disconnected" for s in states):
         return "DISCONNECTED"
-    if any((s == "expired" for s in states)):
+    if any(s == "expired" for s in states):
         return "BROKEN/expired"
     if last_run and last_run.status == "failed":
         if last_run.exit_code == 4 or last_run.failure_kind == "auth":

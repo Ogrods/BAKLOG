@@ -77,7 +77,7 @@ def main():
             removed = _bleed_ids(ref_maps, profile_maps)
             if not removed:
                 continue
-            total = sum((len(v) for v in removed.values()))
+            total = sum(len(v) for v in removed.values())
             print(f"profiles/{entry.name}: would remove {total} inherited entries")
             for key, ids in removed.items():
                 print(f"  {key}: {len(ids)} (sample {ids[:3]})")
@@ -104,7 +104,7 @@ def main():
             b_maps = {k: b_personal.get(k) or {} for k in BLEED_KEYS if isinstance(b_personal.get(k), dict)}
             removed = _bleed_ids(a_maps, b_maps)
             if removed:
-                total = sum((len(v) for v in removed.values()))
+                total = sum(len(v) for v in removed.values())
                 print(f"peer strip profiles/{b_id} vs profiles/{a_id}: {total} matching entries")
                 if args.apply:
                     for key, ids in removed.items():

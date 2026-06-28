@@ -35,9 +35,9 @@ def _load_catalog_games():
 def diff_vgc_vs_catalog(vgc_rows, catalog_games):
     vgc_by_title = {_norm_title(r.get("name") or ""): r for r in vgc_rows if r.get("name")}
     cat_by_title = {_norm_title(g.get("name") or ""): g for g in catalog_games if g.get("name")}
-    only_vgc = sorted((title for title in vgc_by_title if title and title not in cat_by_title))
-    only_catalog = sorted((title for title in cat_by_title if title and title not in vgc_by_title))
-    shared = sorted((title for title in vgc_by_title if title in cat_by_title))
+    only_vgc = sorted(title for title in vgc_by_title if title and title not in cat_by_title)
+    only_catalog = sorted(title for title in cat_by_title if title and title not in vgc_by_title)
+    shared = sorted(title for title in vgc_by_title if title in cat_by_title)
     legacy_only = [
         g.get("name") or ""
         for g in catalog_games
@@ -47,8 +47,8 @@ def diff_vgc_vs_catalog(vgc_rows, catalog_games):
     return {
         "vgc_count": len(vgc_rows),
         "catalog_count": len(catalog_games),
-        "catalog_fresh_count": sum((1 for g in catalog_games if not g.get("nintendo_legacy") and (not g.get("stale")))),
-        "catalog_legacy_count": sum((1 for g in catalog_games if g.get("nintendo_legacy"))),
+        "catalog_fresh_count": sum(1 for g in catalog_games if not g.get("nintendo_legacy") and (not g.get("stale"))),
+        "catalog_legacy_count": sum(1 for g in catalog_games if g.get("nintendo_legacy")),
         "shared_title_count": len(shared),
         "only_vgc_titles": only_vgc,
         "only_catalog_titles": only_catalog,

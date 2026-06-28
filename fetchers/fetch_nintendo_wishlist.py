@@ -310,9 +310,7 @@ def _wishlist_graphql_ok(payload):
 
 
 def _wishlist_session_authenticated(api_payloads):
-    return any((_wishlist_graphql_ok(p) for p in api_payloads)) or any(
-        (_customer_graphql_authed(p) for p in api_payloads)
-    )
+    return any(_wishlist_graphql_ok(p) for p in api_payloads) or any(_customer_graphql_authed(p) for p in api_payloads)
 
 
 def _looks_like_wishlist_item(obj):
@@ -391,12 +389,12 @@ def _find_wishlist_lists(node):
             if not isinstance(val, list) or len(val) == 0:
                 continue
             kl = key.lower()
-            if not any((tok in kl for tok in ("wish", "item", "product", "game"))):
+            if not any(tok in kl for tok in ("wish", "item", "product", "game")):
                 continue
             sample = [obj for x in val[:5] if isinstance(x, dict) for obj in [_wishlist_entry_dict(x)] if obj]
             if not sample:
                 continue
-            if sum((1 for s in sample if _looks_like_wishlist_item(s))) >= max(1, len(sample) // 2):
+            if sum(1 for s in sample if _looks_like_wishlist_item(s)) >= max(1, len(sample) // 2):
                 hits.append(val)
     return hits
 
@@ -466,14 +464,14 @@ def _is_nintendo_capture_url(url):
 
 
 def _wishlist_capture_complete(html, api_payloads):
-    if any((_wishlist_graphql_ok(p) for p in api_payloads)):
+    if any(_wishlist_graphql_ok(p) for p in api_payloads):
         return True
     return bool(parse_wishlist_sources(html, api_payloads))
 
 
 def _is_stale_nintendo_tab(url):
     u = (url or "").lower()
-    return any((tok in u for tok in ("authorize", "accounts.nintendo.com/login", "chrome://")))
+    return any(tok in u for tok in ("authorize", "accounts.nintendo.com/login", "chrome://"))
 
 
 def _close_stale_nintendo_tabs(ctx):
@@ -810,7 +808,7 @@ def _fetch_with_profile(*, dump=False, timeout_s=45):
                 page.wait_for_timeout(poll_interval_ms)
             api_payloads.extend(_drain_nintendo_candidates(candidates, auth_state=auth_state))
             page_session = _load_storefront_auth_from_page(page, auth_state)
-            if not any((_wishlist_graphql_ok(p) for p in api_payloads)) and _is_guest_storefront_auth(page_session):
+            if not any(_wishlist_graphql_ok(p) for p in api_payloads) and _is_guest_storefront_auth(page_session):
                 print("  storefront session is guest-only; reloading to restore signed-in tokens", flush=True)
                 try:
                     page = _goto_wishlist_page(page, ctx)
@@ -822,14 +820,14 @@ def _fetch_with_profile(*, dump=False, timeout_s=45):
                     api_payloads.extend(drained)
                     for payload in drained:
                         _note_tokens_payload(payload, auth_state)
-                    if any((_wishlist_graphql_ok(p) for p in api_payloads)):
+                    if any(_wishlist_graphql_ok(p) for p in api_payloads):
                         break
                     page.wait_for_timeout(poll_interval_ms)
                 api_payloads.extend(_drain_nintendo_candidates(candidates, auth_state=auth_state))
                 page_session = _load_storefront_auth_from_page(page, auth_state)
             direct_payload = None
             if (
-                not any((_wishlist_graphql_ok(p) for p in api_payloads))
+                not any(_wishlist_graphql_ok(p) for p in api_payloads)
                 and _wishlist_session_authenticated(api_payloads)
                 and (not _signed_out(req_html, page.url or url))
             ):
@@ -842,7 +840,7 @@ def _fetch_with_profile(*, dump=False, timeout_s=45):
                         api_payloads.extend(drained)
                         for payload in drained:
                             _note_tokens_payload(payload, auth_state)
-                        if _graphql_auth_ready(auth_state) or any((_wishlist_graphql_ok(p) for p in api_payloads)):
+                        if _graphql_auth_ready(auth_state) or any(_wishlist_graphql_ok(p) for p in api_payloads):
                             break
                         page.wait_for_timeout(300)
                 if not _graphql_auth_ready(auth_state):
@@ -948,15 +946,13 @@ def main():
     except Exception as exc:
         msg = str(exc)
         is_transport = any(
-            (
-                tok in msg.lower()
-                for tok in (
-                    "cdp command timed out",
-                    "websocket",
-                    "browser",
-                    "debugging endpoint",
-                    "session with given id",
-                )
+            tok in msg.lower()
+            for tok in (
+                "cdp command timed out",
+                "websocket",
+                "browser",
+                "debugging endpoint",
+                "session with given id",
             )
         )
         if is_transport:
@@ -988,7 +984,7 @@ def main():
     if (
         not items
         and _wishlist_session_authenticated(api_payloads)
-        and (not any((_wishlist_graphql_ok(p) for p in api_payloads)))
+        and (not any(_wishlist_graphql_ok(p) for p in api_payloads))
     ):
         msg = "Nintendo wish-list session is signed in but stuck in a guest token state, so the storefront never returned wish-list items. Open Connections and reconnect 'Nintendo Store wishlist'."
         mark_invalid("nintendo_wishlist", error=msg)

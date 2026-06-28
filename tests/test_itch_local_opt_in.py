@@ -80,7 +80,7 @@ def test_migration_opts_in_existing_profile_with_itch_library(monkeypatch):
     _write_itch_catalog("default", 12)
     assert _provider_state("itch_local") == "disconnected"
     notes = migrate_existing_itch_local_opt_in()
-    assert any(("default" in n for n in notes))
+    assert any("default" in n for n in notes)
     secrets._cache = None
     assert get_provider_blob("itch_local").get("enabled") is True
     assert _provider_state("itch_local") == "connected"
@@ -88,7 +88,7 @@ def test_migration_opts_in_existing_profile_with_itch_library(monkeypatch):
 
 def test_migration_skips_profile_without_itch_library():
     notes = migrate_existing_itch_local_opt_in()
-    assert not any(("opted in" in n for n in notes))
+    assert not any("opted in" in n for n in notes)
     secrets._cache = None
     assert "enabled" not in get_provider_blob("itch_local")
 

@@ -20,7 +20,7 @@ def is_epic_graphql_url(url):
 
 def wishlist_graphql_ok(payload):
     if isinstance(payload, list):
-        return any((wishlist_graphql_ok(p) for p in payload))
+        return any(wishlist_graphql_ok(p) for p in payload)
     if _elements_from_payload(payload):
         return True
     if not isinstance(payload, dict):
@@ -203,7 +203,7 @@ def enrich_wishlist_elements_with_catalog(html, elements):
 
 
 def wishlist_capture_complete_from_html(html):
-    return any((wishlist_graphql_ok(p) for p in extract_wishlist_payloads_from_html(html)))
+    return any(wishlist_graphql_ok(p) for p in extract_wishlist_payloads_from_html(html))
 
 
 def cloudflare_interstitial(html, url):

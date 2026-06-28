@@ -165,7 +165,7 @@ def pids_holding_chromium_profile(user_data_dir):
                 except IndexError:
                     continue
                 cmd_l = cmd.lower()
-                if not any((needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles)):
+                if not any(needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles):
                     continue
                 try:
                     pids.add(int(pid_s))
@@ -177,7 +177,7 @@ def pids_holding_chromium_profile(user_data_dir):
                 continue
             pid_s, cmd = line.split("|", 1)
             cmd_l = cmd.lower()
-            if not any((needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles)):
+            if not any(needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles):
                 continue
             try:
                 pids.add(int(pid_s.strip()))
@@ -200,7 +200,7 @@ def pids_holding_chromium_profile(user_data_dir):
         exe = Path(cmd.split()[0]).name.lower() if cmd.split() else ""
         if exe not in _CHROMIUM_EXE_NAMES:
             continue
-        if not any((needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles)):
+        if not any(needle in cmd_l and "--user-data-dir" in cmd_l for needle in needles):
             continue
         try:
             pids.add(int(pid_s))
@@ -1060,7 +1060,7 @@ def browser_session_gone(context):
         return True
     pages = list(getattr(context, "pages", ()) or ())
     if pages:
-        return all((p.is_closed for p in pages))
+        return all(p.is_closed for p in pages)
     return False
 
 

@@ -128,7 +128,7 @@ def test_resync_stalled_queue_recovers_dead_worker(runs_env):
     while time.time() < deadline:
         snap = mgr.snapshot()
         if not snap["active"] and (not snap["queue"]):
-            if any((h.get("id") == run.id for h in snap["history"])):
+            if any(h.get("id") == run.id for h in snap["history"]):
                 break
         time.sleep(0.05)
     else:
@@ -194,7 +194,7 @@ def test_cancel_schedules_sync_completion_when_worker_dead(runs_env, monkeypatch
     assert err is None
     assert cancelled is not None
     assert completed == [run.id]
-    assert any((h.get("id") == run.id for h in mgr.snapshot()["history"]))
+    assert any(h.get("id") == run.id for h in mgr.snapshot()["history"])
 
 
 def test_force_reset_clears_queue(runs_env):
@@ -226,7 +226,7 @@ def test_force_finalize_stuck_cancelling(runs_env, monkeypatch):
     mgr._force_finalize_stuck_cancelling()
     snap = mgr.snapshot()
     assert snap["active"] is None
-    assert any((h.get("id") == run.id for h in snap["history"]))
+    assert any(h.get("id") == run.id for h in snap["history"])
 
 
 def test_force_finalize_orphaned_active_run(runs_env, monkeypatch):
@@ -243,7 +243,7 @@ def test_force_finalize_orphaned_active_run(runs_env, monkeypatch):
     mgr._force_finalize_orphaned_runs()
     snap = mgr.snapshot()
     assert snap["active"] is None
-    hist = next((h for h in snap["history"] if h.get("id") == run.id))
+    hist = next(h for h in snap["history"] if h.get("id") == run.id)
     assert hist["status"] == "failed"
     assert hist["exit_code"] == -1
     assert "no live subprocess" in (hist.get("note") or "")
@@ -271,7 +271,7 @@ def test_orphaned_reaper_spares_live_process(runs_env, monkeypatch):
     snap = mgr.snapshot()
     assert snap["active"] is not None
     assert snap["active"]["id"] == run.id
-    assert not any((h.get("id") == run.id for h in snap["history"]))
+    assert not any(h.get("id") == run.id for h in snap["history"])
 
 
 def test_orphaned_reaper_one_cycle_grace(runs_env, monkeypatch):
@@ -292,7 +292,7 @@ def test_orphaned_reaper_one_cycle_grace(runs_env, monkeypatch):
     mgr._force_finalize_orphaned_runs()
     snap = mgr.snapshot()
     assert snap["active"] is None
-    assert any((h.get("id") == run.id for h in snap["history"]))
+    assert any(h.get("id") == run.id for h in snap["history"])
 
 
 def test_cancel_queued_run(runs_env):
@@ -308,7 +308,7 @@ def test_cancel_queued_run(runs_env):
     mgr._queue.put(run)
     deadline = time.time() + 5
     while time.time() < deadline:
-        if any((h.get("id") == run.id for h in mgr.snapshot()["history"])):
+        if any(h.get("id") == run.id for h in mgr.snapshot()["history"]):
             break
         time.sleep(0.05)
     else:
@@ -324,10 +324,10 @@ def test_finalize_run_is_idempotent(runs_env):
     run.mark_finished()
     mgr._finalize_run(run)
     hist = server._load_run_history_from(runs_dir / "history.json")
-    assert sum((1 for h in hist if h.get("id") == run.id)) == 1
+    assert sum(1 for h in hist if h.get("id") == run.id) == 1
     mgr._finalize_run(run)
     hist2 = server._load_run_history_from(runs_dir / "history.json")
-    assert sum((1 for h in hist2 if h.get("id") == run.id)) == 1
+    assert sum(1 for h in hist2 if h.get("id") == run.id) == 1
 
 
 def test_history_persisted_on_finish(runs_env):
@@ -384,7 +384,7 @@ def test_stall_watchdog_emits_notice(runs_env, monkeypatch):
     poll_deadline = time.time() + 10
     while time.time() < poll_deadline:
         replay = run.replay_lines()
-        if any(("no output for" in m.get("text", "") for m in replay)):
+        if any("no output for" in m.get("text", "") for m in replay):
             saw_stall = True
             break
         time.sleep(0.05)
@@ -556,7 +556,7 @@ def test_max_runtime_cap_kills_run(runs_env, monkeypatch):
     deadline = time.time() + 20
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any(("maximum runtime" in m.get("text", "") for m in replay)):
+        if any("maximum runtime" in m.get("text", "") for m in replay):
             saw_cap = True
             break
         time.sleep(0.05)
@@ -622,7 +622,7 @@ def test_per_fetcher_max_runtime_override(runs_env, monkeypatch):
     deadline = time.time() + 30
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any(("maximum runtime (2" in m.get("text", "") for m in replay)):
+        if any("maximum runtime (2" in m.get("text", "") for m in replay):
             saw_cap = True
             break
         time.sleep(0.05)
@@ -654,7 +654,7 @@ def test_stall_kill_after_single_stdout_line(runs_env, monkeypatch):
     deadline = time.time() + 15
     while time.time() < deadline:
         replay = run.replay_lines()
-        if any(("force-killing" in m.get("text", "") for m in replay)):
+        if any("force-killing" in m.get("text", "") for m in replay):
             saw_kill = True
             break
         time.sleep(0.05)
@@ -689,11 +689,11 @@ def test_heartbeat_keeps_long_run_alive(runs_env, monkeypatch):
     assert run._finished.wait(timeout=20)
     replay = run.replay_lines()
     texts = [m.get("text", "") for m in replay]
-    assert not any(("force-killing" in t for t in texts)), (
+    assert not any("force-killing" in t for t in texts), (
         "heartbeating run was force-killed despite emitting periodic stdout"
     )
-    assert any(("still working" in t for t in texts)), "expected heartbeat lines in run log"
-    assert any(("done" in t for t in texts)), "expected the run to reach completion"
+    assert any("still working" in t for t in texts), "expected heartbeat lines in run log"
+    assert any("done" in t for t in texts), "expected the run to reach completion"
     assert run.exit_code == 0
     assert run.status == "done"
 

@@ -62,7 +62,7 @@ def test_auth_error_branches_use_exit_code_4(script):
     assert "mark_invalid" in text, f"{script} must call mark_invalid on auth failure"
     blocks = _auth_error_finish_exit_codes(text)
     assert blocks, f"{script} has no AuthError -> stats.finish exit path"
-    assert all((code == "EXIT_CODE_AUTH" for code in blocks)), (
+    assert all(code == "EXIT_CODE_AUTH" for code in blocks), (
         f"{script} AuthError branches must use exit_code=EXIT_CODE_AUTH, got {blocks}"
     )
 

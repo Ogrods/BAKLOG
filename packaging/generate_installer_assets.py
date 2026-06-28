@@ -65,7 +65,7 @@ def _diagonal_gradient(size):
     for y in range(size):
         for x in range(size):
             t = (x + y) / max(2 * (size - 1), 1)
-            px[x, y] = tuple((int(BG_TOP[i] + (BG_BOTTOM[i] - BG_TOP[i]) * t) for i in range(3)))
+            px[x, y] = tuple(int(BG_TOP[i] + (BG_BOTTOM[i] - BG_TOP[i]) * t) for i in range(3))
     return img
 
 
@@ -75,7 +75,7 @@ def _mark_gradient(size):
     for y in range(size):
         for x in range(size):
             t = (x + y) / max(2 * (size - 1), 1)
-            px[x, y] = tuple((int(ACCENT[i] + (VIOLET[i] - ACCENT[i]) * t) for i in range(3)))
+            px[x, y] = tuple(int(ACCENT[i] + (VIOLET[i] - ACCENT[i]) * t) for i in range(3))
     return img
 
 
@@ -145,7 +145,7 @@ def _vertical_panel(size):
     draw = ImageDraw.Draw(img)
     for y in range(h):
         t = y / max(h - 1, 1)
-        color = tuple((int(BG_TOP[i] + (BG_BOTTOM[i] - BG_TOP[i]) * t) for i in range(3)))
+        color = tuple(int(BG_TOP[i] + (BG_BOTTOM[i] - BG_TOP[i]) * t) for i in range(3))
         draw.line([(0, y), (w, y)], fill=color)
     return img
 

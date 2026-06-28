@@ -183,7 +183,7 @@ def test_leak_detector_cleans_stray_thread():
         t.start()
         assert started.wait(timeout=2.0)
         _cleanup_leaks(baseline_threads=set(), baseline_children=set())
-    assert any(("leaked RunManager thread" in str(w.message) for w in caught))
+    assert any("leaked RunManager thread" in str(w.message) for w in caught)
 
 
 @pytest.mark.no_leak_check
@@ -198,7 +198,7 @@ def test_leak_detector_cleans_child_process():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             _cleanup_leaks(baseline_threads=set(), baseline_children=set())
-        assert any(("leaked child process" in str(w.message) for w in caught))
+        assert any("leaked child process" in str(w.message) for w in caught)
     finally:
         if proc.poll() is None:
             terminate_pid_tree(proc.pid)

@@ -564,8 +564,8 @@ def motion_orbit(layout, preset, n_frames, straight=True):
     cx = cy = 0.0
     slot_polar = []
     if not straight:
-        cx = sum((f[0] for f in finals)) / 3
-        cy = sum((f[1] for f in finals)) / 3
+        cx = sum(f[0] for f in finals) / 3
+        cy = sum(f[1] for f in finals) / 3
         slot_polar = [_polar_from_centroid(cx, cy, finals[s][0], finals[s][1]) for s in range(3)]
     frames = []
     for fi in range(n_frames):

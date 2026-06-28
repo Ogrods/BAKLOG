@@ -29,7 +29,7 @@ def test_wipe_user_data_removes_dir_and_keyring(monkeypatch, tmp_path):
     notes = uninstall_cleanup.wipe_user_data(data_dir)
     assert not data_dir.exists()
     assert keyring_calls["n"] == 1
-    assert any(("keyring" in note.lower() for note in notes))
+    assert any("keyring" in note.lower() for note in notes)
     assert "BAKLOG-Data" in notes[-1]
 
 

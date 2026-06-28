@@ -46,7 +46,7 @@ def credentials_satisfied(key, status_map):
     providers = fetcher_providers(key)
     if not providers:
         return True
-    return any((status_map.get(p, {}).get("status") == "connected" for p in providers))
+    return any(status_map.get(p, {}).get("status") == "connected" for p in providers)
 
 
 def count_games(path):
@@ -129,9 +129,9 @@ def run_fetcher(key, entry, profile_id, timeout_s):
 def cmd_status():
     pid, label = _active_profile()
     status_map = _status_by_key()
-    connected = sum((1 for r in status_map.values() if r.get("status") == "connected"))
-    expired = sum((1 for r in status_map.values() if r.get("status") == "expired"))
-    unverified = sum((1 for r in status_map.values() if r.get("status") == "unverified"))
+    connected = sum(1 for r in status_map.values() if r.get("status") == "connected")
+    expired = sum(1 for r in status_map.values() if r.get("status") == "expired")
+    unverified = sum(1 for r in status_map.values() if r.get("status") == "unverified")
     print(f"Profile: {label} ({pid})")
     print(f"{'STATUS':12} {'KEY':22} LABEL")
     print("-" * 60)
@@ -213,7 +213,7 @@ def cmd_fetch(*, include_enrich, fetcher, timeout_s):
             tail = result.get("tail") or result.get("error") or ""
             if tail:
                 print(f"  tail: {tail[-200:]}")
-    passed = sum((1 for r in results if r.get("ok")))
+    passed = sum(1 for r in results if r.get("ok"))
     failed = len(results) - passed
     print(f"\nSweep: {passed} passed, {failed} failed, {len(keys) - len(results)} skipped")
     return exit_code

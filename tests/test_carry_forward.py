@@ -76,7 +76,7 @@ def test_multi_source_match_key_dedup_not_double_counted():
     assert len(out) == 2
     keys = {match_key(r) for r in out}
     assert keys == {"gog_id:10", "gog_id:99"}
-    fresh_row = next((r for r in out if r["id"] == 10))
+    fresh_row = next(r for r in out if r["id"] == 10)
     assert fresh_row["source"] == "web"
     assert STALE_FIELD not in fresh_row
 

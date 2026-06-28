@@ -101,7 +101,7 @@ def test_cross_gen_playtime_summed():
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(stats, [_trophy(title_id="PPSA01922_00")])
     games = client.collect_library()
-    fn = next((g for g in games if g.name == "Fortnite"))
+    fn = next(g for g in games if g.name == "Fortnite")
     assert fn.playtime_minutes == ps4_min + ps5_min
 
 
@@ -126,7 +126,7 @@ def test_cross_gen_last_first_play_count_merged():
     ]
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(stats, [_trophy()])
-    fn = next((g for g in client.collect_library() if g.name == "Fortnite"))
+    fn = next(g for g in client.collect_library() if g.name == "Fortnite")
     assert fn.play_count == 55
     assert fn.last_played.startswith("2025-01-01")
     assert fn.first_played.startswith("2018-01-01")
@@ -136,7 +136,7 @@ def test_single_platform_not_inflated():
     stats = [_stat(title_id="CUSA12345_00", name="Solo Game", hours=42)]
     client = object.__new__(PsnClient)
     client._client = _FakePsnMe(stats, [_trophy(comm_id="NPWR1", name="Solo Game", title_id="CUSA12345_00")])
-    solo = next((g for g in client.collect_library() if g.name == "Solo Game"))
+    solo = next(g for g in client.collect_library() if g.name == "Solo Game")
     assert solo.playtime_minutes == 42 * 60
 
 
@@ -176,7 +176,7 @@ def test_trophy_counts_and_platinum_flags():
     client._client = _FakePsnMe(
         [], [_trophy(comm_id="NPWR99999_00", name="Platinum Game", earned=earned, defined=defined)]
     )
-    game = next((g for g in client.collect_library() if g.name == "Platinum Game"))
+    game = next(g for g in client.collect_library() if g.name == "Platinum Game")
     assert game.trophies_earned == 17
     assert game.trophies_total == 33
     assert game.has_platinum is True

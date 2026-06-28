@@ -185,4 +185,4 @@ def test_steam_no_key_fallback_is_actionable(monkeypatch):
     msg = str(exc.value).lower()
     assert "dev/apikey" in msg and "agree" in msg, f"unhelpful fallback: {exc.value}"
     assert page.register_clicks <= api_keys.MAX_STEAM_REGISTER_ATTEMPTS
-    assert any(("registering one" in m.lower() for m in session.messages))
+    assert any("registering one" in m.lower() for m in session.messages)

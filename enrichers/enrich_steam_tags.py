@@ -55,7 +55,7 @@ def load_mapping():
 
 def _row_changed(before, after):
     fields = ALWAYS_WRITE_FIELDS | FILL_IF_MISSING_FIELDS
-    return any((before.get(k) != after.get(k) for k in fields))
+    return any(before.get(k) != after.get(k) for k in fields)
 
 
 def main(argv=None):

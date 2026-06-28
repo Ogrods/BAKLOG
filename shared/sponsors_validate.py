@@ -1,4 +1,3 @@
-
 SPONSOR_AD_LOCATIONS = frozenset(
     {
         "dash-spotlight",

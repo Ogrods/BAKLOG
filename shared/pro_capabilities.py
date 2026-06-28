@@ -82,9 +82,9 @@ CAPABILITY_REGISTRY = (
         "requires_opt_in": False,
     },
 )
-CAPABILITY_IDS = frozenset((spec["id"] for spec in CAPABILITY_REGISTRY))
-LIVE_CAPABILITY_IDS = frozenset((spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "live"))
-COMING_CAPABILITY_IDS = frozenset((spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "coming"))
+CAPABILITY_IDS = frozenset(spec["id"] for spec in CAPABILITY_REGISTRY)
+LIVE_CAPABILITY_IDS = frozenset(spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "live")
+COMING_CAPABILITY_IDS = frozenset(spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "coming")
 
 
 def _spec_by_id(capability_id):

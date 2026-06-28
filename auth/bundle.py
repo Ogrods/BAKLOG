@@ -106,7 +106,7 @@ def _should_skip_profile_file(path):
         return True
     if name.startswith("."):
         return True
-    return any((name.endswith(suffix) for suffix in _SKIP_PROFILE_SUFFIXES))
+    return any(name.endswith(suffix) for suffix in _SKIP_PROFILE_SUFFIXES)
 
 
 def _collect_profiles():

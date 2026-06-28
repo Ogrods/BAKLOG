@@ -35,10 +35,10 @@ def test_audit_ok_when_dismissals_differ(tmp_path):
         audit.audit_disk_personal_bleed(report)
     finally:
         audit.PROFILES_DIR = old
-    assert not any((f.code == "DISMISS_BLEED" for f in report.findings))
+    assert not any(f.code == "DISMISS_BLEED" for f in report.findings)
 
 
 def test_audit_scoped_registry_passes_on_repo_profiles_js():
     report = audit.AuditReport()
     audit.audit_scoped_registry(report)
-    assert not any((f.code == "REGISTRY_DRIFT" for f in report.findings))
+    assert not any(f.code == "REGISTRY_DRIFT" for f in report.findings)

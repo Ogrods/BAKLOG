@@ -33,7 +33,7 @@ def extract_script(html):
     if not m:
         raise SystemExit("No inline <script> block found in index.html")
     lines = m.group(1).splitlines()
-    return "\n".join((line[4:] if line.startswith("    ") else line for line in lines))
+    return "\n".join(line[4:] if line.startswith("    ") else line for line in lines)
 
 
 def rewrite_state_access(code):

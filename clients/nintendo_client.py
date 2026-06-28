@@ -283,7 +283,7 @@ class NintendoClient:
             return
         if not isinstance(labels, list):
             return
-        for page_num in sorted(set((int(x) for x in labels if isinstance(x, (int, float))))):
+        for page_num in sorted(set(int(x) for x in labels if isinstance(x, (int, float)))):
             try:
                 page.evaluate(
                     f"() => {{\n                        const want = {page_num};\n                        const el = [...document.querySelectorAll('button, a')]\n                            .find(n => (n.innerText || '').trim() === String(want));\n                        if (el) el.click();\n                    }}"

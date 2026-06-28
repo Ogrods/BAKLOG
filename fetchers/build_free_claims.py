@@ -260,7 +260,7 @@ _EGS_EPIC_HINT = re.compile("\\b(epic|egs)\\b", re.IGNORECASE)
 
 
 def _infer_store_from_text(store, title, blurb, claim_url):
-    haystack = " ".join((part for part in (title, str(blurb or ""), claim_url) if part))
+    haystack = " ".join(part for part in (title, str(blurb or ""), claim_url) if part)
     if _MOBILE_EPIC_HINT.search(haystack) and _EGS_EPIC_HINT.search(haystack):
         return EPIC_MOBILE_STORE
     if store and store != "other":
@@ -1145,7 +1145,7 @@ def prepare_approved_document(
     )
     id_set = set(rekeyed_ids)
     store = {k: v for k, v in store.items() if k in id_set}
-    premium_list = sorted((p for p in premium if p in id_set))
+    premium_list = sorted(p for p in premium if p in id_set)
     merged_fields = dict(field_overrides)
     merged_fields.update(fields)
     blocked_list = list(blocked or [])
@@ -1327,14 +1327,12 @@ def main():
     last_call = [0.0]
     items = []
     enrich_total = sum(
-        (
-            1
-            for raw in raw_items
-            if isinstance(raw, dict)
-            and has_valid_claim_links(raw)
-            and raw.get("store")
-            and (not _is_expired(_resolve_ends_at(raw, now=now), now))
-        )
+        1
+        for raw in raw_items
+        if isinstance(raw, dict)
+        and has_valid_claim_links(raw)
+        and raw.get("store")
+        and (not _is_expired(_resolve_ends_at(raw, now=now), now))
     )
     enrich_hb = HeartbeatTimer(interval=45.0)
     enrich_idx = 0
@@ -1367,10 +1365,10 @@ def main():
     )
     if carried:
         stats.warn(
-            f"carried forward {len(carried)} approved claim(s) missing from the source feed: {', '.join((str(c.get('id')) for c in carried))}"
+            f"carried forward {len(carried)} approved claim(s) missing from the source feed: {', '.join(str(c.get('id')) for c in carried)}"
         )
         if DEBUG_CLAIMS:
-            _debug_claims(f"carry-forward ids: {', '.join((str(c.get('id')) for c in carried))}")
+            _debug_claims(f"carry-forward ids: {', '.join(str(c.get('id')) for c in carried)}")
         items.extend(carried)
     _apply_premium_only(items, premium_only_ids=premium_only_ids, manual_items=manual_items)
     if not args.dry_run:
@@ -1385,7 +1383,7 @@ def main():
         if persisted_manual:
             stats.warn(f"persisted enrichment onto {persisted_manual} manual input row(s)")
     generated_at = datetime.now(UTC).isoformat()
-    has_gamerpower = any((item.get("source") == "gamerpower" for item in items))
+    has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
     payload = {"generated_at": generated_at, "items": items}
     if has_gamerpower:
         payload["attribution"] = [GAMERPOWER_ATTRIBUTION]
@@ -1408,7 +1406,7 @@ def main():
             if not title:
                 continue
             title_keys.setdefault(title, []).append(str(row.get("id") or ""))
-        dup_titles = sum((1 for ids in title_keys.values() if len(ids) > 1))
+        dup_titles = sum(1 for ids in title_keys.values() if len(ids) > 1)
         _debug_claims(f"publish: {len(items)} item(s) by source {pub_by_source}; title collisions={dup_titles}")
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     profile_text = json.dumps(profile_payload, indent=2, ensure_ascii=False)
@@ -1416,7 +1414,7 @@ def main():
         targets = [args.output, FALLBACK_PATH]
         if not args.no_profile:
             targets.append(free_claims_path())
-        print(f"dry-run: would write {len(items)} item(s) to {', '.join((str(t) for t in targets))}", flush=True)
+        print(f"dry-run: would write {len(items)} item(s) to {', '.join(str(t) for t in targets)}", flush=True)
     else:
         empty_code = refuse_empty_result(
             items, label="build_free_claims publish set", allow_empty=args.allow_empty, output_path=args.output
@@ -1433,7 +1431,7 @@ def main():
             profile_out = free_claims_path()
             safe_write_text(profile_out, profile_text)
             written.append(profile_out)
-        print(f"Wrote {len(items)} item(s) to {', '.join((str(p) for p in written))}.", flush=True)
+        print(f"Wrote {len(items)} item(s) to {', '.join(str(p) for p in written)}.", flush=True)
     stats.ok = len(items)
     return stats.finish("build_free_claims", t0, exit_code=0, extra=f"{len(items)} item(s)")
 

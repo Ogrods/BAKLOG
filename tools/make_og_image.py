@@ -42,7 +42,7 @@ def vertical_gradient(w, h, top, bottom):
     px = base.load()
     for y in range(h):
         t = y / max(h - 1, 1)
-        c = tuple((int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)))
+        c = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
         for x in range(w):
             px[x, y] = c
     return base
@@ -53,7 +53,7 @@ def gradient_fast(w, h, top, bottom):
     d = col.load()
     for y in range(h):
         t = y / max(h - 1, 1)
-        d[0, y] = tuple((int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)))
+        d[0, y] = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
     return col.resize((w, h))
 
 

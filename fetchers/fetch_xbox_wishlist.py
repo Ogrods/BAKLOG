@@ -118,7 +118,7 @@ def _index_products(state):
 
     def _looks_like_product(v):
         return (
-            any((field in v for field in ("title", "Title", "displayName", "productTitle", "productSummary")))
+            any(field in v for field in ("title", "Title", "displayName", "productTitle", "productSummary"))
             or "image" in v
             or "images" in v
         )
@@ -413,7 +413,7 @@ def main():
             print(f"  wrote raw wishlist branch to {wishlist_state_dump()} (--dump-state)", flush=True)
     catalog = _index_products(state)
     items = [_to_item(pid, added_at, catalog.get(pid)) for pid, added_at in ids]
-    with_meta = sum((1 for it in items if catalog.get(it.product_id)))
+    with_meta = sum(1 for it in items if catalog.get(it.product_id))
     print(f"  parsed {len(items)} wishlist items ({with_meta} with catalog metadata)", flush=True)
     empty_exit = refuse_empty_result(
         items, label="Xbox wishlist", allow_empty=args.allow_empty, output_path=GAMES_XBOX_WISHLIST_JSON

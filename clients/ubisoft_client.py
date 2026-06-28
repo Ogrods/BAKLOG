@@ -72,7 +72,7 @@ class UbisoftClient:
         catalog = []
         seen_spaces = set()
         for chunk in _chunks(space_ids, CATALOG_BATCH_SIZE):
-            qs = "&".join((f"spaceIds={sid}" for sid in chunk))
+            qs = "&".join(f"spaceIds={sid}" for sid in chunk)
             status, body, text = self._get(f"{CATALOG_PATH}?{qs}")
             if status >= 400 or not isinstance(body, dict):
                 print(f"  HTTP {status} for Ubisoft catalog batch ({len(chunk)} spaceIds): {text[:120]}", flush=True)
@@ -97,7 +97,7 @@ class UbisoftClient:
             raise UbisoftAuthError(f"Could not load games played ({status}). Refresh credentials.")
         games_played = [g for g in played_body.get("gamesPlayed") or [] if isinstance(g, dict)]
         applications = [a for a in apps_body.get("applications") or [] if isinstance(a, dict)]
-        space_ids = list(dict.fromkeys((g["spaceId"] for g in games_played if isinstance(g.get("spaceId"), str))))
+        space_ids = list(dict.fromkeys(g["spaceId"] for g in games_played if isinstance(g.get("spaceId"), str)))
         catalog = self._fetch_catalog(space_ids) if space_ids else []
         endpoint = f"{APPLICATIONS_PATH}+{GAMESPLAYED_PATH}+{CATALOG_PATH}"
         return ({"applications": applications, "gamesPlayed": games_played, "catalog": catalog}, endpoint)

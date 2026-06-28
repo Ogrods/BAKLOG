@@ -256,10 +256,10 @@ def main(argv=None):
         print(
             f"\nsecurity audit: {len(report.findings)} finding(s) (high={by_sev.get('high', 0)}, medium={by_sev.get('medium', 0)}, low={by_sev.get('low', 0)})"
         )
-        if any((f.code in ("DISMISS_BLEED", "PERSONAL_BLEED") for f in report.findings)):
+        if any(f.code in ("DISMISS_BLEED", "PERSONAL_BLEED") for f in report.findings):
             print(f"\n{_bleed_remediation_hint()}")
     if args.fail_on and report.findings:
-        worst = min((order[f.severity] for f in report.findings))
+        worst = min(order[f.severity] for f in report.findings)
         if worst <= order[args.fail_on]:
             return 1
     return 0

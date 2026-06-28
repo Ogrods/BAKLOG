@@ -229,9 +229,9 @@ _CDP_TRANSPORT_TYPES = (
 def _is_cdp_transport_error(exc):
     msg = str(exc).lower()
     type_name = type(exc).__name__.lower()
-    if any((tok in msg for tok in _CDP_TRANSPORT_MSG)):
+    if any(tok in msg for tok in _CDP_TRANSPORT_MSG):
         return True
-    return any((tok in type_name for tok in _CDP_TRANSPORT_TYPES))
+    return any(tok in type_name for tok in _CDP_TRANSPORT_TYPES)
 
 
 def _read_page_html(page, *, timeout=10):
@@ -243,7 +243,7 @@ def _read_page_html(page, *, timeout=10):
 
 
 def _wishlist_capture_complete(html, api_payloads):
-    if any((wishlist_graphql_ok(p) for p in api_payloads)):
+    if any(wishlist_graphql_ok(p) for p in api_payloads):
         return True
     return wishlist_capture_complete_from_html(html)
 

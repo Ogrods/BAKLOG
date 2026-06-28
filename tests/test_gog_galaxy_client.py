@@ -76,7 +76,7 @@ def test_collapses_amazon_luna_dupes(tmp_path):
     assert len(records) == 2
     gog_ids = {r["gog_id"] for r in records}
     assert gog_ids == {3001, 3003}
-    assert not any(("Amazon Luna" in (r.get("name") or "") for r in records))
+    assert not any("Amazon Luna" in (r.get("name") or "") for r in records)
 
 
 def _seed_galaxy_db_with_prime_dupes(path):
@@ -97,7 +97,7 @@ def test_collapses_amazon_prime_dupes(tmp_path):
     names = {r["name"] for r in records}
     assert names == {"Berserk Boy", "Silver Box Classics"}
     assert len(records) == 2
-    assert not any(("Amazon Prime" in (r.get("name") or "") for r in records))
+    assert not any("Amazon Prime" in (r.get("name") or "") for r in records)
 
 
 def _seed_galaxy_db_with_dlcs_list(path):

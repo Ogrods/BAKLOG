@@ -39,7 +39,7 @@ def static_class(path_only, *, admin_enabled=None):
         if not admin_enabled:
             return "deny"
         return "public"
-    if any((p.startswith(".") for p in parts)):
+    if any(p.startswith(".") for p in parts):
         return "deny"
     if parts and parts[0] == "profiles":
         return "deny"
@@ -80,7 +80,7 @@ def resolved_static_path_allowed(resolved):
         return True
     if parts[-1] in (".env", "tracker.html"):
         return False
-    if any((p.startswith(".") for p in parts)):
+    if any(p.startswith(".") for p in parts):
         return False
     if "data" in parts:
         return False

@@ -112,10 +112,10 @@ def _classify_kind(name, edition):
         "season pass",
         "year pass",
     )
-    if edition_s and any((tok in edition_s.lower() for tok in dlc_signals)):
+    if edition_s and any(tok in edition_s.lower() for tok in dlc_signals):
         return "dlc"
     dlc_name_tokens = (" DLC ", "-DLC", "WEAPON SKIN", "MASK PACK", "PREMIER PACK", "WELCOME PACK")
-    if any((tok.upper() in name_s.upper() for tok in dlc_name_tokens)):
+    if any(tok.upper() in name_s.upper() for tok in dlc_name_tokens):
         return "dlc"
     return "game" if edition_s else "dlc"
 
@@ -149,7 +149,7 @@ def _parse_tiles(html):
         if not name:
             raw = (product.get("name") or "").strip()
             name = re.sub("\\s*[-–]\\s*(WW|NCSA|W|EU|US|EMEA)\\s*$", "", raw, flags=re.IGNORECASE)
-            name = " ".join((piece.capitalize() if piece.isupper() else piece for piece in name.split()))
+            name = " ".join(piece.capitalize() if piece.isupper() else piece for piece in name.split())
         if not name:
             name = item_id
         edition = (product.get("edition") or "").strip() or None

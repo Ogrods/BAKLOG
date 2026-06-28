@@ -58,7 +58,7 @@ def _port_pids():
             )
         except (OSError, subprocess.TimeoutExpired):
             return pids
-        pids.update((int(t) for t in (out.stdout or "").split() if t.isdigit()))
+        pids.update(int(t) for t in (out.stdout or "").split() if t.isdigit())
     pids.discard(os.getpid())
     return pids
 
@@ -78,7 +78,7 @@ def _cmdline_pids():
             )
         except (OSError, subprocess.TimeoutExpired):
             return pids
-        pids.update((int(t) for t in (out.stdout or "").split() if t.isdigit()))
+        pids.update(int(t) for t in (out.stdout or "").split() if t.isdigit())
     else:
         try:
             out = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True, timeout=10, check=False)

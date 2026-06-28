@@ -53,7 +53,7 @@ def should_skip_gog_title(name):
 
 
 def has_promo_suffix(name):
-    return any((pat.search(name or "") for pat in _PROMO_SUFFIX_RES))
+    return any(pat.search(name or "") for pat in _PROMO_SUFFIX_RES)
 
 
 def canonical_gog_title(name):
@@ -134,7 +134,7 @@ def collapse_pack_dupes(rows, *, pack_component_keys=None, owned_release_keys=No
             for pack_pat, components in _PACK_REGISTRY:
                 if not pack_pat.match(canonical):
                     continue
-                if all((norm_gog_title(c) in norms_present for c in components)):
+                if all(norm_gog_title(c) in norms_present for c in components):
                     drop = True
                 break
         if not drop:
@@ -149,7 +149,7 @@ def collapse_metadata_barren_dupes(rows):
     out = []
     for row in rows:
         grp = groups[barren_group_key(_row_name(row))]
-        if len(grp) > 1 and row_is_metadata_barren(row) and any((not row_is_metadata_barren(other) for other in grp)):
+        if len(grp) > 1 and row_is_metadata_barren(row) and any(not row_is_metadata_barren(other) for other in grp):
             continue
         out.append(row)
     return out

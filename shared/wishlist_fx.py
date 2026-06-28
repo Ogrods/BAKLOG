@@ -41,7 +41,7 @@ _FX_FIELDS = (
 
 
 def _snapshot(game):
-    return tuple((game.get(k) for k in _FX_FIELDS))
+    return tuple(game.get(k) for k in _FX_FIELDS)
 
 
 def apply_fx_to_game(game, target_ccy, rates_doc):

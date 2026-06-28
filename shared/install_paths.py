@@ -169,7 +169,7 @@ def built_immutable_assets():
         if key in ("builtAt", "version"):
             continue
         if key == "js/chunks" and isinstance(val, list):
-            out.update((str(v) for v in val))
+            out.update(str(v) for v in val)
         elif isinstance(val, str) and val:
             out.add(val.replace("\\", "/"))
     return frozenset(out)

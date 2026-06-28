@@ -35,7 +35,7 @@ def test_forgotten_realms_pack_dropped_when_components_present():
     ]
     out = collapse_pack_dupes(rows)
     assert len(out) == 3
-    assert all(("Collection One" not in r["name"] for r in out))
+    assert all("Collection One" not in r["name"] for r in out)
 
 
 def test_post_merge_drops_pack_with_different_gog_id():
@@ -48,7 +48,7 @@ def test_post_merge_drops_pack_with_different_gog_id():
     ]
     out = filter_gog_game_rows(games)
     assert len(out) == 4
-    assert not any((g["gog_id"] == 9001 for g in out))
+    assert not any(g["gog_id"] == 9001 for g in out)
 
 
 def test_apply_promo_collapse_on_web_style_rows():

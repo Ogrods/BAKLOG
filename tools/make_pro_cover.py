@@ -67,7 +67,7 @@ def load_font(path, size):
 
 
 def lerp(a, b, t):
-    return tuple((round(a[i] + (b[i] - a[i]) * t) for i in range(3)))
+    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
 def draw_background(img):

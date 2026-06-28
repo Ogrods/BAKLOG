@@ -47,7 +47,7 @@ def test_carry_forward_nintendo_legacy_skips_dropped_ids():
     )
     ids = {r["id"] for r in out}
     assert ids == {"1", "3"}
-    legacy = next((r for r in out if r["id"] == "3"))
+    legacy = next(r for r in out if r["id"] == "3")
     assert legacy[NINTENDO_LEGACY_FIELD] is True
 
 
@@ -174,6 +174,6 @@ def test_maybe_repair_nintendo_catalog_on_disk_writes(tmp_path, monkeypatch):
     )
     assert maybe_repair_nintendo_catalog_on_disk() == 1
     payload = json.loads(catalog.read_text(encoding="utf-8"))
-    legacy = next((g for g in payload["games"] if g["id"] == "2"))
+    legacy = next(g for g in payload["games"] if g["id"] == "2")
     assert legacy[NINTENDO_LEGACY_FIELD] is True
     assert STALE_FIELD not in legacy

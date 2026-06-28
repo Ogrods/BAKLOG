@@ -90,7 +90,7 @@ def _tpk_ids_for_sub(sub):
         out = []
         for v in tpks.values():
             if isinstance(v, list):
-                out.extend((str(x) for x in v))
+                out.extend(str(x) for x in v)
             elif isinstance(v, str):
                 out.append(v)
         return out
@@ -118,7 +118,7 @@ def _subproduct_is_game(sub, tpkd_dict):
         if kt in _GAME_KEY_TYPES or kt == "steam":
             return True
     human = (sub.get("human_name") or "").lower()
-    if any((tok in human for tok in ("soundtrack only", "ebook", "audiobook", "comic book"))):
+    if any(tok in human for tok in ("soundtrack only", "ebook", "audiobook", "comic book")):
         return False
     return False
 

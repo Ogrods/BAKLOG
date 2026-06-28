@@ -253,7 +253,7 @@ def _provider_state(provider):
         if session_file.exists() or env_code:
             return "unverified" if not session_file.exists() else "connected"
         return "disconnected"
-    if _env_fallback_allowed() and any((os.getenv(k, "").strip() for k in spec.env_keys)):
+    if _env_fallback_allowed() and any(os.getenv(k, "").strip() for k in spec.env_keys):
         return "unverified"
     return "disconnected"
 

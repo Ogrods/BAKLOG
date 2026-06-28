@@ -18,8 +18,8 @@ def test_parse_wishlist_from_next_data_fixture():
     titles = {it.title for it in items}
     assert "Test Adventure" in titles
     assert "Demo Platformer" in titles
-    assert all((it.product_id.startswith("7") for it in items))
-    assert all(("nintendo.com" in it.store_url for it in items))
+    assert all(it.product_id.startswith("7") for it in items)
+    assert all("nintendo.com" in it.store_url for it in items)
 
 
 def test_build_row_schema():

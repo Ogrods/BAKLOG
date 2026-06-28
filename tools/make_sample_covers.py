@@ -45,7 +45,7 @@ def gradient(w, h, top, bot):
     px = img.load()
     for y in range(h):
         t = y / max(h - 1, 1)
-        c = tuple((int(top[i] + (bot[i] - top[i]) * t) for i in range(3)))
+        c = tuple(int(top[i] + (bot[i] - top[i]) * t) for i in range(3))
         for x in range(w):
             px[x, y] = c
     return img
@@ -62,7 +62,7 @@ def draw_cover(slug, title, orient, accent):
     cx, cy = (w // 2, int(h * 0.38))
     for r in range(min(w, h) // 2, 0, -8):
         alpha = int(28 * (1 - r / (min(w, h) // 2)))
-        c = tuple((min(255, accent_rgb[i] + alpha // 4) for i in range(3)))
+        c = tuple(min(255, accent_rgb[i] + alpha // 4) for i in range(3))
         draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=c)
     bar_h = max(6, h // 80)
     draw.rectangle((0, h - bar_h, w, h), fill=accent_rgb)

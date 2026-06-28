@@ -59,7 +59,7 @@ _EDITION_VARIANT_SUBTITLE_RE = re.compile(
 def normalize_noise_title(name):
     text = _TRADEMARK_RE.sub("", name or "")
     text = unicodedata.normalize("NFKD", text)
-    text = "".join((c for c in text if not unicodedata.combining(c)))
+    text = "".join(c for c in text if not unicodedata.combining(c))
     text = text.lower()
     text = re.sub("[^a-z0-9]+", " ", text)
     return " ".join(text.split()).strip()
@@ -67,7 +67,7 @@ def normalize_noise_title(name):
 
 def is_entitlement_slug(name):
     s = str(name or "").strip()
-    return bool(s) and "_" in s and (not any((ch.isspace() for ch in s)))
+    return bool(s) and "_" in s and (not any(ch.isspace() for ch in s))
 
 
 def is_psn_entitlement_id(name):
@@ -182,7 +182,7 @@ def maybe_tag_library_noise_row(row, store=None):
 
 
 def catalog_game_count(games):
-    return sum((1 for g in games if not is_catalog_noise_row(g)))
+    return sum(1 for g in games if not is_catalog_noise_row(g))
 
 
 def tag_noise_row(row):

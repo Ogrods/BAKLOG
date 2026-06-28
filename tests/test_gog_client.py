@@ -56,9 +56,9 @@ class TestValidateSession:
 
         with patch.object(client.session, "get", side_effect=fake_get):
             assert client.validate_session() is True
-        assert any(("userData.json" in u for u in calls))
-        assert any(("getFilteredProducts" in u for u in calls))
-        assert any(("/user/data/games" in u for u in calls))
+        assert any("userData.json" in u for u in calls)
+        assert any("getFilteredProducts" in u for u in calls)
+        assert any("/user/data/games" in u for u in calls)
 
     def test_validate_session_fails_when_library_and_owned_blocked(self, client):
 

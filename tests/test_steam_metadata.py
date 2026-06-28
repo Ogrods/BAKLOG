@@ -97,7 +97,7 @@ class TestEnrichmentFromAppdetails:
         details = {"genres": [{"description": "Action"}, {}, {"description": "  "}]}
         result = enrichment_from_appdetails(details)
         assert "Action" in result["genres"]
-        assert all((g.strip() for g in result["genres"]))
+        assert all(g.strip() for g in result["genres"])
 
     def test_blank_release_date_becomes_none(self):
         assert enrichment_from_appdetails({"release_date": {"date": "   "}})["release_date"] is None

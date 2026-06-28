@@ -101,7 +101,7 @@ class Results:
         print(f"[{mark}] {name}" + (f" — {detail}" if detail else ""))
 
     def ok(self):
-        return all((x[1] for x in self.items))
+        return all(x[1] for x in self.items)
 
 
 def section_b(r):
@@ -126,7 +126,7 @@ def section_b(r):
     snap = poll_until(
         lambda s: (
             (s.get("active") or {}).get("key") == "steamCovers"
-            and any((q.get("key") == "hltb" for q in s.get("queue") or []))
+            and any(q.get("key") == "hltb" for q in s.get("queue") or [])
         ),
         timeout=15,
     )
@@ -134,8 +134,8 @@ def section_b(r):
     queue = snap.get("queue") or []
     qfile = read_json(RUNS_DIR / "queue.json")
     r.record("B2 active is steamCovers", active.get("key") == "steamCovers", str(active.get("key")))
-    r.record("B2 hltb in api queue", any((q.get("key") == "hltb" for q in queue)), f"queue={queue}")
-    r.record("B2 hltb in queue.json", any((x.get("key") == "hltb" for x in qfile.get("runs", []))), str(qfile))
+    r.record("B2 hltb in api queue", any(q.get("key") == "hltb" for q in queue), f"queue={queue}")
+    r.record("B2 hltb in queue.json", any(x.get("key") == "hltb" for x in qfile.get("runs", [])), str(qfile))
     print("\n=== B3: third submit 409 ===")
     c3, b3 = post_run("amazon")
     snap2 = runs()
@@ -177,7 +177,7 @@ def section_c(r):
     code, _ = api("POST", "/api/runs/cancel")
     time.sleep(0.5)
     snap2 = runs()
-    cancelled = any((h.get("id") == run_id and h.get("status") == "cancelled" for h in snap2.get("history") or []))
+    cancelled = any(h.get("id") == run_id and h.get("status") == "cancelled" for h in snap2.get("history") or [])
     r.record("C3 cancel in history", cancelled, f"run_id={run_id}")
     r.record("C3 idle after cancel", not snap2.get("active"), str(snap2))
 
@@ -198,17 +198,17 @@ def section_d(r):
     poll_until(
         lambda s: (
             (s.get("active") or {}).get("key") == "steamCovers"
-            and any((q.get("key") == "hltb" for q in s.get("queue") or []))
+            and any(q.get("key") == "hltb" for q in s.get("queue") or [])
         ),
         timeout=20,
     )
     queue_before = read_json(RUNS_DIR / "queue.json")
-    has_hltb = any((x.get("key") == "hltb" for x in queue_before.get("runs", [])))
+    has_hltb = any(x.get("key") == "hltb" for x in queue_before.get("runs", []))
     r.record("D1 pre-kill queue has hltb", has_hltb, str(queue_before))
     subprocess.run(["taskkill", "/F", "/PID", str(pid), "/T"], capture_output=True)
     time.sleep(1.0)
     queue_after_kill = read_json(RUNS_DIR / "queue.json")
-    survived = any((x.get("key") == "hltb" for x in queue_after_kill.get("runs", [])))
+    survived = any(x.get("key") == "hltb" for x in queue_after_kill.get("runs", []))
     r.record("D1 queue.json survived kill", survived, str(queue_after_kill))
     proc = subprocess.Popen(
         ["python.exe", "server.py"],
@@ -234,13 +234,13 @@ def section_d(r):
         if active.get("key") == "hltb":
             return True
         hist = snap.get("history") or []
-        return any((h.get("id") == hltb_id and h.get("status") in ("running", "done") for h in hist))
+        return any(h.get("id") == hltb_id and h.get("status") in ("running", "done") for h in hist)
 
     snap_after = poll_until(_hltb_resumed, timeout=30)
     active_after = snap_after.get("active") or {}
     hist = snap_after.get("history") or []
     steam_hist = next((h for h in hist if h.get("id") == steam_id), None)
-    hltb_running = active_after.get("key") == "hltb" or any((h.get("id") == hltb_id for h in hist))
+    hltb_running = active_after.get("key") == "hltb" or any(h.get("id") == hltb_id for h in hist)
     r.record("D1 hltb re-queued/running", hltb_running, str(active_after))
     if steam_hist:
         not_steam = active_after.get("id") != steam_id

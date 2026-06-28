@@ -37,7 +37,7 @@ class WishlistApiSniffer:
         try:
             url = getattr(resp, "url", "") or ""
             low = url.lower()
-            if not any((h in low for h in _API_HINTS)):
+            if not any(h in low for h in _API_HINTS):
                 return
             if len(self.entries) >= _MAX_ENTRIES:
                 return
@@ -45,7 +45,7 @@ class WishlistApiSniffer:
             headers = getattr(req, "headers", None) or {} if req is not None else {}
             auth = headers.get("authorization")
             post = getattr(req, "post_data", "") or "" if req is not None else ""
-            is_wishlisty = any((h in low for h in _BODY_HINTS))
+            is_wishlisty = any(h in low for h in _BODY_HINTS)
             entry = {
                 "url": url,
                 "method": "POST" if post else "GET",

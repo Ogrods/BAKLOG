@@ -263,7 +263,7 @@ def locate_bundle_root(extracted_dir, platform=None):
         required = required_bundle_files(plat)
         for binary in extracted_dir.rglob(server_name):
             parent = binary.parent
-            if all(((parent / name).is_file() for name in required)):
+            if all((parent / name).is_file() for name in required):
                 return parent.resolve()
     raise UpdateSecurityError("extracted bundle missing BAKLOG executables")
 

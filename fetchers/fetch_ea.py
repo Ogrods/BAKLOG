@@ -314,15 +314,13 @@ def main():
     except Exception as e:
         msg = str(e)
         is_transport = any(
-            (
-                tok in msg.lower()
-                for tok in (
-                    "cdp command timed out",
-                    "cdp connection closed",
-                    "websocket",
-                    "browser",
-                    "debugging endpoint",
-                )
+            tok in msg.lower()
+            for tok in (
+                "cdp command timed out",
+                "cdp connection closed",
+                "websocket",
+                "browser",
+                "debugging endpoint",
             )
         )
         if is_transport:

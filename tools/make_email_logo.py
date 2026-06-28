@@ -103,7 +103,7 @@ def main():
         if i < len(WORDMARK) - 1:
             cursor += tracking
     text_w = wordmark_width(font, font_size)
-    text_h = max((bb[3] for bb in boxes)) - min((bb[1] for bb in boxes))
+    text_h = max(bb[3] for bb in boxes) - min(bb[1] for bb in boxes)
     mark_scale = inner_h * 0.88 / MARK_VH
     mark_w = MARK_VW * mark_scale
     mark_h = MARK_VH * mark_scale
@@ -112,7 +112,7 @@ def main():
     mark_ox = ox
     mark_oy = PAD + (inner_h - mark_h) / 2
     text_x = mark_ox + mark_w + MARK_WORD_GAP
-    text_y = PAD + (inner_h - text_h) / 2 - min((bb[1] for bb in boxes))
+    text_y = PAD + (inner_h - text_h) / 2 - min(bb[1] for bb in boxes)
     mask = Image.new("L", (W, H), 0)
     draw_mark(mask, mark_scale, mark_ox, mark_oy)
     draw_wordmark(mask, font, text_x, text_y)

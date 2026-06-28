@@ -1,5 +1,3 @@
-
-
 def remediate_env_imported_archive(root):
     imported_path = root / ".env.imported"
     if not imported_path.is_file():
@@ -37,7 +35,7 @@ def _strip_credential_lines(text, cred_keys):
 
 
 def _has_meaningful_config(text):
-    return any((_split_env_line(line) is not None for line in text.splitlines()))
+    return any(_split_env_line(line) is not None for line in text.splitlines())
 
 
 def maybe_import_legacy_env(root):

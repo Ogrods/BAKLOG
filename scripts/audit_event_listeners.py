@@ -147,7 +147,7 @@ def main():
         "## Custom events (`baklog:*`)",
         "",
     ]
-    for ev in sorted((e for e in custom_index["emitters"] if e.startswith("baklog:"))):
+    for ev in sorted(e for e in custom_index["emitters"] if e.startswith("baklog:")):
         md_lines.append(f"### `{ev}`")
         md_lines.append(f"- Emitters: {', '.join(custom_index['emitters'].get(ev, []))}")
         md_lines.append(f"- Listeners: {', '.join(custom_index['listeners'].get(ev, [])) or '_none_'}")

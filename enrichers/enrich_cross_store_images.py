@@ -242,12 +242,10 @@ def main():
             print(f"{path.name}: nothing to enrich", flush=True)
             continue
         skip_cached = sum(
-            (
-                1
-                for g in todo
-                if f"{store}:{g.get('id')}" in no_steam_match
-                or (args.upgrade_lowres and needs_lowres_upgrade(g) and (f"{store}:{g.get('id')}" in lowres_checked))
-            )
+            1
+            for g in todo
+            if f"{store}:{g.get('id')}" in no_steam_match
+            or (args.upgrade_lowres and needs_lowres_upgrade(g) and (f"{store}:{g.get('id')}" in lowres_checked))
         )
         fresh = len(todo) - skip_cached
         if fresh == 0:

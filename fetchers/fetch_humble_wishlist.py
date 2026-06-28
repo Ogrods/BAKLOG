@@ -129,7 +129,7 @@ def _lookup_products(page, slugs):
         except Exception:
             continue
         if isinstance(obj, dict) and isinstance(obj.get("result"), list):
-            results.extend((r for r in obj["result"] if isinstance(r, dict)))
+            results.extend(r for r in obj["result"] if isinstance(r, dict))
     return results
 
 

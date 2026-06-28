@@ -527,7 +527,7 @@ def _terminate_pid(pid):
 
 
 def _kill_pids_async(pids):
-    unique = list(dict.fromkeys((p for p in pids if p > 0)))
+    unique = list(dict.fromkeys(p for p in pids if p > 0))
     if not unique:
         return
 

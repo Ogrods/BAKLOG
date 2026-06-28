@@ -101,7 +101,7 @@ def _cookie_header(cookies, domains):
     parts = []
     for c in cookies:
         domain = c.get("domain") or ""
-        if not any((d in domain for d in domains)):
+        if not any(d in domain for d in domains):
             continue
         name = c.get("name")
         value = c.get("value")
@@ -606,7 +606,7 @@ def _xbox_has_msa_session(context):
         names = {c.get("name", "") for c in context.cookies()}
     except Exception:
         return False
-    return "WLSSC" in names or any((n.startswith("XBXXtk") for n in names))
+    return "WLSSC" in names or any(n.startswith("XBXXtk") for n in names)
 
 
 def _parse_xbox_preloaded_state(html):
@@ -834,7 +834,7 @@ def _nintendo_wishlist_session_ready(html, url, api_payloads):
     u = (url or "").lower()
     if "accounts.nintendo.com/login" in u:
         return False
-    if any((_wishlist_graphql_ok(p) for p in api_payloads)):
+    if any(_wishlist_graphql_ok(p) for p in api_payloads):
         return True
     return bool(parse_wishlist_sources(html, api_payloads))
 
@@ -945,7 +945,7 @@ def _ubisoft_active_page(live):
             return pg
     for pg in live:
         u = (pg.url or "").lower()
-        if any((x in u for x in ("login", "signin", "authorize", "oauth"))):
+        if any(x in u for x in ("login", "signin", "authorize", "oauth")):
             return pg
     return live[0]
 
@@ -982,7 +982,7 @@ def _extract_ubisoft(page, context, session=None):
                     main.bring_to_front()
                 except Exception:
                     pass
-        on_success = any((UBISOFT_SUCCESS_URL in u for u in urls))
+        on_success = any(UBISOFT_SUCCESS_URL in u for u in urls)
         if on_success and (not seen_success):
             seen_success = True
             if session:

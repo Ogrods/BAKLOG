@@ -48,7 +48,7 @@ def test_reconcile_adopts_orphan_profile_dir(isolated_profiles):
     doc = profile_paths.load_index()
     ids = {p["id"] for p in doc["profiles"]}
     assert "play" in ids
-    assert any(("adopted orphan" in n for n in notes))
+    assert any("adopted orphan" in n for n in notes)
 
 
 def test_reconcile_skips_adoption_when_auth_enabled(isolated_profiles):
@@ -60,7 +60,7 @@ def test_reconcile_skips_adoption_when_auth_enabled(isolated_profiles):
     doc = profile_paths.load_index()
     ids = {p["id"] for p in doc["profiles"]}
     assert "play" not in ids
-    assert any(("orphan profile dir not in index" in n for n in notes))
+    assert any("orphan profile dir not in index" in n for n in notes)
 
 
 def test_reconcile_adopts_orphans_when_auth_and_local_profiles(isolated_profiles):
@@ -73,7 +73,7 @@ def test_reconcile_adopts_orphans_when_auth_and_local_profiles(isolated_profiles
     doc = profile_paths.load_index()
     ids = {p["id"] for p in doc["profiles"]}
     assert "play" in ids
-    assert any(("adopted orphan" in n for n in notes))
+    assert any("adopted orphan" in n for n in notes)
 
 
 def test_reconcile_materializes_index_when_profile_dir_exists_without_index(isolated_profiles):
@@ -85,7 +85,7 @@ def test_reconcile_materializes_index_when_profile_dir_exists_without_index(isol
         with patch("shared.supabase_auth.local_profiles_enabled", return_value=True):
             notes = reconcile_profile_store()
     assert (isolated_profiles / "profiles" / "index.json").is_file()
-    assert any(("materialized profiles/index.json" in n for n in notes))
+    assert any("materialized profiles/index.json" in n for n in notes)
     doc = profile_paths.load_index()
     assert doc["active"] == "default"
 

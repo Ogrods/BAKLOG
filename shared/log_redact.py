@@ -31,5 +31,5 @@ def redact_diagnostics_payload(payload):
     tail = payload.get("refresh_log_tail")
     if isinstance(tail, str) and tail:
         payload = dict(payload)
-        payload["refresh_log_tail"] = "\n".join((redact_log_line(line) for line in tail.splitlines()))
+        payload["refresh_log_tail"] = "\n".join(redact_log_line(line) for line in tail.splitlines())
     return payload

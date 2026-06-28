@@ -64,7 +64,7 @@ def test_auth_status_endpoint_ok_and_reports_platform(auth_server):
         payload = json.loads(resp.read().decode("utf-8"))
     assert status == 200
     assert payload["server_platform"] == sys.platform
-    amazon = next((p for p in payload["providers"] if p["key"] == "amazon"))
+    amazon = next(p for p in payload["providers"] if p["key"] == "amazon")
     assert amazon["platforms"] == ["win32"]
     if sys.platform != "win32":
         assert amazon["status"] == "unavailable"
@@ -103,7 +103,7 @@ def test_amazon_fetcher_available_for_web_on_all_platforms(auth_server):
     req = urllib.request.Request(f"{auth_server}/api/fetchers", method="GET")
     with urllib.request.urlopen(req, timeout=5) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
-    amazon = next((f for f in payload["fetchers"] if f["key"] == "amazon"))
+    amazon = next(f for f in payload["fetchers"] if f["key"] == "amazon")
     assert amazon["available"] is True
     assert amazon["platforms"] == []
 

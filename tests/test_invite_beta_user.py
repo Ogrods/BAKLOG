@@ -28,7 +28,7 @@ def test_invite_send_new_user(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "Invited new@example.com" in out
-    assert any((len(c) == 4 for c in calls))
+    assert any(len(c) == 4 for c in calls)
     assert calls[0][3] == invite.DEFAULT_REDIRECT
 
 

@@ -19,7 +19,7 @@ def _index_has_profile(pid):
     profiles = doc.get("profiles")
     if not isinstance(profiles, list):
         return False
-    return any((isinstance(p, dict) and p.get("id") == pid for p in profiles))
+    return any(isinstance(p, dict) and p.get("id") == pid for p in profiles)
 
 
 def ensure_profile_for_user(user_id, email=None):
@@ -34,7 +34,7 @@ def ensure_profile_for_user(user_id, email=None):
         if not isinstance(profiles, list):
             profiles = []
             doc["profiles"] = profiles
-        if not any((isinstance(p, dict) and p.get("id") == pid for p in profiles)):
+        if not any(isinstance(p, dict) and p.get("id") == pid for p in profiles):
             label = (email or "").strip() or f"Account {pid[:8]}"
             profiles.append({"id": pid, "label": label, "created_at": _now_iso()})
     return pid

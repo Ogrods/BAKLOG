@@ -38,7 +38,7 @@ def mirror_object_key(user_id, profile_id, artifact_path):
 
 def upload_mirror_object(*, user_id, profile_id, artifact_path, body, bearer_token, content_type="application/json"):
     key = mirror_object_key(user_id, profile_id, artifact_path)
-    encoded = "/".join((urllib.parse.quote(part, safe="") for part in key.split("/")))
+    encoded = "/".join(urllib.parse.quote(part, safe="") for part in key.split("/"))
     url = f"{_base_url()}/storage/v1/object/{MIRROR_BUCKET}/{encoded}"
     req = urllib.request.Request(
         url,
@@ -56,7 +56,7 @@ def upload_mirror_object(*, user_id, profile_id, artifact_path, body, bearer_tok
 
 def download_mirror_object(*, user_id, profile_id, artifact_path, bearer_token):
     key = mirror_object_key(user_id, profile_id, artifact_path)
-    encoded = "/".join((urllib.parse.quote(part, safe="") for part in key.split("/")))
+    encoded = "/".join(urllib.parse.quote(part, safe="") for part in key.split("/"))
     url = f"{_base_url()}/storage/v1/object/{MIRROR_BUCKET}/{encoded}"
     req = urllib.request.Request(
         url, method="GET", headers={"apikey": _anon_key(), "Authorization": f"Bearer {bearer_token}"}

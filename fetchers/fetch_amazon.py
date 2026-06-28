@@ -138,7 +138,7 @@ def merge_amazon_sources(current_rows, carried_rows, current_source):
 
 
 def _count_rows_for_source(games, source):
-    return sum((1 for g in games if _effective_row_source(g) == source))
+    return sum(1 for g in games if _effective_row_source(g) == source)
 
 
 def refuse_amazon_source_drift(new_same_source_count, *, source, allow_drift, output_path, threshold=0.5):

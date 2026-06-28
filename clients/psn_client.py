@@ -117,14 +117,14 @@ def _norm_name(name):
         return ""
     n = _strip_marketing(name)
     n = unicodedata.normalize("NFKD", n).lower()
-    n = "".join((c for c in n if not unicodedata.combining(c)))
+    n = "".join(c for c in n if not unicodedata.combining(c))
     n = re.sub("[^a-z0-9\\s]", " ", n)
     n = _SUFFIX_RE.sub(" ", n)
     return " ".join(n.split())
 
 
 def _roman_to_digit(text):
-    return " ".join((_ROMAN_WORDS.get(word, word) for word in text.split()))
+    return " ".join(_ROMAN_WORDS.get(word, word) for word in text.split())
 
 
 def _dedupe_key(name):
@@ -145,7 +145,7 @@ def _iso(dt):
 def _trophy_set_sum(trophy_set):
     if trophy_set is None:
         return 0
-    return sum((int(getattr(trophy_set, tier, 0) or 0) for tier in ("bronze", "silver", "gold", "platinum")))
+    return sum(int(getattr(trophy_set, tier, 0) or 0) for tier in ("bronze", "silver", "gold", "platinum"))
 
 
 def _trophy_set_platinum(trophy_set):
@@ -497,7 +497,7 @@ class PsnClient:
         deduped = self._dedupe_by_name(list(entries.values()))
         self.last_dedupe_dropped = len(entries) - len(deduped)
         games = list(deduped)
-        self.last_filtered_non_games = sum((1 for e in deduped if should_auto_hide_psn_title(e.name)))
+        self.last_filtered_non_games = sum(1 for e in deduped if should_auto_hide_psn_title(e.name))
         return sorted(games, key=lambda g: g.name.lower())
 
     @staticmethod

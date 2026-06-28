@@ -1,4 +1,3 @@
-
 APPLY_BLOCKED_MESSAGES = {
     "dev_runtime": "Updates install only in the desktop app, not the dev server.",
     "platform_not_supported": "In-app updates are not supported on this operating system yet.",

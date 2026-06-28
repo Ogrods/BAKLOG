@@ -106,7 +106,7 @@ def _kill_pids_async(pids):
     if override is not None:
         override(pids)
         return
-    unique = list(dict.fromkeys((p for p in pids if p > 0)))
+    unique = list(dict.fromkeys(p for p in pids if p > 0))
     if not unique:
         return
 
@@ -146,7 +146,7 @@ def _write_active_runs(runs):
 
 
 def _run_id_active_on_disk(run_id):
-    return any((entry.get("id") == run_id for entry in _read_active_runs()))
+    return any(entry.get("id") == run_id for entry in _read_active_runs())
 
 
 def _fetcher_is_enrich(key):
@@ -569,7 +569,7 @@ class RunManager:
         for r in to_put:
             lane_queue.put(r)
         if to_put:
-            keys = ", ".join((r.key for r in to_put))
+            keys = ", ".join(r.key for r in to_put)
             print(f"[runs] re-queued {len(to_put)} stalled {lane} run(s): {keys}", file=sys.stderr, flush=True)
         return len(to_put)
 
@@ -798,7 +798,7 @@ class RunManager:
             if len(self._runs_by_id) <= MAX_HISTORY:
                 return
             keep_ids = {r.id for r in self._pending}
-            keep_ids.update((h.get("id") for h in self._history if h.get("id")))
+            keep_ids.update(h.get("id") for h in self._history if h.get("id"))
             for rid in list(self._runs_by_id):
                 if rid not in keep_ids:
                     del self._runs_by_id[rid]
@@ -933,9 +933,9 @@ class RunManager:
             active = self._enrich_active if is_enrich else self._active
             if active and active.key == key and (active.status in _IN_FLIGHT_STATUSES):
                 raise ValueError(f"{key} already queued or running")
-            if any((_in_lane(r) and r.key == key and (r.status in _IN_FLIGHT_STATUSES) for r in self._pending)):
+            if any(_in_lane(r) and r.key == key and (r.status in _IN_FLIGHT_STATUSES) for r in self._pending):
                 raise ValueError(f"{key} already queued or running")
-            in_flight = sum((1 for r in self._pending if _in_lane(r) and r.status in _IN_FLIGHT_STATUSES))
+            in_flight = sum(1 for r in self._pending if _in_lane(r) and r.status in _IN_FLIGHT_STATUSES)
             if active and active.status in _IN_FLIGHT_STATUSES and (active not in self._pending):
                 in_flight += 1
             if in_flight >= 1:
@@ -966,9 +966,9 @@ class RunManager:
             active = self._internal_active
             if active and active.key == key and (active.status in _IN_FLIGHT_STATUSES):
                 raise ValueError(f"{key} already queued or running")
-            if any((r._internal and r.key == key and (r.status in _IN_FLIGHT_STATUSES) for r in self._pending)):
+            if any(r._internal and r.key == key and (r.status in _IN_FLIGHT_STATUSES) for r in self._pending):
                 raise ValueError(f"{key} already queued or running")
-            in_flight = sum((1 for r in self._pending if r._internal and r.status in _IN_FLIGHT_STATUSES))
+            in_flight = sum(1 for r in self._pending if r._internal and r.status in _IN_FLIGHT_STATUSES)
             if active and active.status in _IN_FLIGHT_STATUSES and (active not in self._pending):
                 in_flight += 1
             if in_flight >= 1:
@@ -1163,7 +1163,7 @@ class RunManager:
             if not run._finished.is_set():
                 stragglers.append(run.to_summary())
         if stragglers:
-            ids = ", ".join((s.get("id", "?") for s in stragglers))
+            ids = ", ".join(s.get("id", "?") for s in stragglers)
             print(
                 f"WARN: {len(stragglers)} run(s) still not finished after {timeout}s cancel wait: {ids}",
                 file=sys.stderr,

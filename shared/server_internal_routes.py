@@ -324,7 +324,7 @@ def handle_internal_free_claims_preview(handler):
     )
     from fetchers.build_free_claims import GAMERPOWER_ATTRIBUTION
 
-    attribution = [GAMERPOWER_ATTRIBUTION] if any((item.get("source") == "gamerpower" for item in items)) else []
+    attribution = [GAMERPOWER_ATTRIBUTION] if any(item.get("source") == "gamerpower" for item in items) else []
     s._send_json(handler, HTTPStatus.OK, {"items": items, "count": len(items), "attribution": attribution})
 
 

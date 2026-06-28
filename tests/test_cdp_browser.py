@@ -256,7 +256,7 @@ class TestLaunchArgs:
         assert "--window-position=-32000,-32000" in args
         assert "--window-size=1280,900" in args
         assert "--start-maximized" not in args
-        assert not any((a.startswith("--headless") for a in args))
+        assert not any(a.startswith("--headless") for a in args)
 
     def test_headed_launch_disables_extensions(self, tmp_path):
         exe = tmp_path / "chrome.exe"
@@ -307,7 +307,7 @@ class TestLaunchArgs:
         finally:
             monkeypatch.undo()
         assert "--start-maximized" in exc.value.args
-        assert not any((a.startswith("--window-position=") for a in exc.value.args))
+        assert not any(a.startswith("--window-position=") for a in exc.value.args)
 
 
 class TestProfileLockRelease:

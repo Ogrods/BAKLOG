@@ -26,5 +26,5 @@ def test_build_game_row_persists_play_count_without_sessions_tag():
     assert row["play_count"] == 12
     assert row["first_played"] == "2020-01-01T00:00:00Z"
     assert row["psn_platforms"] == ["PS4", "PS5"]
-    assert not any((t.startswith("Sessions ") for t in row["tags"]))
-    assert any((t.startswith("Trophy ") for t in row["tags"]))
+    assert not any(t.startswith("Sessions ") for t in row["tags"])
+    assert any(t.startswith("Trophy ") for t in row["tags"])

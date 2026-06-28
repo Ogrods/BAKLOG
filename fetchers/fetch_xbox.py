@@ -63,7 +63,7 @@ def _build_row(title, hltb):
     tags = []
     devices = title.get("devices") or []
     if devices:
-        tags.extend((str(d).lower() for d in devices))
+        tags.extend(str(d).lower() for d in devices)
     row = {
         "store": "xbox",
         "id": tid,

@@ -1,4 +1,3 @@
-
 NULL_STRIP_KEYS = frozenset(
     {
         "hltb_main_hours",

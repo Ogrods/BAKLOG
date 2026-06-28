@@ -25,7 +25,7 @@ def test_parse_order_detail_games_only():
     assert "Sample Game" in names
     assert "Steam Key Game" in names
     assert "Sample Ebook Only" not in names
-    steam = next((it for it in items if it.name == "Steam Key Game"))
+    steam = next(it for it in items if it.name == "Steam Key Game")
     assert steam.steam_app_id == "123456"
     assert "steampowered.com" in steam.store_url
 
@@ -33,7 +33,7 @@ def test_parse_order_detail_games_only():
 def test_parse_order_detail_include_nongames():
     data = json.loads(ORDER_FIXTURE.read_text(encoding="utf-8"))
     items = _parse_order_detail(data, include_nongames=True)
-    assert any((it.name == "Sample Ebook Only" for it in items))
+    assert any(it.name == "Sample Ebook Only" for it in items)
 
 
 def test_build_library_row_schema():
@@ -60,7 +60,7 @@ def test_item_from_lookup_fixture():
     titles = {it.title for it in items}
     assert "Hollow Knight" in titles
     assert "Celeste" in titles
-    celeste = next((it for it in items if it.title == "Celeste"))
+    celeste = next(it for it in items if it.title == "Celeste")
     assert celeste.discount_percent == 75
     assert celeste.price == "$4.99"
     assert celeste.store_url == "https://www.humblebundle.com/store/celeste"

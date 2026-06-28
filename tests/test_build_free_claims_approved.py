@@ -1142,7 +1142,7 @@ def test_preview_publish_items_merges_without_network():
     )
     ids = {it["id"] for it in items}
     assert ids == {"manual-1", "epic-ok"}
-    assert all((it.get("claim_url") and it.get("store") for it in items))
+    assert all(it.get("claim_url") and it.get("store") for it in items)
 
 
 def test_itad_slug_from_blurb():

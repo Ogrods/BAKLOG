@@ -187,11 +187,11 @@ def _fill_rates(items):
     fields = ("header_image", "steam_appid", "review_percent", "genres", "blurb", "ends_at", "source")
     rates = {"count": n}
     for field in fields:
-        filled = sum((1 for it in items if it.get(field) not in (None, "", [])))
+        filled = sum(1 for it in items if it.get(field) not in (None, "", []))
         rates[field] = {"filled": filled, "pct": round(100 * filled / n, 1)}
-    by_source = Counter((str(it.get("source") or "?") for it in items))
+    by_source = Counter(str(it.get("source") or "?") for it in items)
     rates["by_source"] = dict(by_source)
-    by_store = Counter((str(it.get("store") or "?") for it in items))
+    by_store = Counter(str(it.get("store") or "?") for it in items)
     rates["by_store"] = dict(by_store)
     return rates
 
@@ -246,7 +246,7 @@ def _audit_feed(name, doc, path):
         "feed_generated_at": feed_generated_at(doc if isinstance(doc, dict) else None),
         "fill_rates": _fill_rates(items),
         "duplicate_clusters": _duplicate_clusters(items),
-        "rows_with_issues": sum((1 for r in rows if r["issues"])),
+        "rows_with_issues": sum(1 for r in rows if r["issues"]),
         "rows": rows,
     }
 
@@ -385,7 +385,7 @@ def _personal_audit(profile_id, feed_items):
         item = next((it for it in feed_items if str(it.get("id")) == cid), None)
         if item:
             keys = _claim_dedup_keys(item)
-            if not any((k in dismissed_keys for k in keys)):
+            if not any(k in dismissed_keys for k in keys):
                 id_only_no_key.append({"id": cid, "missing_keys": keys})
     backup_timeline = []
     bdir = personal_backup_dir(profile_id=profile_id)
@@ -852,8 +852,8 @@ def run_audit(profile_id, *, check_urls=False, url_limit=30):
     if check_urls:
         report["url_checks"] = _check_urls(_items(built if isinstance(built, dict) else None), limit=url_limit)
     report["findings"] = _compile_findings(report)
-    report["findings_summary"] = Counter((f["severity"] for f in report["findings"]))
-    report["findings_by_owner"] = Counter((f["owner"] for f in report["findings"]))
+    report["findings_summary"] = Counter(f["severity"] for f in report["findings"])
+    report["findings_by_owner"] = Counter(f["owner"] for f in report["findings"])
     return report
 
 

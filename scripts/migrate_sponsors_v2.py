@@ -207,7 +207,7 @@ def main():
         return 0
     out = migrate_v1(doc)
     dst.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote v2 ({len(out['ads'])} ads, {sum((len(v) for v in out['locations'].values()))} assignments) -> {dst}")
+    print(f"wrote v2 ({len(out['ads'])} ads, {sum(len(v) for v in out['locations'].values())} assignments) -> {dst}")
     return 0
 
 

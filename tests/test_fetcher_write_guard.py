@@ -31,7 +31,7 @@ def _called_names(source):
 def _has_drift_guard(names):
     if names & _DRIFT_GUARDS:
         return True
-    return any((n.startswith("refuse_") and n.endswith("_source_drift") for n in names))
+    return any(n.startswith("refuse_") and n.endswith("_source_drift") for n in names)
 
 
 @pytest.mark.parametrize("script", LIBRARY_SCRIPTS, ids=LIBRARY_SCRIPTS)

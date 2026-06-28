@@ -297,7 +297,7 @@ def parse_gamerpower_payload(payload):
 
 def should_skip_itad_title(title):
     lower = (title or "").lower()
-    return any((keyword in lower for keyword in ITAD_SKIP_KEYWORDS))
+    return any(keyword in lower for keyword in ITAD_SKIP_KEYWORDS)
 
 
 def _itad_store_from_text(text):
@@ -310,7 +310,7 @@ def _itad_store_from_text(text):
         ("ubisoft", ("ubisoft",)),
         ("humble", ("humble",)),
     ):
-        if any((n in lower for n in needles)):
+        if any(n in lower for n in needles):
             return store
     return "other"
 

@@ -150,7 +150,7 @@ def _copy_auth_for_migration(auth_src, dest_auth):
             rel = item.relative_to(provider)
             if len(str(rel)) > _MAX_AUTH_FILE_REL_LEN:
                 continue
-            if any((part in _AUTH_SKIP_DIR_NAMES for part in rel.parts)):
+            if any(part in _AUTH_SKIP_DIR_NAMES for part in rel.parts):
                 continue
             target = dest_auth / "profiles" / provider.name / rel
             if _copy_file_if_missing(item, target):

@@ -240,7 +240,7 @@ def merge_itch_sources(current_rows, carried_rows, current_source):
 
 
 def _count_rows_for_source(games, source):
-    return sum((1 for g in games if _effective_row_source(g) == source))
+    return sum(1 for g in games if _effective_row_source(g) == source)
 
 
 def refuse_itch_source_drift(new_same_source_count, *, source, allow_drift, output_path, threshold=0.5):
@@ -559,12 +559,10 @@ def main():
     new_ids = {str(g["id"]) for g in games_out}
     print_id_diff(existing_ids, new_ids)
     preserved_enrichment = sum(
-        (
-            1
-            for g in games_out
-            if existing.get(str(g["id"]))
-            and (g.get("steam_review_percent") is not None or g.get("hltb_main_hours") is not None)
-        )
+        1
+        for g in games_out
+        if existing.get(str(g["id"]))
+        and (g.get("steam_review_percent") is not None or g.get("hltb_main_hours") is not None)
     )
     if preserved_enrichment:
         print(f"  {preserved_enrichment} rows kept enrichment from cache (reviews/HLTB)", flush=True)

@@ -179,11 +179,9 @@ def _nintendo_drift_baseline(output_path):
     if not isinstance(games, list):
         return None
     non_legacy = sum(
-        (
-            1
-            for row in games
-            if isinstance(row, dict) and (not row.get(NINTENDO_LEGACY_FIELD)) and (not row.get(STALE_FIELD))
-        )
+        1
+        for row in games
+        if isinstance(row, dict) and (not row.get(NINTENDO_LEGACY_FIELD)) and (not row.get(STALE_FIELD))
     )
     if non_legacy > 0:
         return non_legacy

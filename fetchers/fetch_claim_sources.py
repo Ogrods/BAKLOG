@@ -227,7 +227,7 @@ def main():
                 f"fetch_claim_sources collected {len(items)} item(s) but the prior feed had {prior_count} (under the 50% floor) — likely a partial source outage. Re-run with --allow-drift if this drop is real."
             )
             return stats.finish("fetch_claim_sources", t0, exit_code=3)
-    has_gamerpower = any((item.get("source") == "gamerpower" for item in items))
+    has_gamerpower = any(item.get("source") == "gamerpower" for item in items)
     payload = {
         "fetched_at": fetched_at,
         "sources": counts,

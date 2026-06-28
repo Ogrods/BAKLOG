@@ -109,9 +109,9 @@ def _is_non_game_title(title):
 
 def _is_epic_catalog_excluded(item):
     paths = [str(c.get("path", "")).lower() for c in item.get("categories") or [] if isinstance(c, dict)]
-    if any((any((frag in p for frag in _NON_GAME_CATEGORY_FRAGMENTS)) for p in paths)):
+    if any(any(frag in p for frag in _NON_GAME_CATEGORY_FRAGMENTS) for p in paths):
         return True
-    return any(("addons" in p and "games" not in p for p in paths))
+    return any("addons" in p and "games" not in p for p in paths)
 
 
 def _can_build_epic_catalog_row(item):
@@ -121,7 +121,7 @@ def _can_build_epic_catalog_row(item):
     if _is_epic_catalog_excluded(item):
         return bool(str(title or "").strip())
     paths = [str(c.get("path", "")).lower() for c in item.get("categories") or [] if isinstance(c, dict)]
-    if any(("games" in p for p in paths)):
+    if any("games" in p for p in paths):
         return True
     return bool(title and item.get("keyImages"))
 
@@ -154,7 +154,7 @@ def _epic_row_id(rec):
 
 
 def _entitlement_set_hash(apps):
-    ids = sorted((_epic_row_id(rec) for rec in apps))
+    ids = sorted(_epic_row_id(rec) for rec in apps)
     return hashlib.sha256("\n".join(ids).encode()).hexdigest()[:16]
 
 
@@ -343,7 +343,7 @@ def main():
     print("Fetching library...")
     records = client.get_library_records()
     apps = [r for r in records if r.get("recordType") == "APPLICATION"]
-    ue_dropped = sum((1 for r in apps if str(r.get("namespace")) == "ue"))
+    ue_dropped = sum(1 for r in apps if str(r.get("namespace")) == "ue")
     apps = [r for r in apps if str(r.get("namespace")) != "ue"]
     print(
         f"  {len(records)} entitlements, {len(apps)} applications (dropped {ue_dropped} UE marketplace assets)",

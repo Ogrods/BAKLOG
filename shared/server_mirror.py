@@ -98,7 +98,7 @@ def handle_mirror_import_post(handler):
     paths_raw = body.get("paths")
     paths = None
     if paths_raw is not None:
-        if not isinstance(paths_raw, list) or not all((isinstance(item, str) for item in paths_raw)):
+        if not isinstance(paths_raw, list) or not all(isinstance(item, str) for item in paths_raw):
             srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "paths must be an array of strings"})
             return
         paths = paths_raw

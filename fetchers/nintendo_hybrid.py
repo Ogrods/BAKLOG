@@ -155,7 +155,7 @@ def dedupe_deluxe_edition_rows(rows):
 
         def _rank(row):
             name_l = norm_nintendo_title(str(row.get("name") or ""))
-            deluxe = any((marker in name_l for marker in _DELUXE_MARKERS))
+            deluxe = any(marker in name_l for marker in _DELUXE_MARKERS)
             return (deluxe, row.get("ownership_source") != "both", not row.get("application_id"))
 
         group.sort(key=_rank)

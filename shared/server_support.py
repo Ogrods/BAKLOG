@@ -19,7 +19,7 @@ def is_running_from_temp_dir(path):
         if resolved == temp_root or temp_root in resolved.parents:
             return True
         lower = str(resolved).lower()
-        return any((marker in lower for marker in _TEMP_DIR_MARKERS))
+        return any(marker in lower for marker in _TEMP_DIR_MARKERS)
     except OSError:
         return False
 

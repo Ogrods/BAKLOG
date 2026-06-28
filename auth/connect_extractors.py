@@ -29,7 +29,7 @@ def _cookie_header(cookies, domains):
     parts = []
     for c in cookies:
         domain = (c.get("domain") or "").lstrip(".")
-        if not any((domain.endswith(d.lstrip(".")) or d.lstrip(".") in domain for d in domains)):
+        if not any(domain.endswith(d.lstrip(".")) or d.lstrip(".") in domain for d in domains):
             continue
         name = c.get("name") or ""
         value = c.get("value")
@@ -88,7 +88,7 @@ class HeaderSniffer:
         context.on("request", on_request)
 
     def ready(self):
-        return all((self.captured.get(k) for k in self.fields.values()))
+        return all(self.captured.get(k) for k in self.fields.values())
 
     def creds(self):
         return dict(self.captured)

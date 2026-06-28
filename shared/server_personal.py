@@ -28,7 +28,7 @@ def _empty_personal_doc():
 def _personal_doc_is_meaningful(doc):
     personal = doc.get("personal")
     if isinstance(personal, dict):
-        if any((k != "__migrated_v3" for k in personal)):
+        if any(k != "__migrated_v3" for k in personal):
             return True
     manual = doc.get("manual")
     if isinstance(manual, list) and manual:
@@ -43,7 +43,7 @@ def _personal_payload_is_empty(validated):
     personal = validated.get("personal") or {}
     if not isinstance(personal, dict):
         return True
-    if any((k != "__migrated_v3" for k in personal)):
+    if any(k != "__migrated_v3" for k in personal):
         return False
     manual = validated.get("manual") or []
     if isinstance(manual, list) and manual:

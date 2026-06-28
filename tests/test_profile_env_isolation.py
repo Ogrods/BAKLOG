@@ -75,7 +75,7 @@ def test_named_profile_auth_status_not_unverified_from_process_env(isolated_prof
     monkeypatch.setenv("BAKLOG_PROFILE", "work")
     monkeypatch.setenv("STEAM_API_KEY", "from-process-env")
     monkeypatch.setenv("STEAM_ID", "76561198000000000")
-    steam = next((r for r in get_status() if r["key"] == "steam"))
+    steam = next(r for r in get_status() if r["key"] == "steam")
     assert steam["status"] == "disconnected"
 
 
@@ -84,7 +84,7 @@ def test_default_profile_unverified_when_only_process_env(isolated_profiles, mon
     monkeypatch.delenv("BAKLOG_PROFILE", raising=False)
     monkeypatch.setenv("STEAM_API_KEY", "from-process-env")
     monkeypatch.setenv("STEAM_ID", "76561198000000000")
-    steam = next((r for r in get_status() if r["key"] == "steam"))
+    steam = next(r for r in get_status() if r["key"] == "steam")
     assert steam["status"] == "unverified"
 
 

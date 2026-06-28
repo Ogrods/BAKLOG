@@ -1,8 +1,18 @@
+"""Canonical Pro capability registry and resolution for /api/config.
+
+Single source of truth for which paid-tier features are live vs coming soon.
+Marketing sync pairs: js/sponsored-deals.js PRO_PROMO ↔ landing/index.html.
+"""
+
 from __future__ import annotations
+
 from typing import Any, Literal, TypedDict
+
 from shared.entitlement import PLAN_PRO
 from shared.supabase_auth import auth_enabled
-CapabilityStatus = Literal['live', 'coming']
+
+CapabilityStatus = Literal["live", "coming"]
+
 
 class CapabilitySpec(TypedDict, total=False):
     id: str
@@ -11,44 +21,150 @@ class CapabilitySpec(TypedDict, total=False):
     requires_auth: bool
     requires_opt_in: bool
     opt_in_key: str
-CAPABILITY_REGISTRY: tuple[CapabilitySpec, ...] = ({'id': 'no_ads', 'status': 'live', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False}, {'id': 'queue_bulk_refresh', 'status': 'live', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False}, {'id': 'scheduled_stale_refresh', 'status': 'live', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False}, {'id': 'silent_connection_probe', 'status': 'live', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False}, {'id': 'bonus_claimables', 'status': 'live', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False}, {'id': 'deep_achievement_sync', 'status': 'live', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False}, {'id': 'cloud_sync_mirror', 'status': 'live', 'requires_plan': True, 'requires_auth': True, 'requires_opt_in': True, 'opt_in_key': 'cloudMirrorEnabled'}, {'id': 'deal_watchlist_alerts', 'status': 'coming', 'requires_plan': True, 'requires_auth': True, 'requires_opt_in': False}, {'id': 'remote_access_tunnel', 'status': 'coming', 'requires_plan': False, 'requires_auth': True, 'requires_opt_in': False}, {'id': 'extended_palettes', 'status': 'coming', 'requires_plan': True, 'requires_auth': False, 'requires_opt_in': False})
-CAPABILITY_IDS: frozenset[str] = frozenset((spec['id'] for spec in CAPABILITY_REGISTRY))
-LIVE_CAPABILITY_IDS: frozenset[str] = frozenset((spec['id'] for spec in CAPABILITY_REGISTRY if spec.get('status') == 'live'))
-COMING_CAPABILITY_IDS: frozenset[str] = frozenset((spec['id'] for spec in CAPABILITY_REGISTRY if spec.get('status') == 'coming'))
+
+
+# Registry order matches PRO_PROMO.features where possible.
+CAPABILITY_REGISTRY: tuple[CapabilitySpec, ...] = (
+    {
+        "id": "no_ads",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "queue_bulk_refresh",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "scheduled_stale_refresh",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "silent_connection_probe",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "bonus_claimables",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "deep_achievement_sync",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "cloud_sync_mirror",
+        "status": "live",
+        "requires_plan": True,
+        "requires_auth": True,
+        "requires_opt_in": True,
+        "opt_in_key": "cloudMirrorEnabled",
+    },
+    {
+        "id": "deal_watchlist_alerts",
+        "status": "coming",
+        "requires_plan": True,
+        "requires_auth": True,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "remote_access_tunnel",
+        "status": "coming",
+        "requires_plan": False,
+        "requires_auth": True,
+        "requires_opt_in": False,
+    },
+    {
+        "id": "extended_palettes",
+        "status": "coming",
+        "requires_plan": True,
+        "requires_auth": False,
+        "requires_opt_in": False,
+    },
+)
+
+CAPABILITY_IDS: frozenset[str] = frozenset(spec["id"] for spec in CAPABILITY_REGISTRY)
+
+LIVE_CAPABILITY_IDS: frozenset[str] = frozenset(
+    spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "live"
+)
+
+COMING_CAPABILITY_IDS: frozenset[str] = frozenset(
+    spec["id"] for spec in CAPABILITY_REGISTRY if spec.get("status") == "coming"
+)
+
 
 def _spec_by_id(capability_id: str) -> CapabilitySpec | None:
     for spec in CAPABILITY_REGISTRY:
-        if spec['id'] == capability_id:
+        if spec["id"] == capability_id:
             return spec
     return None
 
-def resolve_capability(spec: CapabilitySpec, *, plan: str, pro_settings: dict[str, Any]) -> dict[str, Any]:
-    status = spec.get('status', 'coming')
-    enabled = False
-    if status != 'live':
-        return {'status': status, 'enabled': False}
-    if spec.get('requires_plan', True) and plan != PLAN_PRO:
-        return {'status': status, 'enabled': False}
-    if spec.get('requires_auth') and (not auth_enabled()):
-        return {'status': status, 'enabled': False}
-    if spec.get('requires_opt_in'):
-        key = spec.get('opt_in_key') or ''
-        if not pro_settings.get(key):
-            return {'status': status, 'enabled': False}
-    enabled = True
-    return {'status': status, 'enabled': enabled}
 
-def resolve_capabilities(*, plan: str, pro_settings: dict[str, Any] | None=None) -> dict[str, dict[str, Any]]:
+def resolve_capability(
+    spec: CapabilitySpec,
+    *,
+    plan: str,
+    pro_settings: dict[str, Any],
+) -> dict[str, Any]:
+    """Return {status, enabled} for one capability."""
+    status = spec.get("status", "coming")
+    enabled = False
+    if status != "live":
+        return {"status": status, "enabled": False}
+
+    if spec.get("requires_plan", True) and plan != PLAN_PRO:
+        return {"status": status, "enabled": False}
+
+    if spec.get("requires_auth") and not auth_enabled():
+        return {"status": status, "enabled": False}
+
+    if spec.get("requires_opt_in"):
+        key = spec.get("opt_in_key") or ""
+        if not pro_settings.get(key):
+            return {"status": status, "enabled": False}
+
+    enabled = True
+    return {"status": status, "enabled": enabled}
+
+
+def resolve_capabilities(
+    *,
+    plan: str,
+    pro_settings: dict[str, Any] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Resolved capability map for GET /api/config."""
     settings = pro_settings if isinstance(pro_settings, dict) else {}
     out: dict[str, dict[str, Any]] = {}
     for spec in CAPABILITY_REGISTRY:
-        cap_id = spec['id']
+        cap_id = spec["id"]
         out[cap_id] = resolve_capability(spec, plan=plan, pro_settings=settings)
     return out
 
-def capability_enabled(capability_id: str, *, plan: str, pro_settings: dict[str, Any] | None=None) -> bool:
+
+def capability_enabled(
+    capability_id: str,
+    *,
+    plan: str,
+    pro_settings: dict[str, Any] | None = None,
+) -> bool:
     spec = _spec_by_id(capability_id)
     if spec is None:
         return False
     resolved = resolve_capability(spec, plan=plan, pro_settings=pro_settings or {})
-    return bool(resolved.get('enabled'))
+    return bool(resolved.get("enabled"))

@@ -1,46 +1,56 @@
+"""Unit tests for scripts/smoke_port_guard.py."""
+
 from __future__ import annotations
+
 import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-import scripts.smoke_port_guard as guard
+
+import scripts.smoke_port_guard as guard  # noqa: E402
+
 
 class _FakeProc:
-
-    def __init__(self, pid: int, *, returncode: int | None=None) -> None:
+    def __init__(self, pid: int, *, returncode: int | None = None) -> None:
         self.pid = pid
         self._returncode = returncode
 
     def poll(self) -> int | None:
         return self._returncode
 
+
 def test_proc_owns_dev_port_when_listener_in_tree(monkeypatch) -> None:
     proc = _FakeProc(1000)
-    monkeypatch.setattr(guard, 'port_listener_pid', lambda host, port: 2000)
-    monkeypatch.setattr(guard, 'related_pids', lambda pid: {1000, 2000} if pid == 1000 else set())
+    monkeypatch.setattr(guard, "port_listener_pid", lambda host, port: 2000)
+    monkeypatch.setattr(guard, "related_pids", lambda pid: {1000, 2000} if pid == 1000 else set())
     assert guard.proc_owns_dev_port(proc) is True
+
 
 def test_proc_owns_dev_port_false_on_collision(monkeypatch) -> None:
     proc = _FakeProc(1000)
-    monkeypatch.setattr(guard, 'port_listener_pid', lambda host, port: 4242)
-    monkeypatch.setattr(guard, 'related_pids', lambda pid: {1000} if pid == 1000 else set())
+    monkeypatch.setattr(guard, "port_listener_pid", lambda host, port: 4242)
+    monkeypatch.setattr(guard, "related_pids", lambda pid: {1000} if pid == 1000 else set())
     assert guard.proc_owns_dev_port(proc) is False
+
 
 def test_wait_for_owned_server_reports_collision(monkeypatch) -> None:
     proc = _FakeProc(1000)
-    monkeypatch.setattr(guard, 'port_listener_pid', lambda host, port: 4242)
-    monkeypatch.setattr(guard, 'related_pids', lambda pid: {1000} if pid == 1000 else set())
+    monkeypatch.setattr(guard, "port_listener_pid", lambda host, port: 4242)
+    monkeypatch.setattr(guard, "related_pids", lambda pid: {1000} if pid == 1000 else set())
     ticks = iter([0.0, 0.0, 0.02])
-    monkeypatch.setattr(guard.time, 'monotonic', lambda: next(ticks))
-    monkeypatch.setattr(guard.time, 'sleep', lambda _: None)
-    ok, err = guard.wait_for_owned_server(proc, 'http://127.0.0.1:8765', timeout_sec=0.01)
+    monkeypatch.setattr(guard.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(guard.time, "sleep", lambda _: None)
+
+    ok, err = guard.wait_for_owned_server(proc, "http://127.0.0.1:8765", timeout_sec=0.01)
     assert ok is False
     assert err is not None
-    assert '4242' in err
-    assert 'stop_baklog' in err
+    assert "4242" in err
+    assert "stop_baklog" in err
+
 
 def test_port_collision_message() -> None:
     msg = guard.port_collision_message(99)
-    assert '99' in msg
-    assert 'stop_baklog' in msg
+    assert "99" in msg
+    assert "stop_baklog" in msg

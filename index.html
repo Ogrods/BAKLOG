@@ -388,7 +388,23 @@
           Cloud sync to your account
         </label>
         <p id="cloudMirrorPlanNote" class="conn-prefs-note" hidden></p>
+        <p id="cloudMirrorUploadStatus" class="conn-prefs-note conn-prefs-note--mirror-status" hidden></p>
         <button type="button" id="cloudMirrorImportBtn" class="conn-prefs-import hidden" title="Replace local catalogs and personal data with your cloud mirror">Import from cloud mirror</button>
+        <dialog id="cloudMirrorImportDialog" class="conn-mirror-import-dialog" aria-labelledby="cloudMirrorImportDialogTitle">
+          <form method="dialog" class="conn-mirror-import-form">
+            <h3 id="cloudMirrorImportDialogTitle">Import from cloud mirror</h3>
+            <p id="cloudMirrorImportIntro" class="conn-mirror-import-intro">Matching local files will be replaced. Store credentials are not copied.</p>
+            <ul id="cloudMirrorImportArtifactList" class="conn-mirror-import-list"></ul>
+            <label class="fh-toggle conn-mirror-import-personal">
+              <input id="cloudMirrorImportPersonal" type="checkbox" class="rounded" checked />
+              Include personal statuses and notes
+            </label>
+            <div class="conn-mirror-import-actions">
+              <button type="submit" class="conn-mirror-import-cancel" value="cancel">Cancel</button>
+              <button type="submit" class="conn-mirror-import-confirm" value="confirm">Import and reload</button>
+            </div>
+          </form>
+        </dialog>
         <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
       </div>
       </div>

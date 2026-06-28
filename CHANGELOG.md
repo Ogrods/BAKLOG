@@ -31,6 +31,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Added
 
+- Cloud mirror UX (P2): Connections upload status from `localUploadState`; import preview dialog with artifact list and optional personal toggle; hosted viewer copy clarifies library-only scope vs full import.
 - Pro foundation: canonical capability registry on `GET /api/config` (`capabilities` + `proSettings`); profile-scoped `data/pro_settings.json` with `PUT /api/pro-settings` (Pro-gated); cloud mirror M1 scaffolding (`shared/cloud_mirror.py` debounced post-write hooks, disabled until `cloudMirrorEnabled`); Supabase schema stub `landing/sql/cloud_mirror.sql`.
 - Cloud mirror M2: real Supabase Storage upload on debounced flush (`shared/supabase_mirror.py`, cached bearer via `shared/mirror_session.py`); local upload state in `cache/runs/mirror_upload_state.json`; `GET /api/mirror` list/download (Pro bearer, read does not require `cloudMirrorEnabled`); hosted read API `landing/api/mirror.js`.
 - Cloud mirror M3: hosted read-only viewer at `https://baklog.app/mirror` (`landing/mirror.html`, `mirror.js`, `mirror-merge.js`) — Pro sign-in, multi-store table with status/playtime/HLTB from mirrored JSON.

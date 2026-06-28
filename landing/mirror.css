@@ -262,6 +262,17 @@ table.mirror-table {
   padding-left: 1.2rem;
 }
 
+.mirror-scope-note {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
 .hidden {
   display: none !important;
 }

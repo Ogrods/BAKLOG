@@ -1,6 +1,12 @@
 import { baklogFetch, urlWithStreamTicket } from './api-client.js';
 import { getAccessToken, getProSettings, isAccountAuthMode, isPro, refreshAccountPlan } from './auth-gate.js';
 import { importFromCloudMirror } from './cloud-mirror-import.js';
+import {
+  describeImportScope,
+  fetchMirrorSnapshot,
+  listImportableArtifactPaths,
+  summarizeLocalUploadState,
+} from './cloud-mirror-status.js';
 import { capabilityStatus } from './pro-capabilities.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
@@ -526,6 +532,38 @@ function restoreConnNoteFocus(focusState, root) {
 
 
 
+
+
+let _cloudMirrorStatusRequest = 0;
+
+async function refreshCloudMirrorUploadStatus() {
+  const el = document.getElementById('cloudMirrorUploadStatus');
+  if (!el) return;
+  const showCloudMirror =
+    isPro() && isAccountAuthMode() && !!getAccessToken() && capabilityStatus('cloud_sync_mirror') === 'live';
+  const enabled = getProSettings().cloudMirrorEnabled === true;
+  if (!showCloudMirror || !enabled) {
+    el.hidden = true;
+    el.textContent = '';
+    el.classList.remove('conn-prefs-note--error');
+    return;
+  }
+  const reqId = ++_cloudMirrorStatusRequest;
+  try {
+    const snap = await fetchMirrorSnapshot();
+    if (reqId !== _cloudMirrorStatusRequest) return;
+    const summary = summarizeLocalUploadState(snap.localUploadState);
+    el.hidden = false;
+    el.textContent = summary.line;
+    el.classList.toggle('conn-prefs-note--error', summary.kind === 'error');
+  } catch {
+    if (reqId !== _cloudMirrorStatusRequest) return;
+    el.hidden = false;
+    el.textContent = 'Could not read mirror upload status.';
+    el.classList.remove('conn-prefs-note--error');
+  }
+}
+
 function renderConnPrefs() {
   const onConnect = document.getElementById('autoFetchOnConnectToggle');
   const stale24h = document.getElementById('autoFetchStale24hToggle');
@@ -540,7 +578,8 @@ function renderConnPrefs() {
   const importBtn = document.getElementById('cloudMirrorImportBtn');
   const showCloudMirror =
     isPro() && isAccountAuthMode() && !!getAccessToken() && capabilityStatus('cloud_sync_mirror') === 'live';
-  const showMirrorImport = isPro() && isAccountAuthMode() && !!getAccessToken();
+  const showMirrorImport =
+    isPro() && isAccountAuthMode() && !!getAccessToken() && capabilityStatus('cloud_sync_mirror') === 'live';
   if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
   if (importBtn) importBtn.hidden = !showMirrorImport;
   if (cloudToggle && showCloudMirror) {
@@ -551,7 +590,7 @@ function renderConnPrefs() {
       cloudNote.hidden = false;
       cloudNote.classList.add('conn-prefs-note--pro');
       cloudNote.textContent = getProSettings().cloudMirrorEnabled
-        ? 'Cloud mirror uploads catalog JSON after fetch/save. Browse read-only at baklog.app/mirror.'
+        ? 'Cloud sync uploads catalog JSON after fetch/save (~30s). Browse library backlog at baklog.app/mirror (wishlists import via button below).'
         : 'Enable to upload catalog JSON to your account after fetch/save (credentials stay on this PC).';
     } else {
       cloudNote.hidden = true;
@@ -571,6 +610,7 @@ function renderConnPrefs() {
     }
     note.hidden = false;
   }
+  void refreshCloudMirrorUploadStatus();
 }
 
 async function saveCloudMirrorEnabled(enabled) {
@@ -599,6 +639,7 @@ async function handleCloudMirrorToggle(ev) {
     toggle.disabled = true;
     await saveCloudMirrorEnabled(toggle.checked);
     renderConnPrefs();
+    void refreshCloudMirrorUploadStatus();
   } catch (err) {
     toggle.checked = prev;
     window.alert(err?.message || 'Could not save cloud sync setting.');
@@ -607,18 +648,58 @@ async function handleCloudMirrorToggle(ev) {
   }
 }
 
+async function openCloudMirrorImportDialog(artifacts) {
+  const dialog = document.getElementById('cloudMirrorImportDialog');
+  const listEl = document.getElementById('cloudMirrorImportArtifactList');
+  const personalToggle = document.getElementById('cloudMirrorImportPersonal');
+  const intro = document.getElementById('cloudMirrorImportIntro');
+  if (!dialog || !listEl || !personalToggle) return null;
+
+  const paths = listImportableArtifactPaths(artifacts);
+  if (!paths.length) return null;
+
+  const scope = describeImportScope(paths);
+  if (intro) {
+    intro.textContent =
+      `This replaces local mirrorable files with your cloud copy (${scope.join(', ')}). `
+      + 'Store credentials are not copied — reconnect stores afterward.';
+  }
+  listEl.innerHTML = paths.map((path) => `<li>${escapeHtml(path)}</li>`).join('');
+  personalToggle.checked = paths.includes('data/personal.json');
+  personalToggle.disabled = !paths.includes('data/personal.json');
+
+  dialog.returnValue = 'cancel';
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      'close',
+      () => {
+        resolve({
+          confirmed: dialog.returnValue === 'confirm',
+          includePersonal: personalToggle.checked,
+        });
+      },
+      { once: true },
+    );
+  });
+}
+
 async function handleCloudMirrorImport() {
   const btn = document.getElementById('cloudMirrorImportBtn');
-  const confirmed = window.confirm(
-    'Import library catalogs and personal data from your cloud mirror?\n\n'
-    + 'Matching local files will be replaced. Store credentials are not copied — reconnect stores afterward.',
-  );
-  if (!confirmed) return;
   try {
     if (btn) btn.disabled = true;
-    const result = await importFromCloudMirror({ includePersonal: true });
+    const snap = await fetchMirrorSnapshot();
+    const choice = await openCloudMirrorImportDialog(snap.artifacts);
+    if (!choice?.confirmed) return;
+
+    const result = await importFromCloudMirror({
+      includePersonal: choice.includePersonal,
+    });
     const count = result?.count ?? 0;
-    window.alert(`Cloud mirror import complete (${count} file${count === 1 ? '' : 's'}). The app will reload.`);
+    const imported = Array.isArray(result?.imported) ? result.imported.join(', ') : '';
+    window.alert(
+      `Cloud sync import complete (${count} file${count === 1 ? '' : 's'}).${imported ? `\n\n${imported}` : ''}\n\nThe app will reload.`,
+    );
     window.location.reload();
   } catch (err) {
     window.alert(err?.message || 'Cloud mirror import failed.');

@@ -201,7 +201,7 @@ async function loadLibrary(session) {
     }
 
     populateFilters(allRows);
-    lead.textContent = 'Read-only cloud library — edits stay on your home PC.';
+    lead.textContent = 'Read-only library backlog — use Import in Connections for wishlists and full mirror restore.';
     showPanel('library');
     renderTable();
   } finally {

@@ -16,7 +16,7 @@ function extractAdminAdLocations(source) {
 }
 
 function extractMigratorLocationKeys(source) {
-  const block = source.match(/locations: dict\[str, list\[str\]\] = \{k: \[\] for k in \[([\s\S]*?)\]/);
+  const block = source.match(/locations(?::\s*[^=]+)?\s*=\s*(?:\{k:\s*\[\]\s*for\s*k\s*in|\{\s*k:\s*\[\]\s*for\s*k\s*in)\s*\[([\s\S]*?)\]/);
   if (!block) return [];
   return [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }

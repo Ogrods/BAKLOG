@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  artifactsForActiveProfile,
   describeImportScope,
   formatMirrorTimestamp,
   listImportableArtifactPaths,
@@ -49,5 +50,20 @@ describe('cloud-mirror-status', () => {
 
   it('formatMirrorTimestamp returns input when invalid', () => {
     expect(formatMirrorTimestamp('not-a-date')).toBe('not-a-date');
+  });
+
+  it('artifactsForActiveProfile keeps legacy rows without profile tags', () => {
+    const rows = [{ path: 'games_steam.json' }];
+    expect(artifactsForActiveProfile(rows, 'default')).toEqual(rows);
+  });
+
+  it('artifactsForActiveProfile filters tagged rows to active profile', () => {
+    const rows = [
+      { path: 'games_steam.json', profile: 'default' },
+      { path: 'games_steam.json', profile: 'work' },
+    ];
+    expect(artifactsForActiveProfile(rows, 'work')).toEqual([
+      { path: 'games_steam.json', profile: 'work' },
+    ]);
   });
 });

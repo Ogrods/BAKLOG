@@ -70,22 +70,31 @@ async function verifySession(request, supabaseUrl, anonKey) {
   return { auth, user };
 }
 
-async function listStorageObjects({ supabaseUrl, anonKey, auth, prefix, limit = 200 }) {
+async function listStorageObjects({ supabaseUrl, anonKey, auth, prefix, pageSize = 200 }) {
   const listUrl = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/list/${MIRROR_BUCKET}`;
-  const listRes = await fetch(listUrl, {
-    method: "POST",
-    headers: {
-      apikey: anonKey,
-      Authorization: auth,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ prefix, limit, offset: 0 }),
-  });
-  if (!listRes.ok) {
-    throw new Error("list_failed");
+  const rows = [];
+  let offset = 0;
+  while (true) {
+    const listRes = await fetch(listUrl, {
+      method: "POST",
+      headers: {
+        apikey: anonKey,
+        Authorization: auth,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prefix, limit: pageSize, offset }),
+    });
+    if (!listRes.ok) {
+      throw new Error("list_failed");
+    }
+    const chunk = await listRes.json();
+    const page = Array.isArray(chunk) ? chunk : [];
+    if (!page.length) break;
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    offset += pageSize;
   }
-  const rows = await listRes.json();
-  return Array.isArray(rows) ? rows : [];
+  return rows;
 }
 
 export default {

@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-"""Fetch EA App library via Juno GraphQL (unofficial)."""
-
 from __future__ import annotations
-
 import argparse
 import json
 import time
@@ -10,437 +6,249 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
-
 from dotenv import load_dotenv
-
 from auth import mark_connected, mark_invalid, resolve_env
 from auth.secrets import profile_dir
-from clients.ea_client import (
-    EA_PLAY_OWNERSHIP,
-    REAL_OWNERSHIP,
-    XGP_ONLY,
-    EaAuthError,
-    EaCaptureError,
-    EaClient,
-)
-from clients.ea_session import (
-    EA_COOKIE_SESSION,
-    EA_LIBRARY_URLS,
-    capture_ea_browser_session,
-    fetch_owned_games_browser,
-    launch_ea_profile,
-    probe_ea_token,
-    read_ea_connect_snapshot,
-    sniff_ea_bearer,
-)
+from clients.ea_client import EA_PLAY_OWNERSHIP, REAL_OWNERSHIP, XGP_ONLY, EaAuthError, EaCaptureError, EaClient
+from clients.ea_session import EA_COOKIE_SESSION, EA_LIBRARY_URLS, capture_ea_browser_session, fetch_owned_games_browser, launch_ea_profile, probe_ea_token, read_ea_connect_snapshot, sniff_ea_bearer
 from clients.hltb_client import HltbClient
 from fetchers._authoritative import EA
-from fetchers._base import (
-    add_allow_empty_arg,
-    add_no_carry_arg,
-    add_only_new_arg,
-    apply_carry_forward,
-    catalog_file,
-    configure_stdout,
-    merge_cached_row,
-    refuse_drift_result,
-    refuse_empty_result,
-    row_key_by_id,
-    write_catalog_text,
-)
+from fetchers._base import add_allow_empty_arg, add_no_carry_arg, add_only_new_arg, apply_carry_forward, catalog_file, configure_stdout, merge_cached_row, refuse_drift_result, refuse_empty_result, row_key_by_id, write_catalog_text
 from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
 from shared.raw_dumps import profile_raw_dump_path
-
-GAMES_EA_JSON = Path("games_ea.json")
-
-
-EA_RAW_DUMP = profile_raw_dump_path("ea_raw.json")
-
+GAMES_EA_JSON = Path('games_ea.json')
+EA_RAW_DUMP = profile_raw_dump_path('ea_raw.json')
 
 def fetch_debug_json() -> Path:
     from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "ea" / "fetch_debug.json"
-
-
+    return profile_cache_dir() / 'ea' / 'fetch_debug.json'
 HLTB_DELAY_SEC = 1.0
-
-_TM_CHARS = "".maketrans({"®": "", "™": "", "©": ""})
-
+_TM_CHARS = ''.maketrans({'®': '', '™': '', '©': ''})
 
 def _clean_name(raw: str) -> str:
-    return " ".join((raw or "").translate(_TM_CHARS).split()).strip()
-
+    return ' '.join((raw or '').translate(_TM_CHARS).split()).strip()
 
 def _ea_connected() -> bool:
-    """True only after Connect marks EA connected — not while a sign-in window is open."""
     from auth.manager import get_provider_blob
-
-    return get_provider_blob("ea").get("status") == "connected"
-
+    return get_provider_blob('ea').get('status') == 'connected'
 
 def _load_ea_profile_cookies() -> list[dict]:
-    """Best-effort cookie jar read for API replay (no page navigation)."""
     from auth.manager import has_active_sessions
-
     if has_active_sessions():
         return []
-    profile = profile_dir("ea")
+    profile = profile_dir('ea')
     if not profile.exists() or not any(profile.iterdir()):
         return []
     try:
         from auth.cdp_browser import launch_persistent_profile
-
         with launch_persistent_profile(str(profile), headless=True) as ctx:
             return ctx.cookies()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return []
 
-
-def _resolve_session(
-    *,
-    headless: bool,
-    timeout_s: int = 45,
-    dump_debug: bool = False,
-) -> tuple[str, list[dict], dict[str, Any]]:
-    """Return (bearer_token, cookies, debug_info)."""
-    debug: dict[str, Any] = {
-        "headless": headless,
-        "launch_mode": "headed",
-        "stored_token_probe": None,
-    }
-    stored = (resolve_env("EA_BEARER_TOKEN", provider="ea") or "").strip()
-
+def _resolve_session(*, headless: bool, timeout_s: int=45, dump_debug: bool=False) -> tuple[str, list[dict], dict[str, Any]]:
+    debug: dict[str, Any] = {'headless': headless, 'launch_mode': 'headed', 'stored_token_probe': None}
+    stored = (resolve_env('EA_BEARER_TOKEN', provider='ea') or '').strip()
     if stored and stored != EA_COOKIE_SESSION:
         probe = probe_ea_token(stored)
-        debug["stored_token_probe"] = probe
-        if probe.get("ok") and not probe.get("library_via_browser"):
+        debug['stored_token_probe'] = probe
+        if probe.get('ok') and (not probe.get('library_via_browser')):
             cookies = _load_ea_profile_cookies()
             try:
                 items = EaClient(stored, cookies=cookies).get_owned_games()
-                debug["token_source"] = "stored"
-                debug["owned_items"] = items
-                return stored, cookies, debug
+                debug['token_source'] = 'stored'
+                debug['owned_items'] = items
+                return (stored, cookies, debug)
             except EaAuthError as exc:
-                debug["stored_owned_error"] = str(exc)
-
+                debug['stored_owned_error'] = str(exc)
     snapshot = read_ea_connect_snapshot()
     if snapshot:
-        cookies = list(snapshot.get("cookies") or [])
+        cookies = list(snapshot.get('cookies') or [])
         if not cookies:
             cookies = _load_ea_profile_cookies()
-        owned = list(snapshot.get("owned_items") or [])
-        debug["token_source"] = "connect_snapshot"
-        debug["owned_items"] = owned
-        debug["browser_auth_ok"] = True
-        debug["connect_snapshot_at"] = snapshot.get("captured_at")
-        debug["connect_snapshot_auth_only"] = not owned
-        debug["connect_snapshot_cookie_count"] = len(cookies)
-        return "", cookies, debug
-
-    profile = profile_dir("ea")
+        owned = list(snapshot.get('owned_items') or [])
+        debug['token_source'] = 'connect_snapshot'
+        debug['owned_items'] = owned
+        debug['browser_auth_ok'] = True
+        debug['connect_snapshot_at'] = snapshot.get('captured_at')
+        debug['connect_snapshot_auth_only'] = not owned
+        debug['connect_snapshot_cookie_count'] = len(cookies)
+        return ('', cookies, debug)
+    profile = profile_dir('ea')
     if not profile.exists() or not any(profile.iterdir()):
         from auth.manager import get_provider_blob
-
-        if get_provider_blob("ea").get("status") == "connected":
-            raise EaAuthError(
-                "EA session expired — open Connections → EA App → Reconnect and sign in at ea.com."
-            )
-        raise EaAuthError(
-            "No saved EA profile at cache/auth/profiles/ea. "
-            "Open the Connections page and connect EA App first."
-        )
-
+        if get_provider_blob('ea').get('status') == 'connected':
+            raise EaAuthError('EA session expired — open Connections → EA App → Reconnect and sign in at ea.com.')
+        raise EaAuthError('No saved EA profile at cache/auth/profiles/ea. Open the Connections page and connect EA App first.')
     with launch_ea_profile(profile, visible=not headless) as ctx:
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         try:
             if stored == EA_COOKIE_SESSION:
-                result = capture_ea_browser_session(
-                    ctx,
-                    page,
-                    timeout_s=timeout_s,
-                    debug_out=debug,
-                )
+                result = capture_ea_browser_session(ctx, page, timeout_s=timeout_s, debug_out=debug)
             else:
-                result = sniff_ea_bearer(
-                    ctx,
-                    page,
-                    trigger_urls=EA_LIBRARY_URLS,
-                    timeout_s=timeout_s,
-                    debug_out=debug,
-                )
+                result = sniff_ea_bearer(ctx, page, trigger_urls=EA_LIBRARY_URLS, timeout_s=timeout_s, debug_out=debug)
         except (EaAuthError, EaCaptureError):
             if dump_debug:
                 _write_fetch_debug(debug, page=page)
             raise
         debug.update(result.debug)
-        debug["owned_items"] = result.owned_items
-        debug["token_source"] = "sniff"
+        debug['owned_items'] = result.owned_items
+        debug['token_source'] = 'sniff'
         if dump_debug:
-            debug["final_url"] = result.debug.get("final_url")
+            debug['final_url'] = result.debug.get('final_url')
             _write_fetch_debug(debug, page=page)
-        mark_connected(
-            "ea",
-            {
-                "EA_PROFILE": "ready",
-                "EA_BEARER_TOKEN": (
-                    EA_COOKIE_SESSION
-                    if (result.token or "") == EA_COOKIE_SESSION or result.debug.get("browser_auth_ok")
-                    else (result.token or EA_COOKIE_SESSION)
-                ),
-            },
-        )
-        token = result.token if result.token and result.token != EA_COOKIE_SESSION else ""
-        return token, result.cookies, debug
+        mark_connected('ea', {'EA_PROFILE': 'ready', 'EA_BEARER_TOKEN': EA_COOKIE_SESSION if (result.token or '') == EA_COOKIE_SESSION or result.debug.get('browser_auth_ok') else result.token or EA_COOKIE_SESSION})
+        token = result.token if result.token and result.token != EA_COOKIE_SESSION else ''
+        return (token, result.cookies, debug)
 
-
-def _write_fetch_debug(debug: dict[str, Any], *, page: Any = None) -> None:
+def _write_fetch_debug(debug: dict[str, Any], *, page: Any=None) -> None:
     path = fetch_debug_json()
     path.parent.mkdir(parents=True, exist_ok=True)
     if page is not None:
         try:
-            debug.setdefault("final_url", getattr(page, "url", None) or "")
-        except Exception:  # noqa: BLE001
+            debug.setdefault('final_url', getattr(page, 'url', None) or '')
+        except Exception:
             pass
-    path.write_text(json.dumps(debug, indent=2, ensure_ascii=False), encoding="utf-8")
-
+    path.write_text(json.dumps(debug, indent=2, ensure_ascii=False), encoding='utf-8')
 
 def _ownership_methods(item: dict) -> set[str]:
-    product = item.get("product") if isinstance(item.get("product"), dict) else {}
-    gpu = product.get("gameProductUser") if isinstance(product.get("gameProductUser"), dict) else {}
-    methods = gpu.get("ownershipMethods") or []
+    product = item.get('product') if isinstance(item.get('product'), dict) else {}
+    gpu = product.get('gameProductUser') if isinstance(product.get('gameProductUser'), dict) else {}
+    methods = gpu.get('ownershipMethods') or []
     return {str(m) for m in methods if m}
 
-
 def _should_include(item: dict) -> bool:
-    product = item.get("product") if isinstance(item.get("product"), dict) else {}
-    base = product.get("baseItem") if isinstance(product.get("baseItem"), dict) else {}
-    if base.get("isLauncher"):
+    product = item.get('product') if isinstance(item.get('product'), dict) else {}
+    base = product.get('baseItem') if isinstance(product.get('baseItem'), dict) else {}
+    if base.get('isLauncher'):
         return False
-    game_type = (base.get("gameType") or "").upper()
-    if game_type and game_type not in ("GAME", "BASE_GAME", "FULL_GAME", ""):
-        if game_type in ("DEMO", "TRIAL", "TOOL", "LAUNCHER"):
+    game_type = (base.get('gameType') or '').upper()
+    if game_type and game_type not in ('GAME', 'BASE_GAME', 'FULL_GAME', ''):
+        if game_type in ('DEMO', 'TRIAL', 'TOOL', 'LAUNCHER'):
             return False
     methods = _ownership_methods(item)
     if methods and methods <= XGP_ONLY:
         return False
-    name = _clean_name(str(product.get("name") or ""))
+    name = _clean_name(str(product.get('name') or ''))
     return bool(name)
-
 
 def _tags_for(item: dict) -> list[str]:
     methods = _ownership_methods(item)
     tags: list[str] = []
-    if methods & EA_PLAY_OWNERSHIP and not (methods & REAL_OWNERSHIP):
-        tags.append("ea_play")
+    if methods & EA_PLAY_OWNERSHIP and (not methods & REAL_OWNERSHIP):
+        tags.append('ea_play')
     return tags
 
-
 def _store_url(item: dict, name: str) -> str:
-    product = item.get("product") if isinstance(item.get("product"), dict) else {}
-    slug = product.get("gameSlug")
+    product = item.get('product') if isinstance(item.get('product'), dict) else {}
+    slug = product.get('gameSlug')
     if isinstance(slug, str) and slug.strip():
         return f"https://www.ea.com/games/{quote(slug.strip(), safe='')}"
-    return f"https://www.ea.com/search?q={quote(name)}"
-
+    return f'https://www.ea.com/search?q={quote(name)}'
 
 def _row_id(item: dict) -> str:
-    offer = item.get("originOfferId") or item.get("id")
+    offer = item.get('originOfferId') or item.get('id')
     if offer:
         return str(offer)
-    product = item.get("product") if isinstance(item.get("product"), dict) else {}
-    pid = product.get("id")
+    product = item.get('product') if isinstance(item.get('product'), dict) else {}
+    pid = product.get('id')
     if pid:
         return str(pid)
-    return "ea-unknown"
-
+    return 'ea-unknown'
 
 def load_existing() -> dict[str, dict]:
     if not catalog_file(GAMES_EA_JSON).exists():
         return {}
-    data = json.loads(catalog_file(GAMES_EA_JSON).read_text(encoding="utf-8"))
-    return {str(g["id"]): g for g in data.get("games", [])}
+    data = json.loads(catalog_file(GAMES_EA_JSON).read_text(encoding='utf-8'))
+    return {str(g['id']): g for g in data.get('games', [])}
 
-
-def _build_row(
-    item: dict,
-    *,
-    hltb: dict | None,
-    play_by_slug: dict[str, dict],
-) -> dict:
-    product = item.get("product") if isinstance(item.get("product"), dict) else {}
-    name = _clean_name(str(product.get("name") or "")) or "Unknown EA title"
+def _build_row(item: dict, *, hltb: dict | None, play_by_slug: dict[str, dict]) -> dict:
+    product = item.get('product') if isinstance(item.get('product'), dict) else {}
+    name = _clean_name(str(product.get('name') or '')) or 'Unknown EA title'
     rid = _row_id(item)
-    slug = product.get("gameSlug")
+    slug = product.get('gameSlug')
     play = play_by_slug.get(slug) if isinstance(slug, str) else None
     playtime_minutes = None
     last_played = None
     if isinstance(play, dict):
-        secs = play.get("totalPlayTimeSeconds")
+        secs = play.get('totalPlayTimeSeconds')
         if isinstance(secs, (int, float)) and secs > 0:
             playtime_minutes = int(secs // 60)
-        last_played = play.get("lastSessionEndDate") if isinstance(play.get("lastSessionEndDate"), str) else None
-
-    row = {
-        "store": "ea",
-        "id": rid,
-        "ea_id": rid,
-        "ea_offer_id": str(item.get("originOfferId") or rid),
-        "ea_game_slug": slug if isinstance(slug, str) else None,
-        "name": name,
-        "playtime_minutes": playtime_minutes,
-        "last_played": last_played,
-        "header_image": None,
-        "library_image": None,
-        "release_date": None,
-        "genres": [],
-        "tags": _tags_for(item),
-        "steam_review_percent": None,
-        "steam_review_count": None,
-        "steam_review_desc": None,
-        "hltb_main_hours": None,
-        "hltb_main_extra_hours": None,
-        "hltb_completionist_hours": None,
-        "hltb_match_confidence": None,
-        "hltb_name": None,
-        "store_url": _store_url(item, name),
-        "type": "game",
-        "price": None,
-        "price_initial": None,
-        "discount_percent": None,
-        "currency": None,
-    }
+        last_played = play.get('lastSessionEndDate') if isinstance(play.get('lastSessionEndDate'), str) else None
+    row = {'store': 'ea', 'id': rid, 'ea_id': rid, 'ea_offer_id': str(item.get('originOfferId') or rid), 'ea_game_slug': slug if isinstance(slug, str) else None, 'name': name, 'playtime_minutes': playtime_minutes, 'last_played': last_played, 'header_image': None, 'library_image': None, 'release_date': None, 'genres': [], 'tags': _tags_for(item), 'steam_review_percent': None, 'steam_review_count': None, 'steam_review_desc': None, 'hltb_main_hours': None, 'hltb_main_extra_hours': None, 'hltb_completionist_hours': None, 'hltb_match_confidence': None, 'hltb_name': None, 'store_url': _store_url(item, name), 'type': 'game', 'price': None, 'price_initial': None, 'discount_percent': None, 'currency': None}
     if hltb:
-        row.update(
-            {
-                "hltb_main_hours": hltb.get("hltb_main_hours"),
-                "hltb_main_extra_hours": hltb.get("hltb_main_extra_hours"),
-                "hltb_completionist_hours": hltb.get("hltb_completionist_hours"),
-                "hltb_match_confidence": hltb.get("hltb_match_confidence"),
-                "hltb_name": hltb.get("hltb_name"),
-            }
-        )
+        row.update({'hltb_main_hours': hltb.get('hltb_main_hours'), 'hltb_main_extra_hours': hltb.get('hltb_main_extra_hours'), 'hltb_completionist_hours': hltb.get('hltb_completionist_hours'), 'hltb_match_confidence': hltb.get('hltb_match_confidence'), 'hltb_name': hltb.get('hltb_name')})
     return row
-
 
 def main() -> int:
     load_dotenv()
-    parser = argparse.ArgumentParser(description="Fetch EA App library (unofficial GraphQL)")
+    parser = argparse.ArgumentParser(description='Fetch EA App library (unofficial GraphQL)')
     add_allow_empty_arg(parser)
     add_no_carry_arg(parser)
     add_only_new_arg(parser)
-    parser.add_argument("--skip-hltb", action="store_true")
-    parser.add_argument("--dump-raw", action="store_true")
-    parser.add_argument(
-        "--headed",
-        action="store_true",
-        help="Open the saved browser profile visibly (debug capture issues)",
-    )
-    parser.add_argument(
-        "--dump-debug",
-        action="store_true",
-        help=f"Write capture diagnostics to {fetch_debug_json()}",
-    )
+    parser.add_argument('--skip-hltb', action='store_true')
+    parser.add_argument('--dump-raw', action='store_true')
+    parser.add_argument('--headed', action='store_true', help='Open the saved browser profile visibly (debug capture issues)')
+    parser.add_argument('--dump-debug', action='store_true', help=f'Write capture diagnostics to {fetch_debug_json()}')
     args = parser.parse_args()
     configure_stdout()
-    t0 = started("fetch_ea")
+    t0 = started('fetch_ea')
     stats = RunStats()
-
     if not _ea_connected():
-        stats.error(
-            "EA App is not connected. Open Connections → EA App → Connect and sign in at ea.com."
-        )
-        return stats.finish("fetch_ea", t0, exit_code=1)
-
+        stats.error('EA App is not connected. Open Connections → EA App → Connect and sign in at ea.com.')
+        return stats.finish('fetch_ea', t0, exit_code=1)
     from auth.manager import has_active_sessions
-
     if has_active_sessions():
-        stats.error(
-            "EA sign-in is still open. Finish Connect (wait for the browser window to close) "
-            "before refreshing EA."
-        )
-        return stats.finish("fetch_ea", t0, exit_code=1)
-
+        stats.error('EA sign-in is still open. Finish Connect (wait for the browser window to close) before refreshing EA.')
+        return stats.finish('fetch_ea', t0, exit_code=1)
     _dbg: dict[str, Any] = {}
     try:
-        token, cookies, _dbg = run_with_heartbeat(
-            lambda: _resolve_session(
-                headless=not args.headed,
-                dump_debug=args.dump_debug,
-            ),
-            "EA session capture",
-        )
+        token, cookies, _dbg = run_with_heartbeat(lambda: _resolve_session(headless=not args.headed, dump_debug=args.dump_debug), 'EA session capture')
     except EaCaptureError as e:
         if _dbg:
             _write_fetch_debug(_dbg)
         stats.error(str(e))
-        return stats.finish("fetch_ea", t0, exit_code=1)
+        return stats.finish('fetch_ea', t0, exit_code=1)
     except EaAuthError as e:
         if _dbg:
             _write_fetch_debug(_dbg)
-        mark_invalid("ea", error=str(e))
+        mark_invalid('ea', error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_ea", t0, exit_code=EXIT_CODE_AUTH)
-    except Exception as e:  # noqa: BLE001
+        return stats.finish('fetch_ea', t0, exit_code=EXIT_CODE_AUTH)
+    except Exception as e:
         msg = str(e)
-        is_transport = any(
-            tok in msg.lower()
-            for tok in (
-                "cdp command timed out",
-                "cdp connection closed",
-                "websocket",
-                "browser",
-                "debugging endpoint",
-            )
-        )
+        is_transport = any((tok in msg.lower() for tok in ('cdp command timed out', 'cdp connection closed', 'websocket', 'browser', 'debugging endpoint')))
         if is_transport:
-            stats.error(f"EA session capture transport error: {msg}")
-            return stats.finish("fetch_ea", t0, exit_code=1)
-        mark_invalid("ea", error=msg)
+            stats.error(f'EA session capture transport error: {msg}')
+            return stats.finish('fetch_ea', t0, exit_code=1)
+        mark_invalid('ea', error=msg)
         stats.error(msg)
-        return stats.finish("fetch_ea", t0, exit_code=EXIT_CODE_AUTH)
-
+        return stats.finish('fetch_ea', t0, exit_code=EXIT_CODE_AUTH)
     try:
-        raw_items: list[dict] = list(_dbg.get("owned_items") or [])
+        raw_items: list[dict] = list(_dbg.get('owned_items') or [])
         if token:
             try:
                 client = EaClient(token, cookies=cookies)
-                raw_items = run_with_heartbeat(
-                    client.get_owned_games,
-                    "EA owned games (API)",
-                )
+                raw_items = run_with_heartbeat(client.get_owned_games, 'EA owned games (API)')
             except EaAuthError:
                 if not raw_items:
                     raw_items = []
         if not raw_items:
             try:
                 client = EaClient(cookies=cookies)
-                raw_items = run_with_heartbeat(
-                    client.get_owned_games,
-                    "EA owned games (cookie API)",
-                )
+                raw_items = run_with_heartbeat(client.get_owned_games, 'EA owned games (cookie API)')
             except EaAuthError:
                 raw_items = []
         if not raw_items:
-            raw_items = run_with_heartbeat(
-                lambda: fetch_owned_games_browser(
-                    profile_dir("ea"),
-                    headless=not args.headed,
-                ),
-                "EA owned games (browser)",
-            )
+            raw_items = run_with_heartbeat(lambda: fetch_owned_games_browser(profile_dir('ea'), headless=not args.headed), 'EA owned games (browser)')
         if not raw_items:
-            raise EaAuthError(
-                "EA library fetch returned no games. Reconnect EA App on Connections, "
-                "then refresh again."
-            )
-        if "client" not in locals() or client is None:
+            raise EaAuthError('EA library fetch returned no games. Reconnect EA App on Connections, then refresh again.')
+        if 'client' not in locals() or client is None:
             client = EaClient(token, cookies=cookies) if token or cookies else None
     except EaAuthError as e:
-        mark_invalid("ea", error=str(e))
+        mark_invalid('ea', error=str(e))
         stats.error(str(e))
-        return stats.finish("fetch_ea", t0, exit_code=EXIT_CODE_AUTH)
-
+        return stats.finish('fetch_ea', t0, exit_code=EXIT_CODE_AUTH)
     items = [i for i in raw_items if _should_include(i)]
     seen: dict[str, dict] = {}
     for item in items:
@@ -448,56 +256,39 @@ def main() -> int:
         if key not in seen:
             seen[key] = item
     deduped = list(seen.values())
-    print(f"Found {len(deduped)} EA titles (from {len(raw_items)} API rows).", flush=True)
-
+    print(f'Found {len(deduped)} EA titles (from {len(raw_items)} API rows).', flush=True)
     if args.dump_raw:
         EA_RAW_DUMP.parent.mkdir(parents=True, exist_ok=True)
-        EA_RAW_DUMP.write_text(
-            json.dumps({"items": raw_items, "filtered": deduped}, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        print(f"Wrote raw dump to {EA_RAW_DUMP}.", flush=True)
-
-    empty_exit = refuse_empty_result(
-        deduped,
-        label="EA library",
-        allow_empty=args.allow_empty,
-        output_path=GAMES_EA_JSON,
-    )
+        EA_RAW_DUMP.write_text(json.dumps({'items': raw_items, 'filtered': deduped}, indent=2, ensure_ascii=False), encoding='utf-8')
+        print(f'Wrote raw dump to {EA_RAW_DUMP}.', flush=True)
+    empty_exit = refuse_empty_result(deduped, label='EA library', allow_empty=args.allow_empty, output_path=GAMES_EA_JSON)
     if empty_exit is not None:
-        stats.error(
-            "No EA games returned. Confirm you own PC titles on EA App, then reconnect on Connections."
-        )
-        return stats.finish("fetch_ea", t0, exit_code=empty_exit)
-
+        stats.error('No EA games returned. Confirm you own PC titles on EA App, then reconnect on Connections.')
+        return stats.finish('fetch_ea', t0, exit_code=empty_exit)
     slugs = []
     for item in deduped:
-        product = item.get("product") if isinstance(item.get("product"), dict) else {}
-        slug = product.get("gameSlug")
+        product = item.get('product') if isinstance(item.get('product'), dict) else {}
+        slug = product.get('gameSlug')
         if isinstance(slug, str) and slug:
             slugs.append(slug)
     play_by_slug: dict[str, dict] = {}
     try:
-        play_rows = run_with_heartbeat(
-            lambda: client.get_play_times(sorted(set(slugs))),
-            "EA play times",
-        )
+        play_rows = run_with_heartbeat(lambda: client.get_play_times(sorted(set(slugs))), 'EA play times')
         for pt in play_rows:
-            s = pt.get("gameSlug")
+            s = pt.get('gameSlug')
             if isinstance(s, str):
                 play_by_slug[s] = pt
     except Exception as e:
-        print(f"  Play-time warning: {e}", flush=True)
-
+        print(f'  Play-time warning: {e}', flush=True)
     hltb_client = HltbClient()
     existing = load_existing()
     games_out: list[dict] = []
-    def _sort_key(row: dict) -> str:
-        return _clean_name(str((row.get("product") or {}).get("name") or ""))
 
+    def _sort_key(row: dict) -> str:
+        return _clean_name(str((row.get('product') or {}).get('name') or ''))
     for i, item in enumerate(sorted(deduped, key=_sort_key), 1):
-        name = _clean_name(str((item.get("product") or {}).get("name") or ""))
-        print(f"[{i}/{len(deduped)}] {name}", flush=True)
+        name = _clean_name(str((item.get('product') or {}).get('name') or ''))
+        print(f'[{i}/{len(deduped)}] {name}', flush=True)
         cached = existing.get(_row_id(item))
         if args.only_new and cached:
             games_out.append(cached)
@@ -510,39 +301,17 @@ def main() -> int:
                 hltb = hltb_client.lookup(name)
                 hltb_updated = bool(hltb)
             except Exception as e:
-                print(f"  HLTB warning: {e}", flush=True)
+                print(f'  HLTB warning: {e}', flush=True)
         row = _build_row(item, hltb=hltb, play_by_slug=play_by_slug)
-        games_out.append(
-            merge_cached_row(row, cached, authoritative=EA, hltb_updated=hltb_updated)
-        )
-
-    drift_exit = refuse_drift_result(
-        games_out,
-        label="EA library rows",
-        allow_drift=args.allow_drift,
-        output_path=GAMES_EA_JSON,
-    )
+        games_out.append(merge_cached_row(row, cached, authoritative=EA, hltb_updated=hltb_updated))
+    drift_exit = refuse_drift_result(games_out, label='EA library rows', allow_drift=args.allow_drift, output_path=GAMES_EA_JSON)
     if drift_exit is not None:
-        return stats.finish("fetch_ea", t0, exit_code=drift_exit)
-
-    games_out = apply_carry_forward(
-        games_out,
-        existing,
-        key_fn=row_key_by_id,
-        no_carry=args.no_carry,
-    )
-
-    payload = {
-        "fetched_at": datetime.now(UTC).isoformat(),
-        "store": "ea",
-        "game_count": len(games_out),
-        "games": sorted(games_out, key=lambda g: g["name"].lower()),
-    }
+        return stats.finish('fetch_ea', t0, exit_code=drift_exit)
+    games_out = apply_carry_forward(games_out, existing, key_fn=row_key_by_id, no_carry=args.no_carry)
+    payload = {'fetched_at': datetime.now(UTC).isoformat(), 'store': 'ea', 'game_count': len(games_out), 'games': sorted(games_out, key=lambda g: g['name'].lower())}
     write_catalog_text(GAMES_EA_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
-    print(f"\nWrote {len(games_out)} games to {GAMES_EA_JSON}.", flush=True)
+    print(f'\nWrote {len(games_out)} games to {GAMES_EA_JSON}.', flush=True)
     stats.ok = len(games_out)
-    return stats.finish("fetch_ea", t0, exit_code=0, extra=f"{len(games_out)} games")
-
-
-if __name__ == "__main__":
+    return stats.finish('fetch_ea', t0, exit_code=0, extra=f'{len(games_out)} games')
+if __name__ == '__main__':
     raise SystemExit(main())

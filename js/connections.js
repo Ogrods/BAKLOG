@@ -5,12 +5,14 @@ import {
   describeImportScope,
   fetchMirrorSnapshot,
   listImportableArtifactPaths,
+  artifactsForActiveProfile,
   summarizeLocalUploadState,
 } from './cloud-mirror-status.js';
 import { capabilityStatus } from './pro-capabilities.js';
 import { isPageHidden, registerPausable } from './visibility.js';
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import { bindEscapeClose, trapFocus } from './focus-trap.js';
+import { activeProfileId } from './profiles.js';
 import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
 import { startMetrics, stopMetrics } from './anon-metrics.js';
 import { savePrefs } from './prefs.js';
@@ -689,7 +691,9 @@ async function handleCloudMirrorImport() {
   try {
     if (btn) btn.disabled = true;
     const snap = await fetchMirrorSnapshot();
-    const choice = await openCloudMirrorImportDialog(snap.artifacts);
+    const choice = await openCloudMirrorImportDialog(
+      artifactsForActiveProfile(snap.artifacts, activeProfileId()),
+    );
     if (!choice?.confirmed) return;
 
     const result = await importFromCloudMirror({

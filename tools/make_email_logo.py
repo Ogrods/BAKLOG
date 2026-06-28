@@ -1,51 +1,31 @@
-#!/usr/bin/env python3
-"""
-Render a horizontal BAKLOG lockup (3-pill mark + Space Grotesk wordmark) for the
-email signature. Light brand-blue gradient on transparent background, tuned for
-white email bodies.
-
-Run from repo root:
-  python tools/make_email_logo.py
-Output:
-  landing/assets/email-logo.png   (hosted at https://baklog.app/assets/email-logo.png)
-"""
-
 from __future__ import annotations
-
 import io
 from pathlib import Path
-
 from fontTools.ttLib.woff2 import decompress as woff2_decompress
 from PIL import Image, ImageDraw, ImageFont
-
 ROOT = Path(__file__).resolve().parents[1]
-FONT_WOFF2 = ROOT / "landing" / "assets" / "fonts" / "space-grotesk-latin.woff2"
-OUT = ROOT / "landing" / "assets" / "email-logo.png"
-
+FONT_WOFF2 = ROOT / 'landing' / 'assets' / 'fonts' / 'space-grotesk-latin.woff2'
+OUT = ROOT / 'landing' / 'assets' / 'email-logo.png'
 DISPLAY_W = 640
 DISPLAY_H = 180
 SS = 3
 W = DISPLAY_W * SS
 H = DISPLAY_H * SS
 PAD = 24 * SS
-
 PILLS = ((2, 52, 46, 24), (52, 52, 46, 24), (27, 24, 46, 24))
 KNOBS = ((14, 64), (64, 64), (39, 36))
 PILL_RADIUS = 12
 KNOB_R = 8
-MARK_MINX, MARK_MINY = 2, 24
-MARK_VW, MARK_VH = 96, 52
-
-GRAD_TL = (92, 198, 250)   # #5cc6fa
-GRAD_BR = (14, 165, 233)   # #0ea5e9
-WORDMARK = "BAKLOG"
+MARK_MINX, MARK_MINY = (2, 24)
+MARK_VW, MARK_VH = (96, 52)
+GRAD_TL = (92, 198, 250)
+GRAD_BR = (14, 165, 233)
+WORDMARK = 'BAKLOG'
 TRACKING_EM = 0.16
 MARK_WORD_GAP = 20 * SS
 
-
 def map_pt(vx, vy, scale, ox, oy):
     return (ox + (vx - MARK_MINX) * scale, oy + (vy - MARK_MINY) * scale)
-
 
 def load_font(size: int) -> ImageFont.FreeTypeFont:
     buf = io.BytesIO()
@@ -53,21 +33,15 @@ def load_font(size: int) -> ImageFont.FreeTypeFont:
     buf.seek(0)
     return ImageFont.truetype(buf, size=size)
 
-
 def diagonal_gradient(width: int, height: int, tl: tuple[int, int, int], br: tuple[int, int, int]) -> Image.Image:
-    base = Image.new("RGB", (width, height))
+    base = Image.new('RGB', (width, height))
     px = base.load()
     denom = max(width + height - 2, 1)
     for y in range(height):
         for x in range(width):
             t = (x + y) / denom
-            px[x, y] = (
-                round(tl[0] + (br[0] - tl[0]) * t),
-                round(tl[1] + (br[1] - tl[1]) * t),
-                round(tl[2] + (br[2] - tl[2]) * t),
-            )
+            px[x, y] = (round(tl[0] + (br[0] - tl[0]) * t), round(tl[1] + (br[1] - tl[1]) * t), round(tl[2] + (br[2] - tl[2]) * t))
     return base
-
 
 def draw_mark(mask: Image.Image, scale: float, ox: float, oy: float) -> None:
     d = ImageDraw.Draw(mask)
@@ -81,7 +55,6 @@ def draw_mark(mask: Image.Image, scale: float, ox: float, oy: float) -> None:
         px, cy2 = map_pt(cx, cy, scale, ox, oy)
         d.ellipse((px - kr, cy2 - kr, px + kr, cy2 + kr), fill=0)
 
-
 def wordmark_width(font: ImageFont.FreeTypeFont, size: int) -> float:
     tracking = size * TRACKING_EM
     total = 0.0
@@ -90,7 +63,6 @@ def wordmark_width(font: ImageFont.FreeTypeFont, size: int) -> float:
         if i < len(WORDMARK) - 1:
             total += tracking
     return total
-
 
 def draw_wordmark(mask: Image.Image, font: ImageFont.FreeTypeFont, x: float, y: float) -> None:
     d = ImageDraw.Draw(mask)
@@ -102,15 +74,12 @@ def draw_wordmark(mask: Image.Image, font: ImageFont.FreeTypeFont, x: float, y: 
         if i < len(WORDMARK) - 1:
             cursor += tracking
 
-
 def main():
     inner_h = H - 2 * PAD
     font_size = int(inner_h * 0.62)
     font = load_font(font_size)
     tracking = font_size * TRACKING_EM
-
-    # Measure wordmark block.
-    probe = Image.new("L", (1, 1))
+    probe = Image.new('L', (1, 1))
     pd = ImageDraw.Draw(probe)
     text_y = 0
     boxes = []
@@ -122,33 +91,26 @@ def main():
         if i < len(WORDMARK) - 1:
             cursor += tracking
     text_w = wordmark_width(font, font_size)
-    text_h = max(bb[3] for bb in boxes) - min(bb[1] for bb in boxes)
-
-    mark_scale = (inner_h * 0.88) / MARK_VH
+    text_h = max((bb[3] for bb in boxes)) - min((bb[1] for bb in boxes))
+    mark_scale = inner_h * 0.88 / MARK_VH
     mark_w = MARK_VW * mark_scale
     mark_h = MARK_VH * mark_scale
-
     content_w = mark_w + MARK_WORD_GAP + text_w
     ox = PAD + (W - 2 * PAD - content_w) / 2
     mark_ox = ox
     mark_oy = PAD + (inner_h - mark_h) / 2
     text_x = mark_ox + mark_w + MARK_WORD_GAP
-    text_y = PAD + (inner_h - text_h) / 2 - min(bb[1] for bb in boxes)
-
-    mask = Image.new("L", (W, H), 0)
+    text_y = PAD + (inner_h - text_h) / 2 - min((bb[1] for bb in boxes))
+    mask = Image.new('L', (W, H), 0)
     draw_mark(mask, mark_scale, mark_ox, mark_oy)
     draw_wordmark(mask, font, text_x, text_y)
-
     grad = diagonal_gradient(W, H, GRAD_TL, GRAD_BR)
-    out = Image.new("RGBA", (W, H))
+    out = Image.new('RGBA', (W, H))
     out.paste(grad, (0, 0))
     out.putalpha(mask)
-
     out = out.resize((DISPLAY_W, DISPLAY_H), Image.LANCZOS)
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    out.save(OUT, "PNG")
-    print(f"Wrote {OUT} ({DISPLAY_W}x{DISPLAY_H})")
-
-
-if __name__ == "__main__":
+    out.save(OUT, 'PNG')
+    print(f'Wrote {OUT} ({DISPLAY_W}x{DISPLAY_H})')
+if __name__ == '__main__':
     main()

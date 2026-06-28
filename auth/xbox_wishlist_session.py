@@ -1,78 +1,43 @@
-"""xbox.com wishlist SSR capture — shared by fetch_xbox_wishlist and session probe.
-
-Connections sign-in runs headed Chrome; the fetcher uses the same on-disk profile
-headlessly (legacy ``--headless`` — not ``--headless=new``, which xbox.com often
-treats as signed-out). If headless still fails, the fetcher may retry once with a
-visible browser.
-"""
-
 from __future__ import annotations
-
 import time
 from typing import Literal
-
 from auth.cdp_browser import launch_persistent_profile
-from auth.runner import (
-    _STEALTH_INIT,
-    XBOX_WISHLIST_POLL_SEC,
-    XBOX_WISHLIST_URL,
-    _parse_xbox_preloaded_state,
-)
+from auth.runner import _STEALTH_INIT, XBOX_WISHLIST_POLL_SEC, XBOX_WISHLIST_URL, _parse_xbox_preloaded_state
 from auth.secrets import profile_dir
-
-HeadlessMode = bool | Literal["legacy", "old", "new"]
+HeadlessMode = bool | Literal['legacy', 'old', 'new']
 _MAX_SIGNED_OUT_ATTEMPTS = 3
 
-
 def _state_ready(state: dict) -> bool:
-    user = state.get("user") or {}
-    if not user.get("isSignedIn"):
+    user = state.get('user') or {}
+    if not user.get('isSignedIn'):
         return False
-    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
-    err = page_meta.get("error") or {}
-    return err.get("httpStatusCode") != 403
+    page_meta = (state.get('pageRequestMetadata') or {}).get('/wishlist') or {}
+    err = page_meta.get('error') or {}
+    return err.get('httpStatusCode') != 403
 
-
-def _capture_once(
-    *,
-    headless: HeadlessMode,
-    timeout_s: int,
-) -> dict:
-    profile = profile_dir("xbox_wishlist")
+def _capture_once(*, headless: HeadlessMode, timeout_s: int) -> dict:
+    profile = profile_dir('xbox_wishlist')
     if not profile.exists():
-        raise RuntimeError(
-            "No saved Xbox wishlist profile at cache/auth/profiles/xbox_wishlist. "
-            "Open the Connections page and connect 'Xbox Store wishlist' first."
-        )
-
+        raise RuntimeError("No saved Xbox wishlist profile at cache/auth/profiles/xbox_wishlist. Open the Connections page and connect 'Xbox Store wishlist' first.")
     deadline = time.time() + timeout_s
     last_state: dict | None = None
     signed_out_streak = 0
-
     with launch_persistent_profile(str(profile), headless=headless) as ctx:
         ctx.add_init_script(_STEALTH_INIT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         while time.time() < deadline:
             if ctx._proc.poll() is not None:
-                raise RuntimeError(
-                    f"Browser exited during wishlist capture (code {ctx._proc.returncode})"
-                )
+                raise RuntimeError(f'Browser exited during wishlist capture (code {ctx._proc.returncode})')
             remaining_ms = max(5000, int((deadline - time.time()) * 1000))
             try:
-                page.goto(
-                    XBOX_WISHLIST_URL,
-                    wait_until="domcontentloaded",
-                    timeout=min(20000, remaining_ms),
-                )
-            except Exception as exc:  # noqa: BLE001
+                page.goto(XBOX_WISHLIST_URL, wait_until='domcontentloaded', timeout=min(20000, remaining_ms))
+            except Exception as exc:
                 err = str(exc).lower()
-                if "socket is already closed" in err or "connection" in err:
-                    raise RuntimeError(
-                        "Browser connection lost during xbox.com/wishlist capture"
-                    ) from exc
+                if 'socket is already closed' in err or 'connection' in err:
+                    raise RuntimeError('Browser connection lost during xbox.com/wishlist capture') from exc
                 page.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
                 if time.time() >= deadline:
-                    raise RuntimeError(f"xbox.com/wishlist navigation failed: {exc}") from exc
+                    raise RuntimeError(f'xbox.com/wishlist navigation failed: {exc}') from exc
                 continue
             page.wait_for_timeout(2500)
             html = page.content()
@@ -88,37 +53,20 @@ def _capture_once(
             if signed_out_streak >= _MAX_SIGNED_OUT_ATTEMPTS:
                 break
             page.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
-
     if last_state is not None:
         return last_state
-    raise RuntimeError(
-        "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
-    )
+    raise RuntimeError('Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response.')
 
-
-def capture_xbox_wishlist_preloaded_state(
-    *,
-    headless: HeadlessMode = "legacy",
-    timeout_s: int = 30,
-) -> dict:
-    """Load xbox.com/wishlist with the saved profile and return __PRELOADED_STATE__."""
+def capture_xbox_wishlist_preloaded_state(*, headless: HeadlessMode='legacy', timeout_s: int=30) -> dict:
     return _capture_once(headless=headless, timeout_s=timeout_s)
 
-
-def validate_xbox_wishlist_state(state: dict, *, headless: bool = True) -> str | None:
-    """Return an error message when the SSR session is unusable, else None."""
-    user = state.get("user") or {}
-    if not user.get("isSignedIn"):
-        mode = "headless" if headless else "headed"
-        return (
-            f"Xbox wishlist session is not signed in ({mode} SSR: user.isSignedIn=false). "
-            "Reconnect on the Connections page and keep the sign-in window open until it closes."
-        )
-    page_meta = (state.get("pageRequestMetadata") or {}).get("/wishlist") or {}
-    err = page_meta.get("error") or {}
-    if err.get("httpStatusCode") == 403:
-        return (
-            "Signed in to Microsoft but xbox.com has not issued your wishlist token yet. "
-            "Wait a moment on the wishlist page and try Reconnect again."
-        )
+def validate_xbox_wishlist_state(state: dict, *, headless: bool=True) -> str | None:
+    user = state.get('user') or {}
+    if not user.get('isSignedIn'):
+        mode = 'headless' if headless else 'headed'
+        return f'Xbox wishlist session is not signed in ({mode} SSR: user.isSignedIn=false). Reconnect on the Connections page and keep the sign-in window open until it closes.'
+    page_meta = (state.get('pageRequestMetadata') or {}).get('/wishlist') or {}
+    err = page_meta.get('error') or {}
+    if err.get('httpStatusCode') == 403:
+        return 'Signed in to Microsoft but xbox.com has not issued your wishlist token yet. Wait a moment on the wishlist page and try Reconnect again.'
     return None

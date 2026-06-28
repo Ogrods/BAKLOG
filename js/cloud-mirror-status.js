@@ -56,6 +56,16 @@ export function summarizeLocalUploadState(localUploadState) {
   };
 }
 
+/** @param {MirrorArtifactRow[]} artifacts @param {string} [activeProfileId] */
+export function artifactsForActiveProfile(artifacts, activeProfileId) {
+  const pid = String(activeProfileId || '').trim();
+  const rows = Array.isArray(artifacts) ? artifacts : [];
+  if (!pid) return rows;
+  const tagged = rows.filter((row) => String(row?.profile || '').trim());
+  if (!tagged.length) return rows;
+  return tagged.filter((row) => String(row.profile || '').trim() === pid);
+}
+
 /** @param {MirrorArtifactRow[]} artifacts */
 export function listImportableArtifactPaths(artifacts) {
   return (artifacts || [])

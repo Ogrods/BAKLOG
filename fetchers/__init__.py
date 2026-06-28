@@ -1,1 +1,0 @@
-"""Fetcher shared utilities."""

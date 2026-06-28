@@ -1,64 +1,30 @@
-"""GOG embed.gog.com client with on-disk caching."""
-
 import json
 import time
 from pathlib import Path
-
 import requests
-
 from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
-
 REQUEST_DELAY_SEC = 1.0
-
 
 def _default_gog_cache_dir() -> Path:
     from shared.profile_paths import profile_cache_dir
-
-    return profile_cache_dir() / "gog"
-EMBED_BASE = "https://embed.gog.com"
-
-# Per-endpoint cache TTLs. `None` means "cache forever" (legacy behaviour),
-# `0` forces a re-fetch every call. Tuned to balance speed against the
-# staleness bugs we've actually hit:
-#   - user-state lists (owned/wishlist IDs) are tiny and change whenever the
-#     user clicks a heart on gog.com -- never trust cached results.
-#   - paginated owned library metadata is slow to re-fetch but only changes
-#     when you buy a game; refresh once a day.
-#   - per-product detail is essentially immutable once published.
+    return profile_cache_dir() / 'gog'
+EMBED_BASE = 'https://embed.gog.com'
 USER_STATE_TTL = 0
 LIBRARY_TTL = 24 * 60 * 60
 DETAILS_TTL = None
-
-GOG_AUTH_MESSAGE = (
-    "GOG session rejected (expired or blocked). Reconnect GOG on the Connections page, "
-    "or run with --source local if GOG Galaxy is installed."
-)
-
-# embed.gog.com often 403s scripted clients without browser context.
-_GOG_BROWSER_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-)
-
+GOG_AUTH_MESSAGE = 'GOG session rejected (expired or blocked). Reconnect GOG on the Connections page, or run with --source local if GOG Galaxy is installed.'
+_GOG_BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 class GogAuthError(Exception):
-    """Session cookie invalid or expired."""
-
 
 class GogClient:
-    def __init__(self, gog_al: str, cache_dir: Path | None = None):
+
+    def __init__(self, gog_al: str, cache_dir: Path | None=None):
         if cache_dir is None:
             cache_dir = _default_gog_cache_dir()
         self.session = requests.Session()
-        self.session.cookies.set("gog-al", gog_al, domain=".gog.com")
-        self.session.headers.update(
-            {
-                "User-Agent": _GOG_BROWSER_UA,
-                "Accept": "application/json",
-                "Referer": "https://www.gog.com/",
-                "Origin": "https://www.gog.com",
-            }
-        )
+        self.session.cookies.set('gog-al', gog_al, domain='.gog.com')
+        self.session.headers.update({'User-Agent': _GOG_BROWSER_UA, 'Accept': 'application/json', 'Referer': 'https://www.gog.com/', 'Origin': 'https://www.gog.com'})
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._last_request = 0.0
@@ -70,18 +36,10 @@ class GogClient:
         self._last_request = time.time()
 
     def _cache_path(self, key: str) -> Path:
-        safe = key.replace("/", "_")
-        return self.cache_dir / f"{safe}.json"
+        safe = key.replace('/', '_')
+        return self.cache_dir / f'{safe}.json'
 
-    def _read_cache(self, key: str, max_age_seconds: float | None = None) -> dict | None:
-        """Return the cached payload for ``key`` if it's still considered fresh.
-
-        ``max_age_seconds`` semantics:
-            - ``None``: cache never expires (legacy behaviour).
-            - ``0``: cache is always stale; callers should re-fetch.
-            - Otherwise: payload is fresh iff it was written within that many
-              seconds ago.
-        """
+    def _read_cache(self, key: str, max_age_seconds: float | None=None) -> dict | None:
         path = self._cache_path(key)
         if not path.exists():
             return None
@@ -92,35 +50,26 @@ class GogClient:
             if age >= max_age_seconds:
                 return None
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding='utf-8'))
         except (OSError, json.JSONDecodeError):
             return None
 
     def _write_cache(self, key: str, data: dict) -> None:
-        self._cache_path(key).write_text(
-            json.dumps(data, ensure_ascii=False), encoding="utf-8"
-        )
+        self._cache_path(key).write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
 
     @staticmethod
     def _raise_if_auth_error(resp: requests.Response) -> None:
         if resp.status_code in (401, 403):
             raise GogAuthError(GOG_AUTH_MESSAGE)
 
-    def _get(
-        self,
-        path: str,
-        refresh: bool = False,
-        cache_key: str | None = None,
-        max_age_seconds: float | None = None,
-    ) -> dict:
-        ck = cache_key or path.replace("/", "_")
+    def _get(self, path: str, refresh: bool=False, cache_key: str | None=None, max_age_seconds: float | None=None) -> dict:
+        ck = cache_key or path.replace('/', '_')
         if not refresh:
             cached = self._read_cache(ck, max_age_seconds=max_age_seconds)
             if cached is not None:
                 return cached
-
         self._throttle()
-        url = f"{EMBED_BASE}{path}"
+        url = f'{EMBED_BASE}{path}'
         resp = self.session.get(url, timeout=30)
         self._raise_if_auth_error(resp)
         resp.raise_for_status()
@@ -129,21 +78,8 @@ class GogClient:
         return data
 
     def validate_session(self) -> bool:
-        """Verify the session can reach GOG embed APIs.
-
-        Both ``userData.json`` and the paginated library endpoint routinely 403
-        scripted clients even right after a valid browser sign-in, so neither is
-        treated as a hard auth failure on its own. We accept the session as long
-        as the owned-game ID list works — the same degraded path the web fetch
-        loop (``fetch_gog.main``) relies on — and only fail when that also 403s.
-        """
         self._throttle()
-        resp = self.session.get(f"{EMBED_BASE}/userData.json", timeout=30)
-        # A 401/403 on userData.json alone is NOT fatal: scripted clients are
-        # routinely blocked there even with a valid cookie, and the fetch loop
-        # degrades to the owned-ID path regardless. Only surface non-auth errors
-        # here; let the library -> owned-IDs cascade below decide auth validity,
-        # so a probe racing a running fetch can't false-expire the session.
+        resp = self.session.get(f'{EMBED_BASE}/userData.json', timeout=30)
         if resp.status_code not in (401, 403):
             resp.raise_for_status()
         try:
@@ -157,54 +93,40 @@ class GogClient:
                 raise GogAuthError(GOG_AUTH_MESSAGE) from None
 
     def get_owned_game_ids(self) -> list[int]:
-        data = self._get(
-            "/user/data/games",
-            cache_key="user_data_games",
-            max_age_seconds=USER_STATE_TTL,
-        )
-        owned = data.get("owned", data.get("games", []))
+        data = self._get('/user/data/games', cache_key='user_data_games', max_age_seconds=USER_STATE_TTL)
+        owned = data.get('owned', data.get('games', []))
         ids: list[int] = []
         for item in owned:
             if isinstance(item, int):
                 ids.append(item)
             elif isinstance(item, dict):
-                pid = item.get("gameId") or item.get("id") or item.get("productId")
+                pid = item.get('gameId') or item.get('id') or item.get('productId')
                 if pid is not None:
                     ids.append(int(pid))
         return ids
 
-    def get_filtered_products(self, page: int = 1, refresh: bool = False) -> dict:
-        path = f"/account/getFilteredProducts?mediaType=1&sortBy=title&page={page}"
-        return self._get(
-            path,
-            refresh=refresh,
-            cache_key=f"filtered_products_p{page}",
-            max_age_seconds=LIBRARY_TTL,
-        )
+    def get_filtered_products(self, page: int=1, refresh: bool=False) -> dict:
+        path = f'/account/getFilteredProducts?mediaType=1&sortBy=title&page={page}'
+        return self._get(path, refresh=refresh, cache_key=f'filtered_products_p{page}', max_age_seconds=LIBRARY_TTL)
 
-    def get_all_filtered_products(self, refresh: bool = False) -> list[dict]:
+    def get_all_filtered_products(self, refresh: bool=False) -> list[dict]:
         hb = HeartbeatTimer(interval=25.0)
         products: list[dict] = []
         page = 1
         total_pages = 1
         while True:
-            hb.tick_progress(page, total_pages, "GOG library pages", f"{len(products)} products")
+            hb.tick_progress(page, total_pages, 'GOG library pages', f'{len(products)} products')
             data = self.get_filtered_products(page, refresh=refresh)
-            batch = data.get("products", [])
+            batch = data.get('products', [])
             if not batch:
                 break
             products.extend(batch)
-            total_pages = data.get("totalPages") or data.get("total_pages") or page
+            total_pages = data.get('totalPages') or data.get('total_pages') or page
             if page >= total_pages:
                 break
             page += 1
-        heartbeat(progress_line(page, total_pages, "GOG library", f"{len(products)} products"))
+        heartbeat(progress_line(page, total_pages, 'GOG library', f'{len(products)} products'))
         return products
 
-    def get_product_details(self, product_id: int, refresh: bool = False) -> dict:
-        return self._get(
-            f"/account/gameDetails/{product_id}.json",
-            refresh=refresh,
-            cache_key=f"details_{product_id}",
-            max_age_seconds=DETAILS_TTL,
-        )
+    def get_product_details(self, product_id: int, refresh: bool=False) -> dict:
+        return self._get(f'/account/gameDetails/{product_id}.json', refresh=refresh, cache_key=f'details_{product_id}', max_age_seconds=DETAILS_TTL)

@@ -1,23 +1,29 @@
-﻿# Mirrors .gitignore: keep Cursor from indexing local data, caches, and deps.
+# Mirrors .gitignore: keep Cursor from indexing local data, caches, and deps.
 # Agents can still read these via explicit @-mentions.
 
 # Local secrets and env
 .env
 .env.imported
+packaging/bundle-auth.env
+packaging/pro_invitees.txt
 
 # Game catalogs and enrichment blobs (large, local-only)
 games_*.json
+games_wishlist_*.json
 itad_prices.json
+free_claims.json
 broken_images.json
 still_missing_images.json
 _itad.json
 _runs.json
+free-claims.input.json
 
 # Runtime / local state
 cache/
 data/
 profiles/
 %SystemDrive%/
+.vercel/
 
 # Tooling and deps
 node_modules/
@@ -29,20 +35,70 @@ __pycache__/
 .ruff_cache/
 steam_backlog.egg-info/
 
-# Logs and server noise
+# PyInstaller + frontend build outputs (very large, ~420MB+)
+build/
+dist/
+release/
+
+# Logs, test output, and server noise
 refresh.log
 enrich_hltb_run.log
 .enrich_refresh.log
 .server.err
 .server.log
+debug-*.log
+.build-windows.log
+srv.log
+*.log
+_sweep_output*.txt
+pytest_*.txt
+full_pytest_run.txt
+.pytest-full.log
+protondb_run.txt
 
-# IDE / generated reports
-.vscode/
-*.code-workspace
-lighthouse/
+# Temporary folders and files
+tmp/
+_tmp_*
+_baseline_*
+_tail_label.txt
 
 # One-off local maintenance scripts
 check_images.py
 find_dupes.py
 migrate_gog_images.py
 remove_steam_dupes.py
+capture_nintendo_endpoint.py
+scripts/probe_nintendo_graphql.py
+scripts/probe_nintendo_graphql2.py
+scripts/probe_nintendo_graphql3.py
+
+# IDE / generated reports / audits / reviews
+.vscode/
+*.code-workspace
+lighthouse/
+.audit/
+EVENT_AUDIT.json
+EVENT_AUDIT.md
+FREE_SURFACE_REVIEW.md
+review-baseline.json
+review-feed-rows.csv
+review-findings.yaml
+review-handoff.md
+review-report.json
+scripts/_diag_personal.py
+scripts/perf-last-run.json
+
+# Local-only documentation, marketing, and design templates
+marketing/
+docs/
+audit/
+admin/
+tracker.html
+tracker-git.html
+preview-bootstrap.html
+IP.md
+tools/make_ads.py
+tools/make_social_cards.py
+tools/make_one_pager_pdf.py
+assets/milestones/
+assets/social/

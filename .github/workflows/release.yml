@@ -146,7 +146,7 @@ jobs:
           subject-path: release/BAKLOG-win64.zip
 
       - name: Attest SBOM
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@v4
         with:
           subject-path: release/BAKLOG-win64.zip
           sbom-path: release/BAKLOG-win64.sbom.spdx.json

@@ -116,10 +116,31 @@ def _resolve_frozen_data_root() -> Path:
     return target
 
 
+def _frozen_dist_root() -> Path:
+    """In onedir mode, datas end up in _internal. Return the correct dist path for frozen builds."""
+    if is_frozen():
+        return frozen_bundle_dir() / "_internal" / "dist"
+    return bundle_root() / "dist"
+
+
+def _frozen_html_root() -> Path:
+    """In onedir mode, HTML files go to _internal. Return the correct HTML path for frozen builds."""
+    if is_frozen():
+        return frozen_bundle_dir() / "_internal"
+    return bundle_root()
+
+
+def _frozen_static_root() -> Path:
+    """In onedir mode, static assets are in _internal. Return the correct static root for frozen builds."""
+    if is_frozen():
+        return frozen_bundle_dir() / "_internal"
+    return bundle_root()
+
+
 def bundle_root() -> Path:
     """Read-only app assets (UI, manifest, packaged scripts)."""
     if is_frozen():
-        return Path(getattr(sys, "_MEIPASS"))
+        return frozen_bundle_dir()
     return Path(__file__).resolve().parents[1]
 
 
@@ -150,7 +171,12 @@ def data_root() -> Path:
 
 
 def built_manifest_path() -> Path:
-    return bundle_root() / "dist" / "manifest.json"
+    return _frozen_dist_root() / "manifest.json"
+
+
+def built_html_path() -> Path:
+    """Return the path to index.html for frozen builds."""
+    return _frozen_html_root() / "index.html"
 
 
 def _env_serve_built() -> bool:
@@ -210,4 +236,4 @@ def built_immutable_assets() -> frozenset[str]:
 
 def static_root() -> Path:
     """HTTP static file root (index.html, js/, css/)."""
-    return bundle_root()
+    return _frozen_static_root()

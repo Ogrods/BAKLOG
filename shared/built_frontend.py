@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
 
 from shared.install_paths import (
+    built_html_path,
     built_immutable_assets,
     built_manifest_path,
     bundle_root,
@@ -47,7 +48,7 @@ def built_index_html() -> str | None:
     # npm run build:css and without long-lived browser cache on dist/*.css.
     if is_frozen() and (not tailwind or not app_css):
         return None
-    html = (bundle_root() / "index.html").read_text(encoding="utf-8")
+    html = built_html_path().read_text(encoding="utf-8")
     if is_frozen():
         html = html.replace('href="tailwind.css"', f'href="dist/{tailwind}"', 1)
         html = html.replace('href="app.css"', f'href="dist/{app_css}"', 1)

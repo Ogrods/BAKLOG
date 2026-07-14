@@ -1499,6 +1499,11 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
+    _STEAM_UA = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
+
     # ---- handlers ----------------------------------------------------------
     def _handle_proxy_steam_search(self) -> None:
         """Proxy Steam storesearch (CORS workaround for add-game modal)."""
@@ -1515,7 +1520,9 @@ class Handler(SimpleHTTPRequestHandler):
             {"term": term, "l": "english", "cc": "US"}
         )
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "BAKLOG/1.0"})
+            req = urllib.request.Request(
+                url, headers={"User-Agent": self._STEAM_UA}
+            )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 _send_json(self, HTTPStatus.OK, json.loads(resp.read().decode("utf-8")))
         except Exception as exc:
@@ -1534,7 +1541,9 @@ class Handler(SimpleHTTPRequestHandler):
 
         url = f"https://store.steampowered.com/appreviews/{appid}?json=1&language=all&purchase_type=all&num_per_page=0"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "BAKLOG/1.0"})
+            req = urllib.request.Request(
+                url, headers={"User-Agent": self._STEAM_UA}
+            )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 _send_json(self, HTTPStatus.OK, json.loads(resp.read().decode("utf-8")))
         except Exception as exc:

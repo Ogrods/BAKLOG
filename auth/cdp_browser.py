@@ -96,7 +96,6 @@ def _process_alive(pid: int) -> bool:
                 timeout=5,
             )
             return str(pid) in (out or "")
-        import signal
         os.kill(pid, 0)
         return True
     except Exception:

@@ -15,7 +15,7 @@ certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
 colorama==0.4.6
-cryptography==47.0.0
+cryptography==49.0.0
 cssselect2==0.9.0
 defusedxml==0.7.1
 fake-useragent==2.2.0

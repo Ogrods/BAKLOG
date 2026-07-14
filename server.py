@@ -978,6 +978,8 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
         "/api/diagnostics",
     ):
         return True
+    if path.startswith("/api/proxy/"):
+        return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
         return True
     if not auth_enabled():

@@ -56,6 +56,7 @@ def test_built_index_html_rewrites_css_when_frozen(server_mod, tmp_path, monkeyp
     from shared.built_frontend import built_index_html
 
     monkeypatch.setattr(ip, "is_frozen", lambda: True)
+    monkeypatch.setattr(ip, "frozen_bundle_dir", lambda: tmp_path)
     monkeypatch.setattr(ip, "bundle_root", lambda: tmp_path)
     monkeypatch.setattr(bf, "is_frozen", lambda: True)
     monkeypatch.setattr(bf, "bundle_root", lambda: tmp_path)
@@ -119,7 +120,10 @@ def test_built_table_query_worker_served_as_public_static(tmp_path, monkeypatch)
     worker.parent.mkdir(parents=True)
     worker.write_text("self.onmessage = () => {};\n", encoding="utf-8")
 
-    # _resolved_static_path_allowed (translate_path) validates against bundle_root.
+    # translate_path uses static_root() when frozen, Path.cwd() otherwise.
+    # Patch frozen mode so it resolves from tmp_path instead of cwd.
+    monkeypatch.setattr(ip, "is_frozen", lambda: True)
+    monkeypatch.setattr(ip, "frozen_bundle_dir", lambda: tmp_path)
     monkeypatch.setattr(ip, "bundle_root", lambda: tmp_path)
     monkeypatch.setattr(server, "ROOT", tmp_path)
 

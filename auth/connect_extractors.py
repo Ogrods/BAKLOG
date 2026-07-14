@@ -193,17 +193,20 @@ def humble_connect_hint(page: Any) -> str:
     if "humblebundle.com" not in url:
         return "Open humblebundle.com and sign in if prompted."
     return "On humblebundle.com? We'll open your library to confirm the session."
-
-
 def extract_battlenet_session(context: Any) -> dict[str, str] | None:
-    from clients.battlenet_client import probe_session
+    from clients.battlenet_client import BattleNetAuthError, probe_session
 
     if not _battlenet_has_session(context):
         return None
     header = _cookie_header(context.cookies(), (".battle.net", "battle.net"))
     if not header:
         return None
-    probe_session(header)
+    try:
+        probe_session(header)
+    except BattleNetAuthError:
+        # Stale/expired cookies from a prior session — keep the connect window
+        # open so the user can sign in with fresh credentials.
+        return None
     return {"BATTLENET_COOKIE": header}
 
 

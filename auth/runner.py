@@ -127,24 +127,7 @@ def _cookie_header(cookies: list[dict], domains: tuple[str, ...]) -> str:
             parts.append(f"{name}={value}")
     return "; ".join(parts)
 
-
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
-
-
-def _battlenet_has_session(context) -> bool:
-    """True when the Playwright context can read the games-and-subs API."""
-    from clients.battlenet_client import ACCOUNT_URL
-
-    try:
-        resp = context.request.get(ACCOUNT_URL, timeout=30_000)
-        if resp.status == 200:
-            body = resp.text().strip()
-            return body.startswith("{") or body.startswith("[")
-        if resp.status in (401, 403):
-            return False
-    except Exception:  # noqa: BLE001
-        pass
-    return False
 
 
 def _extract_battlenet_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:

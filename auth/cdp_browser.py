@@ -1584,8 +1584,8 @@ def launch_persistent_profile(
     for attempt in range(2):
         proc = subprocess.Popen(
             args,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
         )
 
@@ -1593,6 +1593,13 @@ def launch_persistent_profile(
         while time.time() < deadline:
             if proc.poll() is not None:
                 exit_code = proc.returncode
+                # Capture any early output before the process died.
+                early_output = ""
+                try:
+                    raw = proc.stdout.read(8192) if proc.stdout else b""
+                    early_output = raw.decode("utf-8", errors="replace").strip()[:500]
+                except Exception:
+                    pass
                 proc.kill()
                 if attempt == 0 and exit_code == 21:
                     released_pids = release_chromium_profile_lock(profile)
@@ -1602,8 +1609,9 @@ def launch_persistent_profile(
                     if not released_pids
                     else "A stale sign-in window was still using this profile; try Reconnect again."
                 )
+                detail = f" (output: {early_output})" if early_output else ""
                 raise _browser_launch_error(
-                    f"Browser exited immediately (code {exit_code}). {hint} "
+                    f"Browser exited immediately (code {exit_code}).{detail} {hint} "
                     "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH "
                     "to the browser executable, or try the other installed browser."
                 )
@@ -1620,8 +1628,18 @@ def launch_persistent_profile(
 
     if not ws_url:
         if proc is not None:
+            # Capture any output before killing.
+            late_output = ""
+            try:
+                raw = proc.stdout.read(8192) if proc.stdout else b""
+                late_output = raw.decode("utf-8", errors="replace").strip()[:500]
+            except Exception:
+                pass
             proc.kill()
-        raise _browser_launch_error("Browser did not start CDP debugging endpoint in time.")
+        detail = f" (output: {late_output})" if late_output else ""
+        raise _browser_launch_error(
+            f"Browser did not start CDP debugging endpoint in time.{detail}"
+        )
 
     try:
         # Chrome 111+ exact-matches the handshake Origin against

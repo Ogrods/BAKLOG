@@ -1110,6 +1110,18 @@ def _enrich_item_light(
 
 from shared.free_claims_sources import norm_title as _norm_title_key
 
+# Stopwords matching js/claims-workspace.js DUPE_STOPWORDS — removed from
+# dismissed_keys filters so the Python side matches JS coverLookupKey() output.
+_COVER_STOPWORDS: set[str] = {"a", "an", "and", "the", "of"}
+
+def _cover_lookup_key(title: str) -> str:
+    """Looser key matching JS ``coverLookupKey`` — drops connector stopwords.
+    Sync pair: admin/claims-workspace.js ``coverLookupKey``
+    """
+    base = _norm_title_key(title)
+    parts = [w for w in base.split() if w and w not in _COVER_STOPWORDS]
+    return " ".join(parts).strip()
+
 def preview_publish_items(
     *,
     manual_items: list[dict],
@@ -1148,11 +1160,13 @@ def preview_publish_items(
         field_overrides=field_overrides,
         field_overrides_by_key=field_by_key,
     )
-    # Filter by dismissed title keys (stable across feed refreshes)
+    # Filter by dismissed title keys (stable across feed refreshes).
+    # Uses _cover_lookup_key to match JS coverLookupKey() so stopwords
+    # ("a", "an", "and", "the", "of") are stripped the same way.
     if dismissed_keys:
         auto_items = [
             it for it in auto_items
-            if _norm_title_key(it.get("title") or "") not in dismissed_keys
+            if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
 
     if store_overrides or store_by_key:
@@ -1661,7 +1675,7 @@ def main() -> int:
     if dismissed_keys:
         auto_items = [
             it for it in auto_items
-            if _norm_title_key(it.get("title") or "") not in dismissed_keys
+            if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
     if store_overrides or store_by_key:
         _apply_store_overrides(

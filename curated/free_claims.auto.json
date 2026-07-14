@@ -1,5 +1,5 @@
 {
-  "fetched_at": "2026-07-14T04:29:43.833231+00:00",
+  "fetched_at": "2026-07-14T05:30:45.680316+00:00",
   "sources": {
     "epic": 2,
     "gamerpower": 16,
@@ -15,12 +15,12 @@
       "title": "Nova Lands",
       "claim_url": "https://store.epicgames.com/en-US/p/nova-lands-4d1788",
       "ends_at": "2026-07-16T15:00:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1501610/header.jpg?t=1769181148",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/9a2764693c414ecda63d8f785452a4bb/nova-lands-offer-16wzy.png",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 89,
-      "steam_appid": 1501610
+      "steam_appid": 1501610,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "epic-tattoo-tycoon-b4352c",
@@ -28,12 +28,12 @@
       "title": "Tattoo Tycoon",
       "claim_url": "https://store.epicgames.com/en-US/p/tattoo-tycoon-b4352c",
       "ends_at": "2026-07-16T15:00:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2375260/c50433e6260313f2af4a371ed3dac17755e7f80d/header.jpg?t=1771922358",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/0b68dfc82a014fe2ac9971f13e0e3ce5/tattoo-tycoon-11qwx.jpg",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 67,
-      "steam_appid": 2375260
+      "steam_appid": 2375260,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "gamerpower-3555",
@@ -142,12 +142,12 @@
       "title": "NIGHTBELL (Itch.io) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/nightbell-itch-io-giveaway",
       "ends_at": "2026-07-19T23:59:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4216630/c622bc609f9fd7c5ed05200022ddcb4f896e25a8/header.jpg?t=1768063973",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a456f543d3c9.jpg",
       "blurb": "Download NIGHTBELL for free on Itch.io until July 12th 2026. NIGHTBELL is a 3d first person game with a creepy atmosphere. Check it out.",
       "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 77,
-      "steam_appid": 4216630
+      "steam_appid": 4216630,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "gamerpower-3676",
@@ -155,12 +155,12 @@
       "title": "Dire Echo (itchio) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/dire-echo-itchio-giveaway",
       "ends_at": "2026-07-19T23:59:00Z",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3743180/05c22cf5ef7893b5dd61c756ce94e5d5ebfb3d53/header.jpg?t=1781976683",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a27eafa35794.jpg",
       "blurb": "Explore deep space with this giveaway. Get Dire Echo for free on itch.io, a 3d sci-fi first-person exploration game featuring impressive visuals.",
       "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 72,
-      "steam_appid": 3743180
+      "steam_appid": 3743180,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "gamerpower-3279",
@@ -230,9 +230,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2708790/library_600x900_2x.jpg",
       "blurb": "Together After Dark",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 53,
-      "steam_appid": 2708790
+      "steam_appid": 2708790,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-eb44ea1d719b",
@@ -243,9 +243,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1524630/library_600x900_2x.jpg",
       "blurb": "KeepUp Survival",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 64,
-      "steam_appid": 1524630
+      "steam_appid": 1524630,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-bd4edc3ae553",
@@ -256,9 +256,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3297160/library_600x900_2x.jpg",
       "blurb": "NoRush!",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 100,
-      "steam_appid": 3297160
+      "steam_appid": 3297160,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-cb21d42d706e",
@@ -269,9 +269,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1320490/library_600x900_2x.jpg",
       "blurb": "Princess Farmer",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 95,
-      "steam_appid": 1320490
+      "steam_appid": 1320490,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-90df86960d93",
@@ -282,9 +282,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2375260/library_600x900_2x.jpg",
       "blurb": "Tattoo Tycoon",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 67,
-      "steam_appid": 2375260
+      "steam_appid": 2375260,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-75d1019b80eb",
@@ -295,9 +295,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1501610/library_600x900_2x.jpg",
       "blurb": "Nova Lands",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 89,
-      "steam_appid": 1501610
+      "steam_appid": 1501610,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-b2fe2af076cf",
@@ -308,9 +308,9 @@
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1485340/library_600x900_2x.jpg",
       "blurb": "Game Of Mafia",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 70,
-      "steam_appid": 1485340
+      "steam_appid": 1485340,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-562030929f11",
@@ -321,9 +321,9 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1300430/header.jpg?t=1687266777",
       "blurb": "Whiskey.Mafia. Leo&#039;s Family",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
       "review_percent": 68,
-      "steam_appid": 1300430
+      "steam_appid": 1300430,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-0a93135bfee3",
@@ -334,8 +334,8 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4492760/1e33df18bd8306a81a37cf52d7da39beb8869224/header.jpg?t=1778687408",
       "blurb": "Slime King itch.io",
       "source": "itad",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00",
-      "steam_appid": 4492760
+      "steam_appid": 4492760,
+      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "itad-f0cffe659c19",
@@ -383,11 +383,11 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16092/",
       "ends_at": null,
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2081930/library_600x900_2x.jpg",
-      "blurb": "Carlos the Taco",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/carlos-the-taco/info/\">Carlos the Taco</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/carlos-the-taco>go to giveaway</a>",
       "source": "itad",
-      "first_seen": "2026-06-11T22:48:59.387102+00:00",
       "review_percent": 84,
-      "steam_appid": 2081930
+      "steam_appid": 2081930,
+      "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
       "id": "itad-d85d5bb4128d",
@@ -407,7 +407,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "Smiley Dusty",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },

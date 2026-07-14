@@ -7,7 +7,6 @@
     "gamerpower-3498",
     "gamerpower-3676",
     "gamerpower-3697",
-    "gamerpower-3709",
     "itad-073a56345192",
     "itad-0a93135bfee3",
     "itad-0c69ed1f1bd8",
@@ -55,9 +54,6 @@
     },
     "gamerpower-3697": {
       "title": "NIGHTBELL"
-    },
-    "gamerpower-3709": {
-      "title": "NoRush! - Tower Edition"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -118,16 +114,27 @@
     }
   },
   "dismissed": [
-    "gamerpower-3707",
-    "gamerpower-3555",
-    "gamerpower-3710",
-    "gamerpower-3294",
     "gamerpower-3096",
     "gamerpower-3287",
     "gamerpower-3279",
-    "gamerpower-3706",
+    "gamerpower-3294",
     "epic-nova-lands-4d1788",
-    "epic-tattoo-tycoon-b4352c"
+    "gamerpower-3706",
+    "gamerpower-3710",
+    "gamerpower-3555",
+    "epic-tattoo-tycoon-b4352c",
+    "gamerpower-3707",
+    "gamerpower-3709"
+  ],
+  "dismissed_keys": [
+    "nova lands",
+    "tattoo tycoon",
+    "madness inside",
+    "mr brocco co",
+    "blacklist mafia",
+    "whiskey mafia leo s family",
+    "keepup survival",
+    "together after dark"
   ],
   "premium_only_ids": [
     "gamerpower-3498"

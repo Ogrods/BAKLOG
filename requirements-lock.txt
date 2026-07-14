@@ -58,7 +58,7 @@ PyMuPDF==1.27.2.3
 pypdf==6.13.2
 pyrate-limiter==4.1.0
 PySocks==1.7.1
-pytest==9.1.0
+pytest==9.1.1
 pytest-timeout==2.4.0
 python-dotenv==1.2.2
 pywin32==311

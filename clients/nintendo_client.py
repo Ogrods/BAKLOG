@@ -342,6 +342,26 @@ class NintendoClient:
                     timeout=60_000,
                 )
             except Exception as exc:
+                # The navigation may time out when the session is expired and
+                # Nintendo redirects to accounts.nintendo.com (cross-origin),
+                # which the CDP domcontentloaded wait cannot complete. Check
+                # whether the current page is a sign-in page and give a clear
+                # auth error in that case, not a generic timeout message.
+                try:
+                    cur_url = (page.url or "").lower()
+                    if "accounts.nintendo.com/login" in cur_url:
+                        raise NintendoAuthError(
+                            "Nintendo session expired \u2014 open Connections and reconnect Nintendo."
+                        ) from exc
+                    html = page.content().lower()
+                    if "log in" in html or "sign up" in html or "sign in" in html:
+                        raise NintendoAuthError(
+                            "Nintendo session expired \u2014 open Connections and reconnect Nintendo."
+                        ) from exc
+                except NintendoAuthError:
+                    raise
+                except Exception:
+                    pass
                 raise NintendoAuthError(
                     f"Could not open Nintendo transactions page: {exc}"
                 ) from exc

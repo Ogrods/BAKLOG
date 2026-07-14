@@ -174,6 +174,8 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
     you're back on ec.nintendo.com. We now drive that navigation automatically and
     only fall back to asking the user if it still doesn't land.
     """
+    from auth.cdp_browser import browser_session_gone
+
     try:
         page.goto(NINTENDO_ACCOUNT_URL, wait_until="domcontentloaded", timeout=25_000)
     except Exception:
@@ -183,6 +185,12 @@ def _extract_nintendo_inline(page, context, session: AuthSession | None = None) 
     last_hint = 0.0
     last_nav = 0.0
     while time.time() < deadline:
+        if browser_session_gone(context):
+            raise RuntimeError(
+                "Sign-in browser window closed before completing. "
+                "Click Reconnect to try again."
+            )
+
         drive = _drive_connect_page(page, context)
         url = (drive.url or "").lower()
         signed_in = "ec.nintendo.com" in url and "login" not in url and "connect" not in url

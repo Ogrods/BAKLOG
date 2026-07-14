@@ -727,7 +727,7 @@ def main() -> int:
         )
 
     drift_exit = refuse_nintendo_source_drift(
-        catalog_game_count(games_out),
+        games_out,
         label="Nintendo library rows",
         allow_drift=args.allow_drift,
         output_path=GAMES_NINTENDO_JSON,

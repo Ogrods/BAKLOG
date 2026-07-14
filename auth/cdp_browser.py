@@ -83,10 +83,33 @@ def _pids_listening_on_local_port(port: int) -> list[int]:
         except Exception:
             pass
     return sorted(pids)
+def _process_alive(pid: int) -> bool:
+    """Return True when ``pid`` is still running (best-effort cross‑platform)."""
+    if pid <= 0:
+        return False
+    try:
+        if os.name == "nt":
+            out = subprocess.check_output(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                text=True, encoding="utf-8", errors="ignore",
+                creationflags=_subprocess_no_window_flags(),
+                timeout=5,
+            )
+            return str(pid) in (out or "")
+        import signal
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
 
 
-def _kill_pids(pids: list[int]) -> list[int]:
-    """Force-kill ``pids`` (tree kill on Windows). Returns PIDs we attempted."""
+def _kill_pids(pids: list[int], *, wait_sec: float = 3.0) -> list[int]:
+    """Force-kill ``pids`` (tree kill on Windows). Returns PIDs we attempted.
+
+    After signalling, polls each PID up to ``wait_sec`` seconds for it to
+    actually exit so the caller can safely delete the profile directory or
+    start a fresh browser instance without racing the terminating process.
+    """
     killed: list[int] = []
     flags = _subprocess_no_window_flags()
     for pid in pids:
@@ -108,6 +131,13 @@ def _kill_pids(pids: list[int]) -> list[int]:
             killed.append(pid)
         except Exception:
             pass
+    # Wait for killed PIDs to actually exit so the profile directory can be
+    # safely deleted / reused without racing the terminating Chrome process.
+    if killed and wait_sec > 0:
+        deadline = time.time() + wait_sec
+        for pid in killed:
+            while time.time() < deadline and _process_alive(pid):
+                time.sleep(0.15)
     return killed
 
 
@@ -239,13 +269,22 @@ def pids_holding_chromium_profile(user_data_dir: str | Path) -> list[int]:
     return sorted(pids)
 
 
-def release_chromium_profile_lock(user_data_dir: str | Path) -> list[int]:
-    """Close orphan Chrome/Edge windows holding ``user_data_dir`` (Connect/fetch collision)."""
+def release_chromium_profile_lock(
+    user_data_dir: str | Path,
+    *,
+    wait_sec: float = 3.0,
+) -> list[int]:
+    """Close orphan Chrome/Edge windows holding ``user_data_dir`` (Connect/fetch collision).
+
+    Kills every browser process using this profile, then polls up to
+    ``wait_sec`` for each PID to actually exit so the caller can safely delete
+    the profile directory or start a fresh instance without racing the
+    terminating process.
+    """
     profile = Path(user_data_dir)
     pids = pids_holding_chromium_profile(profile)
     if pids:
-        _kill_pids(pids)
-        time.sleep(0.35)
+        _kill_pids(pids, wait_sec=wait_sec)
     else:
         _clear_stale_chromium_profile_lock_files(profile)
     return pids

@@ -695,10 +695,14 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
         raise ValueError(f"{provider} does not support browser sign-in")
     existing = _unfinished_session_for(provider)
     if existing is not None:
-        raise ValueError(
-            f"A sign-in window for {spec.label} is already open. "
-            "Finish or close it before starting again."
-        )
+        if not fresh:
+            raise ValueError(
+                f"A sign-in window for {spec.label} is already open. "
+                "Finish or close it before starting again."
+            )
+        # Reconnect with a stale session still running: finish the old one
+        # so the user can retry without waiting for the 5-minute timeout.
+        existing.finish()
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.

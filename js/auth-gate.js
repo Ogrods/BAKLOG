@@ -222,14 +222,14 @@ function authConfirmRedirectUrl() {
   const fromConfig = _config?.authConfirmRedirectUrl;
   if (typeof fromConfig === "string" && fromConfig.trim())
     return fromConfig.trim();
-  return "https://baklog.app/auth-confirmed";
+  return "https://baklog.app/auth/confirmed";
 }
 
 function authResetRedirectUrl() {
   const fromConfig = _config?.authResetRedirectUrl;
   if (typeof fromConfig === "string" && fromConfig.trim())
     return fromConfig.trim();
-  return "https://baklog.app/auth-reset";
+  return "https://baklog.app/auth/reset";
 }
 
 function isEmailNotConfirmedError(error) {

@@ -282,6 +282,8 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     for a refresh token immediately (codes are single-use), persisting the session so
     the fetcher can reuse it. On any failure the user can still paste the code manually.
     """
+    from auth.cdp_browser import abort_if_browser_closed
+
     login_url = spec_for("epic").login_url
     try:
         page.goto(login_url, wait_until="domcontentloaded", timeout=25_000)
@@ -291,6 +293,7 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_hint = 0.0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         drive = _drive_connect_page(page, context)
 
         redirect_page = None
@@ -494,6 +497,7 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
     tried_cookie: set[str] = set()
     last_msg = 0.0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         url = page.url or ""
 
         # Always re-check by fetching from ssocookie endpoint first; that's
@@ -578,6 +582,7 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     fetch_epic_wishlist.py. Connect completes when wishlistItems is present in
     either a GraphQL response or Epic's dehydrated React Query HTML state.
     """
+    from auth.cdp_browser import abort_if_browser_closed
     from auth.connect_extractors import build_epic_wishlist_graphql_sniffer
     from auth.epic_wishlist_session import (
         storefront_bounced_to_home,
@@ -615,6 +620,7 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         if not wishlist_loaded and sniffer.drain():
             wishlist_loaded = True
             _write_debug()
@@ -903,6 +909,7 @@ def _xbox_wishlist_connect_creds(sniffer) -> dict[str, str]:
 
 
 def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
+    from auth.cdp_browser import abort_if_browser_closed
     """Open xbox.com/wishlist, wait for MSA sign-in (detected via SSR HTML),
     then capture the Emerald wishlist API token for headless replay. The
     persistent profile remains the fallback credential.
@@ -952,6 +959,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     last_msg = 0.0
     last_ssr_refresh = 0.0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         for pg in context.pages:
             if not pg.is_closed:
                 _attach_sniffer(pg)
@@ -1084,6 +1092,7 @@ def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any
 
 def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     """Open nintendo.com/us/wish-list/, wait for sign-in, return marker cred."""
+    from auth.cdp_browser import abort_if_browser_closed
     from fetchers.fetch_nintendo_wishlist import (
         _drain_nintendo_candidates,
         _is_nintendo_graphql_url,
@@ -1113,6 +1122,7 @@ def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         api_payloads = _drain_nintendo_candidates(candidates)
         try:
             html = page.content()
@@ -1217,6 +1227,7 @@ def _ubisoft_active_page(live: list) -> object | None:
 
 
 def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[str, str]:
+    from auth.cdp_browser import abort_if_browser_closed
     from auth.connect_extractors import (
         build_ubisoft_header_sniffer,
         extract_ubisoft_session,
@@ -1236,6 +1247,7 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
     seen_success = False
     nudged = 0
     while time.time() < deadline:
+        abort_if_browser_closed(context)
         creds = extract_ubisoft_session(sniffer)
         if creds:
             return creds

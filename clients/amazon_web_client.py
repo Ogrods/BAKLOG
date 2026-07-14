@@ -558,6 +558,11 @@ def _poll_prime_collection(
     poll_t0 = _now_s()
     last_log = 0.0
     while _now_s() < deadline and not captured["done"]:
+        try:
+            from auth.cdp_browser import abort_if_browser_closed as _abort_if_browser_closed
+            _abort_if_browser_closed(context)
+        except ImportError:  # noqa: BLE001 - CDP not available in headless fetcher
+            pass
         _drain_claim_candidates(candidates, raw_claims, captured)
         if captured["done"]:
             break

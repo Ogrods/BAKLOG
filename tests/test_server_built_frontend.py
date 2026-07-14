@@ -131,8 +131,9 @@ def test_built_table_query_worker_served_as_public_static(tmp_path, monkeypatch)
 
     assert static_class("/dist/js/table-query.worker.js") == "public"
 
-    worker = tmp_path / "dist" / "js" / "table-query.worker.js"
-    worker.parent.mkdir(parents=True)
+    # translate_path resolves from static_root() (= _internal) when frozen.
+    worker = tmp_path / "_internal" / "dist" / "js" / "table-query.worker.js"
+    worker.parent.mkdir(parents=True, exist_ok=True)
     worker.write_text("self.onmessage = () => {};\n", encoding="utf-8")
 
     # translate_path uses static_root() when frozen, Path.cwd() otherwise.

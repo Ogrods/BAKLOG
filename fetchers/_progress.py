@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TypeVar
 
+from shared.log_redact import redact_log_line
+
 T = TypeVar("T")
 
 EXIT_CODE_AUTH = 4
@@ -160,12 +162,14 @@ class RunStats:
 
     def warn(self, msg: str) -> None:
         self.warnings += 1
-        self.warning_messages.append(msg)
-        print(f"  WARNING: {msg}", flush=True)
+        safe = redact_log_line(msg)
+        self.warning_messages.append(safe)
+        print(f"  WARNING: {safe}", flush=True)
 
     def error(self, msg: str) -> None:
         self.errors += 1
-        print(f"  ERROR: {msg}", file=sys.stderr, flush=True)
+        safe = redact_log_line(msg)
+        print(f"  ERROR: {safe}", file=sys.stderr, flush=True)
 
     def finish(self, label: str, t0: float, *, exit_code: int = 0, extra: str = "") -> int:
         if self.warning_messages:
@@ -175,7 +179,8 @@ class RunStats:
                 flush=True,
             )
             for w in self.warning_messages[:50]:
-                print(f"    · {w}", file=sys.stderr, flush=True)
+                safe = redact_log_line(w)
+                print(f"    · {safe}", file=sys.stderr, flush=True)
             if len(self.warning_messages) > 50:
                 print(
                     f"    · … and {len(self.warning_messages) - 50} more",

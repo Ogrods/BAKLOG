@@ -18,6 +18,7 @@ import argparse
 import json
 import re
 import sys
+import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -919,7 +920,8 @@ def _fetch_with_profile(
     poll_deadline_s = min(max(timeout_s - 5, 20), 30)
     poll_interval_ms = 500
 
-    with launch_persistent_profile(str(profile), headless=True) as ctx:
+    ctx = launch_persistent_profile(str(profile), headless=True)
+    try:
         _close_stale_nintendo_tabs(ctx)
 
         # Cookie-first: a plain authenticated GET returns the SSR HTML without
@@ -1068,8 +1070,13 @@ def _fetch_with_profile(
                 encoding="utf-8",
             )
             print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
-
         return html, url, api_payloads
+    finally:
+        # Spawn browser cleanup on a daemon thread so killing the headless
+        # Chrome process never blocks the fetcher from exiting. The OS will
+        # clean up orphaned Chrome when the Python process terminates.
+        threading.Thread(target=ctx.close, daemon=True).start()
+
 
 
 def _build_row(item: WishlistItem, hltb: dict | None) -> dict:

@@ -390,24 +390,47 @@ def _start_update_notify(icon) -> None:
 
 
 def _start_server_watchdog(icon, controller: ServerController) -> threading.Thread:
-    """Notify when our owned server child dies and nothing is listening."""
+    """Notify when our owned server child dies and nothing is listening.
+    Auto-restarts once on unexpected death; if it crashes again within 30 s,
+    stops and notifies the user instead of crash-looping."""
+
+    RESTART_COOLDOWN = 30.0
 
     def _loop() -> None:
         notified = False
+        last_restart_time = 0.0
+
         while True:
             time.sleep(2.0)
+
             if controller._owns_live_child():
                 notified = False
                 continue
+
+            # Detect and clean up a dead child process reference
             proc = controller.proc
             if proc is not None and proc.poll() is not None:
                 controller.proc = None
-                if not notified and not controller.is_running():
+
+            if not controller.is_running():
+                now = time.monotonic()
+                # First crash or last restart was long ago -> one-shot restart
+                if last_restart_time == 0 or (now - last_restart_time) >= RESTART_COOLDOWN:
+                    last_restart_time = now
+                    notified = False
+                    controller.start()
+                    # If start() succeeded the next loop iteration will detect
+                    # the live child and reset the watch. If it failed, we'll
+                    # fall through to the notification path on the next tick.
+                elif not notified:
+                    # Crash-loop: we already restarted recently and it happened
+                    # again inside the cooldown window — give up and notify.
                     notified = True
                     _tray_notify(
                         icon,
                         "BAKLOG server stopped",
-                        "The local server exited unexpectedly. Use Open BAKLOG to restart.",
+                        "The local server crashed again after a recent restart. "
+                        "Use Open BAKLOG to restart.",
                     )
 
     thread = threading.Thread(target=_loop, name="tray-server-watch", daemon=True)

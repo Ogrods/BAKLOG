@@ -2527,10 +2527,19 @@ def _maybe_open_browser() -> None:
         return
     if not is_frozen():
         return
+    # When launched by BAKLOG Tray (which sets BAKLOG_TRAY_PID), the tray opens
+    # the browser itself after confirming the port is listening — skip here to
+    # avoid a duplicate (and possibly blank) tab caused by serving before
+    # serve_forever() begins its accept loop.
+    if os.environ.get("BAKLOG_TRAY_PID", "").strip():
+        return
     try:
         import webbrowser
 
-        webbrowser.open(f"http://{HOST}:{PORT}/")
+        # Defer 300ms so httpd.serve_forever() is actively accepting requests
+        # before the browser navigates — prevents a blank tab from a race where
+        # the TCP socket is bound but no accept loop is running yet.
+        threading.Timer(0.3, lambda: webbrowser.open(f"http://{HOST}:{PORT}/")).start()
     except Exception:
         pass
 

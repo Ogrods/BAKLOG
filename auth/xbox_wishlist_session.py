@@ -8,6 +8,7 @@ visible browser.
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Literal
 
@@ -49,7 +50,8 @@ def _capture_once(
     last_state: dict | None = None
     signed_out_streak = 0
 
-    with launch_persistent_profile(str(profile), headless=headless) as ctx:
+    ctx = launch_persistent_profile(str(profile), headless=headless)
+    try:
         ctx.add_init_script(_STEALTH_INIT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         while time.time() < deadline:
@@ -89,11 +91,13 @@ def _capture_once(
                 break
             page.wait_for_timeout(int(XBOX_WISHLIST_POLL_SEC * 1000))
 
-    if last_state is not None:
-        return last_state
-    raise RuntimeError(
-        "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
-    )
+        if last_state is not None:
+            return last_state
+        raise RuntimeError(
+            "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
+        )
+    finally:
+        threading.Thread(target=ctx.close, daemon=True).start()
 
 
 def capture_xbox_wishlist_preloaded_state(

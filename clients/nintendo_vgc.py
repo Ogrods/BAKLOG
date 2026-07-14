@@ -9,6 +9,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -354,7 +355,8 @@ class NintendoVgcClient:
         collected: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
 
-        with launch_persistent_profile(profile_path, headless=self._headless) as context:
+        context = launch_persistent_profile(profile_path, headless=self._headless)
+        try:
             page = context.pages[0] if context.pages else None
             html_body = fetch_vgc_portal_html(
                 context, user_agent=self._user_agent, page=page
@@ -428,6 +430,8 @@ class NintendoVgcClient:
                     break
                 time.sleep(0.3)
 
-        if not collected:
-            raise NintendoVgcCaptureError("VGC portal returned zero game cards.")
-        return collected
+            if not collected:
+                raise NintendoVgcCaptureError("VGC portal returned zero game cards.")
+            return collected
+        finally:
+            threading.Thread(target=context.close, daemon=True).start()

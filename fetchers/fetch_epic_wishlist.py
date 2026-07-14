@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -335,12 +336,13 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
 
     # Headed off-screen: same browser fingerprint as connect without stealing focus
     # or inviting accidental window close during automated fetch.
-    with launch_persistent_profile(
+    ctx = launch_persistent_profile(
         str(profile),
         headless=False,
         window_position=(-32000, 0),
         window_size=(1280, 900),
-    ) as ctx:
+    )
+    try:
         ctx.add_init_script(STEALTH_INIT_SCRIPT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", _capture)
@@ -408,6 +410,8 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
             print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
 
         return html, url, api_payloads
+    finally:
+        threading.Thread(target=ctx.close, daemon=True).start()
 
 
 def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:

@@ -18,6 +18,7 @@ History is limited to ~2 years per Nintendo support.
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -332,7 +333,8 @@ class NintendoClient:
             candidates.append(resp)
             debug["graphql_candidates_seen"] = debug.get("graphql_candidates_seen", 0) + 1
 
-        with launch_persistent_profile(profile_path, headless=self._headless) as context:
+        context = launch_persistent_profile(profile_path, headless=self._headless)
+        try:
             page = context.pages[0] if context.pages else context.new_page()
             page.on("response", on_response)
             try:
@@ -411,8 +413,10 @@ class NintendoClient:
                     "the headed browser shows a sign-in page."
                 )
 
-        self._write_debug(debug)
-        return [_map_graphql_item(item) for item in collected]
+            self._write_debug(debug)
+            return [_map_graphql_item(item) for item in collected]
+        finally:
+            threading.Thread(target=context.close, daemon=True).start()
 
     def _paginate_transactions_ui(self, page) -> None:
         """Click numeric pagination buttons to load additional GraphQL pages."""

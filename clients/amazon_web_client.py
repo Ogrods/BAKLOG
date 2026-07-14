@@ -13,6 +13,7 @@ Filter (codeless / Amazon-fulfilled only):
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -720,7 +721,8 @@ def sniff_claims(
         outcome["final_url"] = None
 
         deadline = _now_s() + run_timeout_s
-        with launch_persistent_profile(str(profile), headless=headless) as ctx:
+        ctx = launch_persistent_profile(str(profile), headless=headless)
+        try:
             # Parity with Connections-headed auth.
             from auth.cdp_browser import STEALTH_INIT_SCRIPT
 
@@ -759,9 +761,11 @@ def sniff_claims(
                 f"claims_captured={outcome['claims_captured']} signed_in={outcome['signed_in']} "
                 f"reason={outcome['reason']} url={final_url}",
                 flush=True,
-            )
+                )
 
-        return outcome
+            return outcome
+        finally:
+            threading.Thread(target=ctx.close, daemon=True).start()
 
     headless_timeout_s = min(timeout_s, 30)
     headed_timeout_s = min(timeout_s, 25)

@@ -978,6 +978,12 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
         "/api/diagnostics",
     ):
         return True
+    # /api/proxy/* endpoints proxy public third-party APIs (Steam storesearch,
+    # appreviews). They accept any search term but only proxy to read-only
+    # endpoints on store.steampowered.com — no credentials forwarded, no write
+    # access. Unauthenticated because the add-game modal calls them via bare
+    # fetch() (no Bearer token), and the proxy does not expose the server to
+    # SSRF (fixed target host, read-only search endpoints only).
     if path.startswith("/api/proxy/"):
         return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):

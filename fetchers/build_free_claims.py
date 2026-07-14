@@ -37,7 +37,10 @@ OUTPUT_PATH = Path("landing/free-claims.json")
 FALLBACK_PATH = Path("curated/free_claims.fallback.json")
 STORE_DELAY_SEC = 1.5
 STEAM_STORESEARCH_URL = "https://store.steampowered.com/api/storesearch/"
-STEAM_HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
+_STEAM_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
 FIELD_OVERRIDE_KEYS = frozenset({"title", "claim_url", "claim_urls", "ends_at"})
 ITAD_GAME_SLUG_RE = re.compile(
     r"isthereanydeal\.com/game/([^/\"'>]+)/info",
@@ -132,7 +135,7 @@ def _steam_storesearch(term: str, last_call: list[float]) -> list[dict]:
         resp = requests.get(
             STEAM_STORESEARCH_URL,
             params={"term": term, "l": "english", "cc": "us"},
-            headers=STEAM_HEADERS,
+            headers={"User-Agent": _STEAM_UA},
             timeout=30,
         )
         resp.raise_for_status()

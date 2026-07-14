@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -200,12 +201,13 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
             "Open the Connections page and connect Humble Bundle first."
         )
 
-    with launch_persistent_profile(
+    ctx = launch_persistent_profile(
         str(profile),
         headless=False,
         window_position=_WL_WINDOW_POS,
         window_size=_WL_WINDOW_SIZE,
-    ) as ctx:
+    )
+    try:
         ctx.add_init_script(STEALTH_INIT_SCRIPT)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=45_000)
@@ -248,6 +250,8 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
             print(f"  wrote {dump_json()}", flush=True)
 
         return items, False
+    finally:
+        threading.Thread(target=ctx.close, daemon=True).start()
 
 
 def _build_row(item: WishlistItem, hltb: dict | None) -> dict:

@@ -7,9 +7,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from shared.install_paths import bundle_root, is_frozen
+from shared.install_paths import bundle_root, is_frozen, static_root
 
-MANIFEST_PATH = bundle_root() / "fetchers" / "manifest.json"
+MANIFEST_PATH = static_root() / "fetchers" / "manifest.json"
 
 # Fetcher key -> connections provider id (for reconnect banners).
 AUTH_PROVIDER_BY_KEY: dict[str, str] = {

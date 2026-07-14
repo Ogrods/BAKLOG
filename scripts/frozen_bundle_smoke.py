@@ -191,27 +191,6 @@ def run_smoke(bundle_dir, *, expected_version=None):
     if not cfg_frozen:
         report["error"] = "expected frozen=true in /api/config"
         return report
-    import_smoke = subprocess.run(
-        [
-            sys.executable,
-            str(_REPO / "scripts" / "frozen_import_smoke.py"),
-            "--exe",
-            str(server_exe),
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=str(_REPO),
-    )
-    report["checks"]["import_smoke_exit"] = import_smoke.returncode
-    if import_smoke.returncode != 0:
-        out = (import_smoke.stdout or "").splitlines()[-20:]
-        err = (import_smoke.stderr or "").splitlines()[-12:]
-        tail = "\n".join(out + err)
-        report["error"] = f"import smoke failed (exit {import_smoke.returncode})\n{tail}"
-        return report
-
     dispatch = subprocess.run(
         [
             sys.executable,

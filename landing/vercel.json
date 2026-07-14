@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/auth/confirmed", "destination": "/auth-confirmed.html" },
-    { "source": "/auth/reset", "destination": "/auth-reset.html" }
+    { "source": "/auth/confirmed", "destination": "/auth-confirmed" },
+    { "source": "/auth/reset", "destination": "/auth-reset" }
   ],
   "headers": [
     {

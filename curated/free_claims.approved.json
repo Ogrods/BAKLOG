@@ -1,31 +1,38 @@
 {
   "ids": [
-    "epic-rollercoaster-tycoon-3-complete-edition",
-    "epic-voidwrought-ce8f4b",
     "gamerpower-1604",
     "gamerpower-2204",
-    "gamerpower-2386",
-    "gamerpower-3096",
-    "gamerpower-3266",
+    "gamerpower-3306",
     "gamerpower-3446",
+    "gamerpower-3498",
+    "gamerpower-3676",
+    "gamerpower-3697",
+    "gamerpower-3709",
     "itad-073a56345192",
+    "itad-0a93135bfee3",
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
     "itad-1b0433806065",
-    "itad-31969d48cb26",
+    "itad-562030929f11",
+    "itad-98730029b14b",
     "itad-b07aac9ebd26",
+    "itad-b2fe2af076cf",
+    "itad-bd4edc3ae553",
+    "itad-cb21d42d706e",
+    "itad-d263067e9e67",
+    "itad-d85d5bb4128d",
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
+    "itad-eb44ea1d719b",
     "itad-f0cffe659c19",
-    "itad-f520d9928848"
+    "itad-75d1019b80eb",
+    "itad-90df86960d93"
   ],
   "store_overrides": {
-    "gamerpower-3266": "indiegala",
     "gamerpower-3446": "indiegala",
-    "itad-0d4598c53ffe": "indiegala",
     "itad-1b0433806065": "indiegala",
-    "itad-dd5b5b16e035": "indiegala",
-    "itad-f520d9928848": "epic_mobile"
+    "itad-98730029b14b": "indiegala",
+    "itad-dd5b5b16e035": "indiegala"
   },
   "field_overrides": {
     "gamerpower-1604": {
@@ -34,20 +41,29 @@
     "gamerpower-2204": {
       "title": "Dual Chroma: Academy Carols"
     },
-    "gamerpower-2386": {
-      "title": "Tell Me Why"
-    },
-    "gamerpower-3096": {
-      "title": "Madness Inside"
-    },
-    "gamerpower-3266": {
-      "title": "Carlos the Taco"
+    "gamerpower-3306": {
+      "title": "Whiskey Mafia: Frank's Story"
     },
     "gamerpower-3446": {
       "title": "GigaBash"
     },
+    "gamerpower-3498": {
+      "title": "Primal Slideee Deluxe (Stove)"
+    },
+    "gamerpower-3676": {
+      "title": "Dire Echo"
+    },
+    "gamerpower-3697": {
+      "title": "NIGHTBELL"
+    },
+    "gamerpower-3709": {
+      "title": "NoRush! - Tower Edition"
+    },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
+    },
+    "itad-0a93135bfee3": {
+      "title": "Slime King"
     },
     "itad-0c69ed1f1bd8": {
       "title": "Rogue Waters"
@@ -58,13 +74,29 @@
     "itad-1b0433806065": {
       "title": "Die Young: Prologue"
     },
-    "itad-31969d48cb26": {
-      "ends_at": "2026-06-29T06:59:59.000Z",
-      "claim_url": "https://store.steampowered.com/app/1986840/POPGOES_Arcade/",
-      "title": "POPGOES Arcade"
+    "itad-562030929f11": {
+      "title": "Whiskey.Mafia. Leo's Family"
+    },
+    "itad-98730029b14b": {
+      "title": "Carlos the Taco"
     },
     "itad-b07aac9ebd26": {
       "title": "Wytchwood"
+    },
+    "itad-b2fe2af076cf": {
+      "title": "Game of Mafia"
+    },
+    "itad-bd4edc3ae553": {
+      "title": "NoRush!"
+    },
+    "itad-cb21d42d706e": {
+      "title": "Princess Farmer"
+    },
+    "itad-d263067e9e67": {
+      "title": "Together After Dark"
+    },
+    "itad-d85d5bb4128d": {
+      "title": "Madness Inside"
     },
     "itad-dd5b5b16e035": {
       "title": "The Brave Little Cloud"
@@ -72,28 +104,32 @@
     "itad-de23882e1f39": {
       "title": "Smiley Dusty"
     },
+    "itad-eb44ea1d719b": {
+      "title": "KeepUp Survival"
+    },
     "itad-f0cffe659c19": {
-      "claim_url": "https://freebies.indiegala.com/blacklist-mafia",
       "title": "Blacklist Mafia"
     },
-    "itad-f520d9928848": {
-      "claim_urls": {
-        "ios": "https://buff.ly/fkDgxlX",
-        "android": "https://buff.ly/ugVKgPs"
-      },
-      "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge"
+    "itad-75d1019b80eb": {
+      "title": "Nova Lands"
+    },
+    "itad-90df86960d93": {
+      "title": "Tattoo Tycoon"
     }
   },
   "dismissed": [
-    "itad-98730029b14b",
+    "gamerpower-3707",
+    "gamerpower-3555",
+    "gamerpower-3710",
+    "gamerpower-3294",
+    "gamerpower-3096",
     "gamerpower-3287",
-    "gamerpower-3272",
-    "itad-50a2b5b1d7a6",
     "gamerpower-3279",
-    "itad-d85d5bb4128d",
-    "gamerpower-3692",
-    "gamerpower-392",
-    "itad-c2d91592ecf7",
-    "itad-63ac54bf0426"
+    "gamerpower-3706",
+    "epic-nova-lands-4d1788",
+    "epic-tattoo-tycoon-b4352c"
+  ],
+  "premium_only_ids": [
+    "gamerpower-3498"
   ]
 }

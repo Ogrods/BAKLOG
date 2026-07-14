@@ -587,6 +587,17 @@ def _load_dismissed_ids(path: Path) -> set[str]:
     return _load_id_list(path, "dismissed")
 
 
+def _load_dismissed_keys(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    keys = doc.get("dismissed_keys") or []
+    return {str(k).strip() for k in keys if isinstance(k, str) and k.strip()}
+
+
 def _load_blocked_ids(path: Path) -> set[str]:
     """Permanently blocked claim ids — hidden from the feed and the review modal."""
     return _load_id_list(path, "blocked")
@@ -1097,6 +1108,8 @@ def _enrich_item_light(
     return out
 
 
+from shared.free_claims_sources import norm_title as _norm_title_key
+
 def preview_publish_items(
     *,
     manual_items: list[dict],
@@ -1105,6 +1118,7 @@ def preview_publish_items(
     store_overrides: dict[str, str] | None = None,
     field_overrides: dict[str, dict[str, str]] | None = None,
     dismissed_ids: set[str] | None = None,
+    dismissed_keys: set[str] | None = None,
     live_items: list[dict] | None = None,
     premium_only_ids: set[str] | None = None,
     require_manual_approval: bool = False,
@@ -1113,6 +1127,7 @@ def preview_publish_items(
     """Dry-run merge + prune for admin preview (no disk writes, no Steam API)."""
     store_overrides = store_overrides or {}
     field_overrides = field_overrides or {}
+    dismissed_keys = dismissed_keys or set()
     now = now or datetime.now(UTC)
     live_by_id = _live_items_by_id(live_items)
 
@@ -1133,6 +1148,12 @@ def preview_publish_items(
         field_overrides=field_overrides,
         field_overrides_by_key=field_by_key,
     )
+    # Filter by dismissed title keys (stable across feed refreshes)
+    if dismissed_keys:
+        auto_items = [
+            it for it in auto_items
+            if _norm_title_key(it.get("title") or "") not in dismissed_keys
+        ]
 
     if store_overrides or store_by_key:
         _apply_store_overrides(
@@ -1414,12 +1435,17 @@ def parse_approved_put_payload(payload: dict) -> dict:
         p = str(item_id).strip()
         if p:
             premium_only_ids.add(p)
+    dismissed_keys = [
+        str(k).strip() for k in (payload.get("dismissed_keys") or [])
+        if str(k).strip()
+    ]
     return {
         "ids": ids,
         "store_overrides": store_overrides,
         "field_overrides": field_overrides,
         "premium_only_ids": premium_only_ids,
         "dismissed": dismissed,
+        "dismissed_keys": dismissed_keys,
         "blocked": blocked,
     }
 
@@ -1431,6 +1457,7 @@ def prepare_approved_document(
     field_overrides: dict[str, dict[str, str]],
     premium_only_ids: set[str],
     dismissed: list[str],
+    dismissed_keys: list[str] | None = None,
     auto_items: list[dict],
     blocked: list[str] | None = None,
     prior_rows_by_id: dict[str, dict] | None = None,
@@ -1474,6 +1501,10 @@ def prepare_approved_document(
         out["field_overrides"] = merged_fields
     if pruned_dismissed:
         out["dismissed"] = pruned_dismissed
+    # Preserve dismissed_keys — title-based dismissal survives feed refresh ID churn
+    dismissed_keys_list = [k for k in (dismissed_keys or []) if k]
+    if dismissed_keys_list:
+        out["dismissed_keys"] = dismissed_keys_list
     if blocked_list:
         out["blocked"] = blocked_list
     if premium_list:
@@ -1560,6 +1591,7 @@ def main() -> int:
     # Blocked ids are a permanent kill list; fold them into the dismissed filter
     # so they are excluded from the feed exactly like a soft-hidden claim.
     dismissed_ids = _load_dismissed_ids(APPROVED_PATH) | _load_blocked_ids(APPROVED_PATH)
+    dismissed_keys = _load_dismissed_keys(APPROVED_PATH)
     premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
     store_overrides = _load_store_overrides(APPROVED_PATH)
     field_overrides = _load_field_overrides(APPROVED_PATH)
@@ -1625,6 +1657,12 @@ def main() -> int:
         field_overrides=field_overrides,
         field_overrides_by_key=field_by_key,
     )
+    # Filter by dismissed title keys (stable across feed refreshes)
+    if dismissed_keys:
+        auto_items = [
+            it for it in auto_items
+            if _norm_title_key(it.get("title") or "") not in dismissed_keys
+        ]
     if store_overrides or store_by_key:
         _apply_store_overrides(
             auto_items,

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-27T02:05:02.134714+00:00",
+  "generated_at": "2026-07-14T05:21:32.843559+00:00",
   "items": [
     {
       "id": "other-please-touch-the-artwork",
@@ -60,10 +60,7 @@
       "title": "Tested on Humans: Escape Room",
       "claim_url": "https://luna.amazon.com/claims/home",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1483780/library_600x900_2x.jpg",
-      "genres": [
-        "Adventure",
-        "Indie"
-      ],
+      "genres": [],
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1483780,
@@ -76,12 +73,7 @@
       "title": "Sin Slayers: Reign of The 8th",
       "claim_url": "https://luna.amazon.com/claims/home",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2790000/library_600x900_2x.jpg",
-      "genres": [
-        "Adventure",
-        "Indie",
-        "RPG",
-        "Strategy"
-      ],
+      "genres": [],
       "blurb": null,
       "ends_at": null,
       "steam_appid": 2790000,
@@ -94,11 +86,7 @@
       "title": "Paradise Killer",
       "claim_url": "https://luna.amazon.com/claims/home",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1160220/library_600x900_2x.jpg",
-      "genres": [
-        "Adventure",
-        "Indie",
-        "RPG"
-      ],
+      "genres": [],
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1160220,
@@ -111,10 +99,7 @@
       "title": "Wargame Construction Set III: Age of Rifles 1846-1905",
       "claim_url": "https://luna.amazon.com/claims/home",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2707280/library_600x900_2x.jpg",
-      "genres": [
-        "Simulation",
-        "Strategy"
-      ],
+      "genres": [],
       "blurb": null,
       "ends_at": null,
       "steam_appid": 2707280,
@@ -127,9 +112,7 @@
       "title": "Space Grunts 2",
       "claim_url": "https://luna.amazon.com/claims/home",
       "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1125370/library_600x900_2x.jpg",
-      "genres": [
-        "Indie"
-      ],
+      "genres": [],
       "blurb": null,
       "ends_at": null,
       "steam_appid": 1125370,
@@ -161,98 +144,6 @@
       "first_seen": "2026-06-25T19:10:27Z"
     },
     {
-      "id": "epic-rollercoaster-tycoon-3-complete-edition",
-      "store": "epic",
-      "title": "RollerCoaster Tycoon 3 Complete Edition",
-      "claim_url": "https://store.epicgames.com/en-US/p/rollercoaster-tycoon-3-complete-edition",
-      "header_image": "https://cdn1.epicgames.com/f01b3e0178d448f0b93911e292d8e614/offer/EGS_RollerCoasterTycoon3CompleteEdition_FrontierDevelopments_S5-1920x1080-689d96ca4d5a4e8de183b7a928960c87.jpg",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-07-02T15:00:00Z",
-      "steam_appid": 1368820,
-      "review_percent": 87,
-      "source": "epic",
-      "first_seen": "2026-06-25T18:31:16Z"
-    },
-    {
-      "id": "epic-voidwrought-ce8f4b",
-      "store": "epic",
-      "title": "Voidwrought",
-      "claim_url": "https://store.epicgames.com/en-US/p/voidwrought-ce8f4b",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/ae3f962fab4d42eba2dbefa4a1e76ff6/voidwrought-bio8j.jpg",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-07-02T15:00:00Z",
-      "steam_appid": 2014550,
-      "review_percent": 77,
-      "source": "epic",
-      "first_seen": "2026-06-25T18:31:16Z"
-    },
-    {
-      "id": "gamerpower-2386",
-      "store": "steam",
-      "title": "Tell Me Why",
-      "claim_url": "https://www.gamerpower.com/open/tell-me-why-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6478b9dcae7be.jpg",
-      "genres": [
-        "Adventure",
-        "Free To Play"
-      ],
-      "blurb": "Dive into the Riveting World of Tell Me Why for FREE on Steam! Tell Me Why is a multi-award winning episodic adventure game from Dontnod Entertainment! Don't pass up the chance to experience this extraordinary game for free!",
-      "ends_at": "2026-07-01T23:59:59Z",
-      "steam_appid": 1180660,
-      "review_percent": 82,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59Z"
-    },
-    {
-      "id": "gamerpower-3096",
-      "store": "itch",
-      "title": "Madness Inside",
-      "claim_url": "https://www.gamerpower.com/open/madness-inside-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/67c76007697b3.jpg",
-      "genres": [],
-      "blurb": "Download Madness Inside for free on Itch.io! Madness Inside is an indie psychological walking simulator where you explore a psychiatric hospital.",
-      "ends_at": "2026-08-01T23:59:59Z",
-      "steam_appid": 3102000,
-      "review_percent": 76,
-      "source": "gamerpower",
-      "first_seen": "2026-06-11T22:48:59Z"
-    },
-    {
-      "id": "itad-31969d48cb26",
-      "store": "steam",
-      "title": "POPGOES Arcade",
-      "claim_url": "https://store.steampowered.com/app/1986840/POPGOES_Arcade/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1986840/library_600x900_2x.jpg",
-      "genres": [
-        "RPG"
-      ],
-      "blurb": "POPGOES Arcade",
-      "ends_at": "2026-06-29T06:59:59Z",
-      "steam_appid": 1986840,
-      "review_percent": 96,
-      "source": "itad",
-      "first_seen": "2026-06-27T01:41:17Z"
-    },
-    {
-      "id": "itad-f520d9928848",
-      "store": "epic_mobile",
-      "title": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
-      "claim_urls": {
-        "ios": "https://buff.ly/fkDgxlX",
-        "android": "https://buff.ly/ugVKgPs"
-      },
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1361510/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Teenage Mutant Ninja Turtles: Shredder&#039;s Revenge",
-      "ends_at": "2026-07-09T18:31:16Z",
-      "steam_appid": 1361510,
-      "review_percent": 94,
-      "source": "itad",
-      "first_seen": "2026-06-25T18:31:16Z"
-    },
-    {
       "id": "itad-b07aac9ebd26",
       "store": "epic",
       "title": "Wytchwood",
@@ -263,7 +154,7 @@
       "ends_at": null,
       "steam_appid": 729000,
       "review_percent": 93,
-      "source": "itad"
+      "first_seen": "2026-07-14T05:01:02Z"
     },
     {
       "id": "itad-0c69ed1f1bd8",
@@ -275,8 +166,8 @@
       "blurb": "Rogue Waters",
       "ends_at": null,
       "steam_appid": 1691190,
-      "review_percent": 76,
-      "source": "itad"
+      "review_percent": 75,
+      "first_seen": "2026-07-14T05:01:02Z"
     },
     {
       "id": "itad-073a56345192",
@@ -289,7 +180,197 @@
       "ends_at": null,
       "steam_appid": 867210,
       "review_percent": 86,
-      "source": "itad"
+      "first_seen": "2026-07-14T05:01:02Z"
+    },
+    {
+      "id": "gamerpower-3709",
+      "store": "epic",
+      "title": "NoRush! - Tower Edition",
+      "claim_url": "https://www.gamerpower.com/open/norush-tower-edition-epic-games-giveaways",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a53a044a87b6.jpg",
+      "genres": [],
+      "blurb": "No rush to claim this giveaway. Grab NoRush! - Tower Edition for free via Epic Games Store! NoRush is a 3d casual runner game with unexpected twists.",
+      "ends_at": "2026-07-20T23:59:00Z",
+      "source": "gamerpower",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "gamerpower-3498",
+      "store": "other",
+      "title": "Primal Slideee Deluxe (Stove)",
+      "claim_url": "https://www.gamerpower.com/open/primal-slideee-deluxe-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6993208da38c7.jpg",
+      "genres": [],
+      "blurb": "Download Primal Slideee Deluxe for free via Stove until July 31!",
+      "ends_at": "2026-07-31T23:59:59Z",
+      "source": "gamerpower",
+      "first_seen": "2026-07-14T04:29:43Z",
+      "premium_only": true
+    },
+    {
+      "id": "gamerpower-3306",
+      "store": "indiegala",
+      "title": "Whiskey Mafia: Frank's Story",
+      "claim_url": "https://www.gamerpower.com/open/whiskey-mafia-frank-s-story",
+      "header_image": "https://www.gamerpower.com/offers/1b/68dd2161c3088.jpg",
+      "genres": [],
+      "blurb": "Download Whiskey Mafia: Frank's Story for free on IndieGala! Whiskey Mafia: Frank's Story is a 2D adventure game where you experience life in the mafia.",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "source": "gamerpower",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "gamerpower-3697",
+      "store": "itch",
+      "title": "NIGHTBELL",
+      "claim_url": "https://www.gamerpower.com/open/nightbell-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4216630/c622bc609f9fd7c5ed05200022ddcb4f896e25a8/header.jpg?t=1768063973",
+      "genres": [],
+      "blurb": "Download NIGHTBELL for free on Itch.io until July 12th 2026. NIGHTBELL is a 3d first person game with a creepy atmosphere. Check it out.",
+      "ends_at": "2026-07-19T23:59:00Z",
+      "steam_appid": 4216630,
+      "review_percent": 77,
+      "source": "gamerpower",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "gamerpower-3676",
+      "store": "itch",
+      "title": "Dire Echo",
+      "claim_url": "https://www.gamerpower.com/open/dire-echo-itchio-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3743180/05c22cf5ef7893b5dd61c756ce94e5d5ebfb3d53/header.jpg?t=1781976683",
+      "genres": [],
+      "blurb": "Explore deep space with this giveaway. Get Dire Echo for free on itch.io, a 3d sci-fi first-person exploration game featuring impressive visuals.",
+      "ends_at": "2026-07-19T23:59:00Z",
+      "steam_appid": 3743180,
+      "review_percent": 72,
+      "source": "gamerpower",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-d263067e9e67",
+      "store": "epic",
+      "title": "Together After Dark",
+      "claim_url": "https://isthereanydeal.com/giveaways/16387/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2708790/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Together After Dark",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 2708790,
+      "review_percent": 53,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-eb44ea1d719b",
+      "store": "epic",
+      "title": "KeepUp Survival",
+      "claim_url": "https://isthereanydeal.com/giveaways/16383/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1524630/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "KeepUp Survival",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 1524630,
+      "review_percent": 64,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-bd4edc3ae553",
+      "store": "epic",
+      "title": "NoRush!",
+      "claim_url": "https://isthereanydeal.com/giveaways/16382/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3297160/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "NoRush!",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 3297160,
+      "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-cb21d42d706e",
+      "store": "epic",
+      "title": "Princess Farmer",
+      "claim_url": "https://isthereanydeal.com/giveaways/16373/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1320490/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Princess Farmer",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 1320490,
+      "review_percent": 95,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-90df86960d93",
+      "store": "epic",
+      "title": "Tattoo Tycoon",
+      "claim_url": "https://isthereanydeal.com/giveaways/16370/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2375260/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Tattoo Tycoon",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 2375260,
+      "review_percent": 67,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-75d1019b80eb",
+      "store": "epic",
+      "title": "Nova Lands",
+      "claim_url": "https://isthereanydeal.com/giveaways/16369/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1501610/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Nova Lands",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 1501610,
+      "review_percent": 89,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-b2fe2af076cf",
+      "store": "other",
+      "title": "Game of Mafia",
+      "claim_url": "https://isthereanydeal.com/giveaways/16362/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1485340/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Game Of Mafia",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 1485340,
+      "review_percent": 70,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-562030929f11",
+      "store": "other",
+      "title": "Whiskey.Mafia. Leo's Family",
+      "claim_url": "https://isthereanydeal.com/giveaways/16348/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1300430/header.jpg?t=1687266777",
+      "genres": [],
+      "blurb": "Whiskey.Mafia. Leo&#039;s Family",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 1300430,
+      "review_percent": 68,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-0a93135bfee3",
+      "store": "itch",
+      "title": "Slime King",
+      "claim_url": "https://isthereanydeal.com/giveaways/16322/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4492760/1e33df18bd8306a81a37cf52d7da39beb8869224/header.jpg?t=1778687408",
+      "genres": [],
+      "blurb": "Slime King itch.io",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 4492760,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
     }
   ],
   "attribution": [

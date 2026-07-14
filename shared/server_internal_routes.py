@@ -291,6 +291,10 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
     if premium_only is not None and not isinstance(premium_only, list):
         s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "premium_only_ids must be a list"})
         return
+    dismissed_keys = payload.get("dismissed_keys")
+    if dismissed_keys is not None and not isinstance(dismissed_keys, list):
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "dismissed_keys must be a list"})
+        return
 
     root = s.data_root()
     if manual_items is None:
@@ -384,6 +388,7 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
         },
         dismissed_ids=dismissed_ids,
         live_items=live_items,
+        dismissed_keys=set(dismissed_keys or []),
         premium_only_ids=premium_only_ids,
         require_manual_approval=require_manual_approval_enabled(),
     )
@@ -423,6 +428,9 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
     premium_only_ids = approved_doc.get("premium_only_ids")
     if not isinstance(premium_only_ids, list):
         premium_only_ids = []
+    dismissed_keys = approved_doc.get("dismissed_keys")
+    if not isinstance(dismissed_keys, list):
+        dismissed_keys = []
     s._send_json(
         handler,
         HTTPStatus.OK,
@@ -433,6 +441,7 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
             "store_overrides": store_overrides,
             "field_overrides": field_overrides,
             "dismissed": dismissed,
+            "dismissed_keys": dismissed_keys,
             "blocked": blocked,
             "premium_only_ids": premium_only_ids,
             "built": s._read_optional_json(root / s.FREE_CLAIMS_BUILT_PATH),

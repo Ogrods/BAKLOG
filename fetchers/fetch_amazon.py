@@ -304,7 +304,7 @@ def _load_web_records(*, dump_raw: bool) -> tuple[list[dict], str | None]:
     - signed-in-no-claims (headless parse failed; try raw-dump fallback)
     """
 
-    from amazon_web_client import (
+    from clients.amazon_web_client import (
         filter_codeless_claims,
         raw_dump_max_age_s,
         raw_dump_path,

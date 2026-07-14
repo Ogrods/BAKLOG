@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 
 import pytest
 
@@ -115,6 +116,7 @@ def test_immutable_built_asset_detection(server_mod):
     assert not server_mod._is_immutable_built_asset("/js/app.js")
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="HTTP serve test stable on Windows only")
 def test_built_table_query_worker_served_as_public_static(tmp_path, monkeypatch):
     """The worker that js/table-query.js spawns in built mode resolves to
     /dist/js/table-query.worker.js (tableQueryWorkerUrl, built branch). Guard

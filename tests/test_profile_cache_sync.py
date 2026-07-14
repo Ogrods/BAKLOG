@@ -14,7 +14,7 @@ API_CLIENT = (ROOT / "js" / "api-client.js").read_text(encoding="utf-8")
 
 def _cache_names_from_js() -> set[str]:
     m = re.search(
-        r"const _CACHE_META_RE = /\^\\/cache\\/\(([^)]+)\)\\\.json",
+        r"const _CACHE_META_RE\s*=\s*/\^\\/cache\\/\(([^)]+)\)\\\.json",
         API_CLIENT,
     )
     assert m, "_CACHE_META_RE not found in js/api-client.js"

@@ -247,6 +247,7 @@ def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
     notified: list[tuple[str, str]] = []
     monkeypatch.setattr(tray_app, "_tray_notify", lambda icon, t, m: notified.append((t, m)))
     monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
+    monkeypatch.setattr(tray_app.ServerController, "start", lambda self: False)
 
     class DeadProc:
         def poll(self):
@@ -256,7 +257,9 @@ def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
     ctl.proc = DeadProc()
     icon = MagicMock()
     tray_app._start_server_watchdog(icon, ctl)
-    deadline = time.monotonic() + 3.0
+    # Watchdog sleeps 2s per loop iteration and needs 2 iterations
+    # to reach the notification path (start → detect failure → notify).
+    deadline = time.monotonic() + 6.0
     while time.monotonic() < deadline and not notified:
         time.sleep(0.05)
     assert notified

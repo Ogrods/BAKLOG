@@ -60,6 +60,21 @@ def test_built_index_html_rewrites_css_when_frozen(server_mod, tmp_path, monkeyp
     monkeypatch.setattr(ip, "bundle_root", lambda: tmp_path)
     monkeypatch.setattr(bf, "is_frozen", lambda: True)
     monkeypatch.setattr(bf, "bundle_root", lambda: tmp_path)
+    # Frozen path expects manifest at _internal/dist/ and html at _internal/.
+    frozen_dist = tmp_path / "_internal" / "dist"
+    frozen_dist.mkdir(parents=True, exist_ok=True)
+    (frozen_dist / "manifest.json").write_text(
+        '{"tailwind.css":"tailwind.AAAA.css","app.css":"app.BBBB.css",'
+        '"js/app.js":"js/app-CCCC.js","js/chunks":[]}',
+        encoding="utf-8",
+    )
+    index = tmp_path / "_internal" / "index.html"
+    index.write_text(
+        '<link rel="stylesheet" href="tailwind.css" />\n'
+        '<link rel="stylesheet" href="app.css" />\n'
+        '<script type="module" src="js/app.js"></script>\n',
+        encoding="utf-8",
+    )
     bf.invalidate_built_index_cache()
     ip._BUILT_MANIFEST_CACHE = None
     ip._BUILT_MANIFEST_MTIME_NS = None

@@ -1926,7 +1926,7 @@ class Handler(SimpleHTTPRequestHandler):
         force_vals = qs.get("force", ["0"])
         force = force_vals[0].lower() in ("1", "true", "yes")
         lane = (qs.get("lane", [""])[0] or "").strip().lower() or None
-        if lane not in (None, "fetcher", "internal"):
+        if lane not in (None, "fetcher", "enrich", "internal"):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"invalid lane: {lane}"})
             return
         scope_pid = None

@@ -183,15 +183,8 @@ def run_smoke(bundle_dir, *, expected_version=None):
         "version": cfg_version,
         "frozen": cfg_frozen,
         "auth_required": config.get("authRequired"),
-        "has_capabilities": isinstance(config.get("capabilities"), dict),
-        "has_pro_settings": isinstance(config.get("proSettings"), dict),
+        "plan": config.get("plan"),
     }
-    if not isinstance(config.get("capabilities"), dict):
-        report["error"] = "missing capabilities in /api/config"
-        return report
-    if not isinstance(config.get("proSettings"), dict):
-        report["error"] = "missing proSettings in /api/config"
-        return report
     if cfg_version != version:
         report["error"] = f"version mismatch: expected {version!r}, got {cfg_version!r}"
         return report

@@ -117,17 +117,15 @@ function runWithDuplicateCheck(title, proceed) {
 }
 
 async function steamSearch(term) {
-  const url = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=english&cc=US`;
-  const res = await fetch(url);
+  const res = await fetch(`/api/proxy/steam-search?term=${encodeURIComponent(term)}`);
   if (!res.ok) throw new Error(`Steam search HTTP ${res.status}`);
   const data = await res.json();
   return (data.items || []).slice(0, 6);
 }
 
 async function steamAppReviews(appid) {
-  const url = `https://store.steampowered.com/appreviews/${appid}?json=1&language=all&purchase_type=all&num_per_page=0`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(`/api/proxy/steam-reviews?appid=${appid}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.success || !data.query_summary) return null;

@@ -1238,6 +1238,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/fetchers":
             self._handle_fetchers()
             return
+        if path == "/api/proxy/steam-search":
+            self._handle_proxy_steam_search()
+            return
+        if path == "/api/proxy/steam-reviews":
+            self._handle_proxy_steam_reviews()
+            return
         if path == "/api/personal":
             self._handle_personal_get()
             return
@@ -1494,6 +1500,46 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     # ---- handlers ----------------------------------------------------------
+    def _handle_proxy_steam_search(self) -> None:
+        """Proxy Steam storesearch (CORS workaround for add-game modal)."""
+        from urllib.parse import parse_qs, urlencode
+
+        qs = parse_qs(urlparse(self.path).query)
+        term = (qs.get("term") or [""])[0].strip()
+        if not term:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "missing term"})
+            return
+        import urllib.request
+
+        url = "https://store.steampowered.com/api/storesearch/?" + urlencode(
+            {"term": term, "l": "english", "cc": "US"}
+        )
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "BAKLOG/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                _send_json(self, HTTPStatus.OK, json.loads(resp.read().decode("utf-8")))
+        except Exception as exc:
+            _api_error(self, HTTPStatus.BAD_GATEWAY, "steam_search_failed", exc)
+
+    def _handle_proxy_steam_reviews(self) -> None:
+        """Proxy Steam appreviews (CORS workaround for add-game modal)."""
+        from urllib.parse import parse_qs
+
+        qs = parse_qs(urlparse(self.path).query)
+        appid = (qs.get("appid") or [""])[0].strip()
+        if not appid:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "missing appid"})
+            return
+        import urllib.request
+
+        url = f"https://store.steampowered.com/appreviews/{appid}?json=1&language=all&purchase_type=all&num_per_page=0"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "BAKLOG/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                _send_json(self, HTTPStatus.OK, json.loads(resp.read().decode("utf-8")))
+        except Exception as exc:
+            _api_error(self, HTTPStatus.BAD_GATEWAY, "steam_reviews_failed", exc)
+
     def _handle_config_get(self) -> None:
         from shared.entitlement import current_plan, maybe_refresh_local_license
         from shared.polar_license import polar_configured

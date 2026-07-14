@@ -86,7 +86,7 @@ Write-Host "Deduping stray BAKLOG servers on port 8765..."
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Smoke: frozen bundle (migration + /api/config + fetcher dispatch)..."
-& $Python scripts/frozen_bundle_smoke.py --bundle-dir $OutDir
+& $Python scripts/frozen_bundle_smoke.py $OutDir
 if ($LASTEXITCODE -ne 0) {
     Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
 }

@@ -67,6 +67,8 @@ if (-not (Test-Path $FallbackJson)) {
     Write-Error "Build failed: bundled curated feed missing at $FallbackJson (PyInstaller must ship curated/ for offline claims fallback)"
 }
 
+# pyproject.toml must be at bundle root for frozen version detection
+Copy-Item -Force (Join-Path $Root "pyproject.toml") (Join-Path $OutDir "pyproject.toml")
 Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
 Copy-Item -Force (Join-Path $Root "packaging\BAKLOG.ico") (Join-Path $OutDir "BAKLOG.ico")
 Copy-Item -Force (Join-Path $Root "packaging\apply_update.ps1") (Join-Path $OutDir "apply_update.ps1")

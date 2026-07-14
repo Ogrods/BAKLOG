@@ -1170,16 +1170,19 @@ class Handler(SimpleHTTPRequestHandler):
                 if _resolved_static_path_allowed(resolved):
                     return resolved
                 return str(profile_root() / ".profile_static_blocked" / clean)
-        resolved = super().translate_path(path)
-        # Python 3.13+ translate_path returns a trailing-slash directory for "/"
-        # instead of resolving index.html; map that here so the app shell loads.
-        resolved_path = Path(resolved)
+        from shared.install_paths import static_root
+        # For frozen builds, resolve from the static root (includes _internal)
+        base = static_root() if is_frozen() else Path.cwd()
+        resolved_path = base / clean
+        if clean == "":
+            resolved_path = base / "index.html"
         if resolved_path.is_dir():
             for leaf in ("index.html", "index.htm"):
                 index = resolved_path / leaf
                 if index.is_file():
-                    resolved = str(index)
+                    resolved_path = index
                     break
+        resolved = str(resolved_path)
         if not _resolved_static_path_allowed(resolved):
             return str(profile_root() / ".profile_static_blocked" / clean)
         return resolved

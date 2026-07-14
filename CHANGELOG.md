@@ -29,9 +29,17 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.32] - 2026-07-14
+
+### Added
+
+- Frozen bundle smoke tests: bundle layout, data dir migration, fetcher dispatch, and import verification.
+- `pyproject.toml` copied to bundle root for frozen version detection.
+
 ### Fixed
 
-- CI/release gate: Inno verify skips Pillow when branding assets exist; packaging test strips Pascal comments before `{app}` guard.
+- Frozen bundle root path serves app HTML instead of directory listing via `translate_path` resolving from `static_root()` for PyInstaller builds.
+- CDP browser launch captures Chrome stderr on failure for diagnostics (Battlenet/Amazon_web connect).
 
 ## [0.8.30] - 2026-06-27
 
@@ -389,7 +397,7 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
 
 ### Fixed
 
-- **Blacklist: Epic entitlement slugs** — internal Epic slugs that leak in as titles (single token, no spaces, joined by an underscore — e.g. `Fortnite_StWContent`, `Fortnite_Studio`) are dropped by the hardcoded *blacklist* (`isJunkEntry` in `js/game-core.js`, mirrored by `_is_entitlement_slug` in `fetch_epic.py`). Real titles use spaces (`Aerial_Knight's Never Yield`) so they are unaffected. Terminology note: the **blacklist** is hardcoded non-games that are never shown; the **hidden list** is user-editable games restorable from the Hidden games panel (seeded by `js/hidden-defaults.js`). New filtering should pick a bucket — see the README "Blacklist vs hidden list" table.
+- **Blacklist: Epic entitlement slugs** — internal Epic slugs that leak in as titles (single token, no spaces, joined by an underscore — e.g. `Fortnite_StWContent`, `Fortnite_Studio`) are dropped by the hardcoded _blacklist_ (`isJunkEntry` in `js/game-core.js`, mirrored by `_is_entitlement_slug` in `fetch_epic.py`). Real titles use spaces (`Aerial_Knight's Never Yield`) so they are unaffected. Terminology note: the **blacklist** is hardcoded non-games that are never shown; the **hidden list** is user-editable games restorable from the Hidden games panel (seeded by `js/hidden-defaults.js`). New filtering should pick a bucket — see the README "Blacklist vs hidden list" table.
 - **`.gitignore` store JSON globs** — `games_*.json` and `games_wishlist_*.json` replace per-file enumeration so Humble, EA, and Nintendo-wishlist catalog files (and future stores) cannot be committed accidentally.
 - **`gameId()` EA drift** — `js/game-core.js` now includes the `ea_id` fallback (aligned with `normalizeGame()` and the table-query worker).
 - **Landing CSP** — waitlist handler moved to `landing/main.js`; JSON-LD externalized to `landing/structured-data.json`; Google Fonts load via `id="google-fonts"` (no inline script). Demo spotlight nav uses sibling buttons (no nested interactive controls).
@@ -424,8 +432,8 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
 - **Auto-fetch on connect + stale-store refresh** — Connections prefs: **Auto-fetch when a store connects** (default on) runs that provider's fetcher keys on disconnect/expired → connected transitions (not first boot); **Auto-refresh stores older than 24h** (default off) quietly refreshes one stale store per ~30 min while the app is open. See `js/fetcher-health.js` and `tests/auto-fetch.test.js`.
 - **Chip-level auth-failure backoff** — when a fetcher run ends in an auth-ish failure (401/403, expired cookie/session, rejected sign-in) the chip cools down with an escalating window on consecutive failures (5m → 15m → 60m). While cooling down the chip is disabled, shows an `auth Nm` badge + tooltip, and is skipped by both auto-refresh and the bulk "Run stale" sweep — closing the request-flood path against a provider that needs reconnecting. The cooldown clears on the next successful run, when the timer expires, or the moment the mapped provider shows "connected" in Connections (so reconnecting never leaves a chip stuck). Persisted across reloads.
 - **PSN trophy completion pill** — library rows with `trophy_progress` show a slim muted `🏆 N%` pill in the game-name meta line (no new column); wishlist rows omit it.
-- **SECURITY.md threat model** — formal local-first security model: trust-boundary diagram, protected assets, the at-rest crypto (AES-256-GCM with an OS-keychain key; scrypt N=2¹⁴ for the optional master password and the portable bundle), and an explicit out-of-scope list (local malware, plaintext `.env`/cookie jars, the `.master_key` fallback, storefront ToS). Linked from README and PRIVACY.md. Marketing suite gains a "Nothing to breach" security campaign and a founder-truth line on why local install *is* the security posture.
-- **Library count 1UP** — after a fetch adds games, the library / wishlist count rolls over ~1s with floating green "+N" popups (Mario 1UP / scrolling-combat-text style). Popups anchor on the right edge of the number, spawn ~70ms apart (up to 10 per burst) so several climb at once, and the rolling number uses `tabular-nums` so digits don't shift sideways as it counts. Only fires on fetch-driven *increases*, not filters or cold boot. Cancels cleanly on tab switch, view change, or `prefers-reduced-motion`. Chained fetcher landings (Steam, then GOG, then PSN) keep prior popups climbing instead of cutting them off mid-flight. Surfaces: Dashboard hero number and Library / Wishlist summary chips. Demos for screen recordings: load `index.html?demo=count` (six fake stores landing) or `?demo=count-small` (five `+1` bursts), or run `baklogDemoLibraryCount()` / `baklogDemoLibraryCountSmall()` from the console.
+- **SECURITY.md threat model** — formal local-first security model: trust-boundary diagram, protected assets, the at-rest crypto (AES-256-GCM with an OS-keychain key; scrypt N=2¹⁴ for the optional master password and the portable bundle), and an explicit out-of-scope list (local malware, plaintext `.env`/cookie jars, the `.master_key` fallback, storefront ToS). Linked from README and PRIVACY.md. Marketing suite gains a "Nothing to breach" security campaign and a founder-truth line on why local install _is_ the security posture.
+- **Library count 1UP** — after a fetch adds games, the library / wishlist count rolls over ~1s with floating green "+N" popups (Mario 1UP / scrolling-combat-text style). Popups anchor on the right edge of the number, spawn ~70ms apart (up to 10 per burst) so several climb at once, and the rolling number uses `tabular-nums` so digits don't shift sideways as it counts. Only fires on fetch-driven _increases_, not filters or cold boot. Cancels cleanly on tab switch, view change, or `prefers-reduced-motion`. Chained fetcher landings (Steam, then GOG, then PSN) keep prior popups climbing instead of cutting them off mid-flight. Surfaces: Dashboard hero number and Library / Wishlist summary chips. Demos for screen recordings: load `index.html?demo=count` (six fake stores landing) or `?demo=count-small` (five `+1` bursts), or run `baklogDemoLibraryCount()` / `baklogDemoLibraryCountSmall()` from the console.
 - **Portable secrets bundle** — passphrase-encrypted export/import of all Connections credentials plus CDP browser profile dirs (`auth/bundle.py`, format version 1: magic `BAKLOGSB`, scrypt + AES-GCM). Dashboard: Connections ⋮ → Portable bundle… → Export / Import. API: `POST /api/auth/secrets/export` and `POST /api/auth/secrets/import`. CLI: `python -m auth export-bundle` / `import-bundle` (with `--dry-run`). Import snapshots existing profiles to `cache/auth/profiles_pre_import_<timestamp>/` before overwrite. See PRIVACY.md.
 - **Opt-in bug report submit** — kebab **Report a bug…**, error toast **Send report**, and `?debug=1` overlay open a consent dialog with payload preview. Explicit click POSTs the sanitized bug bundle to `https://baklog.app/api/report` (Supabase log + Resend email). **Copy instead** remains clipboard-only. See PRIVACY.md.
 - **Local-only bug bundle** — sticky error toast and `?debug=1` overlay gain a "Copy bug bundle" button that puts a sanitized JSON payload on the clipboard (app version, view, data version, table fingerprint, filter count, last render time, session + persisted error log). Persisted log is a rolling 200-entry localStorage ring at `baklog-error-log`. Nothing is sent automatically. Kebab menu adds "Report a bug…" for the same bundle without needing a live error. See PRIVACY.md.
@@ -474,7 +482,7 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
 ### Changed
 
 - **Fetcher progress heartbeats** — long pulls now emit consistent `[i/total] (NN%) phase` lines during previously-silent capture/batch steps (PSN library collect, GOG web catalog, itch owned-keys, Epic catalog pool, ITAD price batches, EA session/playtimes, Nintendo transactions, headless wishlist captures) and from enrichers, so the run console shows real progress instead of going quiet.
-- **User-facing copy** — em dashes in UI strings replaced with ` - ` (empty-state placeholders, tooltips, toasts); code comments unchanged.
+- **User-facing copy** — em dashes in UI strings replaced with `-` (empty-state placeholders, tooltips, toasts); code comments unchanged.
 - **Dashboard spotlight portrait covers** — portrait art uses `object-fit: cover` again instead of letterboxed contain.
 - **Fetcher log layout** — run log opens beside the fetcher health card (2/3 + 1/3 columns) instead of below, keeping the dashboard hero and combat-text count visible; console font 1px smaller; narrow viewports stack log under health.
 - **Fetcher health hints** — missing-env warnings in the run log and Steam fetch scripts use plain “open Connections” guidance (`STEAM_CREDENTIALS_HINT` in `fetchers/_base.py`).
@@ -506,8 +514,8 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
 - **`server.py` dev server** — replaces `python -m http.server` as the recommended
   way to run the dashboard on http://localhost:8765. Serves static files and
   exposes a small API: `POST /api/run/<key>` queues a fetcher, `GET
-  /api/stream/<run_id>` streams stdout/stderr over SSE, `GET/PUT
-  /api/personal` reads/writes `data/personal.json`. Runs are serialized through
+/api/stream/<run_id>` streams stdout/stderr over SSE, `GET/PUT
+/api/personal` reads/writes `data/personal.json`. Runs are serialized through
   a single-worker queue; fetcher argv is whitelisted server-side.
 - **Fetcher health row (dashboard)** — compact chip strip for all 25 fetchers
   (12 library + 8 wishlist + ITAD + 4 enrichers) with freshness coloring, entry
@@ -572,7 +580,7 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
   Early Access pill.
 - **Co-op filter toggles** — the filter drawer gained a Co-op section with
   two checkboxes ("Online co-op", "Couch co-op"). Each acts as an AND filter
-  (check both to require games that support *both* flavors), produces a
+  (check both to require games that support _both_ flavors), produces a
   matching active-filter pill ("Online co-op" / "Couch co-op"), and is
   cleared by both the per-pill × button and the Clear-all sweep. Filters
   feed into the same `table-query.js` worker pipeline as the rest of the
@@ -591,8 +599,8 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
   by `wishlist_store`, adds a "Wishlist source: …" pill to the active filter
   bar, and persists across reloads via the `wishlistStoreFilter` pref. Manual
   wishlist entries still appear under "All".
-- **Early Access badge** — games tagged "Early Access" (e.g. *Hyper Light
-  Breaker*, *Slay the Spire 2*) now wear a Steam-style amber ribbon across the
+- **Early Access badge** — games tagged "Early Access" (e.g. _Hyper Light
+  Breaker_, _Slay the Spire 2_) now wear a Steam-style amber ribbon across the
   bottom of their cover art on the dashboard pick cards, deal hero card, and
   wishlist deal cards, plus a small `EA` pill next to the title in the main
   table. Detection is data-driven: any genre/tag containing "early access" or
@@ -686,7 +694,7 @@ First private Windows beta build candidate (`packaging/build_windows.ps1`).
   Newly released wishlist games whose price has never dropped were appearing
   in "Today's top deal" and "Steals waiting" because ITAD/Steam still reports
   `is_historical_low: true` for any never-discounted current price (e.g.
-  *Mina the Hollower*, *MOUSE: P.I. For Hire*). `isStealDeal` and
+  _Mina the Hollower_, _MOUSE: P.I. For Hire_). `isStealDeal` and
   `wishlistGamesWithDeals` now require `cut > 0` first, so the dashboard only
   shows games that are genuinely on sale. The full wishlist tab still keeps
   the historical-low badge for those entries — it's just no longer flagged as

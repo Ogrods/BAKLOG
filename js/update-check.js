@@ -1,20 +1,20 @@
 /** Boot + in-app update flow against /api/update-check and /api/update/* (frozen installs). */
 
-import { baklogFetch } from './api-client.js';
-import { escapeHtml } from './dom-util.js';
+import { baklogFetch } from "./api-client.js";
+import { escapeHtml } from "./dom-util.js";
 
 /** @deprecated legacy session flag; per-version dismiss uses server + localStorage mirror */
-export const UPDATE_BANNER_DISMISS_KEY = 'baklog.updateBannerDismissed';
-export const UPDATE_DISMISSED_VERSION_KEY = 'baklog.updateDismissedVersion';
+export const UPDATE_BANNER_DISMISS_KEY = "baklog.updateBannerDismissed";
+export const UPDATE_DISMISSED_VERSION_KEY = "baklog.updateDismissedVersion";
 
 const UPDATE_STATUS_POLL_MS = 800;
 const POST_APPLY_POLL_MS = 1000;
 const POST_APPLY_TIMEOUT_MS = 90000;
 export const POST_APPLY_RECOVERY_MESSAGE =
   "If BAKLOG didn't restart, open BAKLOG Tray from the Start Menu (or run BAKLOG Tray.exe).";
-const UPDATE_MODAL_ID = 'updateReleaseModal';
-const UPDATE_INSTALL_MODAL_ID = 'updateInstallConfirmModal';
-const UPDATE_TOAST_ID = 'updateNoticeToast';
+const UPDATE_MODAL_ID = "updateReleaseModal";
+const UPDATE_INSTALL_MODAL_ID = "updateInstallConfirmModal";
+const UPDATE_TOAST_ID = "updateNoticeToast";
 
 /** @type {AbortController | null} */
 let _modalKeyAbort = null;
@@ -27,12 +27,13 @@ let _installHints = { installSource: null, arpVersionMismatch: false };
  * @returns {{ installSource: string | null, arpVersionMismatch: boolean }}
  */
 export function installHintsFromPayload(data) {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== "object") {
     return { installSource: null, arpVersionMismatch: false };
   }
-  const installSource = typeof data.install_source === 'string' && data.install_source.trim()
-    ? data.install_source.trim()
-    : null;
+  const installSource =
+    typeof data.install_source === "string" && data.install_source.trim()
+      ? data.install_source.trim()
+      : null;
   return {
     installSource,
     arpVersionMismatch: data.arp_version_mismatch === true,
@@ -54,12 +55,12 @@ export function _resetInstallHintsForTests() {
  * @param {{ installSource?: string | null, arpVersionMismatch?: boolean }} [hints]
  */
 export function renderSetupArpFootnote(hints = _installHints) {
-  if (hints?.installSource !== 'setup' && !hints?.arpVersionMismatch) return '';
+  if (hints?.installSource !== "setup" && !hints?.arpVersionMismatch) return "";
   return (
     '<p class="text-xs text-slate-500 mt-2">' +
-    'Installed with BAKLOG-Setup.exe? Add/Remove Programs may still show an older version after in-app updates. ' +
-    'Re-run the installer from the release page when you want Settings to match, or ignore it if the app version looks correct.' +
-    '</p>'
+    "Installed with BAKLOG-Setup.exe? Add/Remove Programs may still show an older version after in-app updates. " +
+    "Re-run the installer from the release page when you want Settings to match, or ignore it if the app version looks correct." +
+    "</p>"
   );
 }
 
@@ -85,30 +86,44 @@ export function renderSetupArpFootnote(hints = _installHints) {
  * } | { ok: false, error: string }}
  */
 export function parseUpdateCheckResponse(data) {
-  if (!data || typeof data !== 'object') {
-    return { ok: false, error: 'Invalid update-check response' };
+  if (!data || typeof data !== "object") {
+    return { ok: false, error: "Invalid update-check response" };
   }
-  const err = typeof data.error === 'string' ? data.error.trim() : '';
+  const err = typeof data.error === "string" ? data.error.trim() : "";
   if (err) return { ok: false, error: err };
-  const current = typeof data.current === 'string' ? data.current : '';
-  const latest = typeof data.latest === 'string' && data.latest.trim() ? data.latest.trim() : null;
-  const url = typeof data.url === 'string' && data.url.trim() ? data.url.trim() : null;
-  const downloadUrl = typeof data.download_url === 'string' && data.download_url.trim()
-    ? data.download_url.trim()
-    : null;
-  const sha256 = typeof data.sha256 === 'string' && data.sha256.trim() ? data.sha256.trim() : null;
-  const releaseNotes = typeof data.release_notes === 'string' && data.release_notes.trim()
-    ? data.release_notes.trim()
-    : null;
-  const publishedAt = typeof data.published_at === 'string' && data.published_at.trim()
-    ? data.published_at.trim()
-    : null;
-  const blockedReason = typeof data.apply_blocked_reason === 'string' && data.apply_blocked_reason.trim()
-    ? data.apply_blocked_reason.trim()
-    : null;
-  const blockedMessage = typeof data.apply_blocked_message === 'string' && data.apply_blocked_message.trim()
-    ? data.apply_blocked_message.trim()
-    : null;
+  const current = typeof data.current === "string" ? data.current : "";
+  const latest =
+    typeof data.latest === "string" && data.latest.trim()
+      ? data.latest.trim()
+      : null;
+  const url =
+    typeof data.url === "string" && data.url.trim() ? data.url.trim() : null;
+  const downloadUrl =
+    typeof data.download_url === "string" && data.download_url.trim()
+      ? data.download_url.trim()
+      : null;
+  const sha256 =
+    typeof data.sha256 === "string" && data.sha256.trim()
+      ? data.sha256.trim()
+      : null;
+  const releaseNotes =
+    typeof data.release_notes === "string" && data.release_notes.trim()
+      ? data.release_notes.trim()
+      : null;
+  const publishedAt =
+    typeof data.published_at === "string" && data.published_at.trim()
+      ? data.published_at.trim()
+      : null;
+  const blockedReason =
+    typeof data.apply_blocked_reason === "string" &&
+    data.apply_blocked_reason.trim()
+      ? data.apply_blocked_reason.trim()
+      : null;
+  const blockedMessage =
+    typeof data.apply_blocked_message === "string" &&
+    data.apply_blocked_message.trim()
+      ? data.apply_blocked_message.trim()
+      : null;
   return {
     ok: true,
     current,
@@ -120,7 +135,8 @@ export function parseUpdateCheckResponse(data) {
     applySupported: data.apply_supported === true,
     applyBlockedReason: blockedReason,
     applyBlockedMessage: blockedMessage,
-    runtimeLabel: typeof data.runtime_label === 'string' ? data.runtime_label : null,
+    runtimeLabel:
+      typeof data.runtime_label === "string" ? data.runtime_label : null,
     releaseNotes,
     publishedAt,
     dismissed: data.dismissed === true,
@@ -159,7 +175,7 @@ export function rememberDismissedVersion(version) {
 
 /** @param {{ current: string, latest: string | null, url: string | null }} parsed */
 export function formatUpdateAvailableMessage(parsed) {
-  const urlPart = parsed.url ? ` Release page: ${parsed.url}` : '';
+  const urlPart = parsed.url ? ` Release page: ${parsed.url}` : "";
   return `Update available: v${parsed.latest} (you have v${parsed.current}).${urlPart}`;
 }
 
@@ -173,18 +189,18 @@ export function formatUpToDateMessage(parsed) {
  * @param {string | null | undefined} [code]
  */
 export function mapUpdateError(message, code = null) {
-  const text = (message || '').trim();
-  if (code === 'fetchers_running') {
-    return 'Finish or stop fetchers in Fetcher health, then try again.';
+  const text = (message || "").trim();
+  if (code === "fetchers_running") {
+    return "Finish or stop fetchers in Fetcher health, then try again.";
   }
-  if (code === 'sign_in_active') {
-    return 'Finish or cancel the sign-in window before updating.';
+  if (code === "sign_in_active") {
+    return "Finish or cancel the sign-in window before updating.";
   }
-  if (code === 'dev_runtime') {
-    return 'Updates install only in the desktop app, not the dev server.';
+  if (code === "dev_runtime") {
+    return "Updates install only in the desktop app, not the dev server.";
   }
   if (text) return text;
-  return 'Update failed.';
+  return "Update failed.";
 }
 
 /**
@@ -196,13 +212,13 @@ export function mapUpdateError(message, code = null) {
  * }} parsed
  */
 export function renderApplyBlockedHint(parsed) {
-  if (parsed.applySupported && !updateMutationsBlocked(parsed)) return '';
+  if (parsed.applySupported && !updateMutationsBlocked(parsed)) return "";
   const msg = parsed.signInActive
-    ? mapUpdateError('', 'sign_in_active')
+    ? mapUpdateError("", "sign_in_active")
     : parsed.fetchersInFlight
-      ? mapUpdateError('', 'fetchers_running')
+      ? mapUpdateError("", "fetchers_running")
       : parsed.applyBlockedMessage?.trim();
-  if (!msg) return '';
+  if (!msg) return "";
   return `<p class="update-blocked-hint text-sm text-slate-400 mt-1">${escapeHtml(msg)}</p>`;
 }
 
@@ -219,20 +235,20 @@ export function renderApplyBlockedHint(parsed) {
  * }} parsed
  */
 export function renderUpdateBannerHtml(parsed) {
-  const href = parsed.url || 'https://github.com/Ogrods/BAKLOG/releases/latest';
+  const href = parsed.url || "https://github.com/Ogrods/BAKLOG/releases/latest";
   const canUpdateNow = parsed.applySupported && !updateMutationsBlocked(parsed);
   const updateBtn = canUpdateNow
     ? '<button type="button" class="update-available-banner-apply ml-2 text-sky-300 hover:underline">Update now</button>'
-    : '';
+    : "";
   return (
     '<div class="migration-banner-body update-available-banner-body">' +
-    `<span class="text-amber-400">BAKLOG v${escapeHtml(parsed.latest || '')} is available (you have v${escapeHtml(parsed.current)}).</span> ` +
+    `<span class="text-amber-400">BAKLOG v${escapeHtml(parsed.latest || "")} is available (you have v${escapeHtml(parsed.current)}).</span> ` +
     updateBtn +
     `<button type="button" class="update-available-banner-notes ml-2 text-sky-300 hover:underline">What's new</button>` +
     `<a href="${escapeHtml(href)}" class="update-available-banner-release ml-2 text-sky-300 hover:underline" target="_blank" rel="noopener noreferrer">Release page</a>` +
     '<button type="button" class="update-available-banner-snooze ml-2 text-slate-400 hover:text-slate-200 text-sm">Remind me later</button>' +
     renderApplyBlockedHint(parsed) +
-    '</div>'
+    "</div>"
   );
 }
 
@@ -240,14 +256,14 @@ export function renderUpdateBannerHtml(parsed) {
  * @param {{ version: string | null }} status
  */
 export function renderUpdateReadyBannerHtml(status) {
-  const version = status.version || 'new';
+  const version = status.version || "new";
   return (
     '<div class="migration-banner-body update-ready-banner-body">' +
     `<span class="text-amber-400">Update v${escapeHtml(version)} downloaded and verified.</span> ` +
     '<button type="button" class="update-ready-banner-install ml-2 text-sky-300 hover:underline">Install &amp; restart</button>' +
     '<button type="button" class="update-ready-banner-discard ml-2 text-slate-400 hover:text-slate-200 text-sm">Discard download</button>' +
     '<button type="button" class="update-ready-banner-later ml-2 text-slate-400 hover:text-slate-200 text-sm">Not yet</button>' +
-    '</div>'
+    "</div>"
   );
 }
 
@@ -257,13 +273,14 @@ export function renderUpdateReadyBannerHtml(status) {
  */
 export function renderUpdateProgressHtml(status, { cancellable = false } = {}) {
   const msg = formatProgressMessage(status);
-  const cancelBtn = cancellable && status.phase === 'downloading'
-    ? '<button type="button" class="update-progress-cancel ml-2 text-slate-400 hover:text-slate-200 text-sm">Cancel download</button>'
-    : '';
+  const cancelBtn =
+    cancellable && status.phase === "downloading"
+      ? '<button type="button" class="update-progress-cancel ml-2 text-slate-400 hover:text-slate-200 text-sm">Cancel download</button>'
+      : "";
   return (
     `<div class="migration-banner-body update-progress-banner-body">` +
     `<span class="text-amber-400">${escapeHtml(msg)}</span> ${cancelBtn}` +
-    '</div>'
+    "</div>"
   );
 }
 
@@ -280,17 +297,17 @@ export function renderUpdateProgressHtml(status, { cancellable = false } = {}) {
  * }} parsed
  */
 export function renderUpdateModalHtml(parsed) {
-  const href = parsed.url || 'https://github.com/Ogrods/BAKLOG/releases/latest';
+  const href = parsed.url || "https://github.com/Ogrods/BAKLOG/releases/latest";
   const notes = parsed.releaseNotes
     ? `<pre class="update-modal-notes whitespace-pre-wrap text-sm text-slate-300 max-h-64 overflow-y-auto mt-3 p-3 rounded bg-slate-900/80 border border-slate-700">${escapeHtml(parsed.releaseNotes)}</pre>`
     : '<p class="text-sm text-slate-400 mt-3">See the release page for details.</p>';
   const canUpdateNow = parsed.applySupported && !updateMutationsBlocked(parsed);
   const updateBtn = canUpdateNow
     ? '<button type="button" class="update-modal-apply bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Update now</button>'
-    : '';
+    : "";
   return (
     `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-5" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
-    `<h2 id="updateModalTitle" class="text-lg font-semibold text-slate-100">Update available: v${escapeHtml(parsed.latest || '')}</h2>` +
+    `<h2 id="updateModalTitle" class="text-lg font-semibold text-slate-100">Update available: v${escapeHtml(parsed.latest || "")}</h2>` +
     `<p class="text-sm text-slate-400 mt-1">You have v${escapeHtml(parsed.current)}.</p>` +
     renderApplyBlockedHint(parsed) +
     notes +
@@ -298,7 +315,7 @@ export function renderUpdateModalHtml(parsed) {
     `<a href="${escapeHtml(href)}" class="update-modal-release text-sm text-sky-300 hover:underline px-3 py-2" target="_blank" rel="noopener noreferrer">Release page</a>` +
     '<button type="button" class="update-modal-later text-sm px-3 py-2 rounded hover:bg-slate-700">Remind me later</button>' +
     updateBtn +
-    '</div></div>'
+    "</div></div>"
   );
 }
 
@@ -311,22 +328,23 @@ function renderInstallConfirmModalHtml(hints = _installHints) {
     '<div class="flex flex-wrap gap-2 justify-end mt-4">' +
     '<button type="button" class="update-install-decline text-sm px-3 py-2 rounded hover:bg-slate-700">Not yet</button>' +
     '<button type="button" class="update-install-confirm bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Install &amp; restart</button>' +
-    '</div></div>'
+    "</div></div>"
   );
 }
 
 export function hideUpdateBanner() {
-  const banner = document.getElementById('updateAvailableBanner');
+  const banner = document.getElementById("updateAvailableBanner");
   if (!banner) return;
-  banner.classList.add('hidden');
+  banner.classList.add("hidden");
   banner.replaceChildren();
 }
 
 function setBannerHtml(html, { hidden = false } = {}) {
-  const banner = document.getElementById('updateAvailableBanner');
+  const banner = document.getElementById("updateAvailableBanner");
   if (!banner) return;
-  banner.innerHTML = html;
-  banner.classList.toggle('hidden', hidden);
+  banner.replaceChildren();
+  banner.insertAdjacentHTML("beforeend", html);
+  banner.classList.toggle("hidden", hidden);
 }
 
 function hideUpdateModal() {
@@ -334,7 +352,7 @@ function hideUpdateModal() {
   _modalKeyAbort = null;
   const modal = document.getElementById(UPDATE_MODAL_ID);
   if (!modal) return;
-  modal.classList.add('hidden');
+  modal.classList.add("hidden");
   modal.replaceChildren();
 }
 
@@ -343,7 +361,7 @@ function hideInstallConfirmModal() {
   _modalKeyAbort = null;
   const modal = document.getElementById(UPDATE_INSTALL_MODAL_ID);
   if (!modal) return;
-  modal.classList.add('hidden');
+  modal.classList.add("hidden");
   modal.replaceChildren();
 }
 
@@ -356,12 +374,20 @@ function bindModalDismiss(modal, onClose) {
   const controller = new AbortController();
   _modalKeyAbort = controller;
   const { signal } = controller;
-  modal.addEventListener('click', (ev) => {
-    if (ev.target === modal) onClose();
-  }, { signal });
-  modal.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') onClose();
-  }, { signal });
+  modal.addEventListener(
+    "click",
+    (ev) => {
+      if (ev.target === modal) onClose();
+    },
+    { signal },
+  );
+  modal.addEventListener(
+    "keydown",
+    (ev) => {
+      if (ev.key === "Escape") onClose();
+    },
+    { signal },
+  );
 }
 
 /**
@@ -369,21 +395,21 @@ function bindModalDismiss(modal, onClose) {
  * @param {{ error?: boolean }} [opts]
  */
 export function showUpdateToast(message, { error = false } = {}) {
-  if (typeof document === 'undefined') return;
+  if (typeof document === "undefined") return;
   let el = document.getElementById(UPDATE_TOAST_ID);
   if (!el) {
-    el = document.createElement('div');
+    el = document.createElement("div");
     el.id = UPDATE_TOAST_ID;
-    el.className = 'update-notice-toast hidden';
-    el.setAttribute('role', 'status');
-    el.setAttribute('aria-live', 'polite');
+    el.className = "update-notice-toast hidden";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
     document.body.appendChild(el);
   }
-  el.className = `update-notice-toast ${error ? 'update-notice-toast-error' : 'update-notice-toast-info'}`;
+  el.className = `update-notice-toast ${error ? "update-notice-toast-error" : "update-notice-toast-info"}`;
   el.textContent = message;
-  el.classList.remove('hidden');
+  el.classList.remove("hidden");
   clearTimeout(el._hideTimer);
-  el._hideTimer = setTimeout(() => el.classList.add('hidden'), 5000);
+  el._hideTimer = setTimeout(() => el.classList.add("hidden"), 5000);
 }
 
 /**
@@ -393,25 +419,35 @@ export function showUpdateToast(message, { error = false } = {}) {
 export function showUpdateModal(parsed, handlers = {}) {
   let modal = document.getElementById(UPDATE_MODAL_ID);
   if (!modal) {
-    modal = document.createElement('div');
+    modal = document.createElement("div");
     modal.id = UPDATE_MODAL_ID;
-    modal.className = 'fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60';
+    modal.className =
+      "fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60";
     modal.tabIndex = -1;
     document.body.appendChild(modal);
   }
-  modal.innerHTML = renderUpdateModalHtml(parsed);
-  modal.classList.remove('hidden');
+  modal.replaceChildren();
+  modal.insertAdjacentHTML("beforeend", renderUpdateModalHtml(parsed));
+  modal.classList.remove("hidden");
   modal.focus();
 
   const close = () => hideUpdateModal();
   bindModalDismiss(modal, close);
-  modal.querySelector('.update-modal-later')?.addEventListener('click', () => {
-    dismissUpdateForVersion(parsed.latest, handlers).catch(() => {});
-  }, { once: true });
-  modal.querySelector('.update-modal-apply')?.addEventListener('click', () => {
-    close();
-    runInAppUpdateFlow(handlers).catch(() => {});
-  }, { once: true });
+  modal.querySelector(".update-modal-later")?.addEventListener(
+    "click",
+    () => {
+      dismissUpdateForVersion(parsed.latest, handlers).catch(() => {});
+    },
+    { once: true },
+  );
+  modal.querySelector(".update-modal-apply")?.addEventListener(
+    "click",
+    () => {
+      close();
+      runInAppUpdateFlow(handlers).catch(() => {});
+    },
+    { once: true },
+  );
 }
 
 /**
@@ -421,14 +457,16 @@ export function confirmInstallUpdate() {
   return new Promise((resolve) => {
     let modal = document.getElementById(UPDATE_INSTALL_MODAL_ID);
     if (!modal) {
-      modal = document.createElement('div');
+      modal = document.createElement("div");
       modal.id = UPDATE_INSTALL_MODAL_ID;
-      modal.className = 'fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/60';
+      modal.className =
+        "fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/60";
       modal.tabIndex = -1;
       document.body.appendChild(modal);
     }
-    modal.innerHTML = renderInstallConfirmModalHtml();
-    modal.classList.remove('hidden');
+    modal.replaceChildren();
+    modal.insertAdjacentHTML("beforeend", renderInstallConfirmModalHtml());
+    modal.classList.remove("hidden");
     modal.focus();
 
     const finish = (value) => {
@@ -436,8 +474,12 @@ export function confirmInstallUpdate() {
       resolve(value);
     };
     bindModalDismiss(modal, () => finish(false));
-    modal.querySelector('.update-install-decline')?.addEventListener('click', () => finish(false), { once: true });
-    modal.querySelector('.update-install-confirm')?.addEventListener('click', () => finish(true), { once: true });
+    modal
+      .querySelector(".update-install-decline")
+      ?.addEventListener("click", () => finish(false), { once: true });
+    modal
+      .querySelector(".update-install-confirm")
+      ?.addEventListener("click", () => finish(true), { once: true });
   });
 }
 
@@ -452,9 +494,9 @@ export async function dismissUpdateForVersion(version, opts = {}) {
   hideUpdateModal();
   const fetchFn = opts.fetchFn || baklogFetch;
   try {
-    await fetchFn('/api/update/dismiss', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await fetchFn("/api/update/dismiss", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version }),
     });
   } catch {
@@ -473,51 +515,69 @@ export function dismissUpdateBannerForSession() {
 export async function cancelUpdateDownload(handlers = {}) {
   const fetchFn = handlers.fetchFn || baklogFetch;
   try {
-    await fetchFn('/api/update/cancel', { method: 'POST' });
+    await fetchFn("/api/update/cancel", { method: "POST" });
     hideUpdateBanner();
-    handlers.onNotice?.('Update download cancelled.');
+    handlers.onNotice?.("Update download cancelled.");
   } catch (err) {
-    handlers.onNotice?.(`Could not cancel download: ${err?.message || err}`, { error: true });
+    handlers.onNotice?.(`Could not cancel download: ${err?.message || err}`, {
+      error: true,
+    });
   }
 }
 
 function bindUpdateBannerHandlers(parsed, handlers = {}) {
-  const banner = document.getElementById('updateAvailableBanner');
+  const banner = document.getElementById("updateAvailableBanner");
   if (!banner) return;
-  banner.querySelector('.update-available-banner-snooze')?.addEventListener('click', () => {
-    dismissUpdateForVersion(parsed.latest, handlers).catch(() => {});
-  });
-  banner.querySelector('.update-available-banner-apply')?.addEventListener('click', () => {
-    runInAppUpdateFlow(handlers).catch(() => {});
-  });
-  banner.querySelector('.update-available-banner-notes')?.addEventListener('click', () => {
-    showUpdateModal(parsed, handlers);
-  });
+  banner
+    .querySelector(".update-available-banner-snooze")
+    ?.addEventListener("click", () => {
+      dismissUpdateForVersion(parsed.latest, handlers).catch(() => {});
+    });
+  banner
+    .querySelector(".update-available-banner-apply")
+    ?.addEventListener("click", () => {
+      runInAppUpdateFlow(handlers).catch(() => {});
+    });
+  banner
+    .querySelector(".update-available-banner-notes")
+    ?.addEventListener("click", () => {
+      showUpdateModal(parsed, handlers);
+    });
 }
 
 export async function discardReadyUpdate(handlers = {}) {
   const fetchFn = handlers.fetchFn || baklogFetch;
   try {
-    await fetchFn('/api/update/discard-ready', { method: 'POST' });
+    await fetchFn("/api/update/discard-ready", { method: "POST" });
     hideUpdateBanner();
-    handlers.onNotice?.('Downloaded update discarded.');
+    handlers.onNotice?.("Downloaded update discarded.");
   } catch (err) {
-    handlers.onNotice?.(`Could not discard update: ${err?.message || err}`, { error: true });
+    handlers.onNotice?.(`Could not discard update: ${err?.message || err}`, {
+      error: true,
+    });
   }
 }
 
 function bindReadyBannerHandlers(status, handlers = {}) {
-  const banner = document.getElementById('updateAvailableBanner');
+  const banner = document.getElementById("updateAvailableBanner");
   if (!banner) return;
-  banner.querySelector('.update-ready-banner-install')?.addEventListener('click', () => {
-    runApplyReadyUpdate(handlers).catch(() => {});
-  });
-  banner.querySelector('.update-ready-banner-discard')?.addEventListener('click', () => {
-    discardReadyUpdate(handlers).catch(() => {});
-  });
-  banner.querySelector('.update-ready-banner-later')?.addEventListener('click', () => {
-    handlers.onNotice?.('Update ready — choose Install & restart when you want.');
-  });
+  banner
+    .querySelector(".update-ready-banner-install")
+    ?.addEventListener("click", () => {
+      runApplyReadyUpdate(handlers).catch(() => {});
+    });
+  banner
+    .querySelector(".update-ready-banner-discard")
+    ?.addEventListener("click", () => {
+      discardReadyUpdate(handlers).catch(() => {});
+    });
+  banner
+    .querySelector(".update-ready-banner-later")
+    ?.addEventListener("click", () => {
+      handlers.onNotice?.(
+        "Update ready — choose Install & restart when you want.",
+      );
+    });
 }
 
 /**
@@ -545,40 +605,47 @@ export function showUpdateBanner(parsed, handlers = {}) {
  * @param {unknown} data
  */
 export function parseUpdateStatusResponse(data) {
-  if (!data || typeof data !== 'object') {
-    return { ok: false, error: 'Invalid update status response' };
+  if (!data || typeof data !== "object") {
+    return { ok: false, error: "Invalid update status response" };
   }
   return {
     ok: true,
-    phase: typeof data.phase === 'string' ? data.phase : 'idle',
+    phase: typeof data.phase === "string" ? data.phase : "idle",
     progressBytes: Number(data.progress_bytes) || 0,
     totalBytes: data.total_bytes == null ? null : Number(data.total_bytes) || 0,
-    version: typeof data.version === 'string' ? data.version : null,
-    error: typeof data.error === 'string' ? data.error : null,
+    version: typeof data.version === "string" ? data.version : null,
+    error: typeof data.error === "string" ? data.error : null,
     ready: data.ready === true,
     canApply: data.can_apply === true,
   };
 }
 
 function formatProgressMessage(status) {
-  if (status.phase === 'downloading') {
+  if (status.phase === "downloading") {
     if (status.totalBytes) {
-      const pct = Math.min(100, Math.round((status.progressBytes / status.totalBytes) * 100));
+      const pct = Math.min(
+        100,
+        Math.round((status.progressBytes / status.totalBytes) * 100),
+      );
       return `Downloading update… ${pct}%`;
     }
-    return 'Downloading update…';
+    return "Downloading update…";
   }
-  if (status.phase === 'ready') return 'Update downloaded and verified. Ready to install.';
-  if (status.phase === 'applying') return 'Installing update and restarting BAKLOG…';
-  if (status.phase === 'error') return mapUpdateError(status.error);
-  return '';
+  if (status.phase === "ready")
+    return "Update downloaded and verified. Ready to install.";
+  if (status.phase === "applying")
+    return "Installing update and restarting BAKLOG…";
+  if (status.phase === "error") return mapUpdateError(status.error);
+  return "";
 }
 
 function bindProgressCancel(handlers = {}) {
-  const banner = document.getElementById('updateAvailableBanner');
-  banner?.querySelector('.update-progress-cancel')?.addEventListener('click', () => {
-    cancelUpdateDownload(handlers).catch(() => {});
-  });
+  const banner = document.getElementById("updateAvailableBanner");
+  banner
+    ?.querySelector(".update-progress-cancel")
+    ?.addEventListener("click", () => {
+      cancelUpdateDownload(handlers).catch(() => {});
+    });
 }
 
 function showUpdateError(message, handlers = {}) {
@@ -598,27 +665,35 @@ export async function pollPostApplyOutcome(opts = {}) {
   while (Date.now() < deadline) {
     try {
       const [statusRes, resultRes] = await Promise.all([
-        fetchFn('/api/update/status'),
-        fetchFn('/api/update/apply-result'),
+        fetchFn("/api/update/status"),
+        fetchFn("/api/update/apply-result"),
       ]);
       const resultPayload = await resultRes.json().catch(() => ({}));
       const applyResult = resultPayload?.result;
       if (applyResult && applyResult.ok === false) {
-        const msg = mapUpdateError(String(applyResult.error || 'Update apply failed'));
+        const msg = mapUpdateError(
+          String(applyResult.error || "Update apply failed"),
+        );
         showUpdateError(msg, opts);
         throw new Error(msg);
       }
       if (applyResult && applyResult.ok === true) {
         return { ok: true, version: applyResult.version || null };
       }
-      const status = parseUpdateStatusResponse(await statusRes.json().catch(() => ({})));
-      if (status.ok && status.phase === 'error' && status.error) {
+      const status = parseUpdateStatusResponse(
+        await statusRes.json().catch(() => ({})),
+      );
+      if (status.ok && status.phase === "error" && status.error) {
         const msg = mapUpdateError(status.error);
         showUpdateError(msg, opts);
         throw new Error(msg);
       }
     } catch (err) {
-      if (err instanceof Error && err.message && !/fetch|network|failed to fetch/i.test(err.message)) {
+      if (
+        err instanceof Error &&
+        err.message &&
+        !/fetch|network|failed to fetch/i.test(err.message)
+      ) {
         throw err;
       }
     }
@@ -637,18 +712,23 @@ export async function pollUpdateStatusUntilDone(opts = {}) {
   const fetchFn = opts.fetchFn || baklogFetch;
   const sleepMs = opts.sleepMs ?? UPDATE_STATUS_POLL_MS;
   for (;;) {
-    const res = await fetchFn('/api/update/status');
+    const res = await fetchFn("/api/update/status");
     const data = await res.json().catch(() => ({}));
     const status = parseUpdateStatusResponse(data);
-    if (!status.ok) throw new Error(status.error || 'Update status unavailable');
-    if (status.phase !== 'error') {
+    if (!status.ok)
+      throw new Error(status.error || "Update status unavailable");
+    if (status.phase !== "error") {
       setBannerHtml(renderUpdateProgressHtml(status, { cancellable: true }));
       bindProgressCancel(opts);
     }
-    if (status.phase === 'ready' || status.phase === 'error' || status.phase === 'idle') {
+    if (
+      status.phase === "ready" ||
+      status.phase === "error" ||
+      status.phase === "idle"
+    ) {
       return status;
     }
-    if (status.phase === 'applying') return status;
+    if (status.phase === "applying") return status;
     await new Promise((resolve) => setTimeout(resolve, sleepMs));
   }
 }
@@ -660,16 +740,18 @@ export async function runApplyReadyUpdate(opts = {}) {
   const fetchFn = opts.fetchFn || baklogFetch;
   const confirmed = await confirmInstallUpdate();
   if (!confirmed) {
-    const res = await fetchFn('/api/update/status');
-    const status = parseUpdateStatusResponse(await res.json().catch(() => ({})));
+    const res = await fetchFn("/api/update/status");
+    const status = parseUpdateStatusResponse(
+      await res.json().catch(() => ({})),
+    );
     if (status.ok && status.canApply) {
       showReadyToInstallBanner(status, opts);
     }
-    opts.onNotice?.('Update ready — choose Install & restart when you want.');
+    opts.onNotice?.("Update ready — choose Install & restart when you want.");
     return { ok: true, ready: true, applied: false };
   }
 
-  const applyRes = await fetchFn('/api/update/apply', { method: 'POST' });
+  const applyRes = await fetchFn("/api/update/apply", { method: "POST" });
   const applyPayload = await applyRes.json().catch(() => ({}));
   if (!applyRes.ok || applyPayload.ok === false) {
     const msg = mapUpdateError(applyPayload.error, applyPayload.error_code);
@@ -680,7 +762,7 @@ export async function runApplyReadyUpdate(opts = {}) {
   setBannerHtml(
     '<div class="migration-banner-body"><span class="text-amber-400">Installing update and restarting BAKLOG…</span></div>',
   );
-  opts.onNotice?.('Installing update and restarting BAKLOG…');
+  opts.onNotice?.("Installing update and restarting BAKLOG…");
   await pollPostApplyOutcome(opts);
   return { ok: true, applied: true, version: applyPayload.version };
 }
@@ -691,36 +773,40 @@ export async function runApplyReadyUpdate(opts = {}) {
 export async function runInAppUpdateFlow(opts = {}) {
   const fetchFn = opts.fetchFn || baklogFetch;
 
-  const downloadRes = await fetchFn('/api/update/download', { method: 'POST' });
+  const downloadRes = await fetchFn("/api/update/download", { method: "POST" });
   const downloadPayload = await downloadRes.json().catch(() => ({}));
   if (!downloadRes.ok || downloadPayload.ok === false) {
-    const msg = mapUpdateError(downloadPayload.error, downloadPayload.error_code);
+    const msg = mapUpdateError(
+      downloadPayload.error,
+      downloadPayload.error_code,
+    );
     showUpdateError(msg, opts);
     throw new Error(msg);
   }
 
   const status = await pollUpdateStatusUntilDone(opts);
-  if (status.phase === 'error') {
+  if (status.phase === "error") {
     const msg = mapUpdateError(status.error);
     showUpdateError(msg, opts);
     throw new Error(msg);
   }
   if (!status.canApply) {
-    const msg = 'Update package is not ready to apply';
+    const msg = "Update package is not ready to apply";
     showUpdateError(msg, opts);
     throw new Error(msg);
   }
 
-  const confirmed = typeof opts.confirmInstall === 'function'
-    ? await opts.confirmInstall()
-    : await confirmInstallUpdate();
+  const confirmed =
+    typeof opts.confirmInstall === "function"
+      ? await opts.confirmInstall()
+      : await confirmInstallUpdate();
   if (!confirmed) {
     showReadyToInstallBanner(status, opts);
-    opts.onNotice?.('Update ready — choose Install & restart when you want.');
+    opts.onNotice?.("Update ready — choose Install & restart when you want.");
     return { ok: true, ready: true, applied: false };
   }
 
-  const applyRes = await fetchFn('/api/update/apply', { method: 'POST' });
+  const applyRes = await fetchFn("/api/update/apply", { method: "POST" });
   const applyPayload = await applyRes.json().catch(() => ({}));
   if (!applyRes.ok || applyPayload.ok === false) {
     const msg = mapUpdateError(applyPayload.error, applyPayload.error_code);
@@ -731,9 +817,13 @@ export async function runInAppUpdateFlow(opts = {}) {
   setBannerHtml(
     '<div class="migration-banner-body"><span class="text-amber-400">Installing update and restarting BAKLOG…</span></div>',
   );
-  opts.onNotice?.('Installing update and restarting BAKLOG…');
+  opts.onNotice?.("Installing update and restarting BAKLOG…");
   await pollPostApplyOutcome(opts);
-  return { ok: true, applied: true, version: applyPayload.version || status.version };
+  return {
+    ok: true,
+    applied: true,
+    version: applyPayload.version || status.version,
+  };
 }
 
 /**
@@ -743,10 +833,12 @@ export async function syncReadyUpdateFromStatus(opts = {}) {
   if (opts.frozen === false) return { ok: true, ready: false };
   const fetchFn = opts.fetchFn || baklogFetch;
   try {
-    const res = await fetchFn('/api/update/status');
+    const res = await fetchFn("/api/update/status");
     if (!res.ok) return { ok: false };
-    const status = parseUpdateStatusResponse(await res.json().catch(() => ({})));
-    if (status.ok && status.phase === 'ready' && status.canApply) {
+    const status = parseUpdateStatusResponse(
+      await res.json().catch(() => ({})),
+    );
+    if (status.ok && status.phase === "ready" && status.canApply) {
       showReadyToInstallBanner(status, opts);
       return { ok: true, ready: true, status };
     }
@@ -761,11 +853,12 @@ export async function syncReadyUpdateFromStatus(opts = {}) {
  */
 export async function checkForUpdates(opts = {}) {
   const fetchFn = opts.fetchFn || fetch;
-  const source = opts.source || 'manual';
+  const source = opts.source || "manual";
   const frozen = opts.frozen === true;
-  if (source === 'boot') {
-    if (!frozen) return { skipped: true, reason: 'not-frozen' };
-    if (opts.checkOnBoot === false) return { skipped: true, reason: 'pref-disabled' };
+  if (source === "boot") {
+    if (!frozen) return { skipped: true, reason: "not-frozen" };
+    if (opts.checkOnBoot === false)
+      return { skipped: true, reason: "pref-disabled" };
   }
 
   const handlers = {
@@ -773,19 +866,29 @@ export async function checkForUpdates(opts = {}) {
     onNotice: opts.onNotice,
   };
 
-  if (source === 'manual' && opts.frozen !== false) {
-    const readySync = await syncReadyUpdateFromStatus({ ...handlers, frozen: true });
+  if (source === "manual" && opts.frozen !== false) {
+    const readySync = await syncReadyUpdateFromStatus({
+      ...handlers,
+      frozen: true,
+    });
     if (readySync.ready) {
-      opts.onNotice?.(`Update v${readySync.status?.version || ''} is ready to install.`);
-      return { ok: true, updateAvailable: true, ready: true, status: readySync.status };
+      opts.onNotice?.(
+        `Update v${readySync.status?.version || ""} is ready to install.`,
+      );
+      return {
+        ok: true,
+        updateAvailable: true,
+        ready: true,
+        status: readySync.status,
+      };
     }
   }
 
   try {
-    const res = await fetchFn('/api/update-check');
+    const res = await fetchFn("/api/update-check");
     if (!res.ok) {
       const msg = `Could not check for updates (server returned ${res.status}).`;
-      if (source === 'manual') opts.onNotice?.(msg, { error: true });
+      if (source === "manual") opts.onNotice?.(msg, { error: true });
       return { ok: false, error: msg };
     }
     const data = await res.json().catch(() => ({}));
@@ -793,22 +896,22 @@ export async function checkForUpdates(opts = {}) {
     const parsed = parseUpdateCheckResponse(data);
     if (!parsed.ok) {
       const msg = `Could not check for updates: ${parsed.error}`;
-      if (source === 'manual') opts.onNotice?.(msg, { error: true });
+      if (source === "manual") opts.onNotice?.(msg, { error: true });
       return { ok: false, error: parsed.error };
     }
     if (parsed.updateAvailable) {
-      if (source === 'boot') {
+      if (source === "boot") {
         showUpdateBanner(parsed, handlers);
       } else {
         showUpdateModal(parsed, handlers);
       }
       return { ok: true, updateAvailable: true, parsed };
     }
-    if (source === 'manual') opts.onNotice?.(formatUpToDateMessage(parsed));
+    if (source === "manual") opts.onNotice?.(formatUpToDateMessage(parsed));
     return { ok: true, updateAvailable: false, parsed };
   } catch (err) {
     const msg = `Update check failed: ${err?.message || err}`;
-    if (source === 'manual') opts.onNotice?.(msg, { error: true });
+    if (source === "manual") opts.onNotice?.(msg, { error: true });
     return { ok: false, error: msg };
   }
 }

@@ -144,6 +144,9 @@ def test_fetch_via_browser_queues_then_drains(monkeypatch, tmp_path) -> None:
             self.pages = [FakePage()]
             self.request = FakeRequest()
 
+        def close(self) -> None:
+            pass
+
         def __enter__(self):
             return self
 
@@ -212,6 +215,9 @@ def test_empty_capture_raises_capture_error_not_auth(monkeypatch, tmp_path) -> N
         def __init__(self) -> None:
             self.pages = [FakePage()]
             self.request = FakeRequest()
+
+        def close(self) -> None:
+            pass
 
         def __enter__(self):
             return self

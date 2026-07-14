@@ -43,7 +43,7 @@
     "eslint": "^9.22.0",
     "eslint-plugin-import": "^2.31.0",
     "globals": "^16.0.0",
-    "happy-dom": "^20.10.3",
+    "happy-dom": "^20.10.6",
     "pixelmatch": "^7.2.0",
     "playwright": "^1.50.0",
     "pngjs": "^7.0.0",

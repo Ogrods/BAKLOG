@@ -369,7 +369,7 @@ class TestProfileLockRelease:
         killed: list[int] = []
 
         monkeypatch.setattr(cdp, "pids_holding_chromium_profile", lambda _p: [4242, 5151])
-        monkeypatch.setattr(cdp, "_kill_pids", lambda pids: killed.extend(pids) or pids)
+        monkeypatch.setattr(cdp, "_kill_pids", lambda pids, **kwargs: killed.extend(pids) or pids)
         monkeypatch.setattr(cdp.time, "sleep", lambda _s: None)
 
         out = cdp.release_chromium_profile_lock(profile)

@@ -23,7 +23,7 @@ freetype-py==2.5.1
 frozenlist==1.8.0
 greenlet==3.5.0
 h11==0.16.0
-howlongtobeatpy==1.0.21
+howlongtobeatpy==1.0.22
 idna==3.11
 imageio-ffmpeg==0.6.0
 importlib_metadata==9.0.0

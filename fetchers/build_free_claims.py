@@ -1108,7 +1108,7 @@ def _enrich_item_light(
     return out
 
 
-from shared.free_claims_sources import norm_title as _norm_title_key
+from shared.free_claims_sources import norm_title as _norm_title_key  # noqa: E402, I001 — module-level, deliberately placed before preview fn
 
 # Stopwords matching js/claims-workspace.js DUPE_STOPWORDS — removed from
 # dismissed_keys filters so the Python side matches JS coverLookupKey() output.

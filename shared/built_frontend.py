@@ -10,7 +10,6 @@ from shared.install_paths import (
     built_html_path,
     built_immutable_assets,
     built_manifest_path,
-    bundle_root,
     is_frozen,
     load_built_manifest,
     serve_built_frontend,

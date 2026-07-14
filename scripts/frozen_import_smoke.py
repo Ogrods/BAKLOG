@@ -83,7 +83,11 @@ def run_import_test(exe: Path, module_name: str) -> dict:
     stderr = (proc.stderr or "").strip()
     if proc.returncode != 0:
         # Extract the actual error from stderr
-        error_lines = [line for line in stderr.splitlines() if "Error" in line or "error" in line or "Traceback" in line]
+        error_lines = [
+            line
+            for line in stderr.splitlines()
+            if "Error" in line or "error" in line or "Traceback" in line
+        ]
         error = error_lines[-1] if error_lines else stderr[-200:] if stderr else f"exit {proc.returncode}"
         return {"module": module_name, "ok": False, "error": error}
     if "ok" not in stdout:

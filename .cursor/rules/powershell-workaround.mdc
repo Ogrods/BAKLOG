@@ -1,0 +1,13 @@
+# PowerShell command chaining
+
+PowerShell does NOT support `&&` for command chaining (on this version). Use `;` instead:
+
+- `cd dir; command` — OK
+- `cd dir && command` — FAILS (parser error)
+
+Git: pipe diffs through `--no-pager` or redirect to file to avoid blocking on large output:
+
+- `git --no-pager diff <ref1> <ref2> -- file.py`
+- `git show <ref>:path > outfile`
+
+Avoid long-running `git diff` commands with no pagination cutoff.

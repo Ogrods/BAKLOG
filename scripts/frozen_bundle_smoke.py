@@ -213,7 +213,9 @@ def run_smoke(bundle_dir, *, expected_version=None):
     )
     report["checks"]["import_smoke_exit"] = import_smoke.returncode
     if import_smoke.returncode != 0:
-        tail = "\n".join((import_smoke.stdout or "").splitlines()[-20:] + (import_smoke.stderr or "").splitlines()[-12:])
+        out = (import_smoke.stdout or "").splitlines()[-20:]
+        err = (import_smoke.stderr or "").splitlines()[-12:]
+        tail = "\n".join(out + err)
         report["error"] = f"import smoke failed (exit {import_smoke.returncode})\n{tail}"
         return report
 

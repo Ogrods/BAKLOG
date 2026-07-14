@@ -154,7 +154,9 @@ def main():
         args.json_out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"Wrote {args.json_out}")
     print(
-        f"\nSummary: dispatch {report['summary']['dispatch_pass']}/{len(dispatch_rows)}, live {report['summary']['live_pass']}/{len(live_rows)} ({report['summary']['live_skipped']} skipped not connected)"
+        f"\nSummary: dispatch {report['summary']['dispatch_pass']}/{len(dispatch_rows)}, "
+        f"live {report['summary']['live_pass']}/{len(live_rows)} "
+        f"({report['summary']['live_skipped']} skipped not connected)"
     )
     if dispatch_fail or live_fail:
         print("\nFailures:")

@@ -871,12 +871,37 @@ def _apply_field_overrides(
     field_overrides_by_key: dict[str, dict[str, str]] | None = None,
 ) -> None:
     field_overrides_by_key = field_overrides_by_key or {}
+    # Pre-build a reverse lookup: override title norm → override values.
+    # Used as a fallback when ID/key-based lookup fails (common when a source
+    # feed rekeys its IDs and the user's edited title normalizes differently
+    # from the source title, preventing rekey_approved_state from matching).
+    override_by_norm: dict[str, dict[str, str]] = {}
+    for fo_val in field_overrides.values():
+        title = str(fo_val.get("title") or "").strip()
+        if title:
+            norm = norm_title(title)
+            if norm:
+                override_by_norm[norm] = fo_val
     for item in items:
         overrides = _lookup_field_overrides(
             item,
             field_overrides=field_overrides,
             field_overrides_by_key=field_overrides_by_key,
         )
+        if not overrides:
+            # Fallback: match by normalized title when ID/key lookup failed.
+            item_title = str(item.get("title") or "").strip()
+            if item_title:
+                item_norm = norm_title(item_title)
+                overrides = override_by_norm.get(item_norm)
+            # Substring fallback: if the override title is a cleaned-up
+            # version of the source title (e.g. edit removed "(Stove)"),
+            # the exact norms won't match. Check containment both ways.
+            if not overrides:
+                for ov_norm, ov_val in override_by_norm.items():
+                    if ov_norm and item_norm and (ov_norm in item_norm or item_norm in ov_norm):
+                        overrides = ov_val
+                        break
         if not overrides:
             continue
         for field, value in overrides.items():
@@ -1402,7 +1427,12 @@ def rekey_approved_state(
             if resolved:
                 new_id = resolved
             elif auto_items_all and old_id not in prior_rows_by_id:
-                continue
+                # The old ID wasn't found in the new auto feed and we have no
+                # prior published row to fall back on. Keep the old ID so the
+                # approved entry survives in free_claims.approved.json rather
+                # than being silently dropped. _carry_forward_missing_approved
+                # will carry the row forward from the prior published output.
+                new_id = old_id
         if new_id in seen_ids:
             migrate_maps(old_id, new_id)
             continue

@@ -841,16 +841,22 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
       .reduce((a, b) => (!a || a.y > b.y) ? b : a, null);
     if (oldUnplayed) push('^', 'is-rose', `${oldUnplayed.g.name} · ${oldUnplayed.y}`, 'oldest unplayed');
   }
-
-  // Fetchers never set added_at (only manual adds do); fall back to the
-  // library first-seen stamp so "newest add" / "added in {year}" reflect every
-  // store, not just custom entries.
-  const effectiveAddedMs = (g) => {
-    const t = Date.parse(String(g.added_at || ''));
-    if (Number.isFinite(t)) return t;
-    const seen = (state.libraryFirstSeenByKey || {})[gameKey(g)];
-    const n = Number(seen);
-    return Number.isFinite(n) && n > 0 ? n : null;
+// Fetchers never set added_at (only manual adds do); fall back to the
+// library first-seen stamp so "newest add" / "added in {year}" reflect every
+// store, not just custom entries.
+const effectiveAddedMs = (g) => {
+  const t = Date.parse(String(g.added_at || ''));
+  if (Number.isFinite(t)) return t;
+  const seen = (state.libraryFirstSeenByKey || {})[gameKey(g)];
+  const n = Number(seen);
+  if (Number.isFinite(n) && n > 0) return n;
+  // Fall back to catalog-side acquired_at when the first-seen stamp is absent.
+  if (g.acquired_at) {
+    const acq = Date.parse(g.acquired_at);
+    if (Number.isFinite(acq)) return acq;
+  }
+  return null;
+};
   };
   const withAddDate = games
     .map(g => ({ g, ms: effectiveAddedMs(g) }))

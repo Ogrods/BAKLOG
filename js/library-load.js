@@ -1,5 +1,5 @@
-import { state } from './state.js';
-import { escapeHtml } from './dom-util.js';
+import { state } from "./state.js";
+import { escapeHtml } from "./dom-util.js";
 import {
   normalizeGame,
   dedupeWithinStore,
@@ -8,21 +8,21 @@ import {
   gameKey,
   rebuildGameKeyIndex,
   itchIsGame,
-} from './game-core.js';
-import { personalStore } from './personal-store.js';
+} from "./game-core.js";
+import { personalStore } from "./personal-store.js";
 import {
   LIBRARY_STORE_JSON,
   WISHLIST_FETCHER_JSON,
   WISHLIST_FETCHER_META_KEY,
   ENRICH_FETCHER_KEYS,
   ENRICH_RELOAD_WISHLIST_KEYS,
-} from './fetcher-registry.js';
-import { noteFetcherReload, noteLibraryMerge } from './propagation-trace.js';
+} from "./fetcher-registry.js";
+import { noteFetcherReload, noteLibraryMerge } from "./propagation-trace.js";
 import {
   applyItadPriceSnapshot,
   slimItadSnapshot,
   buildOwnedNormNames,
-} from './deals.js';
+} from "./deals.js";
 import {
   loadManualGames,
   saveLibraryFirstSeen,
@@ -33,10 +33,13 @@ import {
   filterCounted,
   libraryGamesBase,
   seedNoiseAutoHidden,
-} from './personal-storage.js';
-import { savePrefs } from './prefs.js';
-import { isDebugEnabled } from './debug-overlay.js';
-import { invalidateTableCache, visibleRowCountForActiveView } from './table-ui.js';
+} from "./personal-storage.js";
+import { savePrefs } from "./prefs.js";
+import { isDebugEnabled } from "./debug-overlay.js";
+import {
+  invalidateTableCache,
+  visibleRowCountForActiveView,
+} from "./table-ui.js";
 import {
   refreshFilterUI,
   renderGenreChips,
@@ -46,10 +49,14 @@ import {
   switchView,
   updateWishlistDrawerVisibility,
   applyItchTabVisibility,
-} from './filters-ui.js';
-import { renderPicks } from './picks-ui.js';
-import { scheduleDashboardRender } from './dashboard.js';
-import { consumeItadAutoRunFlag, diffItadDeals, maybeAutoEnrichNewAdditions } from './fetcher-health.js';
+} from "./filters-ui.js";
+import { renderPicks } from "./picks-ui.js";
+import { scheduleDashboardRender } from "./dashboard.js";
+import {
+  consumeItadAutoRunFlag,
+  diffItadDeals,
+  maybeAutoEnrichNewAdditions,
+} from "./fetcher-health.js";
 import {
   loadClaimableNow,
   consumeClaimsAutoRunFlag,
@@ -58,23 +65,23 @@ import {
   showClaimableBanner,
   saveClaimsSnapshot,
   refreshClaimableUi,
-} from './claimable.js';
-import { loadSponsoredDeals } from './sponsored-deals.js';
-import { fireLibraryCountFlash } from './library-count-animation.js';
-import { itadSnapshotStorageKey } from './profiles.js';
-import { dataFetch } from './api-client.js';
+} from "./claimable.js";
+import { loadSponsoredDeals } from "./sponsored-deals.js";
+import { fireLibraryCountFlash } from "./library-count-animation.js";
+import { itadSnapshotStorageKey } from "./profiles.js";
+import { dataFetch } from "./api-client.js";
 import {
   deferPicksRender,
   deferSummaryRender,
   deferTableRender,
-} from './render-gate.js';
+} from "./render-gate.js";
 
 async function refreshLibraryChromeAfterMerge() {
-  if (state.activeView === 'dashboard') {
+  if (state.activeView === "dashboard") {
     scheduleDashboardRender();
     return;
   }
-  if (state.activeView === 'connections') {
+  if (state.activeView === "connections") {
     deferPicksRender();
     deferSummaryRender();
     deferTableRender();
@@ -82,7 +89,7 @@ async function refreshLibraryChromeAfterMerge() {
   }
   // refreshFilterUI paints summary + picks + table — avoid duplicate chrome paints.
   await refreshFilterUI({ force: true });
-  if (state.activeView === 'wishlist') {
+  if (state.activeView === "wishlist") {
     updateWishlistDrawerVisibility();
     refreshClaimableUi();
   }
@@ -109,10 +116,13 @@ export async function loadItadPrices() {
     applyItadPriceSnapshot(prevByKey, nextByKey);
     state.itadByKey = nextByKey;
     try {
-      localStorage.setItem(itadSnapshotStorageKey(), JSON.stringify({
-        saved_at: Date.now(),
-        by_key: slimItadSnapshot(nextByKey),
-      }));
+      localStorage.setItem(
+        itadSnapshotStorageKey(),
+        JSON.stringify({
+          saved_at: Date.now(),
+          by_key: slimItadSnapshot(nextByKey),
+        }),
+      );
     } catch (_) {}
   } catch {
     state.libraryMeta.itad = null;
@@ -125,9 +135,12 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
   const el = document.getElementById("itadAlertBanner");
   if (!el) return;
   const parts = [];
-  if (newSales > 0) parts.push(`${newSales} new sale${newSales === 1 ? "" : "s"}`);
+  if (newSales > 0)
+    parts.push(`${newSales} new sale${newSales === 1 ? "" : "s"}`);
   if (newHistoricalLows > 0) {
-    parts.push(`${newHistoricalLows} new historical low${newHistoricalLows === 1 ? "" : "s"}`);
+    parts.push(
+      `${newHistoricalLows} new historical low${newHistoricalLows === 1 ? "" : "s"}`,
+    );
   }
   if (!parts.length) return;
   el.innerHTML = `
@@ -140,26 +153,34 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
       </span>
     </div>`;
   el.classList.remove("hidden");
-  el.querySelector("[data-itad-dismiss]")?.addEventListener("click", () => {
-    state.prefs.itadAlertLastDismissedAt = Date.now();
-    savePrefs();
-    el.classList.add("hidden");
-  }, { once: true });
-  el.querySelector("[data-itad-view-deals]")?.addEventListener("click", () => {
-    state.prefs.itadAlertLastDismissedAt = Date.now();
-    savePrefs();
-    el.classList.add("hidden");
-    if (state.activeView !== "wishlist") {
-      switchView("wishlist");
-    } else {
-      state.prefs.picksTab = "wishlistDeals";
+  el.querySelector("[data-itad-dismiss]")?.addEventListener(
+    "click",
+    () => {
+      state.prefs.itadAlertLastDismissedAt = Date.now();
       savePrefs();
-      document.querySelectorAll(".pick-tab").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.tab === "wishlistDeals");
-      });
-      renderPicks();
-    }
-  }, { once: true });
+      el.classList.add("hidden");
+    },
+    { once: true },
+  );
+  el.querySelector("[data-itad-view-deals]")?.addEventListener(
+    "click",
+    () => {
+      state.prefs.itadAlertLastDismissedAt = Date.now();
+      savePrefs();
+      el.classList.add("hidden");
+      if (state.activeView !== "wishlist") {
+        switchView("wishlist");
+      } else {
+        state.prefs.picksTab = "wishlistDeals";
+        savePrefs();
+        document.querySelectorAll(".pick-tab").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.tab === "wishlistDeals");
+        });
+        renderPicks();
+      }
+    },
+    { once: true },
+  );
 }
 
 export async function loadCacheMeta(url, metaKey) {
@@ -216,14 +237,19 @@ export const BULK_FIRST_SEEN_THRESHOLD = 8;
 
 export function shouldBaselineImportBatch(newStampCount, priorKeyCount) {
   if (newStampCount <= 1) return false;
-  if (priorKeyCount === 0 && newStampCount >= BULK_FIRST_SEEN_THRESHOLD) return true;
-  if (newStampCount >= BULK_FIRST_SEEN_THRESHOLD && newStampCount > priorKeyCount) return true;
+  if (priorKeyCount === 0 && newStampCount >= BULK_FIRST_SEEN_THRESHOLD)
+    return true;
+  if (
+    newStampCount >= BULK_FIRST_SEEN_THRESHOLD &&
+    newStampCount > priorKeyCount
+  )
+    return true;
   return false;
 }
 
 /** Collapse bulk-import batches already persisted (same second, many keys). */
 export function repairBulkFirstSeenStamps(map) {
-  if (!map || typeof map !== 'object') return false;
+  if (!map || typeof map !== "object") return false;
   const bySecond = new Map();
   for (const [key, val] of Object.entries(map)) {
     const n = Number(val);
@@ -261,7 +287,10 @@ function collectMergeDiffFirstSeenKeys(priorKeys, pendingRealKeys) {
 }
 
 function applyPendingFirstSeenStamps(pendingRealKeys, priorKeyCount) {
-  const baseline = shouldBaselineImportBatch(pendingRealKeys.size, priorKeyCount);
+  const baseline = shouldBaselineImportBatch(
+    pendingRealKeys.size,
+    priorKeyCount,
+  );
   if (baseline) return 0;
   const now = Date.now();
   for (const key of pendingRealKeys) {
@@ -273,7 +302,10 @@ function applyPendingFirstSeenStamps(pendingRealKeys, priorKeyCount) {
 /** Stamp first-seen timestamps for library keys (silent seed on first load).
  *  Returns count of keys newly stamped with a real timestamp (0 on first seed). */
 export function recordLibraryFirstSeen() {
-  if (!state.libraryFirstSeenByKey || typeof state.libraryFirstSeenByKey !== 'object') {
+  if (
+    !state.libraryFirstSeenByKey ||
+    typeof state.libraryFirstSeenByKey !== "object"
+  ) {
     state.libraryFirstSeenByKey = {};
   }
   let changed = repairBulkFirstSeenStamps(state.libraryFirstSeenByKey);
@@ -299,9 +331,9 @@ export function recordLibraryFirstSeen() {
     const key = gameKey(g);
     if (key in state.libraryFirstSeenByKey) {
       if (
-        state.libraryFirstSeenByKey[key] === 0
-        && priorKeys?.size > 0
-        && !priorKeys.has(key)
+        state.libraryFirstSeenByKey[key] === 0 &&
+        priorKeys?.size > 0 &&
+        !priorKeys.has(key)
       ) {
         pendingRealKeys.add(key);
       }
@@ -329,7 +361,7 @@ export function recordLibraryFirstSeen() {
   state.knownLibraryKeySet = currentKeys;
   saveKnownLibraryKeys(currentKeys);
   if (isDebugEnabled()) {
-    console.debug('[baklog-recents] recordLibraryFirstSeen', {
+    console.debug("[baklog-recents] recordLibraryFirstSeen", {
       mapWasEmpty,
       seeded,
       effectiveSeeded,
@@ -350,6 +382,37 @@ export function recordLibraryFirstSeen() {
     saveLibraryFirstSeen(state.libraryFirstSeenByKey);
     personalStore.notify();
   }
+  if (isDebugEnabled()) {
+    // Expose diagnostics on ?debug=1 so the user can inspect first-seen state
+    // from the console: window.__baklogRecentsDebug()
+    window.__baklogRecentsDebug = () => {
+      const seen = state.libraryFirstSeenByKey || {};
+      const byStore = {};
+      const zeroKeys = [];
+      const stampedKeys = [];
+      for (const [key, val] of Object.entries(seen)) {
+        const store = key.split(":")[0] || "?";
+        if (!byStore[store]) byStore[store] = { zero: 0, stamped: 0 };
+        if (Number(val) > 0) {
+          byStore[store].stamped++;
+          stampedKeys.push({ key, ts: new Date(Number(val)).toISOString() });
+        } else {
+          byStore[store].zero++;
+          zeroKeys.push(key);
+        }
+      }
+      return {
+        totalEntries: Object.keys(seen).length,
+        byStore,
+        zeroCount: zeroKeys.length,
+        zeroKeysSample: zeroKeys.slice(0, 20),
+        stampedCount: stampedKeys.length,
+        recentStamped: stampedKeys
+          .sort((a, b) => b.ts.localeCompare(a.ts))
+          .slice(0, 30),
+      };
+    };
+  }
   return newlyStamped;
 }
 
@@ -357,7 +420,9 @@ function countLibraryVisible() {
   return filterCounted(libraryGamesBase()).length;
 }
 function countWishlistVisible() {
-  return state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g))).length;
+  return state.wishlistGames.filter(
+    (g) => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)),
+  ).length;
 }
 
 /** When reloadGames fails (no JSON files), still mark data ready and paint empty UI. */
@@ -371,8 +436,8 @@ export async function finishEmptyLibraryLoad() {
   buildOwnedNormNames();
   _prevLibraryCount = countLibraryVisible();
   _prevWishlistCount = countWishlistVisible();
-  _prevRowCountLibrary = visibleRowCountForActiveView('library');
-  _prevRowCountWishlist = visibleRowCountForActiveView('wishlist');
+  _prevRowCountLibrary = visibleRowCountForActiveView("library");
+  _prevRowCountWishlist = visibleRowCountForActiveView("wishlist");
   renderStoreChips();
   renderWishlistStoreChips();
   renderCustomListFilterChips();
@@ -392,10 +457,9 @@ export async function applyMergedLibrary(mergeKey = null) {
   state._lastNewlyAddedCount = recordLibraryFirstSeen();
   canonicalizeNotesAcrossTitles();
   applyHiddenTitleNorms({ silent: true });
-  seedNoiseAutoHidden(
-    [...state.allGames, ...(state.itchGames || [])],
-    { itchIsGameFn: itchIsGame },
-  );
+  seedNoiseAutoHidden([...state.allGames, ...(state.itchGames || [])], {
+    itchIsGameFn: itchIsGame,
+  });
   state.dashboardDataReady = true;
   buildOwnedNormNames();
   const banner = document.getElementById("bootErrorBanner");
@@ -411,8 +475,8 @@ export async function applyMergedLibrary(mergeKey = null) {
   const wlPrev = _prevWishlistCount;
   const rowLibPrev = _prevRowCountLibrary;
   const rowWlPrev = _prevRowCountWishlist;
-  const rowLibNow = visibleRowCountForActiveView('library');
-  const rowWlNow = visibleRowCountForActiveView('wishlist');
+  const rowLibNow = visibleRowCountForActiveView("library");
+  const rowWlNow = visibleRowCountForActiveView("wishlist");
   _prevLibraryCount = libNow;
   _prevWishlistCount = wlNow;
   _prevRowCountLibrary = rowLibNow;
@@ -434,19 +498,19 @@ export async function applyMergedLibrary(mergeKey = null) {
   try {
     const newlyAdded = state._lastNewlyAddedCount ?? 0;
     if (libPrev != null && libNow > libPrev && newlyAdded > 0) {
-      fireLibraryCountFlash('library', libPrev, libNow, {
+      fireLibraryCountFlash("library", libPrev, libNow, {
         rowPrev: rowLibPrev,
         rowNext: rowLibNow,
       });
     }
     if (wlPrev != null && wlNow > wlPrev) {
-      fireLibraryCountFlash('wishlist', wlPrev, wlNow, {
+      fireLibraryCountFlash("wishlist", wlPrev, wlNow, {
         rowPrev: rowWlPrev,
         rowNext: rowWlNow,
       });
     }
   } catch (err) {
-    console.warn('[library-count-anim]', err);
+    console.warn("[library-count-anim]", err);
   }
 
   applyItchTabVisibility();
@@ -477,45 +541,144 @@ function nintendoLibraryRow(g) {
 }
 
 export function rebuildAllGamesFromMetas() {
-  const allManual = loadManualGames().map(g => normalizeGame(g));
-  const nonWishlistManual = allManual.filter(g => !g.wishlist);
-  const manualItch = nonWishlistManual.filter(g => g.store === "itch");
-  const manualLibrary = nonWishlistManual.filter(g => g.store !== "itch");
-  const { steam: steamData, gog, psn, epic, amazon, nintendo, xbox, battlenet, ubisoft, itch, humble, ea } = state.libraryMeta;
+  const allManual = loadManualGames().map((g) => normalizeGame(g));
+  const nonWishlistManual = allManual.filter((g) => !g.wishlist);
+  const manualItch = nonWishlistManual.filter((g) => g.store === "itch");
+  const manualLibrary = nonWishlistManual.filter((g) => g.store !== "itch");
+  const {
+    steam: steamData,
+    gog,
+    psn,
+    epic,
+    amazon,
+    nintendo,
+    xbox,
+    battlenet,
+    ubisoft,
+    itch,
+    humble,
+    ea,
+  } = state.libraryMeta;
   const sources = [
-    (steamData?.games || []).map(g => normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid })),
-    (gog?.games || []).map(g => normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id })),
-    (psn?.games || []).map(g => normalizeGame({ ...g, store: "psn", id: g.id ?? g.psn_id })),
-    (epic?.games || []).map(g => normalizeGame({ ...g, store: "epic", id: g.id })),
-    (amazon?.games || []).map(g => normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id })),
+    (steamData?.games || []).map((g) =>
+      normalizeGame({ ...g, store: g.store || "steam", id: g.id ?? g.appid }),
+    ),
+    (gog?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "gog", id: g.id ?? g.gog_id }),
+    ),
+    (psn?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "psn", id: g.id ?? g.psn_id }),
+    ),
+    (epic?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "epic", id: g.id }),
+    ),
+    (amazon?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "amazon", id: g.id ?? g.amazon_id }),
+    ),
     (nintendo?.games || []).map(nintendoLibraryRow),
-    (xbox?.games || []).map(g => normalizeGame({ ...g, store: "xbox", id: g.id ?? g.xbox_title_id })),
-    (battlenet?.games || []).map(g => normalizeGame({ ...g, store: "battlenet", id: g.id ?? g.battlenet_id })),
-    (ubisoft?.games || []).map(g => normalizeGame({ ...g, store: "ubisoft", id: g.id ?? g.ubisoft_id })),
-    (humble?.games || []).map(g => normalizeGame({ ...g, store: "humble", id: g.id ?? `humble-${g.humble_id}` })),
-    (ea?.games || []).map(g => normalizeGame({ ...g, store: "ea", id: g.id ?? g.ea_id })),
+    (xbox?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "xbox", id: g.id ?? g.xbox_title_id }),
+    ),
+    (battlenet?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "battlenet", id: g.id ?? g.battlenet_id }),
+    ),
+    (ubisoft?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "ubisoft", id: g.id ?? g.ubisoft_id }),
+    ),
+    (humble?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "humble",
+        id: g.id ?? `humble-${g.humble_id}`,
+      }),
+    ),
+    (ea?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "ea", id: g.id ?? g.ea_id }),
+    ),
     manualLibrary,
   ];
   state.allGames = sources.flatMap(dedupeWithinStore).map(applyCoopOverrides);
   state.itchGames = dedupeWithinStore([
-    ...(itch?.games || []).map(g => normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id })),
+    ...(itch?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "itch", id: g.id ?? g.itch_id }),
+    ),
     ...manualItch,
   ]).map(applyCoopOverrides);
 }
 
 export function rebuildWishlistFromMetas() {
-  const allManual = loadManualGames().map(g => normalizeGame(g));
-  const manualWishlist = allManual.filter(g => !!g.wishlist);
-  const { wishlist, wishlistGog, wishlistEpic, wishlistPsn, wishlistUbisoft, wishlistXbox, wishlistNintendo, wishlistHumble } = state.libraryMeta;
+  const allManual = loadManualGames().map((g) => normalizeGame(g));
+  const manualWishlist = allManual.filter((g) => !!g.wishlist);
+  const {
+    wishlist,
+    wishlistGog,
+    wishlistEpic,
+    wishlistPsn,
+    wishlistUbisoft,
+    wishlistXbox,
+    wishlistNintendo,
+    wishlistHumble,
+  } = state.libraryMeta;
   const fetchedWishlist = [
-    ...((wishlist?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }))),
-    ...((wishlistGog?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: `gog-${g.id ?? g.gog_id}`, wishlist_store: "gog" }))),
-    ...((wishlistEpic?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `epic-${g.epic_namespace}:${g.epic_offer_id}`, wishlist_store: "epic" }))),
-    ...((wishlistPsn?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `psn-${g.psn_product_id}`, wishlist_store: "psn" }))),
-    ...((wishlistUbisoft?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `ubisoft-${g.ubisoft_product_id}`, wishlist_store: "ubisoft" }))),
-    ...((wishlistXbox?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `xbox-${g.xbox_product_id}`, wishlist_store: "xbox" }))),
-    ...((wishlistNintendo?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `nintendo-${g.nintendo_product_id}`, wishlist_store: "nintendo" }))),
-    ...((wishlistHumble?.games || []).map(g => normalizeGame({ ...g, store: "wishlist", id: g.id ?? `humble-${g.humble_product_id}`, wishlist_store: "humble" }))),
+    ...(wishlist?.games || []).map((g) =>
+      normalizeGame({ ...g, store: "wishlist", id: g.id ?? g.appid }),
+    ),
+    ...(wishlistGog?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: `gog-${g.id ?? g.gog_id}`,
+        wishlist_store: "gog",
+      }),
+    ),
+    ...(wishlistEpic?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: g.id ?? `epic-${g.epic_namespace}:${g.epic_offer_id}`,
+        wishlist_store: "epic",
+      }),
+    ),
+    ...(wishlistPsn?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: g.id ?? `psn-${g.psn_product_id}`,
+        wishlist_store: "psn",
+      }),
+    ),
+    ...(wishlistUbisoft?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: g.id ?? `ubisoft-${g.ubisoft_product_id}`,
+        wishlist_store: "ubisoft",
+      }),
+    ),
+    ...(wishlistXbox?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: g.id ?? `xbox-${g.xbox_product_id}`,
+        wishlist_store: "xbox",
+      }),
+    ),
+    ...(wishlistNintendo?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: g.id ?? `nintendo-${g.nintendo_product_id}`,
+        wishlist_store: "nintendo",
+      }),
+    ),
+    ...(wishlistHumble?.games || []).map((g) =>
+      normalizeGame({
+        ...g,
+        store: "wishlist",
+        id: g.id ?? `humble-${g.humble_product_id}`,
+        wishlist_store: "humble",
+      }),
+    ),
   ];
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
 }
@@ -574,7 +737,7 @@ export async function reloadAfterFetcher(key) {
     if (key === "steamCovers") await loadSteamCoversMeta();
     if (key === "steamTags") await loadSteamTagsMeta();
     if (key === "protondb") await loadProtondbCache();
-  } else if (key === 'claims') {
+  } else if (key === "claims") {
     const wasAuto = consumeClaimsAutoRunFlag();
     const prevKeys = loadClaimsSnapshotKeys();
     await loadClaimableNow();
@@ -591,7 +754,10 @@ export async function reloadAfterFetcher(key) {
     rebuildWishlistFromMetas();
   } else if (LIBRARY_STORE_JSON[key]) {
     captureLibraryKeysBeforeMerge();
-    state.libraryMeta[key] = preserveLibraryMeta(key, await fetchLibraryJson(LIBRARY_STORE_JSON[key]));
+    state.libraryMeta[key] = preserveLibraryMeta(
+      key,
+      await fetchLibraryJson(LIBRARY_STORE_JSON[key]),
+    );
     rebuildAllGamesFromMetas();
   } else {
     await reloadGames();
@@ -602,8 +768,8 @@ export async function reloadAfterFetcher(key) {
   if (LIBRARY_STORE_JSON[key] && !ENRICH_FETCHER_KEYS.has(key)) {
     void maybeAutoEnrichNewAdditions(newCount).catch(() => {});
   }
-  if (key === 'steam') {
-    void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
+  if (key === "steam") {
+    void import("./library-watch.js").then((m) => m.onSteamCatalogReloaded());
   }
 }
 
@@ -651,29 +817,64 @@ export async function reloadGames() {
     fetchLibraryJson("games_wishlist_nintendo.json"),
     fetchLibraryJson("games_wishlist_humble.json"),
   ]);
-  if (!steam && !gog && !psn && !epic && !amazon && !nintendo && !itch && !xbox && !battlenet && !ubisoft && !humble && !ea) throw new Error("No library files found");
-  state.libraryMeta.steam = preserveLibraryMeta('steam', steam);
-  state.libraryMeta.gog = preserveLibraryMeta('gog', gog);
-  state.libraryMeta.psn = preserveLibraryMeta('psn', psn);
-  state.libraryMeta.epic = preserveLibraryMeta('epic', epic);
-  state.libraryMeta.amazon = preserveLibraryMeta('amazon', amazon);
-  state.libraryMeta.nintendo = preserveLibraryMeta('nintendo', nintendo);
-  state.libraryMeta.itch = preserveLibraryMeta('itch', itch);
-  state.libraryMeta.xbox = preserveLibraryMeta('xbox', xbox);
-  state.libraryMeta.battlenet = preserveLibraryMeta('battlenet', battlenet);
-  state.libraryMeta.ubisoft = preserveLibraryMeta('ubisoft', ubisoft);
-  state.libraryMeta.humble = preserveLibraryMeta('humble', humble);
-  state.libraryMeta.ea = preserveLibraryMeta('ea', ea);
+  if (
+    !steam &&
+    !gog &&
+    !psn &&
+    !epic &&
+    !amazon &&
+    !nintendo &&
+    !itch &&
+    !xbox &&
+    !battlenet &&
+    !ubisoft &&
+    !humble &&
+    !ea
+  )
+    throw new Error("No library files found");
+  state.libraryMeta.steam = preserveLibraryMeta("steam", steam);
+  state.libraryMeta.gog = preserveLibraryMeta("gog", gog);
+  state.libraryMeta.psn = preserveLibraryMeta("psn", psn);
+  state.libraryMeta.epic = preserveLibraryMeta("epic", epic);
+  state.libraryMeta.amazon = preserveLibraryMeta("amazon", amazon);
+  state.libraryMeta.nintendo = preserveLibraryMeta("nintendo", nintendo);
+  state.libraryMeta.itch = preserveLibraryMeta("itch", itch);
+  state.libraryMeta.xbox = preserveLibraryMeta("xbox", xbox);
+  state.libraryMeta.battlenet = preserveLibraryMeta("battlenet", battlenet);
+  state.libraryMeta.ubisoft = preserveLibraryMeta("ubisoft", ubisoft);
+  state.libraryMeta.humble = preserveLibraryMeta("humble", humble);
+  state.libraryMeta.ea = preserveLibraryMeta("ea", ea);
   captureLibraryKeysBeforeMerge();
   rebuildAllGamesFromMetas();
-  state.libraryMeta.wishlist = preserveLibraryMeta('wishlist', wishlist);
-  state.libraryMeta.wishlistGog = preserveLibraryMeta('wishlistGog', wishlistGog);
-  state.libraryMeta.wishlistEpic = preserveLibraryMeta('wishlistEpic', wishlistEpic);
-  state.libraryMeta.wishlistPsn = preserveLibraryMeta('wishlistPsn', wishlistPsn);
-  state.libraryMeta.wishlistUbisoft = preserveLibraryMeta('wishlistUbisoft', wishlistUbisoft);
-  state.libraryMeta.wishlistXbox = preserveLibraryMeta('wishlistXbox', wishlistXbox);
-  state.libraryMeta.wishlistNintendo = preserveLibraryMeta('wishlistNintendo', wishlistNintendo);
-  state.libraryMeta.wishlistHumble = preserveLibraryMeta('wishlistHumble', wishlistHumble);
+  state.libraryMeta.wishlist = preserveLibraryMeta("wishlist", wishlist);
+  state.libraryMeta.wishlistGog = preserveLibraryMeta(
+    "wishlistGog",
+    wishlistGog,
+  );
+  state.libraryMeta.wishlistEpic = preserveLibraryMeta(
+    "wishlistEpic",
+    wishlistEpic,
+  );
+  state.libraryMeta.wishlistPsn = preserveLibraryMeta(
+    "wishlistPsn",
+    wishlistPsn,
+  );
+  state.libraryMeta.wishlistUbisoft = preserveLibraryMeta(
+    "wishlistUbisoft",
+    wishlistUbisoft,
+  );
+  state.libraryMeta.wishlistXbox = preserveLibraryMeta(
+    "wishlistXbox",
+    wishlistXbox,
+  );
+  state.libraryMeta.wishlistNintendo = preserveLibraryMeta(
+    "wishlistNintendo",
+    wishlistNintendo,
+  );
+  state.libraryMeta.wishlistHumble = preserveLibraryMeta(
+    "wishlistHumble",
+    wishlistHumble,
+  );
   rebuildWishlistFromMetas();
   await Promise.all([
     loadItadPrices(),
@@ -689,25 +890,31 @@ export async function reloadGames() {
   // filtered on the first paint, not briefly shown until merge completes.
   await loadClaimableNow();
   saveClaimsSnapshot(state.claimableFeed?.items || []);
-  if (state.activeView === 'wishlist') refreshClaimableUi();
-  void import('./library-watch.js').then(m => m.onSteamCatalogReloaded());
+  if (state.activeView === "wishlist") refreshClaimableUi();
+  void import("./library-watch.js").then((m) => m.onSteamCatalogReloaded());
 }
 
 export function refreshAfterManualChange() {
   captureLibraryKeysBeforeMerge();
-  const allManual = loadManualGames().map(g => normalizeGame(g));
-  const manualWishlist = allManual.filter(g => !!g.wishlist);
-  const nonWishlistManual = allManual.filter(g => !g.wishlist);
+  const allManual = loadManualGames().map((g) => normalizeGame(g));
+  const manualWishlist = allManual.filter((g) => !!g.wishlist);
+  const nonWishlistManual = allManual.filter((g) => !g.wishlist);
   // Manual entries added under the itch.io platform belong in the itch tab
   // (state.itchGames), matching where fetched store === "itch" rows live.
   // Without this they leak into the Library catalog and never show on the itch tab.
-  const manualItch = nonWishlistManual.filter(g => g.store === "itch");
-  const manualLibrary = nonWishlistManual.filter(g => g.store !== "itch");
-  const nonManualLibrary = state.allGames.filter(g => !g.manual);
-  state.allGames = [...nonManualLibrary, ...dedupeWithinStore(manualLibrary).map(applyCoopOverrides)];
-  const fetchedWishlist = state.wishlistGames.filter(g => !g.manual);
+  const manualItch = nonWishlistManual.filter((g) => g.store === "itch");
+  const manualLibrary = nonWishlistManual.filter((g) => g.store !== "itch");
+  const nonManualLibrary = state.allGames.filter((g) => !g.manual);
+  state.allGames = [
+    ...nonManualLibrary,
+    ...dedupeWithinStore(manualLibrary).map(applyCoopOverrides),
+  ];
+  const fetchedWishlist = state.wishlistGames.filter((g) => !g.manual);
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
-  const fetchedItch = state.itchGames.filter(g => !g.manual);
-  state.itchGames = [...fetchedItch, ...dedupeWithinStore(manualItch).map(applyCoopOverrides)];
+  const fetchedItch = state.itchGames.filter((g) => !g.manual);
+  state.itchGames = [
+    ...fetchedItch,
+    ...dedupeWithinStore(manualItch).map(applyCoopOverrides),
+  ];
   void applyMergedLibrary();
 }

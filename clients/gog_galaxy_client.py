@@ -252,6 +252,40 @@ class GogGalaxyClient:
                 bucket["meta"] = parsed
         return by_key
 
+    def _load_purchase_dates(
+        self, conn: sqlite3.Connection, release_keys: list[str]
+    ) -> dict[str, str | None]:
+        """Load purchase/added dates from ProductPurchaseDates, keyed by release key.
+
+        Returns ``{release_key: iso_date_string_or_none}``. The column name varies
+        across Galaxy versions — ``purchaseDate`` is the canonical name, but older
+        builds used ``purchasedDate``.
+        """
+        if not self._table_exists(conn, "ProductPurchaseDates") or not release_keys:
+            return {}
+        cols = [d[1] for d in conn.execute("PRAGMA table_info(ProductPurchaseDates)").fetchall()]
+        date_col = None
+        for candidate in ("purchaseDate", "purchasedDate", "dateAdded", "createdAt"):
+            if candidate in cols:
+                date_col = candidate
+                break
+        if not date_col:
+            return {}
+        result: dict[str, str | None] = {}
+        placeholders = ",".join("?" for _ in release_keys)
+        try:
+            rows = conn.execute(
+                f"SELECT gameReleaseKey, {date_col} FROM ProductPurchaseDates "
+                f"WHERE gameReleaseKey IN ({placeholders})",
+                release_keys,
+            ).fetchall()
+            for rk, dt in rows:
+                if dt and str(dt).strip():
+                    result[str(rk)] = str(dt).strip()
+        except Exception:
+            pass
+        return result
+
     def _load_last_played(
         self, conn: sqlite3.Connection, release_keys: list[str]
     ) -> dict[str, str]:
@@ -381,6 +415,7 @@ class GogGalaxyClient:
             )
             pieces = self._load_pieces_for_keys(conn, release_keys, type_ids)
             last_played = self._load_last_played(conn, release_keys)
+            purchase_dates = self._load_purchase_dates(conn, release_keys)
             owned_keys = set(release_keys)
         finally:
             conn.close()
@@ -402,6 +437,7 @@ class GogGalaxyClient:
             images = piece.get("images")
             cover = _pick_cover_url(images)
 
+            acquired = purchase_dates.get(rk)
             records.append(
                 {
                     "gog_id": gog_id,
@@ -412,6 +448,7 @@ class GogGalaxyClient:
                     "library_image": cover,
                     "release_date": _release_date_from_meta(meta),
                     "last_played": last_played.get(rk),
+                    "acquired_at": acquired,
                     "genres": _genres_from_meta(meta),
                     "store_url": _meta_store_url(meta, gog_id),
                 }

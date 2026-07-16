@@ -1,47 +1,76 @@
 // Rotating dashboard spotlight (hero card with auto-fade).
 // Extracted from dashboard.js as part of the dashboard module split.
 
-import { state } from './state.js';
-import { escapeAttr, escapeHtml } from './dom-util.js';
-import { gameKey, hltbMain, ratingValue, steamAppIdFromGame, spotlightArtCandidates, hasEnoughReviews, combinedPlaytime, parseReleaseForSort, parseLastPlayedMs, formatDollar, normalizeGame } from './game-core.js';
-import { storeLogoHtml, storeDisplayName } from './store-logos.js';
-import { getPersonal, filterOutHidden } from './personal-storage.js';
-import { spotlightRecentKeysStorageKey } from './profiles.js';
-import { getDealInfo, cutBucketClass } from './deals.js';
-import { isBarrel, isLeveragePick, getLibrarySnapshot, topWarGame, metacriticScore } from './sabermetrics.js';
-import { computeSpotlightSuperlatives } from './creative-metrics.js';
-import * as MetricTips from './metric-tips.js';
-import { familyForEyebrow, spreadByFamily, FAMILY } from './stat-families.js';
-import { registerPausable } from './visibility.js';
-import { getAdsForLocation, getSpotlightHouseAds, sponsorToSpotlightGame, spotlightLogoMarkHtml, SPOTLIGHT_PREMIUM_SCHEMES, sponsorActionAttrs } from './sponsored-deals.js';
-import { isDebugEnabled } from './debug-overlay.js';
+import { state } from "./state.js";
+import { escapeAttr, escapeHtml } from "./dom-util.js";
+import {
+  gameKey,
+  hltbMain,
+  ratingValue,
+  steamAppIdFromGame,
+  spotlightArtCandidates,
+  hasEnoughReviews,
+  combinedPlaytime,
+  parseReleaseForSort,
+  parseLastPlayedMs,
+  formatDollar,
+  normalizeGame,
+} from "./game-core.js";
+import { storeLogoHtml, storeDisplayName } from "./store-logos.js";
+import { getPersonal, filterOutHidden } from "./personal-storage.js";
+import { spotlightRecentKeysStorageKey } from "./profiles.js";
+import { getDealInfo, cutBucketClass } from "./deals.js";
+import {
+  isBarrel,
+  isLeveragePick,
+  getLibrarySnapshot,
+  topWarGame,
+  metacriticScore,
+} from "./sabermetrics.js";
+import { computeSpotlightSuperlatives } from "./creative-metrics.js";
+import * as MetricTips from "./metric-tips.js";
+import { familyForEyebrow, spreadByFamily, FAMILY } from "./stat-families.js";
+import { registerPausable } from "./visibility.js";
+import {
+  getAdsForLocation,
+  getSpotlightHouseAds,
+  sponsorToSpotlightGame,
+  spotlightLogoMarkHtml,
+  SPOTLIGHT_PREMIUM_SCHEMES,
+  sponsorActionAttrs,
+} from "./sponsored-deals.js";
+import { isDebugEnabled } from "./debug-overlay.js";
 
 // Namespace import avoids link-time failure if metric-tips.js is stale/truncated
 // (data maps may load while named function exports are missing).
-const eyebrowTip = MetricTips.eyebrowTip ?? ((eyebrow) => {
-  if (!eyebrow) return '';
-  return MetricTips.EYEBROW_TIPS?.[eyebrow] || '';
-});
-const eyebrowVariant = MetricTips.eyebrowVariant ?? ((canonical) => {
-  if (!canonical) return '';
-  const variants = MetricTips.EYEBROW_VARIANTS?.[canonical];
-  return variants?.[0] || canonical;
-});
+const eyebrowTip =
+  MetricTips.eyebrowTip ??
+  ((eyebrow) => {
+    if (!eyebrow) return "";
+    return MetricTips.EYEBROW_TIPS?.[eyebrow] || "";
+  });
+const eyebrowVariant =
+  MetricTips.eyebrowVariant ??
+  ((canonical) => {
+    if (!canonical) return "";
+    const variants = MetricTips.EYEBROW_VARIANTS?.[canonical];
+    return variants?.[0] || canonical;
+  });
 
 function releasedWithinMonths(g, months) {
   const t = parseReleaseForSort(g.release_date);
-  return t > 0 && (Date.now() - t) <= months * 30 * 24 * 60 * 60 * 1000;
+  return t > 0 && Date.now() - t <= months * 30 * 24 * 60 * 60 * 1000;
 }
 
 function releasedBeforeYears(g, years) {
   const t = parseReleaseForSort(g.release_date);
-  return t > 0 && (Date.now() - t) >= years * 365 * 24 * 60 * 60 * 1000;
+  return t > 0 && Date.now() - t >= years * 365 * 24 * 60 * 60 * 1000;
 }
 
 /** ProtonDB tier indicating the game runs great on Steam Deck / Linux. */
 function isDeckReady(g) {
-  const t = String(g.protondb_tier || '').toLowerCase();
-  return t === 'platinum' || t === 'gold' || t === 'native';
+  const t = String(g.protondb_tier || "").toLowerCase();
+  return t === "platinum" || t === "gold" || t === "native";
 }
 
 function isOnSale(g) {
@@ -78,18 +107,20 @@ export function setScoreJitterForTest(amount) {
 }
 
 function loadSpotlightRecentKeys() {
-  if (typeof localStorage === 'undefined') return [];
+  if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(spotlightRecentKeysStorageKey());
     const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter(k => typeof k === 'string' && k) : [];
+    return Array.isArray(arr)
+      ? arr.filter((k) => typeof k === "string" && k)
+      : [];
   } catch {
     return [];
   }
 }
 
 function writeSpotlightRecentKeys(keys) {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(spotlightRecentKeysStorageKey(), JSON.stringify(keys));
   } catch {
@@ -176,7 +207,8 @@ function pickFamilyBalancedPool(tagged, target, ratingCapFraction) {
       const k = gameKey(item.g);
       if (pickedKeys.has(k)) continue;
       const fam = familyForEyebrow(item.reason.eyebrow);
-      if (fam === FAMILY.RATING && (familyCounts.get(fam) || 0) >= ratingMax) continue;
+      if (fam === FAMILY.RATING && (familyCounts.get(fam) || 0) >= ratingMax)
+        continue;
       pickedKeys.add(k);
       familyCounts.set(fam, (familyCounts.get(fam) || 0) + 1);
       out.push(item);
@@ -188,36 +220,36 @@ function pickFamilyBalancedPool(tagged, target, ratingCapFraction) {
 
 /** Tagged candidates not already in the selected pool, highest score first. */
 function taggedExtras(tagged, top) {
-  const inTop = new Set(top.map(t => gameKey(t.g)));
-  return dedupeTaggedByGame(tagged).filter(t => !inTop.has(gameKey(t.g)));
+  const inTop = new Set(top.map((t) => gameKey(t.g)));
+  return dedupeTaggedByGame(tagged).filter((t) => !inTop.has(gameKey(t.g)));
 }
 
 // Rare "stinker" easter egg: occasionally the spotlight surfaces the
 // lowest-rated game in your catalog with a tongue-in-cheek eyebrow. Same rarity
 // as the rare boot-loading tip (RARE_CHANCE in js/tips.js).
-const STINKER_EYEBROW = 'Rare stinker';
+const STINKER_EYEBROW = "Rare stinker";
 
 /** Saber superlatives never replace these curated spotlight categories. */
 const SABER_PROTECTED_EYEBROWS = new Set([
-  'Recently added',
-  'Replay',
-  'On sale now',
+  "Recently added",
+  "Replay",
+  "On sale now",
   STINKER_EYEBROW,
-  'Co-op campaign',
-  'Couch co-op',
-  'Almost mastered',
-  'Pick back up',
-  'Return to',
-  'Up next',
-  'Clutch deal',
-  'Barrel',
-  'New release',
-  'Long haul',
-  'Weekend-sized',
-  'Quick win',
-  'Top-rated quick pick',
-  'Random pick',
-  'Cat game',
+  "Co-op campaign",
+  "Couch co-op",
+  "Almost mastered",
+  "Pick back up",
+  "Return to",
+  "Up next",
+  "Clutch deal",
+  "Barrel",
+  "New release",
+  "Long haul",
+  "Weekend-sized",
+  "Quick win",
+  "Top-rated quick pick",
+  "Random pick",
+  "Cat game",
 ]);
 
 let _stinkerChance = 0.02;
@@ -239,7 +271,7 @@ export function setRandomPickChanceForTest(chance) {
   _randomPickChance = chance;
 }
 
-const CAT_GAME_EYEBROW = 'Cat game';
+const CAT_GAME_EYEBROW = "Cat game";
 let _catGameChance = 0.04;
 
 /** Test seam: override the cat-game probability (0 disables, 1 forces it). */
@@ -251,11 +283,11 @@ const CAT_TITLE_RE = /\bcats?\b/i;
 
 /** One library title whose name contains "cat"/"cats" as a whole word. */
 function pickCatGame(eligible, excludeKeys) {
-  const cats = eligible.filter(g => {
-    const status = (getPersonal(g).status) || 'backlog';
-    if (status === 'skip' || status === 'live') return false;
+  const cats = eligible.filter((g) => {
+    const status = getPersonal(g).status || "backlog";
+    if (status === "skip" || status === "live") return false;
     if (excludeKeys.has(gameKey(g))) return false;
-    return CAT_TITLE_RE.test(g.name || '');
+    return CAT_TITLE_RE.test(g.name || "");
   });
   if (!cats.length) return null;
   return cats[Math.floor(Math.random() * cats.length)];
@@ -263,9 +295,9 @@ function pickCatGame(eligible, excludeKeys) {
 
 /** One uniformly-random library title, skipping skip/live and any excluded keys. */
 function pickRandomLibraryGame(eligible, excludeKeys) {
-  const candidates = eligible.filter(g => {
-    const status = (getPersonal(g).status) || 'backlog';
-    if (status === 'skip' || status === 'live') return false;
+  const candidates = eligible.filter((g) => {
+    const status = getPersonal(g).status || "backlog";
+    if (status === "skip" || status === "live") return false;
     return !excludeKeys.has(gameKey(g));
   });
   if (!candidates.length) return null;
@@ -301,7 +333,10 @@ let _spotlightRecentKeys = loadSpotlightRecentKeys();
 
 /** Effective no-repeat window, never larger than pool.length - 1 (avoids deadlock). */
 function spotlightNoRepeatWindow() {
-  return Math.min(SPOTLIGHT_NO_REPEAT_WINDOW, Math.max(0, _spotlightPool.length - 1));
+  return Math.min(
+    SPOTLIGHT_NO_REPEAT_WINDOW,
+    Math.max(0, _spotlightPool.length - 1),
+  );
 }
 
 function isSpotlightRecentlyShown(key) {
@@ -319,13 +354,17 @@ function recordSpotlightShown(key) {
   if (_spotlightRecentKeys[_spotlightRecentKeys.length - 1] === key) return;
   _spotlightRecentKeys.push(key);
   if (_spotlightRecentKeys.length > SPOTLIGHT_NO_REPEAT_WINDOW * 4) {
-    _spotlightRecentKeys = _spotlightRecentKeys.slice(-SPOTLIGHT_NO_REPEAT_WINDOW * 2);
+    _spotlightRecentKeys = _spotlightRecentKeys.slice(
+      -SPOTLIGHT_NO_REPEAT_WINDOW * 2,
+    );
   }
   writeSpotlightRecentKeys(_spotlightRecentKeys);
 }
 
 /** Test seam: inspect / reset the no-repeat history. */
-export function getSpotlightRecentKeysForTest() { return _spotlightRecentKeys.slice(); }
+export function getSpotlightRecentKeysForTest() {
+  return _spotlightRecentKeys.slice();
+}
 export function resetSpotlightRecentKeysForTest() {
   _spotlightRecentKeys = [];
   writeSpotlightRecentKeys([]);
@@ -348,7 +387,9 @@ function nextSpotlightIndex() {
 }
 
 function prefersReducedMotion() {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+  return (
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
+  );
 }
 
 export function getSpotlightPaused() {
@@ -364,17 +405,23 @@ export function isSpotlightRotationActive() {
   return _spotlightTimer != null;
 }
 
-export function getSpotlightPool() { return _spotlightPool; }
-export function getSpotlightCurrentKey() { return _spotlightCurrentKey; }
-export function setSpotlightCurrentKey(key) { _spotlightCurrentKey = key; }
+export function getSpotlightPool() {
+  return _spotlightPool;
+}
+export function getSpotlightCurrentKey() {
+  return _spotlightCurrentKey;
+}
+export function setSpotlightCurrentKey(key) {
+  _spotlightCurrentKey = key;
+}
 
 export function stopSpotlightRotation() {
   if (_spotlightTimer) clearInterval(_spotlightTimer);
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
   _spotlightTimer = null;
   _spotlightFadeTimer = null;
-  const el = document.getElementById('dashboardSpotlight');
-  if (el) el.classList.remove('is-fading');
+  const el = document.getElementById("dashboardSpotlight");
+  if (el) el.classList.remove("is-fading");
   // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
   // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
 }
@@ -391,11 +438,11 @@ export function computeRecentSpotlightKeys(games) {
   if (!state.prefs.librarySeenSeeded) return new Set();
   const seen = state.libraryFirstSeenByKey || {};
   const keys = games
-    .map(g => ({ key: gameKey(g), at: seen[gameKey(g)] ?? 0 }))
-    .filter(e => e.at > 0)
+    .map((g) => ({ key: gameKey(g), at: seen[gameKey(g)] ?? 0 }))
+    .filter((e) => e.at > 0)
     .sort((a, b) => b.at - a.at)
     .slice(0, RECENT_SPOTLIGHT_CAP)
-    .map(e => e.key);
+    .map((e) => e.key);
   return new Set(keys);
 }
 
@@ -433,13 +480,21 @@ function compareBackfillEntries(a, b) {
   const kb = backfillSortKey(b.g);
   if (ka.tier !== kb.tier) return ka.tier - kb.tier;
   if (kb.ms !== ka.ms) return kb.ms - ka.ms;
-  return (a.g.name || '').localeCompare(b.g.name || '');
+  return (a.g.name || "").localeCompare(b.g.name || "");
 }
 
 function displayAddedAtForRecent(g, firstSeen) {
   if (firstSeen > 0) return firstSeen;
   const added = parseAddedAtMs(g);
-  return added > 0 ? added : null;
+  if (added > 0) return added;
+  // Fall back to the catalog-side acquired_at timestamp (populated by some
+  // store fetchers from their purchase/activation date), so games still
+  // surface in recents even when the library-first-seen stamp was missed.
+  if (g.acquired_at) {
+    const acq = Date.parse(g.acquired_at);
+    if (Number.isFinite(acq)) return acq;
+  }
+  return null;
 }
 
 /** Top N library games for the dashboard recents card.
@@ -457,10 +512,10 @@ export function computeRecentAdditions(games, cap = 10) {
   // batch, which would otherwise flood this card and bury additions from the
   // main stores. Demote itch rows below non-itch ones (newest-first within each
   // group) so the primary-store recents stay visible.
-  const isItchEntry = e => gameKey(e.g).startsWith('itch:');
+  const isItchEntry = (e) => gameKey(e.g).startsWith("itch:");
   const tracked = games
-    .map(g => ({ g, at: seen[gameKey(g)] ?? 0 }))
-    .filter(e => e.at > 0)
+    .map((g) => ({ g, at: seen[gameKey(g)] ?? 0 }))
+    .filter((e) => e.at > 0)
     .sort((a, b) => {
       const ia = isItchEntry(a) ? 1 : 0;
       const ib = isItchEntry(b) ? 1 : 0;
@@ -474,13 +529,13 @@ export function computeRecentAdditions(games, cap = 10) {
     if (picked.has(key)) continue;
     picked.add(key);
     out.push({ ...e.g, _addedAt: e.at });
-    debugEntries?.push({ name: e.g.name, _addedAt: e.at, source: 'tracked' });
+    debugEntries?.push({ name: e.g.name, _addedAt: e.at, source: "tracked" });
   }
 
   if (out.length < cap) {
     const backfill = games
-      .filter(g => !picked.has(gameKey(g)))
-      .map(g => ({ g }))
+      .filter((g) => !picked.has(gameKey(g)))
+      .map((g) => ({ g }))
       .sort(compareBackfillEntries);
     for (const e of backfill) {
       if (out.length >= cap) break;
@@ -488,14 +543,20 @@ export function computeRecentAdditions(games, cap = 10) {
       picked.add(key);
       const addedAt = displayAddedAtForRecent(e.g, 0);
       out.push({ ...e.g, _addedAt: addedAt });
-      debugEntries?.push({ name: e.g.name, _addedAt: addedAt, source: 'backfill' });
+      debugEntries?.push({
+        name: e.g.name,
+        _addedAt: addedAt,
+        source: "backfill",
+      });
     }
   }
 
   if (debugEntries) {
-    const trackedInCard = debugEntries.filter((e) => e.source === 'tracked').length;
+    const trackedInCard = debugEntries.filter(
+      (e) => e.source === "tracked",
+    ).length;
     const backfillInCard = debugEntries.length - trackedInCard;
-    console.debug('[baklog-recents] computeRecentAdditions', {
+    console.debug("[baklog-recents] computeRecentAdditions", {
       inputCount: games.length,
       cap,
       trackedPool: tracked.length,
@@ -514,104 +575,109 @@ export function gameSpotlightReason(g, recentKeys) {
   const personal = getPersonal(g);
   const enough = hasEnoughReviews(g);
   const playtime = combinedPlaytime(g);
-  const status = personal.status || 'backlog';
-  if (status === 'skip' || status === 'live') return null;
+  const status = personal.status || "backlog";
+  if (status === "skip" || status === "live") return null;
 
   if (recentKeys?.has(gameKey(g))) {
-    return { eyebrow: 'Recently added', score: 96, isRecent: true };
+    return { eyebrow: "Recently added", score: 96, isRecent: true };
   }
 
-  if (status === 'finished') {
+  if (status === "finished") {
     // "Replay" — capped to ~6% of pool in pickSpotlightGames so finished games
     // appear less often than the other categories. Only worth-revisiting
     // titles (well-reviewed, enough sample) qualify.
     if (rating >= 82 && enough) {
-      return { eyebrow: 'Replay', score: rating - 25, isReplay: true };
+      return { eyebrow: "Replay", score: rating - 25, isReplay: true };
     }
     return null;
   }
-  if (!['backlog', 'next', 'playing', 'unfinished'].includes(status)) return null;
+  if (!["backlog", "next", "playing", "unfinished"].includes(status))
+    return null;
 
   const trophy = g.trophy_progress;
-  if ((status === 'playing' || status === 'unfinished') && trophy != null) {
+  if ((status === "playing" || status === "unfinished") && trophy != null) {
     if (trophy >= 80 && trophy < 100) {
-      return { eyebrow: 'Almost mastered', score: rating + 8 };
+      return { eyebrow: "Almost mastered", score: rating + 8 };
     }
     if (trophy >= 20 && trophy < 80) {
-      return { eyebrow: 'Pick back up', score: rating + 3 };
+      return { eyebrow: "Pick back up", score: rating + 3 };
     }
   }
 
-  if ((status === 'playing' || status === 'unfinished') && playtime >= 30 && rating >= 70) {
-    return { eyebrow: 'Return to', score: rating + 6 };
+  if (
+    (status === "playing" || status === "unfinished") &&
+    playtime >= 30 &&
+    rating >= 70
+  ) {
+    return { eyebrow: "Return to", score: rating + 6 };
   }
-  if (status === 'next' && rating >= 70) {
-    return { eyebrow: 'Up next', score: rating + 10 };
+  if (status === "next" && rating >= 70) {
+    return { eyebrow: "Up next", score: rating + 10 };
   }
   if (isLeveragePick(g)) {
-    return { eyebrow: 'Clutch deal', score: rating + 12, isLeverage: true };
+    return { eyebrow: "Clutch deal", score: rating + 12, isLeverage: true };
   }
   // "Supposedly perfect" — a flawless 100% score on a thin sample (<50 reviews),
   // so the perfection deserves a grain of salt. Checked before Barrel/Quick win
   // so a suspicious perfect score isn't masked by a routine elite-short tag.
   const reviewCount = g.steam_review_count || 0;
   if (rating >= 100 && reviewCount >= 0 && reviewCount < 50) {
-    return { eyebrow: 'Supposedly perfect', score: rating - 2 };
+    return { eyebrow: "Supposedly perfect", score: rating - 2 };
   }
   if (isBarrel(g)) {
-    return { eyebrow: 'Barrel', score: rating + 6, isBarrel: true };
+    return { eyebrow: "Barrel", score: rating + 6, isBarrel: true };
   }
   // "On sale now" is intentionally NOT tagged for library games — a discount on
   // something you already own isn't actionable. The category is sourced from the
   // wishlist instead (see wishlist on-sale injection in pickSpotlightGames).
   if (releasedWithinMonths(g, 12) && rating >= 70) {
-    return { eyebrow: 'New release', score: rating + 7 };
+    return { eyebrow: "New release", score: rating + 7 };
   }
   if (g.coop_online && rating >= 72 && enough) {
-    return { eyebrow: 'Co-op campaign', score: rating + 5 };
+    return { eyebrow: "Co-op campaign", score: rating + 5 };
   }
   if (g.coop_local && rating >= 70) {
-    return { eyebrow: 'Couch co-op', score: rating + 4 };
+    return { eyebrow: "Couch co-op", score: rating + 4 };
   }
   const mc = metacriticScore(g);
   if (mc != null && mc >= 88 && rating >= 75) {
-    return { eyebrow: 'Critic darling', score: rating + 6 };
+    return { eyebrow: "Critic darling", score: rating + 6 };
   }
   if (isDeckReady(g) && rating >= 75 && enough) {
-    return { eyebrow: 'Deck ready', score: rating + 2 };
+    return { eyebrow: "Deck ready", score: rating + 2 };
   }
   if (releasedBeforeYears(g, 12) && rating >= 78 && enough) {
-    return { eyebrow: 'Aged classic', score: rating - 1 };
+    return { eyebrow: "Aged classic", score: rating - 1 };
   }
   if (hltb && hltb >= 40 && rating >= 80 && enough) {
-    return { eyebrow: 'Long haul', score: rating + 1 };
+    return { eyebrow: "Long haul", score: rating + 1 };
   }
   if (rating >= 88 && enough && hltb && hltb <= 8) {
-    return { eyebrow: 'Top-rated quick pick', score: rating + 8 };
+    return { eyebrow: "Top-rated quick pick", score: rating + 8 };
   }
   if (rating >= 90 && enough) {
-    return { eyebrow: 'Critically acclaimed', score: rating + 4 };
+    return { eyebrow: "Critically acclaimed", score: rating + 4 };
   }
   if (rating >= 78 && hltb && hltb <= 5) {
-    return { eyebrow: 'Quick win', score: rating + 2 };
+    return { eyebrow: "Quick win", score: rating + 2 };
   }
   if (rating >= 82 && enough) {
-    return { eyebrow: 'Highly rated', score: rating };
+    return { eyebrow: "Highly rated", score: rating };
   }
   if (rating >= 80 && !enough) {
-    return { eyebrow: 'Hidden gem', score: rating - 3 };
+    return { eyebrow: "Hidden gem", score: rating - 3 };
   }
   if (rating >= 75 && enough) {
-    return { eyebrow: 'Solid pick', score: rating - 5 };
+    return { eyebrow: "Solid pick", score: rating - 5 };
   }
   if (hltb && hltb >= 8 && hltb <= 15 && rating >= 72) {
-    return { eyebrow: 'Weekend-sized', score: rating - 4 };
+    return { eyebrow: "Weekend-sized", score: rating - 4 };
   }
   if (hltb && hltb <= 4 && rating > 0) {
-    return { eyebrow: 'Fast finish', score: rating - 6 };
+    return { eyebrow: "Fast finish", score: rating - 6 };
   }
   if (rating >= 70) {
-    return { eyebrow: 'Worth a look', score: rating - 10 };
+    return { eyebrow: "Worth a look", score: rating - 10 };
   }
   // Discovery fallbacks for backlog titles that earned no rating-driven category
   // above. Ordered most-specific first so a blank-slate game reads as one rather
@@ -620,27 +686,31 @@ export function gameSpotlightReason(g, recentKeys) {
   const noHltb = !hltb;
   const neverPlayed = playtime <= 0;
   if (noRating && noHltb && neverPlayed) {
-    return { eyebrow: 'Total mystery', score: 42 };
+    return { eyebrow: "Total mystery", score: 42 };
   }
   if (noRating) {
-    return { eyebrow: 'Unreviewed', score: 40 };
+    return { eyebrow: "Unreviewed", score: 40 };
   }
   if (neverPlayed) {
-    return { eyebrow: 'Unplayed', score: 38 };
+    return { eyebrow: "Unplayed", score: 38 };
   }
   return null;
 }
 
 export function pickSpotlightGames(games, snapIn) {
   const recentKeys = computeRecentSpotlightKeys(games);
-  const failed = (typeof window !== 'undefined' && window.__dashFailedCovers) || new Set();
-  const hasArt = g => {
+  const failed =
+    (typeof window !== "undefined" && window.__dashFailedCovers) || new Set();
+  const hasArt = (g) => {
     if (failed.has(gameKey(g))) return false;
     if (g.header_image || g.library_image) return true;
     return steamAppIdFromGame(g) != null;
   };
   const eligible = games.filter(hasArt);
-  const target = Math.max(60, Math.round(eligible.length * SPOTLIGHT_POOL_FRACTION));
+  const target = Math.max(
+    60,
+    Math.round(eligible.length * SPOTLIGHT_POOL_FRACTION),
+  );
 
   const tagged = [];
   for (const g of eligible) {
@@ -653,25 +723,29 @@ export function pickSpotlightGames(games, snapIn) {
   // the deal radar (cross-store-hidden + user-hidden excluded).
   const wlHidden = state.wishlistCrossStoreHiddenKeys || new Set();
   const wishlistOnSale = filterOutHidden(
-    (state.wishlistGames || []).filter(g => !wlHidden.has(gameKey(g)))
+    (state.wishlistGames || []).filter((g) => !wlHidden.has(gameKey(g))),
   )
     .filter(hasArt)
-    .filter(g => isOnSale(g) && ratingValue(g) >= 70)
-    .map(g => {
+    .filter((g) => isOnSale(g) && ratingValue(g) >= 70)
+    .map((g) => {
       const deal = getDealInfo(g);
       const cut = deal?.cut || 0;
       const rating = ratingValue(g);
       const metaParts = [`<strong>${rating}%</strong> review`];
       if (cut > 0) {
-        metaParts.push(`<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`);
+        metaParts.push(
+          `<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`,
+        );
       }
       if (deal?.price != null) {
-        metaParts.push(`<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`);
+        metaParts.push(
+          `<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`,
+        );
       }
       return {
         g,
         reason: {
-          eyebrow: 'On sale now',
+          eyebrow: "On sale now",
           score: rating + 9,
           isWishlistSale: true,
           metaParts,
@@ -686,10 +760,10 @@ export function pickSpotlightGames(games, snapIn) {
   if (mvp?.g && hasArt(mvp.g)) {
     const rating = ratingValue(mvp.g);
     const hltb = hltbMain(mvp.g);
-    const hltbStr = hltb != null ? `${Math.round(hltb)}h` : '?';
+    const hltbStr = hltb != null ? `${Math.round(hltb)}h` : "?";
     saberPicks.push({
       key: gameKey(mvp.g),
-      eyebrow: 'MVP pick',
+      eyebrow: "MVP pick",
       score: rating + 11,
       metaParts: [
         `<strong>${mvp.war} WAR</strong>`,
@@ -705,7 +779,7 @@ export function pickSpotlightGames(games, snapIn) {
     if (!prev || pick.score >= prev.score) saberByKey.set(pick.key, pick);
   }
   for (const pick of saberByKey.values()) {
-    const g = eligible.find(x => gameKey(x) === pick.key);
+    const g = eligible.find((x) => gameKey(x) === pick.key);
     if (!g) continue;
     const reason = {
       eyebrow: pick.eyebrow,
@@ -713,7 +787,7 @@ export function pickSpotlightGames(games, snapIn) {
       metaParts: pick.metaParts,
       isSaber: true,
     };
-    const idx = tagged.findIndex(t => gameKey(t.g) === pick.key);
+    const idx = tagged.findIndex((t) => gameKey(t.g) === pick.key);
     if (idx >= 0) {
       const existing = tagged[idx].reason;
       if (SABER_PROTECTED_EYEBROWS.has(existing.eyebrow)) continue;
@@ -727,7 +801,7 @@ export function pickSpotlightGames(games, snapIn) {
   const top = pickFamilyBalancedPool(tagged, target, RATING_FAMILY_CAP);
 
   const recentQuota = Math.min(RECENT_QUOTA, recentKeys.size);
-  const recentsInTop = top.filter(t => t.reason.isRecent).length;
+  const recentsInTop = top.filter((t) => t.reason.isRecent).length;
   if (recentsInTop > recentQuota) {
     let toDrop = recentsInTop - recentQuota;
     for (let i = top.length - 1; i >= 0 && toDrop > 0; i--) {
@@ -737,7 +811,7 @@ export function pickSpotlightGames(games, snapIn) {
       }
     }
   } else if (recentsInTop < recentQuota) {
-    const extras = taggedExtras(tagged, top).filter(t => t.reason.isRecent);
+    const extras = taggedExtras(tagged, top).filter((t) => t.reason.isRecent);
     const need = Math.min(recentQuota - recentsInTop, extras.length);
     for (let i = 0; i < need; i++) top.push(extras[i]);
   }
@@ -750,7 +824,7 @@ export function pickSpotlightGames(games, snapIn) {
   // games.
   const REPLAY_RATIO = 0.035;
   const replayQuota = Math.max(1, Math.round(top.length * REPLAY_RATIO));
-  const replaysInTop = top.filter(t => t.reason.isReplay).length;
+  const replaysInTop = top.filter((t) => t.reason.isReplay).length;
   if (replaysInTop > replayQuota) {
     let toDrop = replaysInTop - replayQuota;
     for (let i = top.length - 1; i >= 0 && toDrop > 0; i--) {
@@ -760,18 +834,20 @@ export function pickSpotlightGames(games, snapIn) {
       }
     }
   } else if (replaysInTop < replayQuota) {
-    const extras = taggedExtras(tagged, top).filter(t => t.reason.isReplay);
+    const extras = taggedExtras(tagged, top).filter((t) => t.reason.isReplay);
     const need = Math.min(replayQuota - replaysInTop, extras.length);
     for (let i = 0; i < need; i++) top.push(extras[i]);
   }
 
   const BARREL_RATIO = 0.04;
   const barrelQuota = Math.max(1, Math.round(top.length * BARREL_RATIO));
-  let barrelsInTop = top.filter(t => t.reason.isBarrel);
+  let barrelsInTop = top.filter((t) => t.reason.isBarrel);
   if (barrelsInTop.length > barrelQuota) {
     barrelsInTop.sort((a, b) => a.reason.score - b.reason.score);
     const dropKeys = new Set(
-      barrelsInTop.slice(0, barrelsInTop.length - barrelQuota).map(t => gameKey(t.g)),
+      barrelsInTop
+        .slice(0, barrelsInTop.length - barrelQuota)
+        .map((t) => gameKey(t.g)),
     );
     for (let i = top.length - 1; i >= 0; i--) {
       if (dropKeys.has(gameKey(top[i].g))) top.splice(i, 1);
@@ -782,26 +858,40 @@ export function pickSpotlightGames(games, snapIn) {
     const j = Math.floor(Math.random() * (i + 1));
     [top[i], top[j]] = [top[j], top[i]];
   }
-  const spreadTop = spreadByFamily(top, t => familyForEyebrow(t.reason.eyebrow), { wrap: true });
-  const pool = spreadTop.map(({ g, reason }) => Object.assign({}, g, { _spotlightReason: reason }));
+  const spreadTop = spreadByFamily(
+    top,
+    (t) => familyForEyebrow(t.reason.eyebrow),
+    { wrap: true },
+  );
+  const pool = spreadTop.map(({ g, reason }) =>
+    Object.assign({}, g, { _spotlightReason: reason }),
+  );
 
   // "Random pick" wildcard: surface one library title at random (it may not have
   // earned any other category). Kept clear of the quota'd categories
   // (recents / replay / barrel) so it never eats their guaranteed slots, and
   // de-clustered as its own family so it never reads as a duplicate of a neighbor.
-  if (eligible.length >= MIN_LIBRARY_FOR_RANDOM_PICK && Math.random() < _randomPickChance) {
+  if (
+    eligible.length >= MIN_LIBRARY_FOR_RANDOM_PICK &&
+    Math.random() < _randomPickChance
+  ) {
     const protectedKeys = new Set(
       pool
-        .filter(g => g._spotlightReason?.isRecent || g._spotlightReason?.isReplay || g._spotlightReason?.isBarrel)
+        .filter(
+          (g) =>
+            g._spotlightReason?.isRecent ||
+            g._spotlightReason?.isReplay ||
+            g._spotlightReason?.isBarrel,
+        )
         .map(gameKey),
     );
     const randomPick = pickRandomLibraryGame(eligible, protectedKeys);
     if (randomPick) {
       const key = gameKey(randomPick);
-      const at = pool.findIndex(g => gameKey(g) === key);
+      const at = pool.findIndex((g) => gameKey(g) === key);
       if (at >= 0) pool.splice(at, 1);
       const entry = Object.assign({}, randomPick, {
-        _spotlightReason: { eyebrow: 'Random pick', score: 50, isRandom: true },
+        _spotlightReason: { eyebrow: "Random pick", score: 50, isRandom: true },
       });
       const insertAt = Math.floor(Math.random() * (pool.length + 1));
       pool.splice(insertAt, 0, entry);
@@ -811,16 +901,26 @@ export function pickSpotlightGames(games, snapIn) {
   if (Math.random() < _catGameChance) {
     const protectedKeys = new Set(
       pool
-        .filter(g => g._spotlightReason?.isRecent || g._spotlightReason?.isReplay || g._spotlightReason?.isBarrel || g._spotlightReason?.isRandom)
+        .filter(
+          (g) =>
+            g._spotlightReason?.isRecent ||
+            g._spotlightReason?.isReplay ||
+            g._spotlightReason?.isBarrel ||
+            g._spotlightReason?.isRandom,
+        )
         .map(gameKey),
     );
     const cat = pickCatGame(eligible, protectedKeys);
     if (cat) {
       const key = gameKey(cat);
-      const at = pool.findIndex(g => gameKey(g) === key);
+      const at = pool.findIndex((g) => gameKey(g) === key);
       if (at >= 0) pool.splice(at, 1);
       const entry = Object.assign({}, cat, {
-        _spotlightReason: { eyebrow: CAT_GAME_EYEBROW, score: 50, isCatGame: true },
+        _spotlightReason: {
+          eyebrow: CAT_GAME_EYEBROW,
+          score: 50,
+          isCatGame: true,
+        },
       });
       pool.splice(Math.floor(Math.random() * (pool.length + 1)), 0, entry);
     }
@@ -829,7 +929,7 @@ export function pickSpotlightGames(games, snapIn) {
   // Preserve the previously-displayed game across dashboard revisits: if it's still
   // eligible, rotate it to index 0 so re-paint doesn't visibly switch games.
   if (_spotlightCurrentKey) {
-    const idx = pool.findIndex(g => gameKey(g) === _spotlightCurrentKey);
+    const idx = pool.findIndex((g) => gameKey(g) === _spotlightCurrentKey);
     if (idx > 0) {
       const [head] = pool.splice(idx, 1);
       pool.unshift(head);
@@ -842,16 +942,24 @@ export function pickSpotlightGames(games, snapIn) {
     const stinker = pickStinkerGame(eligible);
     if (stinker) {
       const key = gameKey(stinker);
-      const at = pool.findIndex(g => gameKey(g) === key);
+      const at = pool.findIndex((g) => gameKey(g) === key);
       if (at >= 0) pool.splice(at, 1);
-      pool.unshift(Object.assign({}, stinker, {
-        _spotlightReason: { eyebrow: STINKER_EYEBROW, score: 999, isStinker: true },
-      }));
+      pool.unshift(
+        Object.assign({}, stinker, {
+          _spotlightReason: {
+            eyebrow: STINKER_EYEBROW,
+            score: 999,
+            isStinker: true,
+          },
+        }),
+      );
     }
   }
 
   // Best-effort paid sponsor spotlights from the feed (round-robin, dismissible).
-  const spotlightAds = getAdsForLocation('dash-spotlight', { count: 3 }).map(sponsorToSpotlightGame);
+  const spotlightAds = getAdsForLocation("dash-spotlight", { count: 3 }).map(
+    sponsorToSpotlightGame,
+  );
   for (let i = 0; i < spotlightAds.length; i++) {
     const insertAt = Math.min((i + 1) * 3, pool.length);
     pool.splice(insertAt, 0, spotlightAds[i]);
@@ -883,15 +991,19 @@ export function pickSpotlightGames(games, snapIn) {
 }
 
 const SPOTLIGHT_STATUS_LABEL = {
-  backlog: 'in backlog',
-  next: 'next up',
-  playing: 'in progress',
-  unfinished: 'unfinished',
-  finished: 'completed',
+  backlog: "in backlog",
+  next: "next up",
+  playing: "in progress",
+  unfinished: "unfinished",
+  finished: "completed",
 };
 
 function spotlightJumpDest(g) {
-  return g.store === 'wishlist' ? 'Wishlist' : g.store === 'itch' ? 'itch.io' : 'Library';
+  return g.store === "wishlist"
+    ? "Wishlist"
+    : g.store === "itch"
+      ? "itch.io"
+      : "Library";
 }
 
 // Secondary stat for the default spotlight meta line. Prefers HLTB main time,
@@ -921,23 +1033,43 @@ function spotlightSecondaryStat(g) {
 // brand backdrop with the Pro pitch, used for house creatives flagged art_mode:
 // "logo". No cover art (so no art-fit/onload), no dismiss — permanent until Pro.
 function spotlightSchemeSuffix(scheme) {
-  const s = String(scheme || '').toLowerCase();
-  return SPOTLIGHT_PREMIUM_SCHEMES.includes(s) ? ` dash-spotlight--scheme-${s}` : '';
+  const s = String(scheme || "").toLowerCase();
+  return SPOTLIGHT_PREMIUM_SCHEMES.includes(s)
+    ? ` dash-spotlight--scheme-${s}`
+    : "";
 }
 
 function syncSpotlightSchemeClasses(el, scheme) {
   for (const s of SPOTLIGHT_PREMIUM_SCHEMES) {
     el.classList.remove(`dash-spotlight--scheme-${s}`);
   }
-  const key = String(scheme || '').toLowerCase();
+  const key = String(scheme || "").toLowerCase();
   if (SPOTLIGHT_PREMIUM_SCHEMES.includes(key)) {
     el.classList.add(`dash-spotlight--scheme-${key}`);
   }
 }
 
 const SPOTLIGHT_COPY_STOPWORDS = new Set([
-  'the', 'and', 'your', 'you', 'for', 'with', 'that', 'this', 'our', 'are',
-  'its', 'into', 'across', 'every', 'all', 'any', 'off', 'per', 'mo', 'now',
+  "the",
+  "and",
+  "your",
+  "you",
+  "for",
+  "with",
+  "that",
+  "this",
+  "our",
+  "are",
+  "its",
+  "into",
+  "across",
+  "every",
+  "all",
+  "any",
+  "off",
+  "per",
+  "mo",
+  "now",
 ]);
 
 /** Significant tokens (len > 2, non-stopword) for redundancy comparison. */
@@ -945,23 +1077,27 @@ function spotlightCopyTokens(text) {
   return new Set(
     String(text)
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/[^a-z0-9]+/g, " ")
       .trim()
-      .split(' ')
-      .filter(w => w.length > 2 && !SPOTLIGHT_COPY_STOPWORDS.has(w)),
+      .split(" ")
+      .filter((w) => w.length > 2 && !SPOTLIGHT_COPY_STOPWORDS.has(w)),
   );
 }
 
 function spotlightLogoBodyCopy(slogan, tagline) {
-  const s = String(slogan || '').trim();
-  const t = String(tagline || '').trim();
-  if (!s) return { headline: t, sub: '' };
-  if (!t) return { headline: s, sub: '' };
-  const norm = (x) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const s = String(slogan || "").trim();
+  const t = String(tagline || "").trim();
+  if (!s) return { headline: t, sub: "" };
+  if (!t) return { headline: s, sub: "" };
+  const norm = (x) =>
+    x
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   const ns = norm(s);
   const nt = norm(t);
   if (ns === nt || ns.includes(nt) || nt.includes(ns)) {
-    return { headline: s, sub: '' };
+    return { headline: s, sub: "" };
   }
   // Safety net: authors often restate the slogan as the tagline (e.g. "Keep
   // your library… no manual exports" vs "BAKLOG Pro keeps your library… no
@@ -973,24 +1109,24 @@ function spotlightLogoBodyCopy(slogan, tagline) {
     const [small, big] = a.size <= b.size ? [a, b] : [b, a];
     let shared = 0;
     for (const w of small) if (big.has(w)) shared++;
-    if (shared / small.size >= 0.7) return { headline: s, sub: '' };
+    if (shared / small.size >= 0.7) return { headline: s, sub: "" };
   }
   return { headline: s, sub: t };
 }
 
 function spotlightLogoInnerHtml(g) {
-  const eyebrow = g._spotlightReason?.eyebrow || 'BAKLOG Pro';
+  const eyebrow = g._spotlightReason?.eyebrow || "BAKLOG Pro";
   const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
-  const tagline = g._spotlightReason?.metaParts?.[0] || '';
-  const slogan = g._spotlightAd?.slogan || g._spotlightReason?.slogan || '';
-  const cta = g._spotlightAd?.cta || '';
+  const tagline = g._spotlightReason?.metaParts?.[0] || "";
+  const slogan = g._spotlightAd?.slogan || g._spotlightReason?.slogan || "";
+  const cta = g._spotlightAd?.cta || "";
   const { headline, sub } = spotlightLogoBodyCopy(slogan, tagline);
   const sloganHtml = headline
     ? `<span class="dash-spotlight-slogan">${escapeHtml(headline)}</span>`
-    : '';
+    : "";
   const metaHtml = sub
     ? `<span class="dash-spotlight-meta">${escapeHtml(sub)}</span>`
-    : '';
+    : "";
   return `
     <div class="dash-spotlight-logo-backdrop" aria-hidden="true"></div>
     <div class="dash-spotlight-logo-lockup" aria-hidden="true">
@@ -1002,36 +1138,43 @@ function spotlightLogoInnerHtml(g) {
       <span class="dash-spotlight-eyebrow">${escapeHtml(displayEyebrow)}</span>
       ${sloganHtml}
       ${metaHtml}
-      ${cta ? `<span class="dash-spotlight-logo-cta">${escapeHtml(cta)} &rarr;</span>` : ''}
+      ${cta ? `<span class="dash-spotlight-logo-cta">${escapeHtml(cta)} &rarr;</span>` : ""}
     </div>`;
 }
 
 export function spotlightInnerHtml(g) {
-  if (g._spotlightArtMode === 'logo') return spotlightLogoInnerHtml(g);
+  if (g._spotlightArtMode === "logo") return spotlightLogoInnerHtml(g);
   const candidates = spotlightArtCandidates(g);
   const art = candidates[0] || "";
   const candidateAttr = escapeAttr(candidates.join("|"));
   const rating = ratingValue(g);
-  const status = (getPersonal(g).status) || 'backlog';
-  const statusLabel = g.store === 'wishlist'
-    ? 'on your wishlist'
-    : (SPOTLIGHT_STATUS_LABEL[status] || 'in your library');
-  const eyebrow = g._spotlightReason?.eyebrow || 'Spotlight';
+  const status = getPersonal(g).status || "backlog";
+  const statusLabel =
+    g.store === "wishlist"
+      ? "on your wishlist"
+      : SPOTLIGHT_STATUS_LABEL[status] || "in your library";
+  const eyebrow = g._spotlightReason?.eyebrow || "Spotlight";
   const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
   const eyebrowTipText = eyebrowTip(eyebrow);
-  const eyebrowTitleAttr = eyebrowTipText ? ` title="${escapeAttr(eyebrowTipText)}"` : '';
+  const eyebrowTitleAttr = eyebrowTipText
+    ? ` title="${escapeAttr(eyebrowTipText)}"`
+    : "";
   const storeKey = normalizeGame(g).store;
-  const storeGlyph = storeLogoHtml(storeKey, { size: 'sm', title: storeDisplayName(storeKey), className: 'dash-spotlight-store' });
+  const storeGlyph = storeLogoHtml(storeKey, {
+    size: "sm",
+    title: storeDisplayName(storeKey),
+    className: "dash-spotlight-store",
+  });
   const customMeta = g._spotlightReason?.metaParts;
   const secondaryStat = spotlightSecondaryStat(g);
   const metaParts = customMeta?.length
     ? [storeGlyph, ...customMeta]
     : [
-      storeGlyph,
-      `<strong>${rating}%</strong> review`,
-      ...(secondaryStat ? [secondaryStat] : []),
-      escapeHtml(statusLabel),
-    ];
+        storeGlyph,
+        `<strong>${rating}%</strong> review`,
+        ...(secondaryStat ? [secondaryStat] : []),
+        escapeHtml(statusLabel),
+      ];
   // Sponsored spotlights carry their disclosure in the eyebrow ("Sponsored"),
   // so no separate badge pill is shown; they're skippable via the rotation nav
   // rather than dismissible, so no close affordance either.
@@ -1043,7 +1186,7 @@ export function spotlightInnerHtml(g) {
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
-      <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaParts.join(' · ')}</span>
+      <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaParts.join(" · ")}</span>
     </div>`;
 }
 
@@ -1058,15 +1201,16 @@ function spotlightNavHtml() {
 export function renderSpotlightHtml(g) {
   const key = gameKey(g);
   const ad = g._spotlightAd;
-  const action = ad ? 'sponsored-deal' : 'dash-list-jump';
-  const keyAttr = ad ? '' : ` data-key="${escapeAttr(key)}"`;
-  const sponsorAttrs = ad ? ` ${sponsorActionAttrs(ad)}` : '';
+  const action = ad ? "sponsored-deal" : "dash-list-jump";
+  const keyAttr = ad ? "" : ` data-key="${escapeAttr(key)}"`;
+  const sponsorAttrs = ad ? ` ${sponsorActionAttrs(ad)}` : "";
   const title = ad
     ? escapeAttr(g.name)
     : `Jump to ${escapeAttr(g.name)} in ${escapeAttr(spotlightJumpDest(g))}`;
-  const adClass = ad ? ' dash-spotlight--ad' : '';
-  const logoClass = g._spotlightArtMode === 'logo' ? ' has-logo-art' : '';
-  const schemeClass = g._spotlightArtMode === 'logo' ? spotlightSchemeSuffix(ad?.scheme) : '';
+  const adClass = ad ? " dash-spotlight--ad" : "";
+  const logoClass = g._spotlightArtMode === "logo" ? " has-logo-art" : "";
+  const schemeClass =
+    g._spotlightArtMode === "logo" ? spotlightSchemeSuffix(ad?.scheme) : "";
   return `<div class="dash-spotlight-wrap" id="dashboardSpotlightWrap" role="group" aria-roledescription="carousel">
     <span class="sr-only dash-spotlight-live" id="dashboardSpotlightLive" aria-live="polite"></span>
     <button type="button" class="dash-spotlight${adClass}${logoClass}${schemeClass}" id="dashboardSpotlight" data-action="${action}"${keyAttr}${sponsorAttrs} title="${title}">
@@ -1077,57 +1221,60 @@ export function renderSpotlightHtml(g) {
 }
 
 export function primeSpotlightArt(btn) {
-  const img = btn?.querySelector('.dash-spotlight-art');
+  const img = btn?.querySelector(".dash-spotlight-art");
   if (!img) return;
   if (img.complete && img.naturalWidth > 0) {
-    img.classList.add('is-loaded');
+    img.classList.add("is-loaded");
     window.applySpotlightArtFit?.(img);
   }
 }
 
 function announceSpotlightSlide(game) {
-  const live = document.getElementById('dashboardSpotlightLive');
+  const live = document.getElementById("dashboardSpotlightLive");
   if (!live || !game) return;
-  const eyebrow = game._spotlightReason?.eyebrow || 'Spotlight';
+  const eyebrow = game._spotlightReason?.eyebrow || "Spotlight";
   live.textContent = `${eyebrowVariant(eyebrow, gameKey(game))}: ${game.name}`;
 }
 
 function updateSpotlightControlsUI() {
-  const wrap = document.getElementById('dashboardSpotlightWrap');
+  const wrap = document.getElementById("dashboardSpotlightWrap");
   if (!wrap) return;
   const multi = _spotlightPool.length > 1;
-  wrap.classList.toggle('dash-spotlight-wrap--multi', multi);
+  wrap.classList.toggle("dash-spotlight-wrap--multi", multi);
 
-  const pauseBtn = wrap.querySelector('[data-spotlight-pause]');
+  const pauseBtn = wrap.querySelector("[data-spotlight-pause]");
   if (pauseBtn) {
-    pauseBtn.setAttribute('aria-pressed', _spotlightPaused ? 'true' : 'false');
-    pauseBtn.setAttribute('aria-label', _spotlightPaused ? 'Play rotation' : 'Pause rotation');
-    pauseBtn.title = _spotlightPaused ? 'Play rotation' : 'Pause rotation';
-    pauseBtn.innerHTML = _spotlightPaused ? '&#9654;' : '&#10074;&#10074;';
+    pauseBtn.setAttribute("aria-pressed", _spotlightPaused ? "true" : "false");
+    pauseBtn.setAttribute(
+      "aria-label",
+      _spotlightPaused ? "Play rotation" : "Pause rotation",
+    );
+    pauseBtn.title = _spotlightPaused ? "Play rotation" : "Pause rotation";
+    pauseBtn.innerHTML = _spotlightPaused ? "&#9654;" : "&#10074;&#10074;";
     pauseBtn.hidden = !multi;
   }
 }
 
 function navDeltaFromTarget(target) {
   const dir = target?.dataset?.spotlightNav;
-  if (dir === 'prev') return -1;
-  if (dir === 'next') return 1;
+  if (dir === "prev") return -1;
+  if (dir === "next") return 1;
   return parseInt(dir, 10) || 0;
 }
 
 function wireSpotlightControls(wrap) {
   if (!wrap || wrap.dataset.controlsWired) return;
-  wrap.dataset.controlsWired = '1';
+  wrap.dataset.controlsWired = "1";
 
-  wrap.addEventListener('click', (e) => {
-    const nav = e.target.closest('[data-spotlight-nav]');
+  wrap.addEventListener("click", (e) => {
+    const nav = e.target.closest("[data-spotlight-nav]");
     if (nav) {
       e.preventDefault();
       e.stopPropagation();
       stepSpotlight(navDeltaFromTarget(nav));
       return;
     }
-    const pause = e.target.closest('[data-spotlight-pause]');
+    const pause = e.target.closest("[data-spotlight-pause]");
     if (pause) {
       e.preventDefault();
       e.stopPropagation();
@@ -1135,26 +1282,26 @@ function wireSpotlightControls(wrap) {
     }
   });
 
-  wrap.addEventListener('keydown', (e) => {
-    const nav = e.target.closest('[data-spotlight-nav]');
-    if (nav && (e.key === 'Enter' || e.key === ' ')) {
+  wrap.addEventListener("keydown", (e) => {
+    const nav = e.target.closest("[data-spotlight-nav]");
+    if (nav && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       e.stopPropagation();
       stepSpotlight(navDeltaFromTarget(nav));
       return;
     }
-    const pause = e.target.closest('[data-spotlight-pause]');
-    if (pause && (e.key === 'Enter' || e.key === ' ')) {
+    const pause = e.target.closest("[data-spotlight-pause]");
+    if (pause && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       e.stopPropagation();
       toggleSpotlightPause();
       return;
     }
-    if (e.key === 'ArrowLeft') {
+    if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
       stepSpotlight(-1);
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
       stepSpotlight(1);
@@ -1163,30 +1310,38 @@ function wireSpotlightControls(wrap) {
 }
 
 function applySpotlightSlide(el, next) {
-  el.classList.remove('has-portrait-art', 'has-art-placeholder', 'is-lowres-art', 'has-logo-art');
-  el.classList.remove('is-tilting');
+  el.classList.remove(
+    "has-portrait-art",
+    "has-art-placeholder",
+    "is-lowres-art",
+    "has-logo-art",
+  );
+  el.classList.remove("is-tilting");
   el._spotlightTiltReset?.();
   el.innerHTML = spotlightInnerHtml(next);
-  el.classList.toggle('has-logo-art', next._spotlightArtMode === 'logo');
-  syncSpotlightSchemeClasses(el, next._spotlightArtMode === 'logo' ? next._spotlightAd?.scheme : '');
+  el.classList.toggle("has-logo-art", next._spotlightArtMode === "logo");
+  syncSpotlightSchemeClasses(
+    el,
+    next._spotlightArtMode === "logo" ? next._spotlightAd?.scheme : "",
+  );
   el.dataset.key = gameKey(next);
   // Keep the click action, sponsor attrs, title, and ad styling in sync with the
   // rotated-in slide (mirrors renderSpotlightHtml). Sponsored slides open the ad
   // URL and have no "jump to … in library" tooltip — their title is just the name.
   const ad = next._spotlightAd;
-  el.classList.toggle('dash-spotlight--ad', !!ad);
+  el.classList.toggle("dash-spotlight--ad", !!ad);
   if (ad) {
-    el.dataset.action = 'sponsored-deal';
+    el.dataset.action = "sponsored-deal";
     el.dataset.sponsorId = ad.id;
-    el.dataset.sponsorUrl = ad.url || '';
+    el.dataset.sponsorUrl = ad.url || "";
     el.title = next.name;
   } else {
-    el.dataset.action = 'dash-list-jump';
+    el.dataset.action = "dash-list-jump";
     delete el.dataset.sponsorId;
     delete el.dataset.sponsorUrl;
     el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
   }
-  el.classList.remove('is-fading');
+  el.classList.remove("is-fading");
   primeSpotlightArt(el);
   _spotlightCurrentKey = gameKey(next);
   recordSpotlightShown(_spotlightCurrentKey);
@@ -1196,7 +1351,7 @@ function applySpotlightSlide(el, next) {
 }
 
 function fadeToSpotlight(el, next) {
-  el.classList.add('is-fading');
+  el.classList.add("is-fading");
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
   _spotlightFadeTimer = setTimeout(() => {
     applySpotlightSlide(el, next);
@@ -1214,7 +1369,7 @@ function startSpotlightTimer(el) {
   _spotlightTimer = setInterval(() => {
     const hoverPaused = el._spotlightPaused?.() ?? false;
     if (hoverPaused || _spotlightPaused) return;
-    if (!document.getElementById('dashboardSpotlight')) {
+    if (!document.getElementById("dashboardSpotlight")) {
       stopSpotlightRotation();
       return;
     }
@@ -1225,13 +1380,17 @@ function startSpotlightTimer(el) {
 
 function wireSpotlightHover(el) {
   if (!el || el.dataset.hoverWired) return;
-  el.dataset.hoverWired = '1';
+  el.dataset.hoverWired = "1";
   let paused = false;
-  el.addEventListener('mouseenter', () => { paused = true; });
-  el.addEventListener('mouseleave', () => { paused = false; });
+  el.addEventListener("mouseenter", () => {
+    paused = true;
+  });
+  el.addEventListener("mouseleave", () => {
+    paused = false;
+  });
   el._spotlightPaused = () => paused;
 
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   const MAX_YAW = 12;
   const MAX_PITCH = 7;
   const HOVER_SCALE = 1.03;
@@ -1242,21 +1401,27 @@ function wireSpotlightHover(el) {
   const PORTRAIT_LEFT_INSET = 0.08;
 
   const portraitArt = () =>
-    (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-art') : null);
+    el.classList.contains("has-portrait-art")
+      ? el.querySelector(".dash-spotlight-art")
+      : null;
   const portraitBg = () =>
-    (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-art-bg') : null);
+    el.classList.contains("has-portrait-art")
+      ? el.querySelector(".dash-spotlight-art-bg")
+      : null;
   const portraitSheen = () =>
-    (el.classList.contains('has-portrait-art') ? el.querySelector('.dash-spotlight-sheen') : null);
+    el.classList.contains("has-portrait-art")
+      ? el.querySelector(".dash-spotlight-sheen")
+      : null;
 
   // Resting pose of the CSS float keyframes (the 0%/100% frame of each
   // spotlightFloatN). On release we ease to this pose so that when `is-tilting`
   // is removed and the keyframe animation resumes at 0%, the handoff is seamless
   // instead of snapping from a flat (0deg) rest pose.
   const FLOAT_ANCHORS = {
-    'portrait-anim-1': { ry: -3, rx: 1 },
-    'portrait-anim-2': { ry: 3, rx: -1 },
-    'portrait-anim-3': { ry: -4, rx: 1.2 },
-    'portrait-anim-4': { ry: 2.5, rx: -0.8 },
+    "portrait-anim-1": { ry: -3, rx: 1 },
+    "portrait-anim-2": { ry: 3, rx: -1 },
+    "portrait-anim-3": { ry: -4, rx: 1.2 },
+    "portrait-anim-4": { ry: 2.5, rx: -0.8 },
   };
   const floatAnchor = () => {
     for (const cls in FLOAT_ANCHORS) {
@@ -1285,7 +1450,8 @@ function wireSpotlightHover(el) {
     const zone = portraitInteractionRect();
     if (!zone) return false;
     if (clientX < zone.left || clientX > zone.right) return false;
-    if (zone.height > 0 && (clientY < zone.top || clientY > zone.bottom)) return false;
+    if (zone.height > 0 && (clientY < zone.top || clientY > zone.bottom))
+      return false;
     return true;
   };
 
@@ -1306,17 +1472,17 @@ function wireSpotlightHover(el) {
     }
     // The sheen ::before reads these via CSS: left tracks the cursor and the
     // opacity factor fades the gleam in/out (see .is-tilting sheen rule).
-    el.style.setProperty('--sheen-x', `${(cur.sx * 100).toFixed(2)}%`);
-    el.style.setProperty('--sheen-op', cur.op.toFixed(3));
+    el.style.setProperty("--sheen-x", `${(cur.sx * 100).toFixed(2)}%`);
+    el.style.setProperty("--sheen-op", cur.op.toFixed(3));
   };
 
   const clearPortraitTransforms = () => {
     const art = portraitArt();
     const bg = portraitBg();
-    if (art) art.style.transform = '';
-    if (bg) bg.style.transform = '';
-    el.style.removeProperty('--sheen-x');
-    el.style.removeProperty('--sheen-op');
+    if (art) art.style.transform = "";
+    if (bg) bg.style.transform = "";
+    el.style.removeProperty("--sheen-x");
+    el.style.removeProperty("--sheen-op");
   };
 
   const frame = () => {
@@ -1324,7 +1490,7 @@ function wireSpotlightHover(el) {
     if (!art) {
       rafId = null;
       clearPortraitTransforms();
-      el.classList.remove('is-tilting');
+      el.classList.remove("is-tilting");
       return;
     }
     cur.rx += (target.rx - cur.rx) * EASE;
@@ -1344,7 +1510,7 @@ function wireSpotlightHover(el) {
       cur.sx = 0.5;
       cur.op = 0;
       clearPortraitTransforms();
-      el.classList.remove('is-tilting');
+      el.classList.remove("is-tilting");
       rafId = null;
       return;
     }
@@ -1360,8 +1526,14 @@ function wireSpotlightHover(el) {
     const zone = portraitInteractionRect();
     const r = zone || art.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    const px = Math.max(-0.5, Math.min(0.5, (clientX - r.left) / r.width - 0.5));
-    const py = Math.max(-0.5, Math.min(0.5, (clientY - r.top) / r.height - 0.5));
+    const px = Math.max(
+      -0.5,
+      Math.min(0.5, (clientX - r.left) / r.width - 0.5),
+    );
+    const py = Math.max(
+      -0.5,
+      Math.min(0.5, (clientY - r.top) / r.height - 0.5),
+    );
     target.ry = px * MAX_YAW;
     target.rx = -py * MAX_PITCH;
     const sr = zone?.sheenRect || portraitSheen()?.getBoundingClientRect();
@@ -1376,7 +1548,7 @@ function wireSpotlightHover(el) {
     hovering = true;
     target.sc = HOVER_SCALE;
     target.op = 1;
-    el.classList.add('is-tilting');
+    el.classList.add("is-tilting");
     updateTiltFromClient(clientX, clientY);
     cur.sx = target.sx;
     startLoop();
@@ -1396,7 +1568,7 @@ function wireSpotlightHover(el) {
 
   el._spotlightSyncHover = () => {
     if (reduceMotion?.matches) return;
-    if (!el.matches(':hover')) {
+    if (!el.matches(":hover")) {
       endTilt();
       return;
     }
@@ -1411,14 +1583,14 @@ function wireSpotlightHover(el) {
     engageTilt(lastPointer.x, lastPointer.y);
   };
 
-  el.addEventListener('pointerenter', (e) => {
-    if (e.pointerType === 'touch' || reduceMotion?.matches) return;
+  el.addEventListener("pointerenter", (e) => {
+    if (e.pointerType === "touch" || reduceMotion?.matches) return;
     lastPointer = { x: e.clientX, y: e.clientY };
     el._spotlightSyncHover();
   });
 
-  el.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'touch' || reduceMotion?.matches) return;
+  el.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "touch" || reduceMotion?.matches) return;
     lastPointer = { x: e.clientX, y: e.clientY };
     if (!portraitArt()) return;
     const inZone = pointerInPortraitZone(e.clientX, e.clientY);
@@ -1434,8 +1606,8 @@ function wireSpotlightHover(el) {
     startLoop();
   });
 
-  el.addEventListener('pointerleave', endTilt);
-  el.addEventListener('pointercancel', endTilt);
+  el.addEventListener("pointerleave", endTilt);
+  el.addEventListener("pointercancel", endTilt);
 
   el._spotlightTiltReset = () => {
     hovering = false;
@@ -1460,7 +1632,7 @@ function wireSpotlightHover(el) {
 export function toggleSpotlightPause() {
   _spotlightPausedByUser = true;
   _spotlightPaused = !_spotlightPaused;
-  const el = document.getElementById('dashboardSpotlight');
+  const el = document.getElementById("dashboardSpotlight");
   if (_spotlightPaused) {
     stopSpotlightTimer();
   } else if (el && _rotationWanted && _spotlightPool.length > 1) {
@@ -1471,7 +1643,7 @@ export function toggleSpotlightPause() {
 
 export function stepSpotlight(delta) {
   if (_spotlightPool.length <= 1) return;
-  const el = document.getElementById('dashboardSpotlight');
+  const el = document.getElementById("dashboardSpotlight");
   if (!el) return;
   const len = _spotlightPool.length;
   _spotlightIndex = (_spotlightIndex + delta + len) % len;
@@ -1483,8 +1655,8 @@ export function stepSpotlight(delta) {
 }
 
 export function startSpotlightRotation(pool) {
-  const wrap = document.getElementById('dashboardSpotlightWrap');
-  const el = document.getElementById('dashboardSpotlight');
+  const wrap = document.getElementById("dashboardSpotlightWrap");
+  const el = document.getElementById("dashboardSpotlight");
   if (!pool || pool.length <= 1) {
     stopSpotlightRotation();
     _spotlightPool = pool || [];
@@ -1519,9 +1691,9 @@ export function startSpotlightRotation(pool) {
 }
 
 export function syncSpotlightInMega(el, spotlight) {
-  const hero = el.querySelector('.dash-mega-hero');
-  const existingWrap = document.getElementById('dashboardSpotlightWrap');
-  const existing = document.getElementById('dashboardSpotlight');
+  const hero = el.querySelector(".dash-mega-hero");
+  const existingWrap = document.getElementById("dashboardSpotlightWrap");
+  const existing = document.getElementById("dashboardSpotlight");
   const newKey = spotlight ? gameKey(spotlight) : null;
   if (spotlight && existing?.dataset.key === newKey) {
     primeSpotlightArt(existing);
@@ -1530,18 +1702,18 @@ export function syncSpotlightInMega(el, spotlight) {
   if (spotlight && existingWrap) {
     stopSpotlightRotation();
     existingWrap.outerHTML = renderSpotlightHtml(spotlight);
-    primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+    primeSpotlightArt(document.getElementById("dashboardSpotlight"));
     return;
   }
   if (spotlight && !existingWrap && hero) {
-    hero.insertAdjacentHTML('afterbegin', renderSpotlightHtml(spotlight));
-    primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+    hero.insertAdjacentHTML("afterbegin", renderSpotlightHtml(spotlight));
+    primeSpotlightArt(document.getElementById("dashboardSpotlight"));
     return;
   }
   existingWrap?.remove();
 }
 
-if (typeof document !== 'undefined') {
+if (typeof document !== "undefined") {
   registerPausable({
     pause: stopSpotlightRotation,
     resume() {

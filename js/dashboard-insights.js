@@ -1,15 +1,35 @@
 // Dashboard insight ticker / marquee (rotating stat lines + sticky marquee items).
 // Extracted from dashboard.js as part of the dashboard module split.
 
-import { state } from './state.js';
-import { escapeAttr, escapeHtml, formatNum } from './dom-util.js';
-import { gameKey, normalizeGame, hltbMain, ratingValue, hasEnoughReviews, itchIsGame, combinedPlaytime, firstPlayedAt, firstPlayedYear, playSessionCount } from './game-core.js';
-import { gameGenresCanonical } from './genres.js';
-import { getPersonal } from './personal-storage.js';
-import { getDealInfo, dealScore, isStealDeal, cutBucketClass } from './deals.js';
-import { formatMoney, displayCurrency } from './currency.js';
-import { registerPausable } from './visibility.js';
-export { applyMarqueeSpeed, observeMarqueeSpeed, MARQUEE_PX_PER_SEC } from './marquee-speed.js';
+import { state } from "./state.js";
+import { escapeAttr, escapeHtml, formatNum } from "./dom-util.js";
+import {
+  gameKey,
+  normalizeGame,
+  hltbMain,
+  ratingValue,
+  hasEnoughReviews,
+  itchIsGame,
+  combinedPlaytime,
+  firstPlayedAt,
+  firstPlayedYear,
+  playSessionCount,
+} from "./game-core.js";
+import { gameGenresCanonical } from "./genres.js";
+import { getPersonal } from "./personal-storage.js";
+import {
+  getDealInfo,
+  dealScore,
+  isStealDeal,
+  cutBucketClass,
+} from "./deals.js";
+import { formatMoney, displayCurrency } from "./currency.js";
+import { registerPausable } from "./visibility.js";
+export {
+  applyMarqueeSpeed,
+  observeMarqueeSpeed,
+  MARQUEE_PX_PER_SEC,
+} from "./marquee-speed.js";
 import {
   getLibrarySnapshot,
   completionAverage,
@@ -96,12 +116,27 @@ import {
   doubleDipBacklogCount,
   letterCoverageShare,
   adultGameCount,
-} from './sabermetrics.js';
-import { appendCreativeInsights, appendCreativeMarqueeChips } from './creative-metrics.js';
-import { marqueeTip, insightTip, metricKeyForLabel, metricKeyForInsight } from './metric-tips.js';
-import { noteMarqueeMetricKeys, noteInsightMetricKeys } from './metrics-rendered.js';
-import { familyForInsight, familyForLabel, spreadByFamily } from './stat-families.js';
-import { metricSeedSessionKey } from './profiles.js';
+} from "./sabermetrics.js";
+import {
+  appendCreativeInsights,
+  appendCreativeMarqueeChips,
+} from "./creative-metrics.js";
+import {
+  marqueeTip,
+  insightTip,
+  metricKeyForLabel,
+  metricKeyForInsight,
+} from "./metric-tips.js";
+import {
+  noteMarqueeMetricKeys,
+  noteInsightMetricKeys,
+} from "./metrics-rendered.js";
+import {
+  familyForInsight,
+  familyForLabel,
+  spreadByFamily,
+} from "./stat-families.js";
+import { metricSeedSessionKey } from "./profiles.js";
 
 /** Sabermetric marquee/pill appearance weights (session-stable RNG). */
 export const METRIC_WEIGHT = {
@@ -117,7 +152,7 @@ export const METRIC_WEIGHT = {
 function disabledMetricSet() {
   const arr = state.prefs.metricsDisabled;
   if (!Array.isArray(arr)) return new Set();
-  return new Set(arr.filter((k) => typeof k === 'string' && k));
+  return new Set(arr.filter((k) => typeof k === "string" && k));
 }
 
 /** @param {string} label */
@@ -170,7 +205,7 @@ function metricRng() {
 /** @param {{ w?: number }[]} items */
 export function applyMetricWeights(items) {
   const rng = metricRng();
-  return items.filter(it => {
+  return items.filter((it) => {
     const w = it.w ?? METRIC_WEIGHT.normal;
     return w >= 1 || rng() < w;
   });
@@ -178,15 +213,15 @@ export function applyMetricWeights(items) {
 
 function normalizeInsightEntries(insights) {
   if (!insights?.length) return [];
-  if (typeof insights[0] === 'string') {
-    return insights.map(html => ({ html, weight: METRIC_WEIGHT.friendly }));
+  if (typeof insights[0] === "string") {
+    return insights.map((html) => ({ html, weight: METRIC_WEIGHT.friendly }));
   }
   return insights;
 }
 
 function filterInsightsByWeight(entries) {
   const rng = metricRng();
-  return entries.filter(e => {
+  return entries.filter((e) => {
     const w = e.weight ?? METRIC_WEIGHT.friendly;
     return w >= 1 || rng() < w;
   });
@@ -196,16 +231,16 @@ function filterInsightsOneLine(el, htmlList) {
   if (!el || !htmlList.length) return htmlList;
   const maxW = el.clientWidth - 24;
   if (maxW <= 0) return htmlList;
-  const measurer = document.createElement('span');
+  const measurer = document.createElement("span");
   const cs = getComputedStyle(el);
   measurer.style.cssText = [
-    'position:absolute',
-    'visibility:hidden',
-    'white-space:nowrap',
+    "position:absolute",
+    "visibility:hidden",
+    "white-space:nowrap",
     `font:${cs.font}`,
     `font-size:${cs.fontSize}`,
     `letter-spacing:${cs.letterSpacing}`,
-  ].join(';');
+  ].join(";");
   document.body.appendChild(measurer);
   const out = htmlList.filter((html) => {
     measurer.innerHTML = html;
@@ -241,19 +276,30 @@ export function buildMegaLibraryContext(games) {
   let backlogHrs = 0;
 
   for (const g of games) {
-    const st = getPersonal(g).status || 'backlog';
+    const st = getPersonal(g).status || "backlog";
     const playMin = combinedPlaytime(g);
     const rating = ratingValue(g);
     const hltb = hltbMain(g);
     const row = { g, st, playMin, rating, hltb };
 
     switch (st) {
-      case 'backlog': backlog.push(row); break;
-      case 'playing': playing.push(row); break;
-      case 'unfinished': unfinished.push(row); break;
-      case 'next': next.push(row); break;
-      case 'finished': finished.push(row); break;
-      default: break;
+      case "backlog":
+        backlog.push(row);
+        break;
+      case "playing":
+        playing.push(row);
+        break;
+      case "unfinished":
+        unfinished.push(row);
+        break;
+      case "next":
+        next.push(row);
+        break;
+      case "finished":
+        finished.push(row);
+        break;
+      default:
+        break;
     }
     if (playMin > 0) {
       touched.push(row);
@@ -261,7 +307,7 @@ export function buildMegaLibraryContext(games) {
     }
     if (rating > 0) rated.push(row);
     if (g.trophy_progress != null) tracked.push(row);
-    if (st === 'backlog') {
+    if (st === "backlog") {
       if (hltb != null && hltb > 0) {
         hltbVals.push(hltb);
         backlogHrs += hltb;
@@ -274,8 +320,19 @@ export function buildMegaLibraryContext(games) {
 
   return {
     total: games.length,
-    backlog, playing, unfinished, next, finished, touched, rated, tracked,
-    hltbVals, genreHrs, playedMinTotal, playedHrs: playedMinTotal / 60, backlogHrs,
+    backlog,
+    playing,
+    unfinished,
+    next,
+    finished,
+    touched,
+    rated,
+    tracked,
+    hltbVals,
+    genreHrs,
+    playedMinTotal,
+    playedHrs: playedMinTotal / 60,
+    backlogHrs,
   };
 }
 
@@ -286,21 +343,26 @@ function gamesFromMegaCtx(ctx, bucket) {
 /** @returns {{ html: string, weight: number }[]} */
 export function buildInsightPool(games, snapIn, ctxIn) {
   const entries = [];
-  const add = (html, weight = METRIC_WEIGHT.friendly) => entries.push({ html, weight });
-  const backlog = ctxIn ? gamesFromMegaCtx(ctxIn, 'backlog') : games.filter(g => getPersonal(g).status === 'backlog');
+  const add = (html, weight = METRIC_WEIGHT.friendly) =>
+    entries.push({ html, weight });
+  const backlog = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "backlog")
+    : games.filter((g) => getPersonal(g).status === "backlog");
   const maxHrs = state.prefs.quickWinMaxHours || 15;
 
   const genreHrs = ctxIn?.genreHrs || {};
   if (!ctxIn) {
-    backlog.forEach(g => {
-      gameGenresCanonical(g).forEach(gen => {
+    backlog.forEach((g) => {
+      gameGenresCanonical(g).forEach((gen) => {
         genreHrs[gen] = (genreHrs[gen] || 0) + (hltbMain(g) || 0);
       });
     });
   }
   const topGenre = Object.entries(genreHrs).sort((a, b) => b[1] - a[1])[0];
   if (topGenre && topGenre[1] > 0) {
-    add(`Biggest backlog: <strong>${escapeHtml(topGenre[0])}</strong> · ${escapeHtml(formatNum(Math.round(topGenre[1])))}h`);
+    add(
+      `Biggest backlog: <strong>${escapeHtml(topGenre[0])}</strong> · ${escapeHtml(formatNum(Math.round(topGenre[1])))}h`,
+    );
   }
 
   const topPlayedRow = ctxIn?.touched.length
@@ -308,75 +370,110 @@ export function buildInsightPool(games, snapIn, ctxIn) {
     : null;
   const byPlay = topPlayedRow
     ? [topPlayedRow.g]
-    : [...games].filter(g => combinedPlaytime(g) > 0).sort((a, b) => combinedPlaytime(b) - combinedPlaytime(a));
+    : [...games]
+        .filter((g) => combinedPlaytime(g) > 0)
+        .sort((a, b) => combinedPlaytime(b) - combinedPlaytime(a));
   if (byPlay[0]) {
-    const mins = topPlayedRow ? topPlayedRow.playMin : combinedPlaytime(byPlay[0]);
+    const mins = topPlayedRow
+      ? topPlayedRow.playMin
+      : combinedPlaytime(byPlay[0]);
     const hrs = Math.round(mins / 60);
-    add(`Most played: <strong>${escapeHtml(byPlay[0].name)}</strong> · ${escapeHtml(formatNum(hrs))}h`);
+    add(
+      `Most played: <strong>${escapeHtml(byPlay[0].name)}</strong> · ${escapeHtml(formatNum(hrs))}h`,
+    );
   }
 
   const devCounts = {};
   for (const g of games) {
     const ng = normalizeGame(g);
-    (ng.developers || g.developers || []).forEach(d => { if (d) devCounts[d] = (devCounts[d] || 0) + 1; });
+    (ng.developers || g.developers || []).forEach((d) => {
+      if (d) devCounts[d] = (devCounts[d] || 0) + 1;
+    });
   }
   const favDev = Object.entries(devCounts).sort((a, b) => b[1] - a[1])[0];
   if (favDev && favDev[1] > 1) {
-    add(`Favorite developer: <strong>${escapeHtml(favDev[0])}</strong> · ${escapeHtml(formatNum(favDev[1]))} games`, METRIC_WEIGHT.moderate);
+    add(
+      `Favorite developer: <strong>${escapeHtml(favDev[0])}</strong> · ${escapeHtml(formatNum(favDev[1]))} games`,
+      METRIC_WEIGHT.moderate,
+    );
   }
 
-  const hltbVals = ctxIn ? ctxIn.hltbVals : backlog.map(g => hltbMain(g)).filter(h => h != null && h > 0);
+  const hltbVals = ctxIn
+    ? ctxIn.hltbVals
+    : backlog.map((g) => hltbMain(g)).filter((h) => h != null && h > 0);
   if (hltbVals.length) {
-    const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);
+    const avg = Math.round(
+      hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length,
+    );
     add(`Avg HLTB main: <strong>${escapeHtml(formatNum(avg))}h</strong>`);
   }
 
-  const unplayed = backlog.filter(g => !combinedPlaytime(g)).sort((a, b) => (hltbMain(b) || 0) - (hltbMain(a) || 0));
+  const unplayed = backlog
+    .filter((g) => !combinedPlaytime(g))
+    .sort((a, b) => (hltbMain(b) || 0) - (hltbMain(a) || 0));
   if (unplayed[0]) {
     const h = hltbMain(unplayed[0]);
-    add(`Longest unplayed: <strong>${escapeHtml(unplayed[0].name)}</strong> · ${h != null ? escapeHtml(formatNum(Math.round(h))) + 'h' : '?'}`);
+    add(
+      `Longest unplayed: <strong>${escapeHtml(unplayed[0].name)}</strong> · ${h != null ? escapeHtml(formatNum(Math.round(h))) + "h" : "?"}`,
+    );
   }
 
-  const deals = state.wishlistGames.filter(g => {
+  const deals = state.wishlistGames.filter((g) => {
     const d = getDealInfo(g);
     return d && (d.cut || 0) > 0;
   });
   if (deals.length) {
     const top = [...deals].sort((a, b) => dealScore(b) - dealScore(a))[0];
     const cut = getDealInfo(top)?.cut || 0;
-    add(`Top deal: <strong>${escapeHtml(top.name)}</strong> · ${coloredCutHtml(cut)}`);
+    add(
+      `Top deal: <strong>${escapeHtml(top.name)}</strong> · ${coloredCutHtml(cut)}`,
+    );
   }
 
-  const rated = ctxIn ? gamesFromMegaCtx(ctxIn, 'rated') : games.filter(g => ratingValue(g) > 0);
+  const rated = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "rated")
+    : games.filter((g) => ratingValue(g) > 0);
   if (rated.length) {
     const avg = ctxIn
-      ? Math.round(ctxIn.rated.reduce((s, r) => s + r.rating, 0) / ctxIn.rated.length)
-      : Math.round(rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length);
+      ? Math.round(
+          ctxIn.rated.reduce((s, r) => s + r.rating, 0) / ctxIn.rated.length,
+        )
+      : Math.round(
+          rated.reduce((s, g) => s + ratingValue(g), 0) / rated.length,
+        );
     add(`Average review: <strong>${avg}%</strong>`);
   }
 
   const withDate = games
-    .map(g => ({ g, d: g.added_at || '' }))
-    .filter(x => x.d)
+    .map((g) => ({ g, d: g.added_at || "" }))
+    .filter((x) => x.d)
     .sort((a, b) => b.d.localeCompare(a.d));
   if (withDate[0]) {
     add(`Newest add: <strong>${escapeHtml(withDate[0].g.name)}</strong>`);
   }
 
-  const playedHrs = ctxIn ? ctxIn.playedHrs : games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
+  const playedHrs = ctxIn
+    ? ctxIn.playedHrs
+    : games.reduce((s, g) => s + combinedPlaytime(g), 0) / 60;
   if (games.length) {
     const ratio = (playedHrs / games.length).toFixed(1);
     add(`Hours per game: <strong>${ratio}h</strong>`);
   }
 
-  const quickWins = backlog.filter(g => ratingValue(g) >= 75 && (hltbMain(g) || 999) <= maxHrs).length;
-  if (quickWins) add(`Quick wins ready: <strong>${formatNum(quickWins)}</strong>`);
+  const quickWins = backlog.filter(
+    (g) => ratingValue(g) >= 75 && (hltbMain(g) || 999) <= maxHrs,
+  ).length;
+  if (quickWins)
+    add(`Quick wins ready: <strong>${formatNum(quickWins)}</strong>`);
 
-  const hiddenGems = backlog.filter(g => ratingValue(g) >= 90 && hasEnoughReviews(g) && !combinedPlaytime(g)).length;
+  const hiddenGems = backlog.filter(
+    (g) => ratingValue(g) >= 90 && hasEnoughReviews(g) && !combinedPlaytime(g),
+  ).length;
   if (hiddenGems) add(`Hidden gems: <strong>${formatNum(hiddenGems)}</strong>`);
 
-  const clutch = backlog.filter(g => isLeveragePick(g));
-  if (clutch[0]) add(`Clutch pick: <strong>${escapeHtml(clutch[0].name)}</strong>`);
+  const clutch = backlog.filter((g) => isLeveragePick(g));
+  if (clutch[0])
+    add(`Clutch pick: <strong>${escapeHtml(clutch[0].name)}</strong>`);
 
   const snap = snapIn || getLibrarySnapshot(games);
   if (games.length > 0) {
@@ -384,68 +481,103 @@ export function buildInsightPool(games, snapIn, ctxIn) {
     add(`Mendoza line: <strong>${mendoza}%</strong>`, METRIC_WEIGHT.moderate);
   }
 
-  const tracked = ctxIn ? gamesFromMegaCtx(ctxIn, 'tracked') : games.filter(g => g.trophy_progress != null);
+  const tracked = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "tracked")
+    : games.filter((g) => g.trophy_progress != null);
   const closest = tracked.length
     ? [...tracked].sort((a, b) => b.trophy_progress - a.trophy_progress)[0]
     : null;
   if (closest && closest.trophy_progress < 100) {
-    add(`Closest to 100%: <strong>${escapeHtml(closest.name)}</strong> · ${Math.round(closest.trophy_progress)}%`);
+    add(
+      `Closest to 100%: <strong>${escapeHtml(closest.name)}</strong> · ${Math.round(closest.trophy_progress)}%`,
+    );
   }
 
   const withFirstPlayed = games
-    .map(g => ({ g, t: firstPlayedAt(g) }))
-    .filter(x => x.t != null)
+    .map((g) => ({ g, t: firstPlayedAt(g) }))
+    .filter((x) => x.t != null)
     .sort((a, b) => a.t - b.t);
   if (withFirstPlayed[0]) {
     const yr = firstPlayedYear(withFirstPlayed[0].g);
-    add(`Playing since <strong>${yr ?? '?'}</strong>: <strong>${escapeHtml(withFirstPlayed[0].g.name)}</strong>`, METRIC_WEIGHT.moderate);
+    add(
+      `Playing since <strong>${yr ?? "?"}</strong>: <strong>${escapeHtml(withFirstPlayed[0].g.name)}</strong>`,
+      METRIC_WEIGHT.moderate,
+    );
   }
 
   const sessionGames = games
-    .map(g => ({ g, n: playSessionCount(g) }))
-    .filter(x => x.n != null)
+    .map((g) => ({ g, n: playSessionCount(g) }))
+    .filter((x) => x.n != null)
     .sort((a, b) => b.n - a.n);
   if (sessionGames[0]) {
-    add(`Most sessions: <strong>${escapeHtml(sessionGames[0].g.name)}</strong> · ${formatNum(sessionGames[0].n)}`, METRIC_WEIGHT.moderate);
+    add(
+      `Most sessions: <strong>${escapeHtml(sessionGames[0].g.name)}</strong> · ${formatNum(sessionGames[0].n)}`,
+      METRIC_WEIGHT.moderate,
+    );
   }
   if (snap.psnSessionTotal > 0) {
-    add(`PSN sessions: <strong>${formatNum(snap.psnSessionTotal)}</strong> total`, METRIC_WEIGHT.moderate);
+    add(
+      `PSN sessions: <strong>${formatNum(snap.psnSessionTotal)}</strong> total`,
+      METRIC_WEIGHT.moderate,
+    );
   }
 
   const avg = completionAverage(snap);
   if (avg != null) {
-    add(`Finish rate: <strong>${formatRate(avg)}</strong>`, METRIC_WEIGHT.moderate);
+    add(
+      `Finish rate: <strong>${formatRate(avg)}</strong>`,
+      METRIC_WEIGHT.moderate,
+    );
   }
   const warTop = topWarGame(snap);
   if (warTop) {
-    add(`Top WAR pick: <strong>${escapeHtml(warTop.g.name)}</strong> · ${warTop.war}`, METRIC_WEIGHT.cryptic);
+    add(
+      `Top WAR pick: <strong>${escapeHtml(warTop.g.name)}</strong> · ${warTop.war}`,
+      METRIC_WEIGHT.cryptic,
+    );
   }
   const pyth = pythagoreanCompletion(snap);
   if (pyth != null && Math.abs(pyth.delta) >= 0.02) {
-    const label = pyth.delta >= 0 ? 'overperforming' : 'underperforming';
+    const label = pyth.delta >= 0 ? "overperforming" : "underperforming";
     add(`Pythagorean: <strong>${label}</strong>`, METRIC_WEIGHT.cryptic);
   }
 
   const champ = peoplesChamp(games);
   if (champ) {
-    add(`People's champ: <strong>${escapeHtml(champ.g.name)}</strong> · +${champ.gap} vs critics`, METRIC_WEIGHT.moderate);
+    add(
+      `People's champ: <strong>${escapeHtml(champ.g.name)}</strong> · +${champ.gap} vs critics`,
+      METRIC_WEIGHT.moderate,
+    );
   }
   const extraInn = extraInningsAvg(snap);
   if (extraInn != null) {
-    add(`Extra innings: <strong>${formatNum(extraInn)}h</strong> avg beyond main`, METRIC_WEIGHT.moderate);
+    add(
+      `Extra innings: <strong>${formatNum(extraInn)}h</strong> avg beyond main`,
+      METRIC_WEIGHT.moderate,
+    );
   }
   const dDips = doubleDipCount();
   if (dDips != null) {
-    add(`Double dips: <strong>${formatNum(dDips)}</strong> titles on 2+ stores`, METRIC_WEIGHT.moderate);
+    add(
+      `Double dips: <strong>${formatNum(dDips)}</strong> titles on 2+ stores`,
+      METRIC_WEIGHT.moderate,
+    );
   }
   const mortality = backlogMortality(snap);
   if (mortality) {
-    const who = mortality.verdict === 'backlog' ? 'Backlog wins' : 'You might make it';
-    add(`Will you die first? <strong>${who}</strong> · finish by age ${mortality.finishByAge}`, METRIC_WEIGHT.cryptic);
+    const who =
+      mortality.verdict === "backlog" ? "Backlog wins" : "You might make it";
+    add(
+      `Will you die first? <strong>${who}</strong> · finish by age ${mortality.finishByAge}`,
+      METRIC_WEIGHT.cryptic,
+    );
   }
   const criticGapAvg = avgCriticGap(games);
   if (criticGapAvg != null) {
-    add(`Critic gap: <strong>${criticGapAvg} pts</strong> avg |Steam − Metacritic|`, METRIC_WEIGHT.moderate);
+    add(
+      `Critic gap: <strong>${criticGapAvg} pts</strong> avg |Steam − Metacritic|`,
+      METRIC_WEIGHT.moderate,
+    );
   }
 
   const avgMc = avgMetacritic(games);
@@ -454,15 +586,24 @@ export function buildInsightPool(games, snapIn, ctxIn) {
   }
   const dormant = longestDormant(games);
   if (dormant) {
-    add(`Longest dormant: <strong>${escapeHtml(dormant.g.name)}</strong>`, METRIC_WEIGHT.moderate);
+    add(
+      `Longest dormant: <strong>${escapeHtml(dormant.g.name)}</strong>`,
+      METRIC_WEIGHT.moderate,
+    );
   }
   const gapLeader = biggestCriticGapGame(games);
   if (gapLeader) {
-    add(`Biggest critic gap: <strong>${escapeHtml(gapLeader.g.name)}</strong> · ${gapLeader.gap} pts`, METRIC_WEIGHT.moderate);
+    add(
+      `Biggest critic gap: <strong>${escapeHtml(gapLeader.g.name)}</strong> · ${gapLeader.gap} pts`,
+      METRIC_WEIGHT.moderate,
+    );
   }
 
   if (games.length > 0) {
-    add('Launcher tip: read installs straight from your launchers - fewer logins, uninstall after.', METRIC_WEIGHT.moderate);
+    add(
+      "Launcher tip: read installs straight from your launchers - fewer logins, uninstall after.",
+      METRIC_WEIGHT.moderate,
+    );
   }
 
   appendCreativeInsights(entries, games, snap, METRIC_WEIGHT);
@@ -472,41 +613,71 @@ export function buildInsightPool(games, snapIn, ctxIn) {
 }
 
 function formatDollarMarquee(n) {
-  if (n == null || Number.isNaN(n)) return ' - ';
-  return formatMoney(n, displayCurrency(), { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+  if (n == null || Number.isNaN(n)) return " - ";
+  return formatMoney(n, displayCurrency(), {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  });
 }
 
 /** Colored cut % for marquee / insight pills (deal cut-depth scale). */
-function coloredCutHtml(cut, { signed = true, className = 'dash-insight-cut' } = {}) {
+function coloredCutHtml(
+  cut,
+  { signed = true, className = "dash-insight-cut" } = {},
+) {
   const label = signed ? `-${cut}%` : `${cut}%`;
   return `<strong class="${className} ${cutBucketClass(cut)}">${escapeHtml(label)}</strong>`;
 }
 
 export function buildMarqueeItems(games, snapIn, ctxIn) {
+  // (balanced)
   const maxHrs = state.prefs.quickWinMaxHours || 15;
-  const status = (g) => getPersonal(g).status || 'backlog';
+  const status = (g) => getPersonal(g).status || "backlog";
   const playMin = (g) => combinedPlaytime(g);
   const rating = (g) => ratingValue(g);
   const hltb = (g) => hltbMain(g);
 
   const total = ctxIn ? ctxIn.total : games.length;
-  const backlog = ctxIn ? gamesFromMegaCtx(ctxIn, 'backlog') : games.filter(g => status(g) === 'backlog');
-  const playing = ctxIn ? gamesFromMegaCtx(ctxIn, 'playing') : games.filter(g => status(g) === 'playing');
-  const unfinished = ctxIn ? gamesFromMegaCtx(ctxIn, 'unfinished') : games.filter(g => status(g) === 'unfinished');
-  const next = ctxIn ? gamesFromMegaCtx(ctxIn, 'next') : games.filter(g => status(g) === 'next');
-  const finished = ctxIn ? gamesFromMegaCtx(ctxIn, 'finished') : games.filter(g => status(g) === 'finished');
-  const touched = ctxIn ? gamesFromMegaCtx(ctxIn, 'touched') : games.filter(g => playMin(g) > 0);
-  const playedHrs = ctxIn ? ctxIn.playedHrs : games.reduce((s, g) => s + playMin(g), 0) / 60;
-  const backlogHrs = ctxIn ? ctxIn.backlogHrs : backlog.reduce((s, g) => s + (hltb(g) || 0), 0);
-  const ratedGames = ctxIn ? gamesFromMegaCtx(ctxIn, 'rated') : games.filter(g => rating(g) > 0);
+  const backlog = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "backlog")
+    : games.filter((g) => status(g) === "backlog");
+  const playing = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "playing")
+    : games.filter((g) => status(g) === "playing");
+  const unfinished = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "unfinished")
+    : games.filter((g) => status(g) === "unfinished");
+  const next = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "next")
+    : games.filter((g) => status(g) === "next");
+  const finished = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "finished")
+    : games.filter((g) => status(g) === "finished");
+  const touched = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "touched")
+    : games.filter((g) => playMin(g) > 0);
+  const playedHrs = ctxIn
+    ? ctxIn.playedHrs
+    : games.reduce((s, g) => s + playMin(g), 0) / 60;
+  const backlogHrs = ctxIn
+    ? ctxIn.backlogHrs
+    : backlog.reduce((s, g) => s + (hltb(g) || 0), 0);
+  const ratedGames = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "rated")
+    : games.filter((g) => rating(g) > 0);
 
   const wl = state.wishlistGames || [];
-  const onSale = wl.filter(g => {
+  const onSale = wl.filter((g) => {
     const d = getDealInfo(g);
     return d && (d.cut || 0) > 0;
   });
   const wlSources = new Set(
-    wl.map(g => g.wishlist_store || g.store_target || (g.manual ? 'manual' : 'steam')).filter(Boolean)
+    wl
+      .map(
+        (g) =>
+          g.wishlist_store || g.store_target || (g.manual ? "manual" : "steam"),
+      )
+      .filter(Boolean),
   ).size;
   const itchGameCount = (state.itchGames || []).filter(itchIsGame).length;
   const snap = snapIn || getLibrarySnapshot(games);
@@ -525,187 +696,392 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
   };
   const W = METRIC_WEIGHT;
 
-  if (total > 0) push('>', '', formatNum(total), 'games owned');
-  const stores = new Set(games.map(g => normalizeGame(g).store)).size;
-  if (stores > 0) push('>', '', String(stores), 'stores');
-  if (wlSources > 0) push('*', 'is-violet', String(wlSources), 'wishlists tracked');
-  if (itchGameCount > 0) push('>', '', formatNum(itchGameCount), 'itch games');
-  if (backlog.length) push('~', 'is-amber', formatNum(backlog.length), 'in backlog');
-  if (finished.length) push('+', 'is-emerald', formatNum(finished.length), 'completed');
-  if (touched.length) push('>', '', formatNum(touched.length), 'games touched');
-  if (playing.length) push('*', 'is-violet', formatNum(playing.length), 'in progress');
-  if (next.length) push('*', 'is-amber', formatNum(next.length), 'queued next');
-  if (unfinished.length) push('^', 'is-rose', formatNum(unfinished.length), 'left unfinished');
+  if (total > 0) push(">", "", formatNum(total), "games owned");
+  const stores = new Set(games.map((g) => normalizeGame(g).store)).size;
+  if (stores > 0) push(">", "", String(stores), "stores");
+  if (wlSources > 0)
+    push("*", "is-violet", String(wlSources), "wishlists tracked");
+  if (itchGameCount > 0) push(">", "", formatNum(itchGameCount), "itch games");
+  if (backlog.length)
+    push("~", "is-amber", formatNum(backlog.length), "in backlog");
+  if (finished.length)
+    push("+", "is-emerald", formatNum(finished.length), "completed");
+  if (touched.length) push(">", "", formatNum(touched.length), "games touched");
+  if (playing.length)
+    push("*", "is-violet", formatNum(playing.length), "in progress");
+  if (next.length) push("*", "is-amber", formatNum(next.length), "queued next");
+  if (unfinished.length)
+    push("^", "is-rose", formatNum(unfinished.length), "left unfinished");
 
   if (total > 0 && snap.nonSkip) {
     const completionPct = Math.round(snap.completionRate * 100);
-    push('+', 'is-emerald', `${completionPct}%`, 'completion (excl. skip)');
+    push("+", "is-emerald", `${completionPct}%`, "completion (excl. skip)");
     const touchedPct = Math.round((touched.length / total) * 100);
-    push('~', 'is-amber', `${touchedPct}%`, 'ever touched');
+    push("~", "is-amber", `${touchedPct}%`, "ever touched");
   }
 
-  if (playedHrs > 0) push('~', 'is-amber', `${formatNum(Math.round(playedHrs))}h`, 'all-time played');
+  if (playedHrs > 0)
+    push(
+      "~",
+      "is-amber",
+      `${formatNum(Math.round(playedHrs))}h`,
+      "all-time played",
+    );
   if (touched.length) {
     const avgSession = Math.round(playedHrs / touched.length);
-    if (avgSession > 0) push('~', 'is-amber', `${avgSession}h`, 'avg time per played game');
+    if (avgSession > 0)
+      push("~", "is-amber", `${avgSession}h`, "avg time per played game");
   }
   const topMarqueePlayed = ctxIn?.touched.length
     ? [...ctxIn.touched].sort((a, b) => b.playMin - a.playMin)[0]
     : null;
-  const mostPlayed = topMarqueePlayed?.g || [...games].sort((a, b) => playMin(b) - playMin(a))[0];
+  const mostPlayed =
+    topMarqueePlayed?.g ||
+    [...games].sort((a, b) => playMin(b) - playMin(a))[0];
   if (mostPlayed) {
-    const mins = topMarqueePlayed ? topMarqueePlayed.playMin : playMin(mostPlayed);
+    const mins = topMarqueePlayed
+      ? topMarqueePlayed.playMin
+      : playMin(mostPlayed);
     if (mins > 0) {
-      push('^', 'is-rose', `${mostPlayed.name} · ${formatNum(Math.round(mins / 60))}h`, 'most-played');
+      push(
+        "^",
+        "is-rose",
+        `${mostPlayed.name} · ${formatNum(Math.round(mins / 60))}h`,
+        "most-played",
+      );
     }
   }
 
-  const hltbVals = ctxIn ? ctxIn.hltbVals : backlog.map(hltb).filter(h => h != null && h > 0);
+  const hltbVals = ctxIn
+    ? ctxIn.hltbVals
+    : backlog.map(hltb).filter((h) => h != null && h > 0);
   if (hltbVals.length) {
-    const avg = Math.round(hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length);
-    push('~', 'is-amber', `${formatNum(avg)}h`, 'avg backlog main');
-    const med = [...hltbVals].sort((a, b) => a - b)[Math.floor(hltbVals.length / 2)];
-    push('~', 'is-amber', `${formatNum(Math.round(med))}h`, 'median backlog main');
+    const avg = Math.round(
+      hltbVals.reduce((s, h) => s + h, 0) / hltbVals.length,
+    );
+    push("~", "is-amber", `${formatNum(avg)}h`, "avg backlog main");
+    const med = [...hltbVals].sort((a, b) => a - b)[
+      Math.floor(hltbVals.length / 2)
+    ];
+    push(
+      "~",
+      "is-amber",
+      `${formatNum(Math.round(med))}h`,
+      "median backlog main",
+    );
   }
 
-  const longest = [...backlog].sort((a, b) => (hltb(b) || 0) - (hltb(a) || 0))[0];
+  const longest = [...backlog].sort(
+    (a, b) => (hltb(b) || 0) - (hltb(a) || 0),
+  )[0];
   if (longest && hltb(longest)) {
-    push('^', 'is-rose', `${longest.name} · ${formatNum(Math.round(hltb(longest)))}h`, 'longest backlog');
+    push(
+      "^",
+      "is-rose",
+      `${longest.name} · ${formatNum(Math.round(hltb(longest)))}h`,
+      "longest backlog",
+    );
   }
-  const shortest = [...backlog].filter(g => hltb(g) > 0).sort((a, b) => hltb(a) - hltb(b))[0];
+  const shortest = [...backlog]
+    .filter((g) => hltb(g) > 0)
+    .sort((a, b) => hltb(a) - hltb(b))[0];
   if (shortest) {
-    push('>', '', `${shortest.name} · ${(hltb(shortest)).toFixed(1)}h`, 'shortest backlog');
+    push(
+      ">",
+      "",
+      `${shortest.name} · ${hltb(shortest).toFixed(1)}h`,
+      "shortest backlog",
+    );
   }
 
-  const underTwo = backlog.filter(g => hltb(g) && hltb(g) <= 2).length;
-  if (underTwo) push('>', '', formatNum(underTwo), 'under 2h to beat');
-  const underFive = backlog.filter(g => hltb(g) && hltb(g) <= 5).length;
-  if (underFive) push('>', '', formatNum(underFive), 'under 5h to beat');
-  const marathons = backlog.filter(g => hltb(g) && hltb(g) >= 50).length;
-  if (marathons) push('^', 'is-rose', formatNum(marathons), '50h+ marathons');
-  const epics = backlog.filter(g => hltb(g) && hltb(g) >= 100).length;
-  if (epics) push('^', 'is-rose', formatNum(epics), '100h+ epics');
+  const underTwo = backlog.filter((g) => hltb(g) && hltb(g) <= 2).length;
+  if (underTwo) push(">", "", formatNum(underTwo), "under 2h to beat");
+  const underFive = backlog.filter((g) => hltb(g) && hltb(g) <= 5).length;
+  if (underFive) push(">", "", formatNum(underFive), "under 5h to beat");
+  const marathons = backlog.filter((g) => hltb(g) && hltb(g) >= 50).length;
+  if (marathons) push("^", "is-rose", formatNum(marathons), "50h+ marathons");
+  const epics = backlog.filter((g) => hltb(g) && hltb(g) >= 100).length;
+  if (epics) push("^", "is-rose", formatNum(epics), "100h+ epics");
 
   if (backlogHrs > 0) {
     const years2h = (backlogHrs / (2 * 365)).toFixed(1);
-    push('~', 'is-amber', `${years2h} yrs`, 'to clear at 2h/day');
+    push("~", "is-amber", `${years2h} yrs`, "to clear at 2h/day");
     const years4h = (backlogHrs / (4 * 365)).toFixed(1);
-    push('~', 'is-amber', `${years4h} yrs`, 'to clear at 4h/day');
+    push("~", "is-amber", `${years4h} yrs`, "to clear at 4h/day");
     const days8h = Math.round(backlogHrs / 8);
-    push('~', 'is-amber', `${formatNum(days8h)} d`, 'non-stop at 8h/day');
+    push("~", "is-amber", `${formatNum(days8h)} d`, "non-stop at 8h/day");
   }
 
   if (ratedGames.length) {
-    const avgRating = Math.round(ratedGames.reduce((s, g) => s + rating(g), 0) / ratedGames.length);
-    push('+', 'is-emerald', `${avgRating}%`, 'avg review score');
-    const backlogRated = backlog.filter(g => rating(g) > 0);
+    const avgRating = Math.round(
+      ratedGames.reduce((s, g) => s + rating(g), 0) / ratedGames.length,
+    );
+    push("+", "is-emerald", `${avgRating}%`, "avg review score");
+    const backlogRated = backlog.filter((g) => rating(g) > 0);
     if (backlogRated.length) {
-      const avgBacklogRating = Math.round(backlogRated.reduce((s, g) => s + rating(g), 0) / backlogRated.length);
-      push('+', 'is-emerald', `${avgBacklogRating}%`, 'avg backlog review');
+      const avgBacklogRating = Math.round(
+        backlogRated.reduce((s, g) => s + rating(g), 0) / backlogRated.length,
+      );
+      push("+", "is-emerald", `${avgBacklogRating}%`, "avg backlog review");
     }
     const ratedPct = Math.round((ratedGames.length / total) * 100);
-    push('~', 'is-amber', `${ratedPct}%`, 'of library rated');
+    push("~", "is-amber", `${ratedPct}%`, "of library rated");
   }
 
-  const tracked = ctxIn ? gamesFromMegaCtx(ctxIn, 'tracked') : games.filter(g => g.trophy_progress != null);
+  const tracked = ctxIn
+    ? gamesFromMegaCtx(ctxIn, "tracked")
+    : games.filter((g) => g.trophy_progress != null);
   if (tracked.length) {
-    const avgTrophy = Math.round(tracked.reduce((s, g) => s + g.trophy_progress, 0) / tracked.length);
-    push('~', 'is-amber', `${avgTrophy}%`, 'avg achievement completion');
-    const perfect = tracked.filter(g => g.trophy_progress >= 100).length;
-    if (perfect) push('+', 'is-emerald', formatNum(perfect), 'fully completed (100%)');
-    const nearComplete = tracked.filter(g => g.trophy_progress >= 90 && g.trophy_progress < 100).length;
-    if (nearComplete) push('*', 'is-amber', formatNum(nearComplete), 'one push from 100%');
-    const closest = [...tracked].sort((a, b) => b.trophy_progress - a.trophy_progress)[0];
+    const avgTrophy = Math.round(
+      tracked.reduce((s, g) => s + g.trophy_progress, 0) / tracked.length,
+    );
+    push("~", "is-amber", `${avgTrophy}%`, "avg achievement completion");
+    const perfect = tracked.filter((g) => g.trophy_progress >= 100).length;
+    if (perfect)
+      push("+", "is-emerald", formatNum(perfect), "fully completed (100%)");
+    const nearComplete = tracked.filter(
+      (g) => g.trophy_progress >= 90 && g.trophy_progress < 100,
+    ).length;
+    if (nearComplete)
+      push("*", "is-amber", formatNum(nearComplete), "one push from 100%");
+    const closest = [...tracked].sort(
+      (a, b) => b.trophy_progress - a.trophy_progress,
+    )[0];
     if (closest && closest.trophy_progress < 100) {
-      push('^', 'is-rose', `${closest.name} · ${Math.round(closest.trophy_progress)}%`, 'closest to 100%');
+      push(
+        "^",
+        "is-rose",
+        `${closest.name} · ${Math.round(closest.trophy_progress)}%`,
+        "closest to 100%",
+      );
     }
-    const platReady = tracked.filter(g => {
+    const platReady = tracked.filter((g) => {
       const h = hltbMain(g);
-      return g.trophy_progress >= 80 && g.trophy_progress < 100 && h != null && h <= 12;
+      return (
+        g.trophy_progress >= 80 &&
+        g.trophy_progress < 100 &&
+        h != null &&
+        h <= 12
+      );
     });
     if (platReady.length) {
-      push('*', 'is-violet', formatNum(platReady.length), 'platinum potential', null, { weight: W.friendly });
-      const best = [...platReady].sort((a, b) => b.trophy_progress - a.trophy_progress)[0];
-      push('^', 'is-rose', `${best.name} · ${Math.round(best.trophy_progress)}%`, 'closest platinum', null, { weight: W.friendly });
+      push(
+        "*",
+        "is-violet",
+        formatNum(platReady.length),
+        "platinum potential",
+        null,
+        { weight: W.friendly },
+      );
+      const best = [...platReady].sort(
+        (a, b) => b.trophy_progress - a.trophy_progress,
+      )[0];
+      push(
+        "^",
+        "is-rose",
+        `${best.name} · ${Math.round(best.trophy_progress)}%`,
+        "closest platinum",
+        null,
+        { weight: W.friendly },
+      );
     }
   }
 
-  const xboxScored = games.filter(g => (g.xbox_gamerscore_current || 0) > 0);
+  const xboxScored = games.filter((g) => (g.xbox_gamerscore_current || 0) > 0);
   if (xboxScored.length) {
-    const sumCurrent = xboxScored.reduce((s, g) => s + (g.xbox_gamerscore_current || 0), 0);
-    push('*', 'is-amber', formatNum(sumCurrent), 'gamerscore earned');
-    const sumTotal = xboxScored.reduce((s, g) => s + (g.xbox_gamerscore_total || 0), 0);
+    const sumCurrent = xboxScored.reduce(
+      (s, g) => s + (g.xbox_gamerscore_current || 0),
+      0,
+    );
+    push("*", "is-amber", formatNum(sumCurrent), "gamerscore earned");
+    const sumTotal = xboxScored.reduce(
+      (s, g) => s + (g.xbox_gamerscore_total || 0),
+      0,
+    );
     if (sumTotal > 0) {
       const pct = Math.round((sumCurrent / sumTotal) * 100);
-      push('~', 'is-amber', `${pct}%`, 'of available gamerscore');
+      push("~", "is-amber", `${pct}%`, "of available gamerscore");
     }
   }
 
-  const top90 = backlog.filter(g => rating(g) >= 90 && hasEnoughReviews(g)).length;
-  if (top90) push('*', 'is-amber', formatNum(top90), '90%+ unplayed');
-  const top80 = backlog.filter(g => rating(g) >= 80 && hasEnoughReviews(g)).length;
-  if (top80) push('*', 'is-amber', formatNum(top80), '80%+ unplayed');
+  const top90 = backlog.filter(
+    (g) => rating(g) >= 90 && hasEnoughReviews(g),
+  ).length;
+  if (top90) push("*", "is-amber", formatNum(top90), "90%+ unplayed");
+  const top80 = backlog.filter(
+    (g) => rating(g) >= 80 && hasEnoughReviews(g),
+  ).length;
+  if (top80) push("*", "is-amber", formatNum(top80), "80%+ unplayed");
   const qwIdx = quickWinSpeedIndex(snap, maxHrs);
-  if (qwIdx) push('>', '', formatNum(qwIdx), 'quick-win speed index', null, { weight: W.friendly });
-  const hiddenGems = backlog.filter(g => rating(g) >= 90 && hasEnoughReviews(g) && !playMin(g)).length;
-  if (hiddenGems) push('*', 'is-amber', formatNum(hiddenGems), 'hidden gems', null, { weight: W.friendly });
+  if (qwIdx)
+    push(">", "", formatNum(qwIdx), "quick-win speed index", null, {
+      weight: W.friendly,
+    });
+  const hiddenGems = backlog.filter(
+    (g) => rating(g) >= 90 && hasEnoughReviews(g) && !playMin(g),
+  ).length;
+  if (hiddenGems)
+    push("*", "is-amber", formatNum(hiddenGems), "hidden gems", null, {
+      weight: W.friendly,
+    });
 
-  const topRated = [...backlog].filter(g => rating(g) > 0 && hasEnoughReviews(g))
+  const topRated = [...backlog]
+    .filter((g) => rating(g) > 0 && hasEnoughReviews(g))
     .sort((a, b) => rating(b) - rating(a))[0];
-  if (topRated) push('*', 'is-amber', `${topRated.name} · ${rating(topRated)}%`, 'top-rated unplayed');
+  if (topRated)
+    push(
+      "*",
+      "is-amber",
+      `${topRated.name} · ${rating(topRated)}%`,
+      "top-rated unplayed",
+    );
 
   const compAvg = completionAverage(snap);
-  if (compAvg != null) push('+', 'is-emerald', formatRate(compAvg), 'completion AVG', null, { weight: W.moderate });
+  if (compAvg != null)
+    push("+", "is-emerald", formatRate(compAvg), "completion AVG", null, {
+      weight: W.moderate,
+    });
   const ops = backlogOps(snap);
-  if (ops != null) push('+', 'is-emerald', formatRate(ops), 'backlog OPS', null, { weight: W.cryptic });
+  if (ops != null)
+    push("+", "is-emerald", formatRate(ops), "backlog OPS", null, {
+      weight: W.cryptic,
+    });
   const obp = startRate(snap);
-  if (obp != null) push('~', 'is-amber', formatPct100(obp), 'start rate (OBP)', null, { weight: W.cryptic });
+  if (obp != null)
+    push("~", "is-amber", formatPct100(obp), "start rate (OBP)", null, {
+      weight: W.cryptic,
+    });
   const kRate = abandonRate(snap);
-  if (kRate != null) push('^', 'is-rose', formatPct100(kRate), 'abandon rate (K%)', null, { weight: W.cryptic });
+  if (kRate != null)
+    push("^", "is-rose", formatPct100(kRate), "abandon rate (K%)", null, {
+      weight: W.cryptic,
+    });
   const iso = closerPower(snap);
-  if (iso != null && iso > 0) push('*', 'is-amber', formatRate(iso, 2), 'closer power (ISO)', null, { weight: W.cryptic });
+  if (iso != null && iso > 0)
+    push("*", "is-amber", formatRate(iso, 2), "closer power (ISO)", null, {
+      weight: W.cryptic,
+    });
   const slg = backlogSlg(snap);
-  if (slg != null) push('+', 'is-emerald', formatRate(slg), 'slugging (SLG)', null, { weight: W.cryptic });
+  if (slg != null)
+    push("+", "is-emerald", formatRate(slg), "slugging (SLG)", null, {
+      weight: W.cryptic,
+    });
   const barrels = barrelRate(snap);
-  if (barrels != null && barrels > 0) push('+', 'is-emerald', formatPct100(barrels), 'barrel rate', null, { weight: W.moderate });
+  if (barrels != null && barrels > 0)
+    push("+", "is-emerald", formatPct100(barrels), "barrel rate", null, {
+      weight: W.moderate,
+    });
   const magic = magicNumber(snap, 0.5);
-  if (magic != null && magic > 0) push('>', '', formatNum(magic), 'magic # to 50%', null, { weight: W.friendly });
+  if (magic != null && magic > 0)
+    push(">", "", formatNum(magic), "magic # to 50%", null, {
+      weight: W.friendly,
+    });
   const pace = backlogPace(snap);
-  if (pace != null) push('~', 'is-amber', `${formatNum(Math.round(pace))}h`, 'backlog pace (median HLTB)', null, { weight: W.moderate });
+  if (pace != null)
+    push(
+      "~",
+      "is-amber",
+      `${formatNum(Math.round(pace))}h`,
+      "backlog pace (median HLTB)",
+      null,
+      { weight: W.moderate },
+    );
   const hoard = hoardRate(snap);
-  if (hoard != null) push('^', 'is-rose', formatPct100(hoard), 'hoard rate (never touched)', null, { weight: W.moderate });
+  if (hoard != null)
+    push(
+      "^",
+      "is-rose",
+      formatPct100(hoard),
+      "hoard rate (never touched)",
+      null,
+      { weight: W.moderate },
+    );
   const qs = qualityStartRate(snap);
-  if (qs != null) push('+', 'is-emerald', formatPct100(qs), 'quality start rate', null, { weight: W.moderate });
+  if (qs != null)
+    push("+", "is-emerald", formatPct100(qs), "quality start rate", null, {
+      weight: W.moderate,
+    });
   const warTop = topWarGame(snap);
-  if (warTop) push('*', 'is-violet', `${warTop.g.name} · ${warTop.war}`, 'top WAR', null, { weight: W.cryptic });
+  if (warTop)
+    push(
+      "*",
+      "is-violet",
+      `${warTop.g.name} · ${warTop.war}`,
+      "top WAR",
+      null,
+      { weight: W.cryptic },
+    );
   const cleanup = cleanupCandidateCount(snap);
-  if (cleanup) push('^', 'is-rose', formatNum(cleanup), 'cleanup candidates', null, { weight: W.friendly });
-  const clutchCount = backlog.filter(g => isLeveragePick(g)).length;
-  if (clutchCount) push('*', 'is-violet', formatNum(clutchCount), 'clutch picks', null, { weight: W.friendly });
+  if (cleanup)
+    push("^", "is-rose", formatNum(cleanup), "cleanup candidates", null, {
+      weight: W.friendly,
+    });
+  const clutchCount = backlog.filter((g) => isLeveragePick(g)).length;
+  if (clutchCount)
+    push("*", "is-violet", formatNum(clutchCount), "clutch picks", null, {
+      weight: W.friendly,
+    });
   const streak = total > 0 ? hotColdStreak(snap) : null;
   if (streak) {
-    const streakGlyph = streak === 'hot' ? '+' : streak === 'cold' ? '^' : '~';
-    const streakCls = streak === 'hot' ? 'is-emerald' : streak === 'cold' ? 'is-rose' : 'is-amber';
-    push(streakGlyph, streakCls, streak, 'finish streak');
+    const streakGlyph = streak === "hot" ? "+" : streak === "cold" ? "^" : "~";
+    const streakCls =
+      streak === "hot"
+        ? "is-emerald"
+        : streak === "cold"
+          ? "is-rose"
+          : "is-amber";
+    push(streakGlyph, streakCls, streak, "finish streak");
   }
   const psn = powerSpeedNumber(snap);
-  if (psn != null) push('*', 'is-violet', String(psn), 'power-speed #', null, { weight: W.cryptic });
+  if (psn != null)
+    push("*", "is-violet", String(psn), "power-speed #", null, {
+      weight: W.cryptic,
+    });
   const tro = trophyEfficiency(snap);
-  if (tro != null) push('~', 'is-amber', `${tro}%`, 'trophy efficiency', null, { weight: W.friendly });
+  if (tro != null)
+    push("~", "is-amber", `${tro}%`, "trophy efficiency", null, {
+      weight: W.friendly,
+    });
   const gs = gamerscoreEfficiency(snap);
-  if (gs != null) push('~', 'is-amber', `${gs}%`, 'gamerscore efficiency', null, { weight: W.friendly });
+  if (gs != null)
+    push("~", "is-amber", `${gs}%`, "gamerscore efficiency", null, {
+      weight: W.friendly,
+    });
   const pyth = pythagoreanCompletion(snap);
   if (pyth != null) {
-    const sign = pyth.delta >= 0 ? '+' : '';
-    push('~', pyth.delta >= 0 ? 'is-emerald' : 'is-rose', `${sign}${formatPct100(Math.abs(pyth.delta), 0)}`, 'vs pythagorean', null, { weight: W.cryptic });
+    const sign = pyth.delta >= 0 ? "+" : "";
+    push(
+      "~",
+      pyth.delta >= 0 ? "is-emerald" : "is-rose",
+      `${sign}${formatPct100(Math.abs(pyth.delta), 0)}`,
+      "vs pythagorean",
+      null,
+      { weight: W.cryptic },
+    );
   }
 
   if (total > 0 && snap.rBar > 0) {
-    push('~', 'is-amber', `${Math.round(snap.rBar)}%`, 'league avg rating', null, { weight: W.friendly });
+    push(
+      "~",
+      "is-amber",
+      `${Math.round(snap.rBar)}%`,
+      "league avg rating",
+      null,
+      { weight: W.friendly },
+    );
   }
-  const belowMendoza = backlog.filter(g => rating(g) > 0 && rating(g) < snap.mendozaLine).length;
+  const belowMendoza = backlog.filter(
+    (g) => rating(g) > 0 && rating(g) < snap.mendozaLine,
+  ).length;
   if (belowMendoza) {
-    push('^', 'is-rose', formatNum(belowMendoza), `below Mendoza (${Math.round(snap.mendozaLine)}%)`, null, { weight: W.moderate });
+    push(
+      "^",
+      "is-rose",
+      formatNum(belowMendoza),
+      `below Mendoza (${Math.round(snap.mendozaLine)}%)`,
+      null,
+      { weight: W.moderate },
+    );
   }
 
   let topBv = null;
@@ -723,40 +1099,86 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     }
   }
   if (topBv) {
-    push('*', 'is-violet', `${topBv.name} · ${topBvVal}`, 'BV+ leader', null, { weight: W.cryptic });
+    push("*", "is-violet", `${topBv.name} · ${topBvVal}`, "BV+ leader", null, {
+      weight: W.cryptic,
+    });
   }
   if (bvN) {
-    push('~', 'is-amber', String(Math.round(bvSum / bvN)), 'avg BV+ (100 = avg)', null, { weight: W.cryptic });
+    push(
+      "~",
+      "is-amber",
+      String(Math.round(bvSum / bvN)),
+      "avg BV+ (100 = avg)",
+      null,
+      { weight: W.cryptic },
+    );
   }
 
   const genrePlus = genrePlusMap(snap);
   const genreEntries = Object.entries(genrePlus).sort((a, b) => b[1] - a[1]);
   if (genreEntries[0]) {
-    push('*', 'is-amber', `${genreEntries[0][0]} · ${genreEntries[0][1]}`, 'Genre+', null, { weight: W.moderate });
+    push(
+      "*",
+      "is-amber",
+      `${genreEntries[0][0]} · ${genreEntries[0][1]}`,
+      "Genre+",
+      null,
+      { weight: W.moderate },
+    );
   }
   if (genreEntries.length > 1) {
     const weak = genreEntries[genreEntries.length - 1];
-    push('^', 'is-rose', `${weak[0]} · ${weak[1]}`, 'weakest Genre+', null, { weight: W.moderate });
+    push("^", "is-rose", `${weak[0]} · ${weak[1]}`, "weakest Genre+", null, {
+      weight: W.moderate,
+    });
   }
   const storePlus = storePlusMap(snap);
   const storeEntries = Object.entries(storePlus).sort((a, b) => b[1] - a[1]);
   if (storeEntries[0]) {
-    push('>', '', `${storeEntries[0][0]} · ${storeEntries[0][1]}`, 'Store+', null, { weight: W.moderate });
+    push(
+      ">",
+      "",
+      `${storeEntries[0][0]} · ${storeEntries[0][1]}`,
+      "Store+",
+      null,
+      { weight: W.moderate },
+    );
   }
 
   const winShares = winSharesByGenre(snap);
   if (winShares[0]) {
-    push('+', 'is-emerald', `${winShares[0][0]} · ${formatNum(winShares[0][1])}`, 'win shares leader', null, { weight: W.moderate });
+    push(
+      "+",
+      "is-emerald",
+      `${winShares[0][0]} · ${formatNum(winShares[0][1])}`,
+      "win shares leader",
+      null,
+      { weight: W.moderate },
+    );
   }
 
   const aging = agingCurveBuckets(snap);
-  const rookie = aging.find(b => b.label === '<30d');
-  const veteran = aging.find(b => b.label === '1y+');
+  const rookie = aging.find((b) => b.label === "<30d");
+  const veteran = aging.find((b) => b.label === "1y+");
   if (rookie?.total) {
-    push('~', 'is-amber', `${rookie.finishRate}%`, 'rookie finish rate (<30d)', null, { weight: W.moderate });
+    push(
+      "~",
+      "is-amber",
+      `${rookie.finishRate}%`,
+      "rookie finish rate (<30d)",
+      null,
+      { weight: W.moderate },
+    );
   }
   if (veteran?.total) {
-    push('^', 'is-rose', `${veteran.finishRate}%`, 'veteran finish rate (1y+)', null, { weight: W.moderate });
+    push(
+      "^",
+      "is-rose",
+      `${veteran.finishRate}%`,
+      "veteran finish rate (1y+)",
+      null,
+      { weight: W.moderate },
+    );
   }
 
   let luckSwing = null;
@@ -771,28 +1193,56 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     }
   }
   if (luckSwing && luckDelta >= 3) {
-    push('~', 'is-amber', `${luckSwing.name} · ${luckAdjustedRating(luckSwing, snap.rBar)}%`, 'luck-adjusted', null, { weight: W.cryptic });
+    push(
+      "~",
+      "is-amber",
+      `${luckSwing.name} · ${luckAdjustedRating(luckSwing, snap.rBar)}%`,
+      "luck-adjusted",
+      null,
+      { weight: W.cryptic },
+    );
   }
 
   const stealsCount = wl.filter(isStealDeal).length;
-  if (stealsCount) push('+', 'is-emerald', formatNum(stealsCount), 'steal-tier deals');
-  if (onSale.length) push('+', 'is-emerald', formatNum(onSale.length), 'on sale now');
+  if (stealsCount)
+    push("+", "is-emerald", formatNum(stealsCount), "steal-tier deals");
+  if (onSale.length)
+    push("+", "is-emerald", formatNum(onSale.length), "on sale now");
   if (onSale.length) {
     const top = [...onSale].sort((a, b) => dealScore(b) - dealScore(a))[0];
     const cut = getDealInfo(top)?.cut || 0;
     push(
-      '+',
-      'is-emerald',
-      '',
-      'top deal',
-      `${escapeHtml(top.name)} ${coloredCutHtml(cut, { className: 'dash-marquee-cut' })}`,
+      "+",
+      "is-emerald",
+      "",
+      "top deal",
+      `${escapeHtml(top.name)} ${coloredCutHtml(cut, { className: "dash-marquee-cut" })}`,
     );
-    const cuts = onSale.map(g => getDealInfo(g)?.cut || 0).filter(x => x > 0);
+    const cuts = onSale
+      .map((g) => getDealInfo(g)?.cut || 0)
+      .filter((x) => x > 0);
     if (cuts.length) {
-      const avgCut = Math.round(cuts.reduce((s, c2) => s + c2, 0) / cuts.length);
-      push('+', 'is-emerald', '', 'avg discount', coloredCutHtml(avgCut, { signed: false, className: 'dash-marquee-cut' }));
+      const avgCut = Math.round(
+        cuts.reduce((s, c2) => s + c2, 0) / cuts.length,
+      );
+      push(
+        "+",
+        "is-emerald",
+        "",
+        "avg discount",
+        coloredCutHtml(avgCut, {
+          signed: false,
+          className: "dash-marquee-cut",
+        }),
+      );
       const steepest = Math.max(...cuts);
-      push('+', 'is-emerald', '', 'steepest cut', coloredCutHtml(steepest, { className: 'dash-marquee-cut' }));
+      push(
+        "+",
+        "is-emerald",
+        "",
+        "steepest cut",
+        coloredCutHtml(steepest, { className: "dash-marquee-cut" }),
+      );
     }
   }
 
@@ -803,9 +1253,20 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     if (d?.regular != null) wishlistValue += d.regular;
     if (d?.price != null) wishlistSaleNow += d.price;
   }
-  if (wishlistValue > 0) push('#', 'is-violet', formatDollarMarquee(wishlistValue), 'wishlist value');
+  if (wishlistValue > 0)
+    push(
+      "#",
+      "is-violet",
+      formatDollarMarquee(wishlistValue),
+      "wishlist value",
+    );
   if (wishlistSaleNow > 0 && wishlistSaleNow < wishlistValue) {
-    push('#', 'is-violet', formatDollarMarquee(wishlistValue - wishlistSaleNow), 'savings if bought now');
+    push(
+      "#",
+      "is-violet",
+      formatDollarMarquee(wishlistValue - wishlistSaleNow),
+      "savings if bought now",
+    );
   }
 
   const parseReleaseYear = (d) => {
@@ -818,97 +1279,139 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     return null;
   };
   const withReleaseYear = games
-    .map(g => {
+    .map((g) => {
       const y = parseReleaseYear(g.release_date);
       return y != null ? { g, y } : null;
     })
     .filter(Boolean);
   if (withReleaseYear.length) {
-    const oldest = withReleaseYear.reduce((a, b) => a.y < b.y ? a : b);
-    push('^', 'is-rose', `${oldest.g.name} · ${oldest.y}`, 'oldest in library');
-    const newest = withReleaseYear.reduce((a, b) => a.y > b.y ? a : b);
-    push('*', 'is-violet', `${newest.g.name} · ${newest.y}`, 'newest release owned');
+    const oldest = withReleaseYear.reduce((a, b) => (a.y < b.y ? a : b));
+    push("^", "is-rose", `${oldest.g.name} · ${oldest.y}`, "oldest in library");
+    const newest = withReleaseYear.reduce((a, b) => (a.y > b.y ? a : b));
+    push(
+      "*",
+      "is-violet",
+      `${newest.g.name} · ${newest.y}`,
+      "newest release owned",
+    );
     const decadeCounts = {};
     for (const { y } of withReleaseYear) {
       const dec = Math.floor(y / 10) * 10;
       decadeCounts[dec] = (decadeCounts[dec] || 0) + 1;
     }
     const topDec = Object.entries(decadeCounts).sort((a, b) => b[1] - a[1])[0];
-    if (topDec) push('>', '', `${topDec[0]}s · ${formatNum(topDec[1])}`, 'top decade');
+    if (topDec)
+      push(">", "", `${topDec[0]}s · ${formatNum(topDec[1])}`, "top decade");
     const oldUnplayed = backlog
-      .map(g => ({ g, y: parseReleaseYear(g.release_date) }))
-      .filter(x => x.y != null)
-      .reduce((a, b) => (!a || a.y > b.y) ? b : a, null);
-    if (oldUnplayed) push('^', 'is-rose', `${oldUnplayed.g.name} · ${oldUnplayed.y}`, 'oldest unplayed');
+      .map((g) => ({ g, y: parseReleaseYear(g.release_date) }))
+      .filter((x) => x.y != null)
+      .reduce((a, b) => (!a || a.y > b.y ? b : a), null);
+    if (oldUnplayed)
+      push(
+        "^",
+        "is-rose",
+        `${oldUnplayed.g.name} · ${oldUnplayed.y}`,
+        "oldest unplayed",
+      );
   }
-// Fetchers never set added_at (only manual adds do); fall back to the
-// library first-seen stamp so "newest add" / "added in {year}" reflect every
-// store, not just custom entries.
-const effectiveAddedMs = (g) => {
-  const t = Date.parse(String(g.added_at || ''));
-  if (Number.isFinite(t)) return t;
-  const seen = (state.libraryFirstSeenByKey || {})[gameKey(g)];
-  const n = Number(seen);
-  if (Number.isFinite(n) && n > 0) return n;
-  // Fall back to catalog-side acquired_at when the first-seen stamp is absent.
-  if (g.acquired_at) {
-    const acq = Date.parse(g.acquired_at);
-    if (Number.isFinite(acq)) return acq;
-  }
-  return null;
-};
+  // Fetchers never set added_at (only manual adds do); fall back to the
+  // library first-seen stamp so "newest add" / "added in {year}" reflect every
+  // store, not just custom entries.
+  const effectiveAddedMs = (g) => {
+    const t = Date.parse(String(g.added_at || ""));
+    if (Number.isFinite(t)) return t;
+    const seen = (state.libraryFirstSeenByKey || {})[gameKey(g)];
+    const n = Number(seen);
+    if (Number.isFinite(n) && n > 0) return n;
+    // Fall back to catalog-side acquired_at when the first-seen stamp is absent.
+    if (g.acquired_at) {
+      const acq = Date.parse(g.acquired_at);
+      if (Number.isFinite(acq)) return acq;
+    }
+    return null;
   };
   const withAddDate = games
-    .map(g => ({ g, ms: effectiveAddedMs(g) }))
-    .filter(x => x.ms != null)
+    .map((g) => ({ g, ms: effectiveAddedMs(g) }))
+    .filter((x) => x.ms != null)
     .sort((a, b) => b.ms - a.ms);
-  if (withAddDate[0]) push('*', 'is-violet', withAddDate[0].g.name, 'newest add');
+  if (withAddDate[0])
+    push("*", "is-violet", withAddDate[0].g.name, "newest add");
 
   const thisYear = new Date().getFullYear();
-  const addedThisYear = games.filter(g => {
+  const addedThisYear = games.filter((g) => {
     const ms = effectiveAddedMs(g);
     return ms != null && new Date(ms).getFullYear() === thisYear;
   }).length;
-  if (addedThisYear) push('+', 'is-emerald', formatNum(addedThisYear), `added in ${thisYear}`);
+  if (addedThisYear)
+    push("+", "is-emerald", formatNum(addedThisYear), `added in ${thisYear}`);
 
   const nowMs = Date.now();
-  const addedLastWeek = games.filter(g => {
+  const addedLastWeek = games.filter((g) => {
     const ms = effectiveAddedMs(g);
     return ms != null && nowMs - ms <= 7 * 86400000;
   }).length;
-  if (addedLastWeek) push('+', 'is-emerald', formatNum(addedLastWeek), 'added this week');
-  const addedLastMonth = games.filter(g => {
+  if (addedLastWeek)
+    push("+", "is-emerald", formatNum(addedLastWeek), "added this week");
+  const addedLastMonth = games.filter((g) => {
     const ms = effectiveAddedMs(g);
     return ms != null && nowMs - ms <= 30 * 86400000;
   }).length;
-  if (addedLastMonth) push('+', 'is-emerald', formatNum(addedLastMonth), 'added this month');
+  if (addedLastMonth)
+    push("+", "is-emerald", formatNum(addedLastMonth), "added this month");
 
   const devCounts = {};
   const pubCounts = {};
   for (const g of games) {
     const ng = normalizeGame(g);
-    (ng.developers || g.developers || []).forEach(d => { if (d) devCounts[d] = (devCounts[d] || 0) + 1; });
-    (ng.publishers || g.publishers || []).forEach(p => { if (p) pubCounts[p] = (pubCounts[p] || 0) + 1; });
+    (ng.developers || g.developers || []).forEach((d) => {
+      if (d) devCounts[d] = (devCounts[d] || 0) + 1;
+    });
+    (ng.publishers || g.publishers || []).forEach((p) => {
+      if (p) pubCounts[p] = (pubCounts[p] || 0) + 1;
+    });
   }
   const topDev = Object.entries(devCounts).sort((a, b) => b[1] - a[1])[0];
-  if (topDev && topDev[1] > 1) push('*', 'is-violet', `${topDev[0]} · ${formatNum(topDev[1])}`, 'top developer');
+  if (topDev && topDev[1] > 1)
+    push(
+      "*",
+      "is-violet",
+      `${topDev[0]} · ${formatNum(topDev[1])}`,
+      "top developer",
+    );
   const topPub = Object.entries(pubCounts).sort((a, b) => b[1] - a[1])[0];
-  if (topPub && topPub[1] > 1) push('*', 'is-violet', `${topPub[0]} · ${formatNum(topPub[1])}`, 'top publisher');
+  if (topPub && topPub[1] > 1)
+    push(
+      "*",
+      "is-violet",
+      `${topPub[0]} · ${formatNum(topPub[1])}`,
+      "top publisher",
+    );
   const uniqueDevs = Object.keys(devCounts).length;
-  if (uniqueDevs > 1) push('>', '', formatNum(uniqueDevs), 'unique developers');
+  if (uniqueDevs > 1) push(">", "", formatNum(uniqueDevs), "unique developers");
 
   const genreCounts = {};
   for (const g of games) {
     const gens = gameGenresCanonical(g);
-    gens.forEach(genre => { if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1; });
+    gens.forEach((genre) => {
+      if (genre) genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+    });
   }
   const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
-  if (topGenre) push('*', 'is-amber', `${topGenre[0]} · ${formatNum(topGenre[1])}`, 'top genre');
+  if (topGenre)
+    push(
+      "*",
+      "is-amber",
+      `${topGenre[0]} · ${formatNum(topGenre[1])}`,
+      "top genre",
+    );
   const uniqueGenres = Object.keys(genreCounts).length;
-  if (uniqueGenres > 1) push('>', '', formatNum(uniqueGenres), 'unique genres');
+  if (uniqueGenres > 1) push(">", "", formatNum(uniqueGenres), "unique genres");
 
   const adultGames = adultGameCount(games);
-  if (adultGames != null) push('*', 'is-rose', formatNum(adultGames), 'adult games', null, { weight: W.cryptic });
+  if (adultGames != null)
+    push("*", "is-rose", formatNum(adultGames), "adult games", null, {
+      weight: W.cryptic,
+    });
 
   const storeCounts = {};
   for (const g of games) {
@@ -916,345 +1419,589 @@ const effectiveAddedMs = (g) => {
     if (s) storeCounts[s] = (storeCounts[s] || 0) + 1;
   }
   const topStore = Object.entries(storeCounts).sort((a, b) => b[1] - a[1])[0];
-  if (topStore) push('>', '', `${topStore[0]} · ${formatNum(topStore[1])}`, 'biggest store');
+  if (topStore)
+    push(
+      ">",
+      "",
+      `${topStore[0]} · ${formatNum(topStore[1])}`,
+      "biggest store",
+    );
 
-  const catGames = games.filter(g => String(g.name || '').toLowerCase().includes('cat')).length;
-  if (catGames) push('=^..^=', 'is-violet', formatNum(catGames), 'cat games', null, { weight: W.friendly });
+  const catGames = games.filter((g) =>
+    String(g.name || "")
+      .toLowerCase()
+      .includes("cat"),
+  ).length;
+  if (catGames)
+    push("=^..^=", "is-violet", formatNum(catGames), "cat games", null, {
+      weight: W.friendly,
+    });
 
   if (stores > 0 && total > 0) {
     const avgPerStore = Math.round(total / stores);
-    push('~', 'is-amber', formatNum(avgPerStore), 'games per store avg');
+    push("~", "is-amber", formatNum(avgPerStore), "games per store avg");
   }
 
   const longestBeat = [...finished]
-    .filter(g => hltb(g) > 0)
+    .filter((g) => hltb(g) > 0)
     .sort((a, b) => hltb(b) - hltb(a))[0];
   if (longestBeat) {
-    push('^', 'is-rose', `${longestBeat.name} · ${formatNum(Math.round(hltb(longestBeat)))}h`, 'longest game beaten');
+    push(
+      "^",
+      "is-rose",
+      `${longestBeat.name} · ${formatNum(Math.round(hltb(longestBeat)))}h`,
+      "longest game beaten",
+    );
   }
   const finishedHrs = finished.reduce((s, g) => s + (hltb(g) || 0), 0);
   if (finishedHrs > 0) {
-    push('+', 'is-emerald', `${formatNum(Math.round(finishedHrs))}h`, 'total hours finished', null, { weight: W.friendly });
+    push(
+      "+",
+      "is-emerald",
+      `${formatNum(Math.round(finishedHrs))}h`,
+      "total hours finished",
+      null,
+      { weight: W.friendly },
+    );
   }
-  const compHrs = games.map(g => g.hltb_completionist_hours).filter(h => h != null && h > 0);
+  const compHrs = games
+    .map((g) => g.hltb_completionist_hours)
+    .filter((h) => h != null && h > 0);
   if (compHrs.length) {
     const compSum = compHrs.reduce((s, h) => s + h, 0);
-    push('~', 'is-amber', `${formatNum(Math.round(compSum))}h`, 'completionist hours total');
+    push(
+      "~",
+      "is-amber",
+      `${formatNum(Math.round(compSum))}h`,
+      "completionist hours total",
+    );
     const compAvg = Math.round(compSum / compHrs.length);
-    push('~', 'is-amber', `${formatNum(compAvg)}h`, 'avg completionist run');
+    push("~", "is-amber", `${formatNum(compAvg)}h`, "avg completionist run");
   }
 
-  const coopGames = games.filter(g => g.coop_online || g.coop_local);
+  const coopGames = games.filter((g) => g.coop_online || g.coop_local);
   if (coopGames.length) {
     const pct = Math.round((coopGames.length / total) * 100);
-    push('>', '', `${formatNum(coopGames.length)} · ${pct}%`, 'co-op ready', null, { weight: W.friendly });
+    push(
+      ">",
+      "",
+      `${formatNum(coopGames.length)} · ${pct}%`,
+      "co-op ready",
+      null,
+      { weight: W.friendly },
+    );
   }
 
-  const finishedThisYear = games.filter(g =>
-    status(g) === 'finished' && String(g.last_played || '').startsWith(String(thisYear)),
+  const finishedThisYear = games.filter(
+    (g) =>
+      status(g) === "finished" &&
+      String(g.last_played || "").startsWith(String(thisYear)),
   ).length;
   const netAdded = addedThisYear - finishedThisYear;
   if (addedThisYear || finishedThisYear) {
-    const sign = netAdded >= 0 ? '+' : '';
-    push(netAdded >= 0 ? '+' : '^', netAdded >= 0 ? 'is-emerald' : 'is-rose', `${sign}${formatNum(netAdded)}`, `net adds in ${thisYear}`);
+    const sign = netAdded >= 0 ? "+" : "";
+    push(
+      netAdded >= 0 ? "+" : "^",
+      netAdded >= 0 ? "is-emerald" : "is-rose",
+      `${sign}${formatNum(netAdded)}`,
+      `net adds in ${thisYear}`,
+    );
   }
 
-  const ratingVals = ratedGames.map(g => rating(g));
+  const ratingVals = ratedGames.map((g) => rating(g));
   const medRating = median(ratingVals);
-  if (medRating != null) push('~', 'is-amber', `${medRating}%`, 'median review score');
+  if (medRating != null)
+    push("~", "is-amber", `${medRating}%`, "median review score");
 
-  const priorityCount = games.filter(g => (getPersonal(g).priority || 0) > 0).length;
-  if (priorityCount) push('*', 'is-violet', formatNum(priorityCount), 'priority flagged');
+  const priorityCount = games.filter(
+    (g) => (getPersonal(g).priority || 0) > 0,
+  ).length;
+  if (priorityCount)
+    push("*", "is-violet", formatNum(priorityCount), "priority flagged");
 
   const oldestPlayed = games
-    .map(g => ({ g, t: firstPlayedAt(g) }))
-    .filter(x => x.t != null)
+    .map((g) => ({ g, t: firstPlayedAt(g) }))
+    .filter((x) => x.t != null)
     .sort((a, b) => a.t - b.t)[0];
   if (oldestPlayed) {
     const yr = firstPlayedYear(oldestPlayed.g);
-    push('^', 'is-rose', `${oldestPlayed.g.name} · ${yr ?? '?'}`, 'first PSN session');
+    push(
+      "^",
+      "is-rose",
+      `${oldestPlayed.g.name} · ${yr ?? "?"}`,
+      "first PSN session",
+    );
   }
   const topSessions = games
-    .map(g => ({ g, n: playSessionCount(g) }))
-    .filter(x => x.n != null)
+    .map((g) => ({ g, n: playSessionCount(g) }))
+    .filter((x) => x.n != null)
     .sort((a, b) => b.n - a.n)[0];
   if (topSessions) {
-    push('*', 'is-violet', `${topSessions.g.name} · ${formatNum(topSessions.n)}`, 'most PSN sessions');
+    push(
+      "*",
+      "is-violet",
+      `${topSessions.g.name} · ${formatNum(topSessions.n)}`,
+      "most PSN sessions",
+    );
   }
   if (snap.psnSessionTotal > 0) {
-    push('>', '', formatNum(snap.psnSessionTotal), 'PSN sessions total');
+    push(">", "", formatNum(snap.psnSessionTotal), "PSN sessions total");
   }
 
   const criticGapAvg = avgCriticGap(games);
   if (criticGapAvg != null) {
-    push('~', 'is-amber', `${criticGapAvg} pts`, 'critic gap (avg)', null, { weight: W.moderate });
+    push("~", "is-amber", `${criticGapAvg} pts`, "critic gap (avg)", null, {
+      weight: W.moderate,
+    });
   }
   const champ = peoplesChamp(games);
   if (champ) {
-    push('*', 'is-violet', `${champ.g.name} · +${champ.gap}`, "people's champ", null, { weight: W.moderate });
+    push(
+      "*",
+      "is-violet",
+      `${champ.g.name} · +${champ.gap}`,
+      "people's champ",
+      null,
+      { weight: W.moderate },
+    );
   }
   const darling = criticsDarling(games);
   if (darling) {
-    push('*', 'is-amber', `${darling.g.name} · ${darling.score}`, "critics' darling", null, { weight: W.moderate });
+    push(
+      "*",
+      "is-amber",
+      `${darling.g.name} · ${darling.score}`,
+      "critics' darling",
+      null,
+      { weight: W.moderate },
+    );
   }
   const overrated = overratedLeader(games);
   if (overrated) {
-    push('^', 'is-rose', `${overrated.g.name} · ${overrated.gap}`, 'overrated index', null, { weight: W.cryptic });
+    push(
+      "^",
+      "is-rose",
+      `${overrated.g.name} · ${overrated.gap}`,
+      "overrated index",
+      null,
+      { weight: W.cryptic },
+    );
   }
   const betaCount = perpetualBetaCount(snap);
   if (betaCount != null) {
-    push('^', 'is-rose', formatNum(betaCount), 'perpetual beta', null, { weight: W.moderate });
+    push("^", "is-rose", formatNum(betaCount), "perpetual beta", null, {
+      weight: W.moderate,
+    });
   }
   const couch = couchReadyRate(snap);
   if (couch != null) {
-    push('>', '', formatPct100(couch), 'couch-ready %', null, { weight: W.friendly });
+    push(">", "", formatPct100(couch), "couch-ready %", null, {
+      weight: W.friendly,
+    });
   }
   const agingDays = acquireToPlayDaysAvg(snap);
   if (agingDays != null) {
-    push('~', 'is-amber', `${formatNum(agingDays)}d`, 'aging curve', null, { weight: W.moderate });
+    push("~", "is-amber", `${formatNum(agingDays)}d`, "aging curve", null, {
+      weight: W.moderate,
+    });
   }
   const dayOne = dayOnePlayerCount(snap);
   if (dayOne != null) {
-    push('+', 'is-emerald', formatNum(dayOne), 'day-one player', null, { weight: W.friendly });
+    push("+", "is-emerald", formatNum(dayOne), "day-one player", null, {
+      weight: W.friendly,
+    });
   }
   const extraInn = extraInningsAvg(snap);
   if (extraInn != null) {
-    push('~', 'is-amber', `${formatNum(extraInn)}h`, 'extra innings', null, { weight: W.moderate });
+    push("~", "is-amber", `${formatNum(extraInn)}h`, "extra innings", null, {
+      weight: W.moderate,
+    });
   }
   const dDips = doubleDipCount();
   if (dDips != null) {
-    push('>', '', formatNum(dDips), 'double dips', null, { weight: W.moderate });
+    push(">", "", formatNum(dDips), "double dips", null, {
+      weight: W.moderate,
+    });
   }
   const cpf = costPerFinish(snap);
   if (cpf != null) {
-    push('#', 'is-violet', formatDollarMarquee(cpf), 'cost per finish', null, { weight: W.moderate });
+    push("#", "is-violet", formatDollarMarquee(cpf), "cost per finish", null, {
+      weight: W.moderate,
+    });
   }
   const sunk = sunkCostUnplayed(snap);
   if (sunk != null) {
-    push('#', 'is-violet', formatDollarMarquee(sunk), 'sunk cost', null, { weight: W.moderate });
+    push("#", "is-violet", formatDollarMarquee(sunk), "sunk cost", null, {
+      weight: W.moderate,
+    });
   }
   const mortality = backlogMortality(snap);
   if (mortality) {
-    const who = mortality.verdict === 'backlog' ? 'Backlog wins' : 'You might';
-    push('^', mortality.verdict === 'backlog' ? 'is-rose' : 'is-emerald', `${who} · age ${mortality.finishByAge}`, 'will you die first?', null, { weight: W.cryptic });
+    const who = mortality.verdict === "backlog" ? "Backlog wins" : "You might";
+    push(
+      "^",
+      mortality.verdict === "backlog" ? "is-rose" : "is-emerald",
+      `${who} · age ${mortality.finishByAge}`,
+      "will you die first?",
+      null,
+      { weight: W.cryptic },
+    );
   }
 
   const deckReady = protonReadyShare(games);
   if (deckReady != null) {
-    push('>', '', `${Math.round(deckReady * 100)}%`, 'Deck-ready %', null, { weight: W.normal });
+    push(">", "", `${Math.round(deckReady * 100)}%`, "Deck-ready %", null, {
+      weight: W.normal,
+    });
   }
-  const protonPlat = protonCount(games, 'platinum');
+  const protonPlat = protonCount(games, "platinum");
   if (protonPlat != null) {
-    push('+', 'is-emerald', formatNum(protonPlat), 'Proton platinum', null, { weight: W.normal });
+    push("+", "is-emerald", formatNum(protonPlat), "Proton platinum", null, {
+      weight: W.normal,
+    });
   }
-  const borked = protonCount(games, 'borked');
+  const borked = protonCount(games, "borked");
   if (borked != null) {
-    push('^', 'is-rose', formatNum(borked), 'borked on Linux', null, { weight: W.moderate });
+    push("^", "is-rose", formatNum(borked), "borked on Linux", null, {
+      weight: W.moderate,
+    });
   }
   const trendingUp = protonTrendingUp(games);
   if (trendingUp != null) {
-    push('*', 'is-violet', formatNum(trendingUp), 'Proton trending up', null, { weight: W.cryptic });
+    push("*", "is-violet", formatNum(trendingUp), "Proton trending up", null, {
+      weight: W.cryptic,
+    });
   }
   const deckBacklog = protonDeckReadyBacklog(games, status);
   if (deckBacklog != null) {
-    push('~', 'is-amber', formatNum(deckBacklog), 'Deck-ready backlog', null, { weight: W.moderate });
+    push("~", "is-amber", formatNum(deckBacklog), "Deck-ready backlog", null, {
+      weight: W.moderate,
+    });
   }
 
   const platEarned = psnPlatinumsEarned(games);
   if (platEarned != null) {
-    push('+', 'is-emerald', formatNum(platEarned), 'platinums earned', null, { weight: W.normal });
+    push("+", "is-emerald", formatNum(platEarned), "platinums earned", null, {
+      weight: W.normal,
+    });
   }
   const platHunt = psnPlatinumHunt(games);
   if (platHunt != null) {
-    push('*', 'is-amber', formatNum(platHunt), 'platinum hunt', null, { weight: W.moderate });
+    push("*", "is-amber", formatNum(platHunt), "platinum hunt", null, {
+      weight: W.moderate,
+    });
   }
   const troEarned = psnTrophiesEarned(games);
   if (troEarned != null) {
-    push('>', '', formatNum(troEarned), 'trophies earned', null, { weight: W.normal });
+    push(">", "", formatNum(troEarned), "trophies earned", null, {
+      weight: W.normal,
+    });
   }
 
   const ps5Share = ps5NativeShare(games);
   if (ps5Share != null) {
-    push('>', '', `${Math.round(ps5Share * 100)}%`, 'PS5-native %', null, { weight: W.moderate });
+    push(">", "", `${Math.round(ps5Share * 100)}%`, "PS5-native %", null, {
+      weight: W.moderate,
+    });
   }
   const ps4Only = ps4Holdouts(games);
   if (ps4Only != null) {
-    push('^', 'is-rose', formatNum(ps4Only), 'PS4 holdouts', null, { weight: W.cryptic });
+    push("^", "is-rose", formatNum(ps4Only), "PS4 holdouts", null, {
+      weight: W.cryptic,
+    });
   }
 
   const tagTop = topTag(games);
   if (tagTop) {
-    push('>', '', `${tagTop.tag} · ${formatNum(tagTop.count)}`, 'top tag', null, { weight: W.normal });
+    push(
+      ">",
+      "",
+      `${tagTop.tag} · ${formatNum(tagTop.count)}`,
+      "top tag",
+      null,
+      { weight: W.normal },
+    );
   }
   const mpShare = multiplayerTagShare(games);
   if (mpShare != null) {
-    push('>', '', `${Math.round(mpShare * 100)}%`, 'multiplayer share', null, { weight: W.normal });
+    push(">", "", `${Math.round(mpShare * 100)}%`, "multiplayer share", null, {
+      weight: W.normal,
+    });
   }
   const spBacklog = singleplayerBacklogCount(games, status);
   if (spBacklog != null) {
-    push('~', 'is-amber', formatNum(spBacklog), 'singleplayer backlog', null, { weight: W.moderate });
+    push("~", "is-amber", formatNum(spBacklog), "singleplayer backlog", null, {
+      weight: W.moderate,
+    });
   }
 
   const freeItch = freeItchCount(games);
   if (freeItch != null) {
-    push('+', 'is-emerald', formatNum(freeItch), 'free itch games', null, { weight: W.normal });
+    push("+", "is-emerald", formatNum(freeItch), "free itch games", null, {
+      weight: W.normal,
+    });
   }
   const itchSpend = itchSpendTotal(games);
   if (itchSpend != null) {
-    push('#', 'is-violet', formatDollarMarquee(itchSpend), 'itch spend', null, { weight: W.moderate });
+    push("#", "is-violet", formatDollarMarquee(itchSpend), "itch spend", null, {
+      weight: W.moderate,
+    });
   }
 
   const installed = installedLocalCount(games);
   if (installed != null) {
-    push('>', '', formatNum(installed), 'installed locally', null, { weight: W.normal });
+    push(">", "", formatNum(installed), "installed locally", null, {
+      weight: W.normal,
+    });
   }
   const recent30 = recentlyPlayedCount(games);
   if (recent30 != null) {
-    push('*', 'is-violet', formatNum(recent30), 'played in last 30d', null, { weight: W.normal });
+    push("*", "is-violet", formatNum(recent30), "played in last 30d", null, {
+      weight: W.normal,
+    });
   }
 
   const mcClub = metacriticClubCount(games);
   if (mcClub != null) {
-    push('+', 'is-emerald', formatNum(mcClub), 'Metacritic 90+ club', null, { weight: W.moderate });
+    push("+", "is-emerald", formatNum(mcClub), "Metacritic 90+ club", null, {
+      weight: W.moderate,
+    });
   }
 
   const upcomingWl = upcomingWishlistCount(wl);
   if (upcomingWl != null) {
-    push('*', 'is-amber', formatNum(upcomingWl), 'upcoming wishlist', null, { weight: W.moderate });
+    push("*", "is-amber", formatNum(upcomingWl), "upcoming wishlist", null, {
+      weight: W.moderate,
+    });
   }
 
   const silverNative = protonSilverNativeShare(games);
   if (silverNative != null) {
-    push('>', '', `${Math.round(silverNative * 100)}%`, 'silver or native %', null, { weight: W.moderate });
+    push(
+      ">",
+      "",
+      `${Math.round(silverNative * 100)}%`,
+      "silver or native %",
+      null,
+      { weight: W.moderate },
+    );
   }
   const protonLowConf = protonLowConfidenceCount(games);
   if (protonLowConf != null) {
-    push('^', 'is-rose', formatNum(protonLowConf), 'Proton low confidence', null, { weight: W.moderate });
+    push(
+      "^",
+      "is-rose",
+      formatNum(protonLowConf),
+      "Proton low confidence",
+      null,
+      { weight: W.moderate },
+    );
   }
   const avgProton = avgProtonScore(games);
   if (avgProton != null) {
-    push('~', 'is-amber', String(avgProton), 'avg Proton score', null, { weight: W.cryptic });
+    push("~", "is-amber", String(avgProton), "avg Proton score", null, {
+      weight: W.cryptic,
+    });
   }
 
   const onSaleOwned = boughtOnSaleCount(games);
   if (onSaleOwned != null) {
-    push('#', 'is-violet', formatNum(onSaleOwned), 'bought on sale', null, { weight: W.moderate });
+    push("#", "is-violet", formatNum(onSaleOwned), "bought on sale", null, {
+      weight: W.moderate,
+    });
   }
   const paidItch = paidItchCount(games);
   if (paidItch != null) {
-    push('#', 'is-violet', formatNum(paidItch), 'paid itch games', null, { weight: W.normal });
+    push("#", "is-violet", formatNum(paidItch), "paid itch games", null, {
+      weight: W.normal,
+    });
   }
   const avgSteamPrice = avgOwnedSteamPrice(games);
   if (avgSteamPrice != null) {
-    push('#', 'is-violet', formatDollarMarquee(avgSteamPrice), 'avg owned Steam price', null, { weight: W.moderate });
+    push(
+      "#",
+      "is-violet",
+      formatDollarMarquee(avgSteamPrice),
+      "avg owned Steam price",
+      null,
+      { weight: W.moderate },
+    );
   }
 
   const prioWl = priorityWishlistCount(wl);
   if (prioWl != null) {
-    push('*', 'is-violet', formatNum(prioWl), 'priority wishlist', null, { weight: W.moderate });
+    push("*", "is-violet", formatNum(prioWl), "priority wishlist", null, {
+      weight: W.moderate,
+    });
   }
   const wlThisYear = wishlistAddedThisYear(wl);
   if (wlThisYear != null) {
-    push('+', 'is-emerald', formatNum(wlThisYear), 'wishlist added this year', null, { weight: W.normal });
+    push(
+      "+",
+      "is-emerald",
+      formatNum(wlThisYear),
+      "wishlist added this year",
+      null,
+      { weight: W.normal },
+    );
   }
   const wlStores = wishlistStoreCount(wl);
   if (wlStores != null) {
-    push('>', '', formatNum(wlStores), 'wishlist stores', null, { weight: W.normal });
+    push(">", "", formatNum(wlStores), "wishlist stores", null, {
+      weight: W.normal,
+    });
   }
 
   const seenWeek = lastSeenThisWeek(games);
   if (seenWeek != null) {
-    push('*', 'is-violet', formatNum(seenWeek), 'last seen this week', null, { weight: W.normal });
+    push("*", "is-violet", formatNum(seenWeek), "last seen this week", null, {
+      weight: W.normal,
+    });
   }
   const launcher = launcherInstallCount(games);
   if (launcher != null) {
-    push('>', '', formatNum(launcher), 'launcher installs', null, { weight: W.normal });
+    push(">", "", formatNum(launcher), "launcher installs", null, {
+      weight: W.normal,
+    });
   }
   const hltbLo = hltbLowConfidenceCount(games);
   if (hltbLo != null) {
-    push('^', 'is-rose', formatNum(hltbLo), 'HLTB low confidence', null, { weight: W.moderate });
+    push("^", "is-rose", formatNum(hltbLo), "HLTB low confidence", null, {
+      weight: W.moderate,
+    });
   }
 
   const coopTagOnly = coopTaggedOnlyCount(games);
   if (coopTagOnly != null) {
-    push('~', 'is-amber', formatNum(coopTagOnly), 'co-op tagged only', null, { weight: W.cryptic });
+    push("~", "is-amber", formatNum(coopTagOnly), "co-op tagged only", null, {
+      weight: W.cryptic,
+    });
   }
   const partialPad = partialControllerCount(games);
   if (partialPad != null) {
-    push('>', '', formatNum(partialPad), 'partial controller', null, { weight: W.moderate });
+    push(">", "", formatNum(partialPad), "partial controller", null, {
+      weight: W.moderate,
+    });
   }
   const indieShare = indieTaggedShare(games);
   if (indieShare != null) {
-    push('>', '', `${Math.round(indieShare * 100)}%`, 'indie-tagged %', null, { weight: W.normal });
+    push(">", "", `${Math.round(indieShare * 100)}%`, "indie-tagged %", null, {
+      weight: W.normal,
+    });
   }
 
   const troComp = avgTrophyCompletion(games);
   if (troComp != null) {
-    push('~', 'is-amber', `${Math.round(troComp * 100)}%`, 'avg trophy completion', null, { weight: W.normal });
+    push(
+      "~",
+      "is-amber",
+      `${Math.round(troComp * 100)}%`,
+      "avg trophy completion",
+      null,
+      { weight: W.normal },
+    );
   }
   const gsComp = gamerscoreCompletionShare(games);
   if (gsComp != null) {
-    push('~', 'is-amber', `${Math.round(gsComp * 100)}%`, 'gamerscore completion %', null, { weight: W.normal });
+    push(
+      "~",
+      "is-amber",
+      `${Math.round(gsComp * 100)}%`,
+      "gamerscore completion %",
+      null,
+      { weight: W.normal },
+    );
   }
 
   const mc80Unplayed = metacritic80UnplayedCount(games);
   if (mc80Unplayed != null) {
-    push('*', 'is-amber', formatNum(mc80Unplayed), 'Metacritic 80+ unplayed', null, { weight: W.moderate });
+    push(
+      "*",
+      "is-amber",
+      formatNum(mc80Unplayed),
+      "Metacritic 80+ unplayed",
+      null,
+      { weight: W.moderate },
+    );
   }
   const gapGame = biggestCriticGapGame(games);
   if (gapGame) {
-    push('^', 'is-rose', `${gapGame.g.name} · ${gapGame.gap} pts`, 'biggest critic gap', null, { weight: W.moderate });
+    push(
+      "^",
+      "is-rose",
+      `${gapGame.g.name} · ${gapGame.gap} pts`,
+      "biggest critic gap",
+      null,
+      { weight: W.moderate },
+    );
   }
 
   const eaBacklog = earlyAccessBacklogCount(games, status);
   if (eaBacklog != null) {
-    push('^', 'is-rose', formatNum(eaBacklog), 'early access backlog', null, { weight: W.moderate });
+    push("^", "is-rose", formatNum(eaBacklog), "early access backlog", null, {
+      weight: W.moderate,
+    });
   }
   const dipBacklog = doubleDipBacklogCount(games, status);
   if (dipBacklog != null) {
-    push('>', '', formatNum(dipBacklog), 'double-dip backlog', null, { weight: W.moderate });
+    push(">", "", formatNum(dipBacklog), "double-dip backlog", null, {
+      weight: W.moderate,
+    });
   }
   const letterCov = letterCoverageShare(games);
   if (letterCov != null) {
-    push('?', 'is-violet', `${Math.round(letterCov * 100)}%`, 'letter coverage %', null, { weight: W.friendly });
+    push(
+      "?",
+      "is-violet",
+      `${Math.round(letterCov * 100)}%`,
+      "letter coverage %",
+      null,
+      { weight: W.friendly },
+    );
   }
 
   appendCreativeMarqueeChips(push, games, snap, METRIC_WEIGHT);
 
   // kojima metric — super-rare MGSV codec easter egg
   if (total > 0) {
-    push('*', 'is-violet', '1', 'gay character: you, the player.', null, {
+    push("*", "is-violet", "1", "gay character: you, the player.", null, {
       weight: W.kojima,
-      iconTitle: 'kojima',
+      iconTitle: "kojima",
     });
   }
 
   noteMarqueeMetricKeys(items.map((it) => metricKeyForLabel(it.label)));
   const enabledItems = items.filter((it) => isMarqueeMetricEnabled(it.label));
-  return spreadByFamily(applyMetricWeights(enabledItems), it => it.family, { wrap: true });
+  // eslint-disable-next-line no-unused-expressions
+  return spreadByFamily(applyMetricWeights(enabledItems), (it) => it.family, {
+    wrap: true,
+  });
 }
 
 /** Inner HTML for `.dash-marquee-track`: one copy of the chips, twice (seamless loop). */
 export function renderMarqueeTrackInner(items) {
-  if (!items.length) return '';
-  const itemHtml = items.map(it => {
-    const chipTip = marqueeTip(it.label);
-    const chipTitle = chipTip ? ` title="${escapeAttr(chipTip)}"` : '';
-    const iconTip = it.iconTitle && !chipTip ? ` title="${escapeAttr(it.iconTitle)}"` : '';
-    return `
+  if (!items.length) return "";
+  const itemHtml = items
+    .map((it) => {
+      const chipTip = marqueeTip(it.label);
+      const chipTitle = chipTip ? ` title="${escapeAttr(chipTip)}"` : "";
+      const iconTip =
+        it.iconTitle && !chipTip ? ` title="${escapeAttr(it.iconTitle)}"` : "";
+      return `
     <span class="dash-marquee-item"${chipTitle}>
-      <span class="dash-marquee-icon ${escapeAttr(it.iconCls || '')}"${iconTip}>${escapeHtml(it.glyph)}</span>
+      <span class="dash-marquee-icon ${escapeAttr(it.iconCls || "")}"${iconTip}>${escapeHtml(it.glyph)}</span>
       <strong>${it.valueHtml}</strong>
       <span class="dash-marquee-label">${escapeHtml(it.label)}</span>
     </span>`;
-  }).join('');
+    })
+    .join("");
   // Two identical copies so the -50% scroll loops seamlessly. Wrapping each copy
   // lets the static (too-few-chips) path hide the duplicate and center the rest.
   return `<span class="dash-marquee-copy">${itemHtml}</span><span class="dash-marquee-copy" aria-hidden="true">${itemHtml}</span>`;
 }
 
 export function renderMarqueeHtml(items) {
-  if (!items.length) return '';
+  if (!items.length) return "";
   return `
     <div class="dash-marquee" id="dashboardMarquee" aria-hidden="true">
       <div class="dash-marquee-track">${renderMarqueeTrackInner(items)}</div>
@@ -1268,41 +2015,45 @@ function insightListsEqual(a, b) {
 }
 
 export function startInsightRotation(insights) {
-  const el = document.getElementById('dashboardInsight');
+  const el = document.getElementById("dashboardInsight");
   const entries = normalizeInsightEntries(insights);
   if (!el || !entries.length) {
     stopInsightRotation();
     if (el) {
-      el.innerHTML = '';
-      el.classList.remove('is-visible');
+      el.innerHTML = "";
+      el.classList.remove("is-visible");
     }
     _lastInsights = [];
     return;
   }
   const weighted = filterInsightsByWeight(entries);
-  let htmlList = weighted.map(e => e.html);
+  let htmlList = weighted.map((e) => e.html);
   htmlList = filterInsightsOneLine(el, htmlList);
   htmlList = spreadByFamily(htmlList, familyForInsight, { wrap: true });
-  if (htmlList.length && _insightTimer && insightListsEqual(htmlList, _lastInsights)) {
+  if (
+    htmlList.length &&
+    _insightTimer &&
+    insightListsEqual(htmlList, _lastInsights)
+  ) {
     return;
   }
   stopInsightRotation();
   _lastInsights = htmlList;
   if (!htmlList.length) {
-    el.innerHTML = '';
-    el.classList.remove('is-visible');
+    el.innerHTML = "";
+    el.classList.remove("is-visible");
     return;
   }
   _insightIndex = 0;
   const show = (i) => {
-    el.classList.remove('is-visible');
+    el.classList.remove("is-visible");
     if (_insightFadeTimer) clearTimeout(_insightFadeTimer);
     _insightFadeTimer = setTimeout(() => {
       const html = htmlList[i % htmlList.length];
       el.innerHTML = html;
       const tip = insightTip(html);
-      el.title = tip || '';
-      el.classList.add('is-visible');
+      el.title = tip || "";
+      el.classList.add("is-visible");
     }, 250);
   };
   show(0);
@@ -1312,7 +2063,7 @@ export function startInsightRotation(insights) {
   }, 6000);
 }
 
-if (typeof document !== 'undefined') {
+if (typeof document !== "undefined") {
   registerPausable({
     pause: stopInsightRotation,
     resume() {

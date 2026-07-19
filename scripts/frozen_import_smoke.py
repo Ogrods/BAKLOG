@@ -70,7 +70,9 @@ def run_import_test(exe: Path, module_name: str) -> dict:
             capture_output=True,
             text=True,
             timeout=30,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+            creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW)
+            if sys.platform == "win32"
+            else 0,
         )
     except subprocess.TimeoutExpired:
         return {"module": module_name, "ok": False, "error": "timeout"}

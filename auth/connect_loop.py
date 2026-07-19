@@ -29,6 +29,8 @@ def run_connect_poll(
 ) -> dict[str, str]:
     """Poll until ``check()`` returns creds or the deadline passes."""
     last_hint = 0.0
+    _last_check_log = 0.0
+    _LOG_INTERVAL = 30.0  # Rate-limit stderr diagnostic spam on repeated failures
     page = None
     pages = getattr(context, "pages", None) or []
     if pages:
@@ -41,8 +43,11 @@ def run_connect_poll(
         except ConnectBrowserClosed:
             raise
         except Exception:
-            print("[connect_loop] check() raised, retrying:", file=sys.stderr, flush=True)
-            traceback.print_exc(file=sys.stderr)
+            t = time.time()
+            if t - _last_check_log >= _LOG_INTERVAL:
+                _last_check_log = t
+                print("[connect_loop] check() raised, retrying:", file=sys.stderr, flush=True)
+                traceback.print_exc(file=sys.stderr)
             creds = None
         if creds:
             if on_signed_in:

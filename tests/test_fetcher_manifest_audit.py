@@ -221,7 +221,7 @@ def test_reload_after_fetcher_calls_enrich_cache_loaders() -> None:
     """Each enrich fetcher must reload its cache meta after SSE done."""
     text = (ROOT / "js" / "library-load.js").read_text(encoding="utf-8")
     branch = re.search(
-        r"ENRICH_FETCHER_KEYS\.has\(key\)\)\s*\{([\s\S]*?)\} else if \(key === 'claims'\)",
+        r"""ENRICH_FETCHER_KEYS\.has\(key\)\)\s*\{([\s\S]*?)\} else if \(key === ['"]claims['"]\)""",
         text,
     )
     assert branch, "enrich branch missing in reloadAfterFetcher"

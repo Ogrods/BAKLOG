@@ -194,7 +194,12 @@ def humble_connect_hint(page: Any) -> str:
         return "Open humblebundle.com and sign in if prompted."
     return "On humblebundle.com? We'll open your library to confirm the session."
 def extract_battlenet_session(context: Any) -> dict[str, str] | None:
-    from clients.battlenet_client import BattleNetAuthError, probe_session
+    try:
+        from clients.battlenet_client import BattleNetAuthError, probe_session
+    except Exception as exc:
+        import sys
+        print(f"[battlenet] import failed: {exc}", file=sys.stderr, flush=True)
+        return None
 
     if not _battlenet_has_session(context):
         return None

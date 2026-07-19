@@ -1,38 +1,38 @@
 /** reloadAfterFetcher routing + enrich cache reload parity. */
-import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import {
   ENRICH_FETCHER_KEYS,
   ENRICH_RELOAD_WISHLIST_KEYS,
   LIBRARY_STORE_JSON,
   WISHLIST_FETCHER_JSON,
-} from '../js/fetcher-registry.js';
+} from "../js/fetcher-registry.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LIBRARY_LOAD_SRC = readFileSync(
-  join(__dirname, '..', 'js', 'library-load.js'),
-  'utf8',
+  join(__dirname, "..", "js", "library-load.js"),
+  "utf8",
 );
 
 const ENRICH_CACHE_LOADERS = {
-  hltb: 'loadHltbCache',
-  steamReviews: 'loadSteamReviewCache',
-  steamCovers: 'loadSteamCoversMeta',
-  steamTags: 'loadSteamTagsMeta',
-  protondb: 'loadProtondbCache',
+  hltb: "loadHltbCache",
+  steamReviews: "loadSteamReviewCache",
+  steamCovers: "loadSteamCoversMeta",
+  steamTags: "loadSteamTagsMeta",
+  protondb: "loadProtondbCache",
 };
 
 function enrichBranchSource() {
   const m = LIBRARY_LOAD_SRC.match(
-    /ENRICH_FETCHER_KEYS\.has\(key\)\)\s*\{([\s\S]*?)\} else if \(key === 'claims'\)/,
+    /ENRICH_FETCHER_KEYS\.has\(key\)\)\s*\{([\s\S]*?)\} else if \(key === ["']claims["']\)/,
   );
-  return m ? m[1] : '';
+  return m ? m[1] : "";
 }
 
-describe('reloadAfterFetcher source routing', () => {
-  it('calls a cache loader for every enrich fetcher key', () => {
+describe("reloadAfterFetcher source routing", () => {
+  it("calls a cache loader for every enrich fetcher key", () => {
     const branch = enrichBranchSource();
     expect(branch.length).toBeGreaterThan(0);
     for (const key of ENRICH_FETCHER_KEYS) {
@@ -42,71 +42,82 @@ describe('reloadAfterFetcher source routing', () => {
     }
   });
 
-  it('always reloads library catalogs for enrich keys', () => {
+  it("always reloads library catalogs for enrich keys", () => {
     const branch = enrichBranchSource();
-    expect(branch).toContain('reloadAllLibraryStoreFiles');
+    expect(branch).toContain("reloadAllLibraryStoreFiles");
   });
 
-  it('reloads wishlist catalogs only for enrich keys that mutate wishlist JSON', () => {
+  it("reloads wishlist catalogs only for enrich keys that mutate wishlist JSON", () => {
     const branch = enrichBranchSource();
-    expect(branch).toContain('ENRICH_RELOAD_WISHLIST_KEYS.has(key)');
+    expect(branch).toContain("ENRICH_RELOAD_WISHLIST_KEYS.has(key)");
     for (const key of ENRICH_RELOAD_WISHLIST_KEYS) {
-      expect(ENRICH_FETCHER_KEYS.has(key), `${key} in ENRICH_FETCHER_KEYS`).toBe(true);
+      expect(
+        ENRICH_FETCHER_KEYS.has(key),
+        `${key} in ENRICH_FETCHER_KEYS`,
+      ).toBe(true);
     }
-    const wishlistOnly = [...ENRICH_FETCHER_KEYS].filter((k) => !ENRICH_RELOAD_WISHLIST_KEYS.has(k));
-    expect(wishlistOnly.sort()).toEqual(['protondb', 'steamReviews', 'steamTags'].sort());
+    const wishlistOnly = [...ENRICH_FETCHER_KEYS].filter(
+      (k) => !ENRICH_RELOAD_WISHLIST_KEYS.has(k),
+    );
+    expect(wishlistOnly.sort()).toEqual(
+      ["protondb", "steamReviews", "steamTags"].sort(),
+    );
   });
 
-  it('refreshLibraryChromeAfterMerge does not double-paint summary/picks', () => {
+  it("refreshLibraryChromeAfterMerge does not double-paint summary/picks", () => {
     const fn = LIBRARY_LOAD_SRC.match(
       /async function refreshLibraryChromeAfterMerge\(\)\s*\{([\s\S]*?)^\}/m,
     );
-    expect(fn, 'refreshLibraryChromeAfterMerge').toBeTruthy();
+    expect(fn, "refreshLibraryChromeAfterMerge").toBeTruthy();
     const body = fn[1];
     expect(body).not.toMatch(/renderSummary\(\)[\s\S]*refreshFilterUI/);
     expect(body).not.toMatch(/renderPicks\(\)[\s\S]*refreshFilterUI/);
-    expect(body).toContain('refreshFilterUI({ force: true })');
+    expect(body).toContain("refreshFilterUI({ force: true })");
   });
 
-  it('always ends in applyMergedLibrary for mapped branches', () => {
-    expect(LIBRARY_LOAD_SRC).toContain('await applyMergedLibrary()');
+  it("always ends in applyMergedLibrary for mapped branches", () => {
+    expect(LIBRARY_LOAD_SRC).toContain("await applyMergedLibrary()");
     expect(LIBRARY_LOAD_SRC).toMatch(
       /reloadAfterFetcher\(key\)[\s\S]*await applyMergedLibrary\(\)/,
     );
   });
 
-  it('gates the library count flash on genuinely-new keys, not raw visible delta', () => {
+  it("gates the library count flash on genuinely-new keys, not raw visible delta", () => {
     // Regression: un-hide / dedup / wishlist->library bumps libNow by 1 without
     // a real acquisition; the celebratory burst must not fire (nothing lands in
     // "Recently added"). Flash requires _lastNewlyAddedCount > 0.
     const fn = LIBRARY_LOAD_SRC.match(
       /export async function applyMergedLibrary\([\s\S]*?\n\}/,
     );
-    expect(fn, 'applyMergedLibrary').toBeTruthy();
+    expect(fn, "applyMergedLibrary").toBeTruthy();
     const body = fn[0];
     expect(body).toMatch(
-      /libNow > libPrev && newlyAdded > 0[\s\S]*fireLibraryCountFlash\('library'/,
+      /libNow > libPrev && newlyAdded > 0[\s\S]*fireLibraryCountFlash\(["']library["']/,
     );
-    expect(body).toContain('state._lastNewlyAddedCount ?? 0');
+    expect(body).toContain("state._lastNewlyAddedCount ?? 0");
   });
 });
 
-describe('manifest key coverage', () => {
-  it('every library manifest key maps to LIBRARY_STORE_JSON', () => {
+describe("manifest key coverage", () => {
+  it("every library manifest key maps to LIBRARY_STORE_JSON", () => {
     const manifest = JSON.parse(
-      readFileSync(join(__dirname, '..', 'fetchers', 'manifest.json'), 'utf8'),
+      readFileSync(join(__dirname, "..", "fetchers", "manifest.json"), "utf8"),
     );
-    const libKeys = manifest.fetchers.filter((f) => f.group === 'library').map((f) => f.key);
+    const libKeys = manifest.fetchers
+      .filter((f) => f.group === "library")
+      .map((f) => f.key);
     for (const key of libKeys) {
       expect(LIBRARY_STORE_JSON[key], `library key ${key}`).toBeTruthy();
     }
   });
 
-  it('every wishlist manifest key maps to WISHLIST_FETCHER_JSON', () => {
+  it("every wishlist manifest key maps to WISHLIST_FETCHER_JSON", () => {
     const manifest = JSON.parse(
-      readFileSync(join(__dirname, '..', 'fetchers', 'manifest.json'), 'utf8'),
+      readFileSync(join(__dirname, "..", "fetchers", "manifest.json"), "utf8"),
     );
-    const wlKeys = manifest.fetchers.filter((f) => f.group === 'wishlist').map((f) => f.key);
+    const wlKeys = manifest.fetchers
+      .filter((f) => f.group === "wishlist")
+      .map((f) => f.key);
     for (const key of wlKeys) {
       expect(WISHLIST_FETCHER_JSON[key], `wishlist key ${key}`).toBeTruthy();
     }

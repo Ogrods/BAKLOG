@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 import time
+import traceback
 from collections.abc import Callable
 from typing import Any
 
-from auth.cdp_browser import abort_if_browser_closed
+from auth.cdp_browser import ConnectBrowserClosed, abort_if_browser_closed
 
 PollResult = dict[str, str] | None
 HintFn = Callable[[], str | None]
@@ -34,7 +36,14 @@ def run_connect_poll(
 
     while time.time() < deadline:
         abort_if_browser_closed(context)
-        creds = check()
+        try:
+            creds = check()
+        except ConnectBrowserClosed:
+            raise
+        except Exception:
+            print("[connect_loop] check() raised, retrying:", file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+            creds = None
         if creds:
             if on_signed_in:
                 on_signed_in(creds)
@@ -43,7 +52,12 @@ def run_connect_poll(
         now = time.time()
         if session and hint and now - last_hint >= hint_interval:
             last_hint = now
-            msg = hint()
+            try:
+                msg = hint()
+            except Exception:
+                print("[connect_loop] hint() raised:", file=sys.stderr, flush=True)
+                traceback.print_exc(file=sys.stderr)
+                msg = None
             if msg:
                 session.emit("waiting_for_user", {"message": msg})
 

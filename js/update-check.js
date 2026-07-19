@@ -662,47 +662,55 @@ export async function pollPostApplyOutcome(opts = {}) {
   const fetchFn = opts.fetchFn || baklogFetch;
   const sleepMs = opts.sleepMs ?? POST_APPLY_POLL_MS;
   const deadline = Date.now() + (opts.timeoutMs ?? POST_APPLY_TIMEOUT_MS);
-  while (Date.now() < deadline) {
-    try {
-      const [statusRes, resultRes] = await Promise.all([
-        fetchFn("/api/update/status"),
-        fetchFn("/api/update/apply-result"),
-      ]);
-      const resultPayload = await resultRes.json().catch(() => ({}));
-      const applyResult = resultPayload?.result;
-      if (applyResult && applyResult.ok === false) {
-        const msg = mapUpdateError(
-          String(applyResult.error || "Update apply failed"),
+  // Server is shutting down for restart — suppress network error persistence
+  // so transient "unreachable" during apply doesn't show as a permanent error.
+  const prev = window.__baklogSuppressNetworkErrors;
+  window.__baklogSuppressNetworkErrors = true;
+  try {
+    while (Date.now() < deadline) {
+      try {
+        const [statusRes, resultRes] = await Promise.all([
+          fetchFn("/api/update/status"),
+          fetchFn("/api/update/apply-result"),
+        ]);
+        const resultPayload = await resultRes.json().catch(() => ({}));
+        const applyResult = resultPayload?.result;
+        if (applyResult && applyResult.ok === false) {
+          const msg = mapUpdateError(
+            String(applyResult.error || "Update apply failed"),
+          );
+          showUpdateError(msg, opts);
+          throw new Error(msg);
+        }
+        if (applyResult && applyResult.ok === true) {
+          return { ok: true, version: applyResult.version || null };
+        }
+        const status = parseUpdateStatusResponse(
+          await statusRes.json().catch(() => ({})),
         );
-        showUpdateError(msg, opts);
-        throw new Error(msg);
+        if (status.ok && status.phase === "error" && status.error) {
+          const msg = mapUpdateError(status.error);
+          showUpdateError(msg, opts);
+          throw new Error(msg);
+        }
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message &&
+          !/fetch|network|failed to fetch/i.test(err.message)
+        ) {
+          throw err;
+        }
       }
-      if (applyResult && applyResult.ok === true) {
-        return { ok: true, version: applyResult.version || null };
-      }
-      const status = parseUpdateStatusResponse(
-        await statusRes.json().catch(() => ({})),
-      );
-      if (status.ok && status.phase === "error" && status.error) {
-        const msg = mapUpdateError(status.error);
-        showUpdateError(msg, opts);
-        throw new Error(msg);
-      }
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        err.message &&
-        !/fetch|network|failed to fetch/i.test(err.message)
-      ) {
-        throw err;
-      }
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
     }
-    await new Promise((resolve) => setTimeout(resolve, sleepMs));
+    setBannerHtml(
+      `<div class="migration-banner-body"><span class="text-amber-400">${escapeHtml(POST_APPLY_RECOVERY_MESSAGE)}</span></div>`,
+    );
+    opts.onNotice?.(POST_APPLY_RECOVERY_MESSAGE);
+  } finally {
+    window.__baklogSuppressNetworkErrors = prev;
   }
-  setBannerHtml(
-    `<div class="migration-banner-body"><span class="text-amber-400">${escapeHtml(POST_APPLY_RECOVERY_MESSAGE)}</span></div>`,
-  );
-  opts.onNotice?.(POST_APPLY_RECOVERY_MESSAGE);
 }
 
 /**

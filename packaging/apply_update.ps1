@@ -110,8 +110,19 @@ function Wait-ProcessGone([int]$ProcessId, [int]$TimeoutSec) {
     Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
 }
 
+function Kill-ProcessTree([int]$ProcessId) {
+    if ($ProcessId -le 0) { return }
+    # Tree-kill the process and all its children (fetchers, browser windows, etc.)
+    taskkill /F /T /PID $ProcessId 2>&1 | Out-Null
+}
+
 Wait-ProcessGone -ProcessId $serverPid -TimeoutSec 45
 Wait-ProcessGone -ProcessId $trayPid -TimeoutSec 15
+
+# Ensure child processes (fetchers, CDP browser windows) are cleaned up
+# before we start moving files — otherwise they can hold file locks.
+Kill-ProcessTree -ProcessId $serverPid
+Kill-ProcessTree -ProcessId $trayPid
 
 $staging = Join-Path $script:UpdateRoot ("staging-" + [Guid]::NewGuid().ToString("n"))
 New-Item -ItemType Directory -Path $staging | Out-Null

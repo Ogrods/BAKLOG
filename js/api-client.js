@@ -127,10 +127,18 @@ async function _fetchWithRetry(
         `Server unreachable: BAKLOG is not responding at ${url}. Check that the server is running.`,
       );
       descriptive.name = "NetworkError";
-      reportError(descriptive, {
-        source: "fetchWithAuthRetry",
-        kind: "network",
-      });
+      // Suppress error persistence when the server is expected to be down
+      // (e.g. during update apply/restart). The poll caller handles retries;
+      // we don't want transient downtime logged as a permanent error.
+      if (
+        typeof window === "undefined" ||
+        !window.__baklogSuppressNetworkErrors
+      ) {
+        reportError(descriptive, {
+          source: "fetchWithAuthRetry",
+          kind: "network",
+        });
+      }
       throw descriptive;
     }
   }

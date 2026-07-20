@@ -1,0 +1,6 @@
+HEAD: opens=511, closes=512, diff=-1
+WC:   opens=511, closes=512, diff=-1
+HEAD line count: 1323
+HEAD imbalance at line 1235: depth=-1
+HEAD imbalance at line 1236: depth=-1
+HEAD imbalance at line 1237: depth=-1

@@ -1,0 +1,13 @@
+1230:   }
+1231: 
+1232:   noteMarqueeMetricKeys(items.map((it) => metricKeyForLabel(it.label)));
+1233:   const enabledItems = items.filter((it) => isMarqueeMetricEnabled(it.label));
+1234:   return spreadByFamily(applyMetricWeights(enabledItems), it => it.family, { wrap: true });
+1235: }
+1236: 
+1237: /** Inner HTML for `.dash-marquee-track`: one copy of the chips, twice (seamless loop). */
+1238: export function renderMarqueeTrackInner(items) {
+1239:   if (!items.length) return '';
+1240:   const itemHtml = items.map(it => {
+1241:     const chipTip = marqueeTip(it.label);
+1242:     const chipTitle = chipTip ? ` title="${escapeAttr(chipTip)}"` : '';

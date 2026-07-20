@@ -28,7 +28,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-
 BASE_URL = "http://127.0.0.1:8765"
 SMOKE_PORT = 8765  # Must match default server port
 START_TIMEOUT_SEC = 15

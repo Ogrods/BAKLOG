@@ -1,18 +1,29 @@
 {
   "ids": [
+    "epic-echo-generation-midnight-edition-069026",
+    "epic-luto-0a4ab3",
     "gamerpower-1604",
     "gamerpower-2204",
     "gamerpower-3306",
     "gamerpower-3446",
     "gamerpower-3498",
+    "gamerpower-3555",
     "gamerpower-3676",
     "gamerpower-3697",
+    "gamerpower-3709",
+    "gamerpower-3712",
+    "gamerpower-3714",
+    "gamerpower-3715",
     "itad-073a56345192",
     "itad-0a93135bfee3",
     "itad-0c69ed1f1bd8",
     "itad-0d4598c53ffe",
     "itad-1b0433806065",
     "itad-562030929f11",
+    "itad-75d1019b80eb",
+    "itad-840d262ba7fa",
+    "itad-90df86960d93",
+    "itad-920c69f9fdf1",
     "itad-98730029b14b",
     "itad-b07aac9ebd26",
     "itad-b2fe2af076cf",
@@ -23,9 +34,7 @@
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
     "itad-eb44ea1d719b",
-    "itad-f0cffe659c19",
-    "itad-75d1019b80eb",
-    "itad-90df86960d93"
+    "itad-f0cffe659c19"
   ],
   "store_overrides": {
     "gamerpower-3446": "indiegala",
@@ -49,11 +58,26 @@
     "gamerpower-3498": {
       "title": "Primal Slideee Deluxe (Stove)"
     },
+    "gamerpower-3555": {
+      "title": "Together After Dark"
+    },
     "gamerpower-3676": {
       "title": "Dire Echo"
     },
     "gamerpower-3697": {
       "title": "NIGHTBELL"
+    },
+    "gamerpower-3709": {
+      "title": "NoRush! - Tower Edition"
+    },
+    "gamerpower-3712": {
+      "title": "Catch Me!"
+    },
+    "gamerpower-3714": {
+      "title": "Luto"
+    },
+    "gamerpower-3715": {
+      "title": "Echo Generation: Midnight Edition"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -72,6 +96,18 @@
     },
     "itad-562030929f11": {
       "title": "Whiskey.Mafia. Leo's Family"
+    },
+    "itad-75d1019b80eb": {
+      "title": "Nova Lands"
+    },
+    "itad-840d262ba7fa": {
+      "title": "The Mound: Omen of Cthulhu: Lost Explorers Swords Pack"
+    },
+    "itad-90df86960d93": {
+      "title": "Tattoo Tycoon"
+    },
+    "itad-920c69f9fdf1": {
+      "title": "The Ouroboros King"
     },
     "itad-98730029b14b": {
       "title": "Carlos the Taco"
@@ -106,11 +142,11 @@
     "itad-f0cffe659c19": {
       "title": "Blacklist Mafia"
     },
-    "itad-75d1019b80eb": {
-      "title": "Nova Lands"
+    "itad-0e2b83ac494b": {
+      "title": "Echo Generation: Midnight Edition"
     },
-    "itad-90df86960d93": {
-      "title": "Tattoo Tycoon"
+    "itad-df07e9ed2270": {
+      "title": "LUTO free on EGS"
     }
   },
   "dismissed": [
@@ -118,13 +154,12 @@
     "gamerpower-3287",
     "gamerpower-3279",
     "gamerpower-3294",
-    "epic-nova-lands-4d1788",
-    "gamerpower-3706",
     "gamerpower-3710",
-    "gamerpower-3555",
-    "epic-tattoo-tycoon-b4352c",
-    "gamerpower-3707",
-    "gamerpower-3709"
+    "itad-928b6c2361a4",
+    "itad-0e2b83ac494b",
+    "itad-df07e9ed2270",
+    "gamerpower-3716",
+    "gamerpower-3717"
   ],
   "dismissed_keys": [
     "nova lands",
@@ -134,9 +169,13 @@
     "blacklist mafia",
     "whiskey mafia leo s family",
     "keepup survival",
-    "together after dark"
+    "together after dark",
+    "catch me",
+    "luto",
+    "echo generation midnight edition"
   ],
   "premium_only_ids": [
-    "gamerpower-3498"
+    "gamerpower-3498",
+    "itad-840d262ba7fa"
   ]
 }

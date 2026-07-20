@@ -1,39 +1,100 @@
 {
-  "fetched_at": "2026-07-14T05:30:45.680316+00:00",
+  "fetched_at": "2026-07-16T19:53:42.027841+00:00",
   "sources": {
     "epic": 2,
-    "gamerpower": 16,
-    "itad": 16
+    "gamerpower": 19,
+    "itad": 18
   },
   "attribution": [
     "GamerPower.com"
   ],
   "items": [
     {
-      "id": "epic-nova-lands-4d1788",
+      "id": "epic-luto-0a4ab3",
       "store": "epic",
-      "title": "Nova Lands",
-      "claim_url": "https://store.epicgames.com/en-US/p/nova-lands-4d1788",
-      "ends_at": "2026-07-16T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/9a2764693c414ecda63d8f785452a4bb/nova-lands-offer-16wzy.png",
+      "title": "Luto",
+      "claim_url": "https://store.epicgames.com/en-US/p/luto-0a4ab3",
+      "ends_at": "2026-07-23T15:00:00Z",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/eda0432529164b29b8a659d627d660e4/luto-14zrp.png",
       "blurb": null,
       "source": "epic",
-      "review_percent": 89,
-      "steam_appid": 1501610,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
     },
     {
-      "id": "epic-tattoo-tycoon-b4352c",
+      "id": "epic-echo-generation-midnight-edition-069026",
       "store": "epic",
-      "title": "Tattoo Tycoon",
-      "claim_url": "https://store.epicgames.com/en-US/p/tattoo-tycoon-b4352c",
-      "ends_at": "2026-07-16T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/0b68dfc82a014fe2ac9971f13e0e3ce5/tattoo-tycoon-11qwx.jpg",
+      "title": "Echo Generation: Midnight Edition",
+      "claim_url": "https://store.epicgames.com/en-US/p/echo-generation-midnight-edition-069026",
+      "ends_at": "2026-07-23T15:00:00Z",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/d85d8cbcd8bd43308d262ba62af5b5ce/echo-generation-midnight-edition-49ac1.jpg",
       "blurb": null,
       "source": "epic",
-      "review_percent": 67,
-      "steam_appid": 2375260,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "gamerpower-3717",
+      "store": "steam",
+      "title": "shapez (Steam) Key Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/shapez-steam-key-giveaway",
+      "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/6a5913d6ea4c8.jpg",
+      "blurb": "Claim your free Steam key for shapez via Alienware Arena! Please note this Steam Key giveaway requires 50 ARP (Arena Reward Points) to claim a key. Fortunately, you can earn ARP daily for free. shapez is a minimalistic factory building game about the automation of shapes.",
+      "source": "gamerpower",
+      "review_percent": 96,
+      "steam_appid": 1318690,
+      "genres": [
+        "Casual",
+        "Indie",
+        "Simulation",
+        "Strategy"
+      ],
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "gamerpower-3716",
+      "store": "steam",
+      "title": "Dwarven Realms (Steam) Key Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/dwarven-realms-steam-key-giveaway",
+      "ends_at": null,
+      "header_image": "https://www.gamerpower.com/offers/1b/6a59119a8eb8d.jpg",
+      "blurb": "Claim free Steam keys for Dwarven Realms! Dwarven Realms is a 3D action-packed ARPG with epic powers and endless possibilities. Please note this Steam Key giveaway requires 10 ARP (Arena Reward Points) to claim a key. Fortunately, you can earn ARP daily for free.",
+      "source": "gamerpower",
+      "review_percent": 82,
+      "steam_appid": 2015240,
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "gamerpower-3715",
+      "store": "epic",
+      "title": "Echo Generation: Midnight Edition (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/echo-generation-midnight-edition-epic-games-giveaway",
+      "ends_at": "2026-07-23T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a58f965b9d43.jpg",
+      "blurb": "Don´t miss this nostalgic adventure! Grab Echo Generation: Midnight Edition for free via Epic Games Store! Echo Generation: Midnight Edition is a fun turn-based adventure game set in the 90s.",
+      "source": "gamerpower",
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "gamerpower-3714",
+      "store": "epic",
+      "title": "Luto (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/luto-epic-games-giveaway",
+      "ends_at": "2026-07-23T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a58f8a468d50.jpg",
+      "blurb": "Claim Luto for free via Epic Games Store! Luto is a 3d first-person psychological experience game where you take on the role of someone unable to leave their home.",
+      "source": "gamerpower",
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "gamerpower-3712",
+      "store": "steam",
+      "title": "Catch Me! (Steam) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/catch-me-steam-giveaway",
+      "ends_at": "2026-07-17T23:59:00Z",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a57bece3e05e.jpg",
+      "blurb": "Catch this giveaway! Grab Catch Me! for free via Steam until 17 Jul.  Catch Me! is a fun 2d 4-player game of tag. Don´t miss it!",
+      "source": "gamerpower",
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
     },
     {
       "id": "gamerpower-3555",
@@ -65,28 +126,6 @@
       "ends_at": "2026-07-20T23:59:00Z",
       "header_image": "https://www.gamerpower.com/offers/1b/6a53a044a87b6.jpg",
       "blurb": "No rush to claim this giveaway. Grab NoRush! - Tower Edition for free via Epic Games Store! NoRush is a 3d casual runner game with unexpected twists.",
-      "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "gamerpower-3707",
-      "store": "epic",
-      "title": "Tattoo Tycoon (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/tattoo-tycoon-epic-games-giveaway",
-      "ends_at": "2026-07-16T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a4fb9f42523a.jpg",
-      "blurb": "Finally you can open your own tattoo parlor! Claim Tattoo Tycoon for free on the Epic Games Store. Tattoo Tycoon is a 3d management game where you become a tattoo artist and run your own shop.",
-      "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "gamerpower-3706",
-      "store": "epic",
-      "title": "Nova Lands (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/nova-lands-epic-games-giveaway",
-      "ends_at": "2026-07-16T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a4fb8cf73513.jpg",
-      "blurb": "Start building your factory today! Grab Nova Lands for free via Epic Games Store! Nova Lands is a cool 2d factory building and island management game. Don´t miss it!",
       "source": "gamerpower",
       "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
@@ -222,6 +261,69 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
+      "id": "itad-920c69f9fdf1",
+      "store": "epic",
+      "title": "The Ouroboros King free on MOBILE from EGS on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16399/",
+      "ends_at": null,
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2096510/library_600x900_2x.jpg",
+      "blurb": "The Ouroboros King",
+      "source": "itad",
+      "review_percent": 81,
+      "steam_appid": 2096510,
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "itad-0e2b83ac494b",
+      "store": "epic",
+      "title": "Echo Generation: Midnight Edition free on EGS on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16397/",
+      "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/echo-generation-midnight-edition/info/\">Echo Generation: Midnight Edition</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 23 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/echo-generation-midnight-edition-069026>go to giveaway</a>",
+      "source": "itad",
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "itad-df07e9ed2270",
+      "store": "epic",
+      "title": "LUTO free on EGS on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16398/",
+      "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/luto/info/\">Luto</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 23 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/luto-0a4ab3>go to giveaway</a>",
+      "source": "itad",
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "itad-840d262ba7fa",
+      "store": "steam",
+      "title": "The Mound: Omen of Cthulhu: Lost Explorers Swords Pack on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16392/",
+      "ends_at": null,
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4630450/8a73f1c23566bed776b54e4eade74ee90b47915f/header.jpg?t=1784109673",
+      "blurb": "The Mound: Omen of Cthulhu - Lost Explorers&#039; Swords Pack",
+      "source": "itad",
+      "review_percent": 100,
+      "steam_appid": 4630450,
+      "genres": [
+        "Action",
+        "Adventure"
+      ],
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
+      "id": "itad-928b6c2361a4",
+      "store": "steam",
+      "title": "Catch Me -  FREE on Steam on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16391/",
+      "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/catch-me/info/\">Catch Me</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Fri, 17 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1741160/Catch_Me/>go to giveaway</a>",
+      "source": "itad",
+      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+    },
+    {
       "id": "itad-d263067e9e67",
       "store": "epic",
       "title": "Together After Dark free on EGS on Epic Game Store",
@@ -261,45 +363,6 @@
       "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
-      "id": "itad-cb21d42d706e",
-      "store": "epic",
-      "title": "Princess Farmer free on Mobile from EGS on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16373/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1320490/library_600x900_2x.jpg",
-      "blurb": "Princess Farmer",
-      "source": "itad",
-      "review_percent": 95,
-      "steam_appid": 1320490,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "itad-90df86960d93",
-      "store": "epic",
-      "title": "Tattoo Tycoon - FREE on Epic Games on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16370/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2375260/library_600x900_2x.jpg",
-      "blurb": "Tattoo Tycoon",
-      "source": "itad",
-      "review_percent": 67,
-      "steam_appid": 2375260,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "itad-75d1019b80eb",
-      "store": "epic",
-      "title": "Nova Lands - FREE on Epic Games on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16369/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1501610/library_600x900_2x.jpg",
-      "blurb": "Nova Lands",
-      "source": "itad",
-      "review_percent": 89,
-      "steam_appid": 1501610,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
       "id": "itad-b2fe2af076cf",
       "store": "other",
       "title": "Game of Mafia - FREE on IndieGala on IndieGala Store",
@@ -319,7 +382,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16348/",
       "ends_at": null,
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1300430/header.jpg?t=1687266777",
-      "blurb": "Whiskey.Mafia. Leo&#039;s Family",
+      "blurb": "<a href=\"https://isthereanydeal.com/game/whiskey-mafia-leos-family/info/\">Whiskey.Mafia. Leo&#039;s Family</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/whiskeymafia-leos-family>go to giveaway</a>",
       "source": "itad",
       "review_percent": 68,
       "steam_appid": 1300430,

@@ -88,33 +88,32 @@ from shared.install_paths import (
     load_built_manifest,
     serve_built_frontend,
     static_root,
-static_root,
 )
 
 if __name__ == "__main__":
-from baklog_fetcher_dispatch import exit_if_fetcher_child
+    from baklog_fetcher_dispatch import exit_if_fetcher_child
 
-exit_if_fetcher_child()
+    exit_if_fetcher_child()
 
-# Apply BAKLOG_DEV_FROZEN_PARITY=1 patches before any path resolution.
-# Must come after the fetcher-child exit guard but before ROOT = data_root().
-from shared.dev_frozen_parity import apply_frozen_parity_patches
+    # Apply BAKLOG_DEV_FROZEN_PARITY=1 patches before any path resolution.
+    # Must come after the fetcher-child exit guard but before ROOT = data_root().
+    from shared.dev_frozen_parity import apply_frozen_parity_patches
 
-apply_frozen_parity_patches()
+    apply_frozen_parity_patches()
 
 
 def _warn_built_manifest_version_mismatch() -> None:
-if not serve_built_frontend():
-    return
-manifest = load_built_manifest()
-built_ver = str(manifest.get("version") or "").strip()
-app_ver = _app_version()
-if built_ver and built_ver != app_ver:
-    print(
-        f"WARNING: dist/manifest.json version {built_ver} != app {app_ver} "
-        f"— run npm run build before testing packaged frontend",
-        flush=True,
-    )
+    if not serve_built_frontend():
+        return
+    manifest = load_built_manifest()
+    built_ver = str(manifest.get("version") or "").strip()
+    app_ver = _app_version()
+    if built_ver and built_ver != app_ver:
+        print(
+            f"WARNING: dist/manifest.json version {built_ver} != app {app_ver} "
+            f"— run npm run build before testing packaged frontend",
+            flush=True,
+        )
 
 ROOT = data_root()
 try:

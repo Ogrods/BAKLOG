@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 
@@ -56,7 +55,7 @@ def apply_frozen_parity_patches() -> bool:
     os.environ.setdefault("BAKLOG_DATA_DIR", parity_root)
 
     print(
-        f"[dev_frozen_parity] BAKLOG_DEV_FROZEN_PARITY=1 active",
+        "[dev_frozen_parity] BAKLOG_DEV_FROZEN_PARITY=1 active",
         file=sys.stderr,
         flush=True,
     )

@@ -1,6 +1,18 @@
 {
-  "generated_at": "2026-07-14T05:38:16.082601+00:00",
+  "generated_at": "2026-07-16T19:55:52.196316+00:00",
   "items": [
+    {
+      "id": "gamerpower-3709",
+      "store": "epic",
+      "title": "NoRush! - Tower Edition",
+      "claim_url": "https://www.gamerpower.com/open/norush-tower-edition-epic-games-giveaways",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a53a044a87b6.jpg",
+      "genres": [],
+      "blurb": "No rush to claim this giveaway. Grab NoRush! - Tower Edition for free via Epic Games Store! NoRush is a 3d casual runner game with unexpected twists.",
+      "ends_at": "2026-07-20T23:59:00Z",
+      "source": "gamerpower",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
     {
       "id": "gamerpower-3498",
       "store": "other",
@@ -55,6 +67,38 @@
       "first_seen": "2026-07-14T04:29:43Z"
     },
     {
+      "id": "itad-920c69f9fdf1",
+      "store": "epic",
+      "title": "The Ouroboros King",
+      "claim_url": "https://isthereanydeal.com/giveaways/16399/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2096510/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "The Ouroboros King",
+      "ends_at": "2026-07-30T19:44:35Z",
+      "steam_appid": 2096510,
+      "review_percent": 81,
+      "source": "itad",
+      "first_seen": "2026-07-16T19:44:35Z"
+    },
+    {
+      "id": "itad-840d262ba7fa",
+      "store": "steam",
+      "title": "The Mound: Omen of Cthulhu: Lost Explorers Swords Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16392/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4630450/8a73f1c23566bed776b54e4eade74ee90b47915f/header.jpg?t=1784109673",
+      "genres": [
+        "Action",
+        "Adventure"
+      ],
+      "blurb": "The Mound: Omen of Cthulhu - Lost Explorers&#039; Swords Pack",
+      "ends_at": "2026-07-30T19:44:35Z",
+      "steam_appid": 4630450,
+      "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-07-16T19:44:35Z",
+      "premium_only": true
+    },
+    {
       "id": "itad-d263067e9e67",
       "store": "epic",
       "title": "Together After Dark",
@@ -97,18 +141,57 @@
       "first_seen": "2026-07-14T04:29:43Z"
     },
     {
-      "id": "itad-cb21d42d706e",
-      "store": "epic",
-      "title": "Princess Farmer",
-      "claim_url": "https://isthereanydeal.com/giveaways/16373/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1320490/library_600x900_2x.jpg",
+      "id": "itad-b2fe2af076cf",
+      "store": "indiegala",
+      "title": "Game of Mafia",
+      "claim_url": "https://isthereanydeal.com/giveaways/16362/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1485340/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Princess Farmer",
+      "blurb": "Game Of Mafia",
       "ends_at": "2026-07-28T04:29:43Z",
-      "steam_appid": 1320490,
-      "review_percent": 95,
+      "steam_appid": 1485340,
+      "review_percent": 70,
       "source": "itad",
       "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-0a93135bfee3",
+      "store": "itch",
+      "title": "Slime King",
+      "claim_url": "https://isthereanydeal.com/giveaways/16322/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4492760/1e33df18bd8306a81a37cf52d7da39beb8869224/header.jpg?t=1778687408",
+      "genres": [],
+      "blurb": "Slime King itch.io",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 4492760,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
+    },
+    {
+      "id": "itad-0c69ed1f1bd8",
+      "store": "epic",
+      "title": "Rogue Waters",
+      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Rogue Waters",
+      "ends_at": null,
+      "steam_appid": 1691190,
+      "review_percent": 75,
+      "first_seen": "2026-07-14T05:01:02Z"
+    },
+    {
+      "id": "itad-b07aac9ebd26",
+      "store": "epic",
+      "title": "Wytchwood",
+      "claim_url": "https://isthereanydeal.com/giveaways/16242/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/729000/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Wytchwood",
+      "ends_at": null,
+      "steam_appid": 729000,
+      "review_percent": 93,
+      "first_seen": "2026-07-14T05:01:02Z"
     },
     {
       "id": "itad-90df86960d93",
@@ -139,43 +222,16 @@
       "first_seen": "2026-07-14T04:29:43Z"
     },
     {
-      "id": "itad-b2fe2af076cf",
-      "store": "other",
-      "title": "Game of Mafia",
-      "claim_url": "https://isthereanydeal.com/giveaways/16362/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1485340/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Game Of Mafia",
-      "ends_at": "2026-07-28T04:29:43Z",
-      "steam_appid": 1485340,
-      "review_percent": 70,
-      "source": "itad",
-      "first_seen": "2026-07-14T04:29:43Z"
-    },
-    {
-      "id": "itad-0a93135bfee3",
-      "store": "itch",
-      "title": "Slime King",
-      "claim_url": "https://isthereanydeal.com/giveaways/16322/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4492760/1e33df18bd8306a81a37cf52d7da39beb8869224/header.jpg?t=1778687408",
-      "genres": [],
-      "blurb": "Slime King itch.io",
-      "ends_at": "2026-07-28T04:29:43Z",
-      "steam_appid": 4492760,
-      "source": "itad",
-      "first_seen": "2026-07-14T04:29:43Z"
-    },
-    {
-      "id": "itad-b07aac9ebd26",
+      "id": "itad-073a56345192",
       "store": "epic",
-      "title": "Wytchwood",
-      "claim_url": "https://isthereanydeal.com/giveaways/16242/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/729000/library_600x900_2x.jpg",
+      "title": "Songs of Conquest",
+      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Wytchwood",
+      "blurb": "Songs of Conquest",
       "ends_at": null,
-      "steam_appid": 729000,
-      "review_percent": 93,
+      "steam_appid": 867210,
+      "review_percent": 86,
       "first_seen": "2026-07-14T05:01:02Z"
     },
     {
@@ -193,30 +249,18 @@
       "first_seen": "2026-07-14T04:29:43Z"
     },
     {
-      "id": "itad-0c69ed1f1bd8",
+      "id": "itad-cb21d42d706e",
       "store": "epic",
-      "title": "Rogue Waters",
-      "claim_url": "https://isthereanydeal.com/giveaways/16240/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1691190/library_600x900_2x.jpg",
+      "title": "Princess Farmer",
+      "claim_url": "https://isthereanydeal.com/giveaways/16373/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1320490/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Rogue Waters",
-      "ends_at": null,
-      "steam_appid": 1691190,
-      "review_percent": 75,
-      "first_seen": "2026-07-14T05:01:02Z"
-    },
-    {
-      "id": "itad-073a56345192",
-      "store": "epic",
-      "title": "Songs of Conquest",
-      "claim_url": "https://isthereanydeal.com/giveaways/16239/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/867210/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Songs of Conquest",
-      "ends_at": null,
-      "steam_appid": 867210,
-      "review_percent": 86,
-      "first_seen": "2026-07-14T05:01:02Z"
+      "blurb": "Princess Farmer",
+      "ends_at": "2026-07-28T04:29:43Z",
+      "steam_appid": 1320490,
+      "review_percent": 95,
+      "source": "itad",
+      "first_seen": "2026-07-14T04:29:43Z"
     }
   ],
   "attribution": [

@@ -1,6 +1,6 @@
 """Apply the 3 remaining fixes for the pre-beta audit."""
+import py_compile
 import sys
-import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -92,9 +92,10 @@ content = content.replace(old_exemption, new_exemption)
 
 open(path3, "w", encoding="utf-8").write(content)
 print("server.py: OK")
+print("server.py: OK")
 
 # ---- Verify syntax -----------------------------------------------------
-import py_compile
+
 for path, label in [(path1, "humble"), (path2, "build_free_claims"), (path3, "server")]:
     try:
         py_compile.compile(str(path), doraise=True)

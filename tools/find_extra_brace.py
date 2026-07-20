@@ -1,7 +1,6 @@
 """Find the precise location of the extra closing brace in buildMarqueeItems."""
-import re
 
-with open(r'c:\Users\DanOg\Documents\my-docs\coding-stuff\steam-backlog\js\dashboard-insights.js', 'r', encoding='utf-8') as f:
+with open(r'c:\Users\DanOg\Documents\my-docs\coding-stuff\steam-backlog\js\dashboard-insights.js', encoding='utf-8') as f:
     lines = f.readlines()
 
 # Track brace depth per-line, skipping strings/template literals

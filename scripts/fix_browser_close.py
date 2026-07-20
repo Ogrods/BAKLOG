@@ -6,7 +6,8 @@ For each file:
 3. Before the next top-level 'def'/'class' after the last 'return'/'raise' in the
    with block, insert 'finally:' + daemon close at the try indent level.
 """
-import re, subprocess, sys
+import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,8 +32,10 @@ for path_rel, import_before, with_line, def_line in FIXES:
         if line.strip() == import_before and "threading" not in line:
             lines.insert(i + 1, "import threading")
             # Adjust line numbers after insertion
-            if with_line >= i + 1: with_line += 1
-            if def_line >= i + 1: def_line += 1
+            if with_line >= i + 1:
+                with_line += 1
+            if def_line >= i + 1:
+                def_line += 1
             break
     
     # 2. Parse the with line to get var name and indent
@@ -131,7 +134,9 @@ for path_rel, import_before in [
             func_indent = len(indent)
             end_func = len(lines)
             for k in range(i + 1, len(lines)):
-                if lines[k].strip().startswith(("def ", "class ")) and (len(lines[k]) - len(lines[k].lstrip())) <= func_indent:
+                line = lines[k]
+                stripped = line.strip()
+                if stripped.startswith(("def ", "class ")) and (len(line) - len(line.lstrip())) <= func_indent:
                     end_func = k
                     break
             
@@ -148,7 +153,11 @@ for path_rel, import_before in [
             insert_pos = end_func
             if insert_pos > 0 and lines[insert_pos - 1].strip() == "":
                 insert_pos -= 1
-            lines.insert(insert_pos, f"{' ' * (func_indent + 4)}threading.Thread(target={var}.close, daemon=True).start()")
+            close_line = (
+                f"{' ' * (func_indent + 4)}threading.Thread"
+                f"(target={var}.close, daemon=True).start()"
+            )
+            lines.insert(insert_pos, close_line)
             lines.insert(insert_pos, f"{' ' * func_indent}finally:")
             lines.insert(insert_pos, "")
             

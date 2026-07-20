@@ -1,5 +1,4 @@
 """Minimal patch: change steamSearch and steamAppReviews to use local proxy."""
-import sys
 path = "js/add-game-modal.js"
 content = open(path, encoding="utf-8").read()
 

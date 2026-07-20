@@ -1,6 +1,5 @@
-import re
 
-with open(r'c:\Users\DanOg\Documents\my-docs\coding-stuff\steam-backlog\js\dashboard-insights.js', 'r', encoding='utf-8') as f:
+with open(r'c:\Users\DanOg\Documents\my-docs\coding-stuff\steam-backlog\js\dashboard-insights.js', encoding='utf-8') as f:
     lines = f.readlines()
 
 depth = 0

@@ -1,5 +1,4 @@
 """Bump version from 0.8.32 to 0.8.33 in all 3 files."""
-import re
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]

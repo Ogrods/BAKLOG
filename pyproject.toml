@@ -62,3 +62,8 @@ select = ["E", "F", "I", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/audit_*.py" = ["E501", "E402", "F841"]
+"scripts/bump_version.py" = ["F401"]
+"scripts/fix_browser_close.py" = ["E501", "E701"]
+"scripts/fix_remaining_items.py" = ["E402"]
+"scripts/patch_steam_proxy.py" = ["F401"]
+"tools/*.py" = ["E501", "E701", "F401", "I001", "UP015"]

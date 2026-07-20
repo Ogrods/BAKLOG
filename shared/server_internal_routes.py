@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
 from typing import Any
@@ -561,3 +563,80 @@ def handle_internal_sponsors_put(handler: SimpleHTTPRequestHandler) -> None:
     else:
         count = len(payload.get("items") or [])
     s._send_json(handler, HTTPStatus.OK, {"ok": True, "items": count, "ads": count})
+
+
+def probe_import_health(module_name: str) -> dict:
+    """Test whether a module can be imported; return ok + error string."""
+    import importlib
+
+    try:
+        importlib.import_module(module_name)
+        return {"module": module_name, "ok": True, "error": None}
+    except Exception as exc:
+        return {"module": module_name, "ok": False, "error": str(exc)}
+
+
+def handle_internal_frozen_diag(handler: SimpleHTTPRequestHandler) -> None:
+    """GET /api/internal/frozen-diag — return frozen-environment diagnostics.
+
+    Only available when BAKLOG_ADMIN=1.
+    """
+    s = _srv()
+
+    # Import health for known-problematic modules on frozen builds
+    import_health = [
+        probe_import_health("browser_cookie3"),
+        probe_import_health("websocket"),
+        probe_import_health("websocket._app"),
+        probe_import_health("auth.cdp_browser"),
+        probe_import_health("clients.battlenet_client"),
+        probe_import_health("clients.amazon_web_client"),
+        probe_import_health("shared.supabase_auth"),
+    ]
+
+    # Profile auth dir listing for each browser-based provider
+    profile_auth_dirs = {}
+    try:
+        root = s.data_root()
+        active = s.get_active_profile_id()
+        if active:
+            for provider in ("battlenet", "amazon", "nintendo", "epic", "gog", "humble"):
+                pdir = root / "profiles" / active / "cache" / "auth" / "profiles" / provider
+                if pdir.is_dir():
+                    profile_auth_dirs[provider] = {
+                        "exists": True,
+                        "files": [str(f.name) for f in pdir.iterdir() if f.is_file()],
+                    }
+                else:
+                    profile_auth_dirs[provider] = {"exists": False, "files": []}
+    except Exception as exc:
+        profile_auth_dirs = {"error": str(exc)}
+
+    # Build info from install_paths
+    from shared.install_paths import (
+        bundle_root,
+        data_root,
+        frozen_bundle_dir,
+        is_frozen,
+        is_portable_frozen,
+        runtime_label,
+        serve_built_frontend,
+    )
+
+    diag = {
+        "frozen": is_frozen(),
+        "executable": str(sys.executable),
+        "sys_path": list(sys.path),
+        "bundle_root": str(bundle_root()),
+        "data_root": str(data_root()),
+        "frozen_bundle_dir": str(frozen_bundle_dir()),
+        "portable": is_portable_frozen(),
+        "runtime_label": runtime_label(),
+        "serve_built_frontend": serve_built_frontend(),
+        "platform": sys.platform,
+        "python_version": sys.version,
+        "import_health": import_health,
+        "profile_auth_dirs": profile_auth_dirs,
+    }
+
+    s._send_json(handler, HTTPStatus.OK, diag)

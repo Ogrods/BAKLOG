@@ -78,4 +78,14 @@ if ($IsWindows -or $env:OS -match "Windows") {
     }
 }
 
+# Frozen parity tests (requires BAKLOG.exe in release/)
+$FrozenExe = Join-Path $PSScriptRoot "..\release\BAKLOG\BAKLOG.exe"
+if (Test-Path $FrozenExe) {
+    Write-Host "==> frozen_connect_smoke"
+    & $Python (Join-Path $PSScriptRoot "frozen_connect_smoke.py") --exe $FrozenExe
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+} else {
+    Write-Host "==> frozen_connect_smoke (SKIPPED - no frozen exe at $FrozenExe)"
+}
+
 exit 0

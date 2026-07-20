@@ -1,15 +1,15 @@
-import { baklogFetch, urlWithStreamTicket } from './api-client.js';
-import { isAccountAuthMode, isPro } from './auth-gate.js';
-import { isPageHidden, registerPausable } from './visibility.js';
-import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
-import { bindEscapeClose, trapFocus } from './focus-trap.js';
-import { FETCHER_AUTH_PROVIDER } from './fetcher-registry.js';
-import { startMetrics, stopMetrics } from './anon-metrics.js';
-import { savePrefs } from './prefs.js';
-import { state } from './state.js';
-import { storeLogoHtml } from './store-logos.js';
-import { STORE_BRAND_COLORS } from './store-brand-colors.js';
-import { formatPlatformList } from './platform-labels.js';
+import { baklogFetch, urlWithStreamTicket } from "./api-client.js";
+import { isAccountAuthMode, isPro } from "./auth-gate.js";
+import { isPageHidden, registerPausable } from "./visibility.js";
+import { escapeAttr, escapeHtml, isSafeHttpUrl } from "./dom-util.js";
+import { bindEscapeClose, trapFocus } from "./focus-trap.js";
+import { FETCHER_AUTH_PROVIDER } from "./fetcher-registry.js";
+import { startMetrics, stopMetrics } from "./anon-metrics.js";
+import { savePrefs } from "./prefs.js";
+import { state } from "./state.js";
+import { storeLogoHtml } from "./store-logos.js";
+import { STORE_BRAND_COLORS } from "./store-brand-colors.js";
+import { formatPlatformList } from "./platform-labels.js";
 import {
   authStatusLoaded,
   connectedProviderCount,
@@ -19,7 +19,7 @@ import {
   isProviderConnected,
   providerForFetcher,
   providerStatus,
-} from './connections-status.js';
+} from "./connections-status.js";
 import {
   STATUS_CLASS,
   STATUS_LABEL,
@@ -34,7 +34,7 @@ import {
   renderConnRailHtml,
   sourceFacet,
   syncConnRailSelection,
-} from './connections-rail.js';
+} from "./connections-rail.js";
 
 export { FETCHER_AUTH_PROVIDER };
 export {
@@ -51,22 +51,27 @@ export {
   groupRepFor,
   combinedGroupStatus,
   groupRailPill,
-} from './connections-rail.js';
+} from "./connections-rail.js";
 
 let _chromiumAvailable = true;
+let _serverFrozen = false;
 
 const LOCAL_PROVIDER_FOOTER = {
   amazon: {
-    connected: 'Auto-detected from Amazon Games launcher. Open the app and sync, then run the Amazon fetcher for new games.',
-    disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use Prime web',
+    connected:
+      "Auto-detected from Amazon Games launcher. Open the app and sync, then run the Amazon fetcher for new games.",
+    disconnected:
+      "Disconnected - cached library stays visible. Connect to refresh, or use Prime web",
   },
   gog_galaxy: {
-    connected: 'Auto-detected from GOG Galaxy on this PC',
-    disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use GOG (web)',
+    connected: "Auto-detected from GOG Galaxy on this PC",
+    disconnected:
+      "Disconnected - cached library stays visible. Connect to refresh, or use GOG (web)",
   },
   itch_local: {
-    connected: 'Auto-detected from the itch desktop app',
-    disconnected: 'Disconnected - cached library stays visible. Connect to refresh, or use an API key',
+    connected: "Auto-detected from the itch desktop app",
+    disconnected:
+      "Disconnected - cached library stays visible. Connect to refresh, or use an API key",
   },
 };
 
@@ -75,8 +80,8 @@ export function localProviderFooterCopy(providerKey, connected) {
   const copy = LOCAL_PROVIDER_FOOTER[providerKey];
   if (!copy) {
     return connected
-      ? 'Auto-detected locally on this PC'
-      : 'Local source hidden - Connect to use it again';
+      ? "Auto-detected locally on this PC"
+      : "Local source hidden - Connect to use it again";
   }
   return connected ? copy.connected : copy.disconnected;
 }
@@ -89,8 +94,8 @@ let pollTimer = null;
 // True while refreshConnections() is running, so the baklog:auth-status listener
 // (below) doesn't redundantly re-render — refreshConnections renders itself.
 let _connRefreshInFlight = false;
-let _connRenderFingerprint = '';
-let _connAuthFingerprint = '';
+let _connRenderFingerprint = "";
+let _connAuthFingerprint = "";
 
 const POST_CONNECT_FAST_POLL_MS = 3000;
 const POST_CONNECT_FAST_POLL_MAX_MS = 30_000;
@@ -102,119 +107,102 @@ let noteSaveTimer = null;
 
 let chromeWired = false;
 
-let _selectedKey = 'steam';
+let _selectedKey = "steam";
 
 let _secretsCorrupt = false;
 
 const CONN_HELP_LINKS = {
   steam: {
-    url: 'https://steamcommunity.com/dev/apikey',
-    before: 'Register for a Steam Web API key ',
-    linkText: 'here',
-    after: ' first, then sign in to connect.',
+    url: "https://steamcommunity.com/dev/apikey",
+    before: "Register for a Steam Web API key ",
+    linkText: "here",
+    after: " first, then sign in to connect.",
   },
 };
 
-
-
 const PROVIDER_BRAND = {
-  steam: { color: STORE_BRAND_COLORS.steam, initial: 'S' },
-  gog: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
-  gog_galaxy: { color: STORE_BRAND_COLORS.gog, initial: 'G' },
-  psn: { color: STORE_BRAND_COLORS.psn, initial: 'P' },
-  epic: { color: STORE_BRAND_COLORS.epic, initial: 'E' },
-  epic_wishlist: { color: STORE_BRAND_COLORS.epic, initial: 'E' },
-  amazon: { color: STORE_BRAND_COLORS.amazon, initial: 'A' },
-  amazon_web: { color: STORE_BRAND_COLORS.amazon, initial: 'A' },
-  xbox: { color: STORE_BRAND_COLORS.xbox, initial: 'X' },
-  xbox_wishlist: { color: STORE_BRAND_COLORS.xbox, initial: 'X' },
-  battlenet: { color: STORE_BRAND_COLORS.battlenet, initial: 'B' },
-  nintendo: { color: STORE_BRAND_COLORS.nintendo, initial: 'N' },
-  nintendo_wishlist: { color: STORE_BRAND_COLORS.nintendo, initial: 'N' },
-  ubisoft: { color: STORE_BRAND_COLORS.ubisoft, initial: 'U' },
-  humble: { color: STORE_BRAND_COLORS.humble, initial: 'H' },
-  ea: { color: STORE_BRAND_COLORS.ea, initial: 'EA' },
-  itch: { color: STORE_BRAND_COLORS.itch, initial: 'I' },
-  itch_local: { color: STORE_BRAND_COLORS.itch, initial: 'I' },
-  itad: { color: '#22d3ee', initial: 'I' },
+  steam: { color: STORE_BRAND_COLORS.steam, initial: "S" },
+  gog: { color: STORE_BRAND_COLORS.gog, initial: "G" },
+  gog_galaxy: { color: STORE_BRAND_COLORS.gog, initial: "G" },
+  psn: { color: STORE_BRAND_COLORS.psn, initial: "P" },
+  epic: { color: STORE_BRAND_COLORS.epic, initial: "E" },
+  epic_wishlist: { color: STORE_BRAND_COLORS.epic, initial: "E" },
+  amazon: { color: STORE_BRAND_COLORS.amazon, initial: "A" },
+  amazon_web: { color: STORE_BRAND_COLORS.amazon, initial: "A" },
+  xbox: { color: STORE_BRAND_COLORS.xbox, initial: "X" },
+  xbox_wishlist: { color: STORE_BRAND_COLORS.xbox, initial: "X" },
+  battlenet: { color: STORE_BRAND_COLORS.battlenet, initial: "B" },
+  nintendo: { color: STORE_BRAND_COLORS.nintendo, initial: "N" },
+  nintendo_wishlist: { color: STORE_BRAND_COLORS.nintendo, initial: "N" },
+  ubisoft: { color: STORE_BRAND_COLORS.ubisoft, initial: "U" },
+  humble: { color: STORE_BRAND_COLORS.humble, initial: "H" },
+  ea: { color: STORE_BRAND_COLORS.ea, initial: "EA" },
+  itch: { color: STORE_BRAND_COLORS.itch, initial: "I" },
+  itch_local: { color: STORE_BRAND_COLORS.itch, initial: "I" },
+  itad: { color: "#22d3ee", initial: "I" },
 };
 
-
-
 function primaryLabel(st) {
+  if (st === "connected" || st === "expired") return "Reconnect";
 
-  if (st === 'connected' || st === 'expired') return 'Reconnect';
+  if (st === "unverified") return "Verify";
 
-  if (st === 'unverified') return 'Verify';
-
-  return 'Connect';
-
+  return "Connect";
 }
 
-
-
 function ensureSelectedKey() {
-  if (getAuthStatusSnapshot().some(p => p.key === _selectedKey)) return;
+  if (getAuthStatusSnapshot().some((p) => p.key === _selectedKey)) return;
   const rep = groupRepFor(_selectedKey);
   if (
-    PROVIDER_GROUPS[rep]
-    && PROVIDER_GROUPS[rep].members.some(k => getAuthStatusSnapshot().some(p => p.key === k))
+    PROVIDER_GROUPS[rep] &&
+    PROVIDER_GROUPS[rep].members.some((k) =>
+      getAuthStatusSnapshot().some((p) => p.key === k),
+    )
   ) {
     _selectedKey = rep;
     return;
   }
-  const steam = getAuthStatusSnapshot().find(p => p.key === 'steam');
-  _selectedKey = steam?.key || getAuthStatusSnapshot()[0]?.key || 'steam';
+  const steam = getAuthStatusSnapshot().find((p) => p.key === "steam");
+  _selectedKey = steam?.key || getAuthStatusSnapshot()[0]?.key || "steam";
 }
 
-
-
 function renderHero() {
+  const countEl = document.getElementById("connHeroCount");
 
-  const countEl = document.getElementById('connHeroCount');
-
-  const fillEl = document.getElementById('connProgressFill');
+  const fillEl = document.getElementById("connProgressFill");
 
   if (!countEl || !fillEl) return;
 
   if (!getAuthStatusSnapshot().length) {
+    countEl.textContent = "Loading connections…";
 
-    countEl.textContent = 'Loading connections…';
-
-    fillEl.style.width = '0%';
+    fillEl.style.width = "0%";
 
     return;
-
   }
 
   const entries = railEntries();
 
-  const connected = entries.filter(e => e.status === 'connected').length;
+  const connected = entries.filter((e) => e.status === "connected").length;
 
   const total = entries.length;
 
   countEl.textContent = `${connected} of ${total} stores connected`;
 
-  fillEl.style.width = total ? `${(connected / total) * 100}%` : '0%';
-
+  fillEl.style.width = total ? `${(connected / total) * 100}%` : "0%";
 }
 
-
-
 function renderOnboard() {
-
-  const el = document.getElementById('connOnboard');
+  const el = document.getElementById("connOnboard");
 
   if (!el) return;
 
   if (!getAuthStatusSnapshot().length || connectedProviderCount() > 0) {
-
-    el.innerHTML = '';
+    el.innerHTML = "";
 
     el.hidden = true;
 
     return;
-
   }
 
   el.hidden = false;
@@ -232,27 +220,23 @@ function renderOnboard() {
       <p class="conn-onboard-muted">or pick any store from the list below</p>
 
     </div>`;
-
 }
 
-
-
 function buildFormFields(p) {
-
-  return (p.form_fields || []).map(f => `
+  return (p.form_fields || [])
+    .map(
+      (f) => `
 
     <label>${escapeHtml(f.label)}
 
-      <input type="${f.secret ? 'password' : 'text'}" data-field="${escapeAttr(f.key)}" placeholder="${escapeAttr(f.placeholder || '')}" autocomplete="off" />
+      <input type="${f.secret ? "password" : "text"}" data-field="${escapeAttr(f.key)}" placeholder="${escapeAttr(f.placeholder || "")}" autocomplete="off" />
 
-    </label>`).join('');
-
+    </label>`,
+    )
+    .join("");
 }
 
-
-
 function buildFormPanel(p) {
-
   return `
 
     <div class="conn-paste-panel">
@@ -268,9 +252,7 @@ function buildFormPanel(p) {
       </div>
 
     </div>`;
-
 }
-
 
 /**
  * Browser providers connect via the primary button; their form field is only a
@@ -278,9 +260,10 @@ function buildFormPanel(p) {
  * required step.
  */
 function buildFallbackPanel(p) {
-  const epicBrowser = p.key === 'epic'
-    ? `<button type="button" class="conn-open-url" data-epic-oauth data-provider="epic" title="Epic library OAuth in browser">Sign in with your browser instead</button>`
-    : '';
+  const epicBrowser =
+    p.key === "epic"
+      ? `<button type="button" class="conn-open-url" data-epic-oauth data-provider="epic" title="Epic library OAuth in browser">Sign in with your browser instead</button>`
+      : "";
   return `
     <details class="conn-fallback">
       <summary class="conn-fallback-summary">
@@ -294,17 +277,15 @@ function buildFallbackPanel(p) {
     </details>`;
 }
 
-
 function disconnectBtnHtml(p, st) {
-  const show = st !== 'disconnected' && st !== 'unverified' && p.kind !== 'local';
+  const show =
+    st !== "disconnected" && st !== "unverified" && p.kind !== "local";
   return show
     ? `<button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
-    : '';
+    : "";
 }
 
-
 function buildCardFooter(p, st) {
-
   if (p.available === false) {
     const plats = formatPlatformList(p.platforms);
     return `
@@ -313,24 +294,22 @@ function buildCardFooter(p, st) {
       </div>`;
   }
 
-  if (p.kind === 'local') {
-    const connected = st === 'connected';
+  if (p.kind === "local") {
+    const connected = st === "connected";
     const label = localProviderFooterCopy(p.key, connected);
     return `
       <div class="conn-card-footer">
-        ${connected
-          ? `<span class="conn-local-label">${escapeHtml(label)}</span>
+        ${
+          connected
+            ? `<span class="conn-local-label">${escapeHtml(label)}</span>
              <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
-          : `<span class="conn-local-label">${escapeHtml(label)}</span>
+            : `<span class="conn-local-label">${escapeHtml(label)}</span>
              <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}" title="Enable ${escapeAttr(p.label)} from local launcher data">Connect</button>`
         }
       </div>`;
   }
 
-
-
-  if (p.kind === 'manual') {
-
+  if (p.kind === "manual") {
     return `
 
       <div class="conn-card-footer">
@@ -340,10 +319,7 @@ function buildCardFooter(p, st) {
         ${disconnectBtnHtml(p, st)}
 
       </div>`;
-
   }
-
-
 
   const label = primaryLabel(st);
 
@@ -356,78 +332,71 @@ function buildCardFooter(p, st) {
       ${disconnectBtnHtml(p, st)}
 
     </div>`;
-
 }
 
-
-
 async function pasteFromClipboard(card) {
+  const log = card?.querySelector(".conn-log");
 
-  const log = card?.querySelector('.conn-log');
-
-  const input = card?.querySelector('.conn-paste-panel [data-field]');
+  const input = card?.querySelector(".conn-paste-panel [data-field]");
 
   if (!input) return;
 
   try {
-
     const text = await navigator.clipboard.readText();
 
-    input.value = (text || '').trim();
+    input.value = (text || "").trim();
 
     if (log) {
+      log.classList.remove("hidden");
 
-      log.classList.remove('hidden');
-
-      log.textContent = 'Pasted from clipboard.';
-
+      log.textContent = "Pasted from clipboard.";
     }
-
   } catch {
-
     if (log) {
+      log.classList.remove("hidden");
 
-      log.classList.remove('hidden');
-
-      log.textContent = 'Could not read clipboard - paste into the field manually (Ctrl+V).';
-
+      log.textContent =
+        "Could not read clipboard - paste into the field manually (Ctrl+V).";
     }
-
   }
-
 }
-
-
 
 function buildConnHelpLink(key) {
   const help = CONN_HELP_LINKS[key];
-  if (!help || !isSafeHttpUrl(help.url)) return '';
+  if (!help || !isSafeHttpUrl(help.url)) return "";
   return `<p class="conn-help">${escapeHtml(help.before)}<a class="conn-help-link" href="${escapeAttr(help.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(help.linkText)}</a>${escapeHtml(help.after)}</p>`;
 }
 
 function buildCardHtml(p) {
-
-  const st = p.status || 'disconnected';
+  const st = p.status || "disconnected";
 
   const pillSt = displayStatus(st);
 
   const storeKey = connStoreKey(p);
 
-  const expiry = p.expiry_days ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>` : '';
+  const expiry = p.expiry_days
+    ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>`
+    : "";
 
-  const note = STATUS_NOTE[st] ? `<p class="conn-note">${escapeHtml(STATUS_NOTE[st])}</p>` : '';
+  const note = STATUS_NOTE[st]
+    ? `<p class="conn-note">${escapeHtml(STATUS_NOTE[st])}</p>`
+    : "";
 
   const helpLink = buildConnHelpLink(p.key);
 
-  const err = p.last_error ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>` : '';
+  const err = p.last_error
+    ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>`
+    : "";
 
   const tips = (p.tips || []).length
-    ? `<ul class="conn-tips">${p.tips.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
-    : '';
+    ? `<ul class="conn-tips">${p.tips.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
+    : "";
 
   const hasFormFields = (p.form_fields || []).length > 0;
 
-  const showFormPanel = hasFormFields && (p.kind === 'form' || p.kind === 'manual' || p.kind === 'browser');
+  const showFormPanel =
+    hasFormFields &&
+    (p.kind === "form" || p.kind === "manual" || p.kind === "browser");
 
   const facets = `
     <div class="conn-facets" aria-label="Pull type and credential source">
@@ -435,7 +404,7 @@ function buildCardHtml(p) {
       <span class="conn-facet conn-facet--source" title="Where credentials are stored">${escapeHtml(sourceFacet(p))}</span>
     </div>`;
 
-  const noteVal = (state.prefs?.connectionNotes || {})[p.key] || '';
+  const noteVal = (state.prefs?.connectionNotes || {})[p.key] || "";
   const notesHtml = `
     <div class="conn-notes">
       <label class="conn-notes-label" for="conn-note-${escapeAttr(p.key)}">Notes</label>
@@ -446,13 +415,13 @@ function buildCardHtml(p) {
 
   return `
 
-    <article class="conn-card${p.kind === 'manual' ? ' conn-card--manual' : ''}" data-provider="${escapeAttr(p.key)}">
+    <article class="conn-card${p.kind === "manual" ? " conn-card--manual" : ""}" data-provider="${escapeAttr(p.key)}">
 
       <div class="conn-card-stripe"></div>
 
       <div class="conn-card-head">
 
-        ${storeLogoHtml(storeKey, { size: 'lg', title: p.label, className: 'conn-card-badge' })}
+        ${storeLogoHtml(storeKey, { size: "lg", title: p.label, className: "conn-card-badge" })}
 
         <div class="conn-head-actions">
 
@@ -470,7 +439,7 @@ function buildCardHtml(p) {
 
           ${facets}
 
-          <p class="conn-desc">${escapeHtml(p.description || '')}</p>
+          <p class="conn-desc">${escapeHtml(p.description || "")}</p>
 
           ${helpLink}
 
@@ -490,19 +459,16 @@ function buildCardHtml(p) {
 
       </div>
 
-      ${showFormPanel ? (p.kind === 'browser' ? buildFallbackPanel(p) : buildFormPanel(p)) : ''}
+      ${showFormPanel ? (p.kind === "browser" ? buildFallbackPanel(p) : buildFormPanel(p)) : ""}
 
       ${buildCardFooter(p, st)}
 
     </article>`;
-
 }
-
-
 
 function captureConnNoteFocus() {
   const active = document.activeElement;
-  if (!active?.classList?.contains('conn-note-input')) return null;
+  if (!active?.classList?.contains("conn-note-input")) return null;
   return {
     provider: active.dataset.noteProvider,
     selStart: active.selectionStart,
@@ -512,7 +478,9 @@ function captureConnNoteFocus() {
 
 function restoreConnNoteFocus(focusState, root) {
   if (!focusState?.provider || !root) return;
-  const ta = root.querySelector(`.conn-note-input[data-note-provider="${focusState.provider}"]`);
+  const ta = root.querySelector(
+    `.conn-note-input[data-note-provider="${focusState.provider}"]`,
+  );
   if (!ta) return;
   ta.focus();
   try {
@@ -522,39 +490,39 @@ function restoreConnNoteFocus(focusState, root) {
   }
 }
 
-
-
 function renderConnPrefs() {
-  const onConnect = document.getElementById('autoFetchOnConnectToggle');
-  const stale24h = document.getElementById('autoFetchStale24hToggle');
-  const shareStats = document.getElementById('shareAnonStatsToggle');
+  const onConnect = document.getElementById("autoFetchOnConnectToggle");
+  const stale24h = document.getElementById("autoFetchStale24hToggle");
+  const shareStats = document.getElementById("shareAnonStatsToggle");
   if (onConnect) onConnect.checked = state.prefs.autoFetchOnConnect !== false;
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
   if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
-  const note = document.getElementById('bgRefreshPlanNote');
+  const note = document.getElementById("bgRefreshPlanNote");
   if (note) {
     if (isPro()) {
       note.textContent =
-        'Pro: background refresh keeps stale stores fresh even when BAKLOG is closed to the tray.';
-      note.classList.add('conn-prefs-note--pro');
+        "Pro: background refresh keeps stale stores fresh even when BAKLOG is closed to the tray.";
+      note.classList.add("conn-prefs-note--pro");
     } else {
       note.textContent =
-        'Auto-refresh runs while BAKLOG is open (even minimized). Pro adds background refresh while closed to the tray.';
-      note.classList.remove('conn-prefs-note--pro');
+        "Auto-refresh runs while BAKLOG is open (even minimized). Pro adds background refresh while closed to the tray.";
+      note.classList.remove("conn-prefs-note--pro");
     }
     note.hidden = false;
   }
 }
 
 function connAuthFingerprint() {
-  return JSON.stringify(getAuthStatusSnapshot().map(p => ({
-    key: p.key,
-    status: p.status || 'disconnected',
-    connected: !!p.connected,
-    available: p.available !== false,
-    label: p.label || '',
-  })));
+  return JSON.stringify(
+    getAuthStatusSnapshot().map((p) => ({
+      key: p.key,
+      status: p.status || "disconnected",
+      connected: !!p.connected,
+      available: p.available !== false,
+      label: p.label || "",
+    })),
+  );
 }
 
 function connRenderFingerprint() {
@@ -566,17 +534,17 @@ function connRenderFingerprint() {
 }
 
 function renderConnectionsPaneOnly(selKey) {
-  const pane = document.getElementById('connPane');
+  const pane = document.getElementById("connPane");
   if (!pane) return;
   const noteFocus = captureConnNoteFocus();
   if (PROVIDER_GROUPS[selKey]) {
     const members = PROVIDER_GROUPS[selKey].members
-      .map(k => getAuthStatusSnapshot().find(x => x.key === k))
+      .map((k) => getAuthStatusSnapshot().find((x) => x.key === k))
       .filter(Boolean);
     const note = groupConnectNote(selKey, members);
-    pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
+    pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join("")}</div>`;
   } else {
-    const selected = getAuthStatusSnapshot().find(p => p.key === selKey);
+    const selected = getAuthStatusSnapshot().find((p) => p.key === selKey);
     pane.innerHTML = selected
       ? buildCardHtml(selected)
       : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
@@ -585,17 +553,20 @@ function renderConnectionsPaneOnly(selKey) {
 }
 
 function renderConnections() {
+  const rail = document.getElementById("connRail");
 
-  const rail = document.getElementById('connRail');
-
-  const pane = document.getElementById('connPane');
+  const pane = document.getElementById("connPane");
 
   if (!rail || !pane) return;
 
   const authFp = connAuthFingerprint();
   const fp = connRenderFingerprint();
   let selKey = groupRepFor(_selectedKey);
-  if (fp === _connRenderFingerprint && rail.innerHTML.trim() && pane.innerHTML.trim()) {
+  if (
+    fp === _connRenderFingerprint &&
+    rail.innerHTML.trim() &&
+    pane.innerHTML.trim()
+  ) {
     return;
   }
   if (authFp === _connAuthFingerprint && rail.innerHTML.trim()) {
@@ -614,13 +585,12 @@ function renderConnections() {
   renderOnboard();
 
   if (!getAuthStatusSnapshot().length) {
+    rail.innerHTML = "";
 
-    rail.innerHTML = '';
-
-    pane.innerHTML = '<p class="text-sm text-slate-400">Loading connections…</p>';
+    pane.innerHTML =
+      '<p class="text-sm text-slate-400">Loading connections…</p>';
 
     return;
-
   }
 
   ensureSelectedKey();
@@ -633,189 +603,135 @@ function renderConnections() {
 
   if (PROVIDER_GROUPS[selKey]) {
     const members = PROVIDER_GROUPS[selKey].members
-      .map(k => getAuthStatusSnapshot().find(x => x.key === k))
+      .map((k) => getAuthStatusSnapshot().find((x) => x.key === k))
       .filter(Boolean);
     const note = groupConnectNote(selKey, members);
-    pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join('')}</div>`;
+    pane.innerHTML = `${note}<div class="conn-card-stack">${members.map(buildCardHtml).join("")}</div>`;
   } else {
-    const selected = getAuthStatusSnapshot().find(p => p.key === selKey);
+    const selected = getAuthStatusSnapshot().find((p) => p.key === selKey);
     pane.innerHTML = selected
       ? buildCardHtml(selected)
       : '<p class="text-sm text-slate-400">Select a provider on the left to get started.</p>';
   }
 
   restoreConnNoteFocus(noteFocus, pane);
-
 }
 
-
-
 function handleLayoutClick(ev) {
-
   const target = ev.target;
 
-
-
-  const startSteam = target.closest('[data-conn-start-steam]');
+  const startSteam = target.closest("[data-conn-start-steam]");
 
   if (startSteam) {
-
     ev.preventDefault();
 
-    reconnectProvider('steam');
+    reconnectProvider("steam");
 
     return;
-
   }
 
+  const card = target.closest(".conn-card");
 
-
-  const card = target.closest('.conn-card');
-
-  const railItem = target.closest('.conn-rail-item');
+  const railItem = target.closest(".conn-rail-item");
 
   const provider = card?.dataset.provider || railItem?.dataset.provider;
 
-
-
-  const disconnectBtn = target.closest('[data-disconnect-quick]');
+  const disconnectBtn = target.closest("[data-disconnect-quick]");
 
   if (disconnectBtn && provider) {
-
     runConnAction(provider, () => disconnectProvider(provider));
 
     return;
-
   }
 
-
-
-  const pasteBtn = target.closest('[data-paste-clipboard]');
+  const pasteBtn = target.closest("[data-paste-clipboard]");
 
   if (pasteBtn && card) {
-
     pasteFromClipboard(card);
 
     return;
-
   }
 
-
-
-  const epicOauthBtn = target.closest('[data-epic-oauth]');
+  const epicOauthBtn = target.closest("[data-epic-oauth]");
 
   if (epicOauthBtn) {
-
     startEpicBrowserOAuth();
 
     return;
-
   }
 
-
-
-  const openUrlBtn = target.closest('[data-open-url]');
+  const openUrlBtn = target.closest("[data-open-url]");
 
   if (openUrlBtn && provider) {
-
     openManualUrl(provider);
 
     return;
-
   }
 
-
-
-  const enableLocalBtn = target.closest('[data-enable-local]');
+  const enableLocalBtn = target.closest("[data-enable-local]");
 
   if (enableLocalBtn?.dataset.provider) {
-
-    runConnAction(enableLocalBtn.dataset.provider, () => enableLocalProvider(enableLocalBtn.dataset.provider));
+    runConnAction(enableLocalBtn.dataset.provider, () =>
+      enableLocalProvider(enableLocalBtn.dataset.provider),
+    );
 
     return;
-
   }
 
-
-
-  const primaryBtn = target.closest('.conn-primary');
+  const primaryBtn = target.closest(".conn-primary");
 
   if (primaryBtn?.dataset.provider) {
-    runConnAction(primaryBtn.dataset.provider, () => startBrowserConnect(primaryBtn.dataset.provider));
+    runConnAction(primaryBtn.dataset.provider, () =>
+      startBrowserConnect(primaryBtn.dataset.provider),
+    );
 
     return;
-
   }
 
-
-
-  const saveBtn = target.closest('.conn-save');
+  const saveBtn = target.closest(".conn-save");
 
   if (saveBtn?.dataset.provider) {
-
     saveFormCredentials(saveBtn.dataset.provider);
 
     return;
-
   }
 
-
-
   if (railItem?.dataset.provider && !card) {
-
     _selectedKey = railItem.dataset.provider;
 
     renderConnections();
-
   }
-
 }
 
-
-
 function handleLayoutKeydown(ev) {
-
-  const railItem = ev.target.closest('.conn-rail-item');
+  const railItem = ev.target.closest(".conn-rail-item");
 
   if (!railItem || !getAuthStatusSnapshot().length) return;
 
-
-
-  const order = railEntries().map(e => e.key);
+  const order = railEntries().map((e) => e.key);
 
   let idx = order.indexOf(groupRepFor(_selectedKey));
 
   if (idx < 0) idx = 0;
 
-
-
-  if (ev.key === 'ArrowDown') {
-
+  if (ev.key === "ArrowDown") {
     ev.preventDefault();
 
     idx = Math.min(idx + 1, order.length - 1);
-
-  } else if (ev.key === 'ArrowUp') {
-
+  } else if (ev.key === "ArrowUp") {
     ev.preventDefault();
 
     idx = Math.max(idx - 1, 0);
-
-  } else if (ev.key === 'Home') {
-
+  } else if (ev.key === "Home") {
     ev.preventDefault();
 
     idx = 0;
-
-  } else if (ev.key === 'End') {
-
+  } else if (ev.key === "End") {
     ev.preventDefault();
 
     idx = order.length - 1;
-
-  } else if (ev.key === 'Enter' || ev.key === ' ') {
-
-    if (ev.target.closest('button, input, select, a')) return;
+  } else if (ev.key === "Enter" || ev.key === " ") {
+    if (ev.target.closest("button, input, select, a")) return;
 
     ev.preventDefault();
 
@@ -824,39 +740,32 @@ function handleLayoutKeydown(ev) {
     renderConnections();
 
     return;
-
   } else {
-
     return;
-
   }
-
-
 
   _selectedKey = order[idx];
 
   renderConnections();
 
-  document.querySelector(`.conn-rail-item[data-provider="${_selectedKey}"]`)?.focus();
-
+  document
+    .querySelector(`.conn-rail-item[data-provider="${_selectedKey}"]`)
+    ?.focus();
 }
 
-
-
 function wireGridEvents() {
-
   if (gridWired) return;
 
-  const container = document.getElementById('connectionsContainer');
+  const container = document.getElementById("connectionsContainer");
 
-  const layout = document.getElementById('connLayout');
+  const layout = document.getElementById("connLayout");
 
   if (!container || !layout) return;
 
-  container.addEventListener('click', handleLayoutClick);
+  container.addEventListener("click", handleLayoutClick);
 
-  container.addEventListener('input', (ev) => {
-    const ta = ev.target.closest('.conn-note-input');
+  container.addEventListener("input", (ev) => {
+    const ta = ev.target.closest(".conn-note-input");
     if (!ta) return;
     const provider = ta.dataset.noteProvider;
     if (!provider) return;
@@ -866,14 +775,14 @@ function wireGridEvents() {
     noteSaveTimer = setTimeout(() => savePrefs(), 500);
   });
 
-  container.addEventListener('change', (ev) => {
-    if (ev.target.id === 'autoFetchOnConnectToggle') {
+  container.addEventListener("change", (ev) => {
+    if (ev.target.id === "autoFetchOnConnectToggle") {
       state.prefs.autoFetchOnConnect = ev.target.checked;
       savePrefs();
-    } else if (ev.target.id === 'autoFetchStale24hToggle') {
+    } else if (ev.target.id === "autoFetchStale24hToggle") {
       state.prefs.autoFetchStale24h = ev.target.checked;
       savePrefs();
-    } else if (ev.target.id === 'shareAnonStatsToggle') {
+    } else if (ev.target.id === "shareAnonStatsToggle") {
       state.prefs.shareAnonStats = ev.target.checked;
       savePrefs();
       if (ev.target.checked) startMetrics();
@@ -881,58 +790,50 @@ function wireGridEvents() {
     }
   });
 
-  layout.addEventListener('keydown', handleLayoutKeydown);
+  layout.addEventListener("keydown", handleLayoutKeydown);
 
   gridWired = true;
-
 }
 
-
-
 function closeConnPopover() {
-
   _connPopoverRelease?.();
   _connPopoverRelease = null;
 
-  const pop = document.getElementById('connPopover');
+  const pop = document.getElementById("connPopover");
 
-  const bd = document.getElementById('connPopoverBackdrop');
+  const bd = document.getElementById("connPopoverBackdrop");
 
-  const body = document.getElementById('connPopoverBody');
+  const body = document.getElementById("connPopoverBody");
 
   if (pop) pop.hidden = true;
 
   if (bd) bd.hidden = true;
 
-  if (body) body.innerHTML = '';
-
+  if (body) body.innerHTML = "";
 }
 
-
-
 function openConnPopover(which) {
+  const pop = document.getElementById("connPopover");
 
-  const pop = document.getElementById('connPopover');
+  const bd = document.getElementById("connPopoverBackdrop");
 
-  const bd = document.getElementById('connPopoverBackdrop');
-
-  const body = document.getElementById('connPopoverBody');
+  const body = document.getElementById("connPopoverBody");
 
   if (!pop || !bd || !body) return;
 
   const tplMap = {
-    howto: 'tplConnHowToPopover',
-    passphrase: 'tplConnPassphrasePopover',
-    bundle: 'tplConnBundlePopover',
+    howto: "tplConnHowToPopover",
+    passphrase: "tplConnPassphrasePopover",
+    bundle: "tplConnBundlePopover",
   };
 
-  const tplId = tplMap[which] || 'tplConnHowToPopover';
+  const tplId = tplMap[which] || "tplConnHowToPopover";
 
   const tpl = document.getElementById(tplId);
 
   if (!tpl) return;
 
-  body.innerHTML = '';
+  body.innerHTML = "";
 
   body.appendChild(tpl.content.cloneNode(true));
 
@@ -940,16 +841,16 @@ function openConnPopover(which) {
 
   pop.hidden = false;
 
-  if (which === 'passphrase') wireMasterPasswordSave();
-  if (which === 'bundle') wireSecretsBundle();
+  if (which === "passphrase") wireMasterPasswordSave();
+  if (which === "bundle") wireSecretsBundle();
 
   const titleMap = {
-    howto: 'How connections work',
-    passphrase: 'Encryption passphrase',
-    bundle: 'Portable bundle',
+    howto: "How connections work",
+    passphrase: "Encryption passphrase",
+    bundle: "Portable bundle",
   };
-  const dialogTitle = document.getElementById('connPopoverDialogTitle');
-  if (dialogTitle) dialogTitle.textContent = titleMap[which] || 'Connections';
+  const dialogTitle = document.getElementById("connPopoverDialogTitle");
+  if (dialogTitle) dialogTitle.textContent = titleMap[which] || "Connections";
 
   _connPopoverRelease?.();
   const releaseTrap = trapFocus(pop);
@@ -959,119 +860,104 @@ function openConnPopover(which) {
     releaseEsc();
     _connPopoverRelease = null;
   };
-  pop.querySelector('.conn-popover-close')?.focus();
+  pop.querySelector(".conn-popover-close")?.focus();
 }
 
-
-
 function toggleKebabMenu(force) {
+  const btn = document.getElementById("connKebabBtn");
 
-  const btn = document.getElementById('connKebabBtn');
-
-  const menu = document.getElementById('connKebabMenu');
+  const menu = document.getElementById("connKebabMenu");
 
   if (!btn || !menu) return;
 
-  const open = typeof force === 'boolean' ? force : menu.hidden;
+  const open = typeof force === "boolean" ? force : menu.hidden;
 
   menu.hidden = !open;
 
-  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
-
-
 
 function wireMasterPasswordSave() {
+  const btn = document.getElementById("masterPasswordSave");
 
-  const btn = document.getElementById('masterPasswordSave');
+  if (!btn || btn.dataset.bound === "1") return;
 
-  if (!btn || btn.dataset.bound === '1') return;
+  btn.dataset.bound = "1";
 
-  btn.dataset.bound = '1';
-
-  btn.addEventListener('click', async () => {
-
-    const pw = document.getElementById('masterPasswordInput')?.value || '';
+  btn.addEventListener("click", async () => {
+    const pw = document.getElementById("masterPasswordInput")?.value || "";
 
     try {
+      const res = await baklogFetch("/api/auth/master-password", {
+        method: "POST",
 
-      const res = await baklogFetch('/api/auth/master-password', {
-
-        method: 'POST',
-
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
 
         body: JSON.stringify({ password: pw || null }),
-
       });
 
-      const hint = document.getElementById('masterPasswordHint');
+      const hint = document.getElementById("masterPasswordHint");
 
       if (!res.ok) {
-
         const data = await res.json().catch(() => ({}));
 
-        if (hint) hint.textContent = data.error || `Save failed (${res.status})`;
+        if (hint)
+          hint.textContent = data.error || `Save failed (${res.status})`;
 
         return;
-
       }
 
-      if (hint) hint.textContent = pw ? 'Master password set (portable encryption).' : 'Using OS keychain.';
-
+      if (hint)
+        hint.textContent = pw
+          ? "Master password set (portable encryption)."
+          : "Using OS keychain.";
     } catch (_) {
+      const hint = document.getElementById("masterPasswordHint");
 
-      const hint = document.getElementById('masterPasswordHint');
-
-      if (hint) hint.textContent = 'Could not reach the local server.';
-
+      if (hint) hint.textContent = "Could not reach the local server.";
     }
-
   });
-
 }
-
-
 
 function setSecretsBundleHint(text, isError = false) {
-  const hint = document.getElementById('secretsBundleHint');
+  const hint = document.getElementById("secretsBundleHint");
   if (!hint) return;
-  hint.textContent = text || '';
-  hint.classList.toggle('text-red-400', !!isError);
-  hint.classList.toggle('text-slate-400', !isError);
+  hint.textContent = text || "";
+  hint.classList.toggle("text-red-400", !!isError);
+  hint.classList.toggle("text-slate-400", !isError);
 }
 
-
-
-function promptSecretsBundlePassphrase({ mode = 'export' } = {}) {
+function promptSecretsBundlePassphrase({ mode = "export" } = {}) {
   return new Promise((resolve) => {
-    const dialog = document.getElementById('secretsBundleDialog');
-    const form = document.getElementById('secretsBundleDialogForm');
-    const title = document.getElementById('secretsBundleDialogTitle');
-    const help = document.getElementById('secretsBundleDialogHelp');
-    const pw = document.getElementById('secretsBundlePassphrase');
-    const confirmWrap = document.getElementById('secretsBundleConfirmWrap');
-    const confirmPw = document.getElementById('secretsBundlePassphraseConfirm');
-    const cancelBtn = document.getElementById('secretsBundleCancel');
+    const dialog = document.getElementById("secretsBundleDialog");
+    const form = document.getElementById("secretsBundleDialogForm");
+    const title = document.getElementById("secretsBundleDialogTitle");
+    const help = document.getElementById("secretsBundleDialogHelp");
+    const pw = document.getElementById("secretsBundlePassphrase");
+    const confirmWrap = document.getElementById("secretsBundleConfirmWrap");
+    const confirmPw = document.getElementById("secretsBundlePassphraseConfirm");
+    const cancelBtn = document.getElementById("secretsBundleCancel");
     if (!dialog || !form || !pw) {
       resolve(null);
       return;
     }
-    const isExport = mode === 'export';
-    if (title) title.textContent = isExport ? 'Export bundle passphrase' : 'Import bundle passphrase';
+    const isExport = mode === "export";
+    if (title)
+      title.textContent = isExport
+        ? "Export bundle passphrase"
+        : "Import bundle passphrase";
     if (help) {
       help.textContent = isExport
-        ? 'Choose a passphrase for this backup file. You will need it to import on another machine.'
-        : 'Enter the passphrase you used when exporting this bundle.';
+        ? "Choose a passphrase for this backup file. You will need it to import on another machine."
+        : "Enter the passphrase you used when exporting this bundle.";
     }
-    pw.value = '';
-    if (confirmPw) confirmPw.value = '';
-    if (confirmWrap) confirmWrap.classList.toggle('hidden', !isExport);
+    pw.value = "";
+    if (confirmPw) confirmPw.value = "";
+    if (confirmWrap) confirmWrap.classList.toggle("hidden", !isExport);
     const cleanup = () => {
-      form.removeEventListener('submit', onSubmit);
-      cancelBtn?.removeEventListener('click', onCancel);
-      dialog.removeEventListener('close', onClose);
+      form.removeEventListener("submit", onSubmit);
+      cancelBtn?.removeEventListener("click", onCancel);
+      dialog.removeEventListener("close", onClose);
     };
     let settled = false;
     const finish = (value) => {
@@ -1090,36 +976,34 @@ function promptSecretsBundlePassphrase({ mode = 'export' } = {}) {
     };
     const onSubmit = (ev) => {
       ev.preventDefault();
-      const value = pw.value || '';
+      const value = pw.value || "";
       if (value.length < 8) {
-        setSecretsBundleHint('Passphrase must be at least 8 characters.', true);
+        setSecretsBundleHint("Passphrase must be at least 8 characters.", true);
         return;
       }
       if (isExport && confirmPw && value !== confirmPw.value) {
-        setSecretsBundleHint('Passphrases do not match.', true);
+        setSecretsBundleHint("Passphrases do not match.", true);
         return;
       }
       finish(value);
     };
-    form.addEventListener('submit', onSubmit);
-    cancelBtn?.addEventListener('click', onCancel);
-    dialog.addEventListener('close', onClose);
-    if (typeof dialog.showModal === 'function') dialog.showModal();
-    else dialog.removeAttribute('hidden');
+    form.addEventListener("submit", onSubmit);
+    cancelBtn?.addEventListener("click", onCancel);
+    dialog.addEventListener("close", onClose);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.removeAttribute("hidden");
     pw.focus();
   });
 }
 
-
-
 async function exportSecretsBundle() {
-  const passphrase = await promptSecretsBundlePassphrase({ mode: 'export' });
+  const passphrase = await promptSecretsBundlePassphrase({ mode: "export" });
   if (!passphrase) return;
-  setSecretsBundleHint('Exporting bundle…');
+  setSecretsBundleHint("Exporting bundle…");
   try {
-    const resp = await baklogFetch('/api/auth/secrets/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const resp = await baklogFetch("/api/auth/secrets/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passphrase, include_profiles: true }),
     });
     if (!resp.ok) {
@@ -1127,169 +1011,158 @@ async function exportSecretsBundle() {
       try {
         const err = await resp.json();
         if (err?.error) msg = err.error;
-      } catch (_) { /* binary or empty */ }
+      } catch (_) {
+        /* binary or empty */
+      }
       setSecretsBundleHint(msg, true);
       return;
     }
     const blob = await resp.blob();
-    const cd = resp.headers.get('Content-Disposition') || '';
+    const cd = resp.headers.get("Content-Disposition") || "";
     const match = cd.match(/filename="([^"]+)"/);
-    const filename = match?.[1] || 'baklog-secrets.bundle';
+    const filename = match?.[1] || "baklog-secrets.bundle";
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    setSecretsBundleHint('Bundle downloaded. Store it somewhere safe - we cannot recover the passphrase.');
+    setSecretsBundleHint(
+      "Bundle downloaded. Store it somewhere safe - we cannot recover the passphrase.",
+    );
   } catch (err) {
-    setSecretsBundleHint(err?.message || 'Export failed.', true);
+    setSecretsBundleHint(err?.message || "Export failed.", true);
   }
 }
 
-
-
 async function importSecretsBundle(file) {
   if (!file) return;
-  const passphrase = await promptSecretsBundlePassphrase({ mode: 'import' });
+  const passphrase = await promptSecretsBundlePassphrase({ mode: "import" });
   if (!passphrase) return;
-  setSecretsBundleHint('Importing bundle…');
+  setSecretsBundleHint("Importing bundle…");
   try {
     const buf = await file.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    let binary = '';
+    let binary = "";
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
     }
     const blobB64 = btoa(binary);
-    const resp = await baklogFetch('/api/auth/secrets/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const resp = await baklogFetch("/api/auth/secrets/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ passphrase, blob: blobB64 }),
     });
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      setSecretsBundleHint(payload?.error || `Import failed (${resp.status})`, true);
+      setSecretsBundleHint(
+        payload?.error || `Import failed (${resp.status})`,
+        true,
+      );
       return;
     }
     const nProv = (payload.providers_imported || []).length;
     const nProf = (payload.profiles_imported || []).length;
-    setSecretsBundleHint(`Imported ${nProv} provider(s) and ${nProf} profile(s). Reloading…`);
+    setSecretsBundleHint(
+      `Imported ${nProv} provider(s) and ${nProf} profile(s). Reloading…`,
+    );
     window.setTimeout(() => window.location.reload(), 1200);
   } catch (err) {
-    setSecretsBundleHint(err?.message || 'Import failed.', true);
+    setSecretsBundleHint(err?.message || "Import failed.", true);
   }
 }
 
-
-
 function wireSecretsBundle() {
-  const exportBtn = document.getElementById('secretsExportBtn');
-  const importBtn = document.getElementById('secretsImportBtn');
-  const importFile = document.getElementById('secretsImportFile');
+  const exportBtn = document.getElementById("secretsExportBtn");
+  const importBtn = document.getElementById("secretsImportBtn");
+  const importFile = document.getElementById("secretsImportFile");
   if (!exportBtn || !importBtn || !importFile) return;
-  if (exportBtn.dataset.bound === '1') return;
-  exportBtn.dataset.bound = '1';
-  importBtn.dataset.bound = '1';
-  exportBtn.addEventListener('click', () => { exportSecretsBundle(); });
-  importBtn.addEventListener('click', () => {
-    importFile.value = '';
+  if (exportBtn.dataset.bound === "1") return;
+  exportBtn.dataset.bound = "1";
+  importBtn.dataset.bound = "1";
+  exportBtn.addEventListener("click", () => {
+    exportSecretsBundle();
+  });
+  importBtn.addEventListener("click", () => {
+    importFile.value = "";
     importFile.click();
   });
-  importFile.addEventListener('change', () => {
+  importFile.addEventListener("change", () => {
     const file = importFile.files?.[0];
     if (file) importSecretsBundle(file);
   });
 }
 
-
-
 function wireChromeEvents() {
-
   if (chromeWired) return;
 
-  const section = document.getElementById('connectionsContainer');
+  const section = document.getElementById("connectionsContainer");
 
   if (!section) return;
 
   chromeWired = true;
 
-  section.addEventListener('click', ev => {
-
+  section.addEventListener("click", (ev) => {
     const target = ev.target;
 
-    if (target.closest('#connKebabBtn')) {
-
+    if (target.closest("#connKebabBtn")) {
       toggleKebabMenu();
 
       return;
-
     }
 
-    const openTrigger = target.closest('[data-conn-open]');
+    const openTrigger = target.closest("[data-conn-open]");
 
     if (openTrigger) {
-
       toggleKebabMenu(false);
 
       openConnPopover(openTrigger.dataset.connOpen);
 
       return;
-
     }
 
-    if (target.closest('[data-conn-close]') || target.closest('#connPopoverBackdrop')) {
-
+    if (
+      target.closest("[data-conn-close]") ||
+      target.closest("#connPopoverBackdrop")
+    ) {
       closeConnPopover();
 
       return;
-
     }
-
   });
 
   // Close the kebab menu on any click outside it (the section-scoped handler
   // above only fires for clicks inside #connectionsContainer, so clicks on the
   // header or elsewhere on the page would otherwise leave the menu open).
-  document.addEventListener('click', ev => {
-
-    const menu = document.getElementById('connKebabMenu');
+  document.addEventListener("click", (ev) => {
+    const menu = document.getElementById("connKebabMenu");
 
     if (!menu || menu.hidden) return;
 
     const target = ev.target;
 
-    if (target.closest('#connKebabMenu') || target.closest('#connKebabBtn')) return;
+    if (target.closest("#connKebabMenu") || target.closest("#connKebabBtn"))
+      return;
 
     toggleKebabMenu(false);
-
   });
 
-  document.addEventListener('keydown', ev => {
-
-    if (ev.key !== 'Escape') return;
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
 
     closeConnPopover();
 
     toggleKebabMenu(false);
-
   });
-
 }
 
-
-
-
-
 export function showReconnectBanner(providers) {
-
   for (const p of providers || []) reconnectProviders.add(p);
 
   renderReconnectBanner();
-
 }
 
 export function clearReconnectBanner(provider) {
@@ -1298,28 +1171,25 @@ export function clearReconnectBanner(provider) {
 }
 
 function renderReconnectBanner() {
-
-  const el = document.getElementById('authReconnectBanner');
+  const el = document.getElementById("authReconnectBanner");
 
   if (!el) return;
 
   if (!reconnectProviders.size) {
+    el.classList.add("hidden");
 
-    el.classList.add('hidden');
-
-    el.innerHTML = '';
+    el.innerHTML = "";
 
     return;
-
   }
 
   const names = [...reconnectProviders]
 
-    .map(k => getAuthStatusSnapshot().find(p => p.key === k)?.label || k)
+    .map((k) => getAuthStatusSnapshot().find((p) => p.key === k)?.label || k)
 
-    .join(', ');
+    .join(", ");
 
-  el.classList.remove('hidden');
+  el.classList.remove("hidden");
 
   el.innerHTML = `
 
@@ -1331,8 +1201,7 @@ function renderReconnectBanner() {
 
   `;
 
-  el.querySelector('[data-jump-connections]')?.addEventListener('click', () => {
-
+  el.querySelector("[data-jump-connections]")?.addEventListener("click", () => {
     const first = reconnectProviders.values().next().value;
 
     if (first) _selectedKey = first;
@@ -1340,80 +1209,80 @@ function renderReconnectBanner() {
     document.querySelector('.view-tab[data-view="connections"]')?.click();
 
     renderConnections();
-
   });
 
-  el.querySelector('[data-dismiss-auth-banner]')?.addEventListener('click', () => {
-    const providers = [...reconnectProviders];
-    reconnectProviders.clear();
-    renderReconnectBanner();
-    try {
-      document.dispatchEvent(
-        new CustomEvent('baklog:reconnect-dismiss', { detail: { providers } }),
-      );
-    } catch (_) { /* no DOM (tests) */ }
-  });
-
+  el.querySelector("[data-dismiss-auth-banner]")?.addEventListener(
+    "click",
+    () => {
+      const providers = [...reconnectProviders];
+      reconnectProviders.clear();
+      renderReconnectBanner();
+      try {
+        document.dispatchEvent(
+          new CustomEvent("baklog:reconnect-dismiss", {
+            detail: { providers },
+          }),
+        );
+      } catch (_) {
+        /* no DOM (tests) */
+      }
+    },
+  );
 }
-
-
 
 function connectionStatusErrorMessage(err) {
   const status = err?.status;
   if (status === 401) {
     return isAccountAuthMode()
-      ? 'Session expired or not signed in. Sign in again to refresh connection status.'
-      : 'Not authorized to load connection status.';
+      ? "Session expired or not signed in. Sign in again to refresh connection status."
+      : "Not authorized to load connection status.";
   }
-  if (status === 503) return 'Server secrets store is unavailable. Check server logs.';
+  if (status === 503)
+    return "Server secrets store is unavailable. Check server logs.";
   if (status >= 500) {
     return err?.detail
       ? `Server error loading connection status: ${err.detail}`
-      : 'Server error loading connection status. Check server.py logs.';
+      : "Server error loading connection status. Check server.py logs.";
   }
-  if (err?.code === 'network') {
-    return 'Could not reach the local server (is server.py running?).';
+  if (err?.code === "network") {
+    return "Could not reach the local server (is server.py running?).";
   }
-  return 'Could not load connection status.';
+  return "Could not load connection status.";
 }
 
-
 function ensureConnRefreshBanner() {
-  const layout = document.getElementById('connLayout');
+  const layout = document.getElementById("connLayout");
   if (!layout) return null;
-  let el = document.getElementById('connRefreshBanner');
+  let el = document.getElementById("connRefreshBanner");
   if (!el) {
-    el = document.createElement('p');
-    el.id = 'connRefreshBanner';
-    el.className = 'conn-refresh-error text-sm text-amber-400 hidden';
-    el.setAttribute('role', 'status');
+    el = document.createElement("p");
+    el.id = "connRefreshBanner";
+    el.className = "conn-refresh-error text-sm text-amber-400 hidden";
+    el.setAttribute("role", "status");
     layout.parentNode?.insertBefore(el, layout);
   }
   return el;
 }
 
-
 function showConnRefreshError(msg) {
   const el = ensureConnRefreshBanner();
   if (!el) return;
   el.textContent = msg;
-  el.classList.remove('hidden');
+  el.classList.remove("hidden");
 }
-
 
 function clearConnRefreshError() {
-  const el = document.getElementById('connRefreshBanner');
-  if (el) el.classList.add('hidden');
+  const el = document.getElementById("connRefreshBanner");
+  if (el) el.classList.add("hidden");
 }
-
 
 async function fetchAuthStatus() {
   let res;
   try {
-    res = await baklogFetch('/api/auth/status');
+    res = await baklogFetch("/api/auth/status");
   } catch (_) {
-    const err = new Error('network');
-    err.code = 'network';
+    const err = new Error("network");
+    err.code = "network";
     throw err;
   }
   if (!res.ok) {
@@ -1422,7 +1291,9 @@ async function fetchAuthStatus() {
     try {
       const body = await res.json();
       if (body?.error) err.detail = body.error;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     throw err;
   }
   const data = await res.json();
@@ -1438,14 +1309,14 @@ export function secretsStoreCorrupt() {
 }
 
 function renderSecretsCorruptBanner() {
-  const el = document.getElementById('authSecretsBanner');
+  const el = document.getElementById("authSecretsBanner");
   if (!el) return;
   if (!_secretsCorrupt) {
-    el.classList.add('hidden');
-    el.innerHTML = '';
+    el.classList.add("hidden");
+    el.innerHTML = "";
     return;
   }
-  el.classList.remove('hidden');
+  el.classList.remove("hidden");
   el.innerHTML = `
     <div class="migration-banner-body">
       <span><strong>Secrets store corrupt.</strong> Restore from a backup on Connections, or reset the store and reconnect stores.</span>
@@ -1455,23 +1326,29 @@ function renderSecretsCorruptBanner() {
       </span>
     </div>
   `;
-  el.querySelector('[data-jump-connections-secrets]')?.addEventListener('click', () => {
-    document.querySelector('.view-tab[data-view="connections"]')?.click();
-  });
-  el.querySelector('[data-reset-secrets-store]')?.addEventListener('click', () => {
-    void resetSecretsStoreFromBanner();
-  });
+  el.querySelector("[data-jump-connections-secrets]")?.addEventListener(
+    "click",
+    () => {
+      document.querySelector('.view-tab[data-view="connections"]')?.click();
+    },
+  );
+  el.querySelector("[data-reset-secrets-store]")?.addEventListener(
+    "click",
+    () => {
+      void resetSecretsStoreFromBanner();
+    },
+  );
 }
 
 async function resetSecretsStoreFromBanner() {
   const ok = window.confirm(
-    'Reset the encrypted credentials store? Saved API keys and sign-in cookies for this profile will be removed. You can reconnect stores afterward.'
+    "Reset the encrypted credentials store? Saved API keys and sign-in cookies for this profile will be removed. You can reconnect stores afterward.",
   );
   if (!ok) return;
   try {
-    const res = await baklogFetch('/api/auth/secrets/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await baklogFetch("/api/auth/secrets/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ confirm: true }),
     });
     if (!res.ok) {
@@ -1481,218 +1358,184 @@ async function resetSecretsStoreFromBanner() {
     }
     await fetchAuthStatus();
   } catch {
-    window.alert('Could not reach the local server.');
+    window.alert("Could not reach the local server.");
   }
 }
 
 async function openManualUrl(provider) {
+  const card = document.querySelector(
+    `.conn-card[data-provider="${provider}"]`,
+  );
 
-  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
-
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   if (log) {
+    log.classList.remove("hidden");
 
-    log.classList.remove('hidden');
-
-    log.textContent = 'Opening in your default browser…';
-
+    log.textContent = "Opening in your default browser…";
   }
 
-  const res = await baklogFetch(`/api/auth/${provider}/open-url`, { method: 'POST' });
+  const res = await baklogFetch(`/api/auth/${provider}/open-url`, {
+    method: "POST",
+  });
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-
-    if (log) log.textContent = data.error || `Could not open browser (${res.status})`;
+    if (log)
+      log.textContent = data.error || `Could not open browser (${res.status})`;
 
     return;
-
   }
 
-  if (log) log.textContent = 'Copy your API key from the browser tab, paste above, then Save key.';
-
+  if (log)
+    log.textContent =
+      "Copy your API key from the browser tab, paste above, then Save key.";
 }
 
-
-
 async function startEpicBrowserOAuth() {
-
   const card = document.querySelector('.conn-card[data-provider="epic"]');
 
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   if (log) {
+    log.classList.remove("hidden");
 
-    log.classList.remove('hidden');
-
-    log.textContent = 'Opening Epic sign-in…';
-
+    log.textContent = "Opening Epic sign-in…";
   }
 
   let res;
 
   try {
-
-    res = await baklogFetch('/api/auth/epic/oauth-url', { method: 'POST' });
-
+    res = await baklogFetch("/api/auth/epic/oauth-url", { method: "POST" });
   } catch (_) {
-
-    if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
+    if (log)
+      log.textContent =
+        "Could not reach the local server (is server.py running?).";
 
     return;
-
   }
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok || !data.url) {
-
-    if (log) log.textContent = data.error || `Could not start Epic sign-in (${res.status})`;
+    if (log)
+      log.textContent =
+        data.error || `Could not start Epic sign-in (${res.status})`;
 
     return;
-
   }
 
   if (!isSafeHttpUrl(data.url)) {
-
-    if (log) log.textContent = 'Epic returned an unexpected sign-in URL; aborting.';
+    if (log)
+      log.textContent = "Epic returned an unexpected sign-in URL; aborting.";
 
     return;
-
   }
 
-  window.open(data.url, '_blank', 'noopener');
+  window.open(data.url, "_blank", "noopener");
 
   startPostConnectFastPoll();
 
-  if (log) log.textContent = 'Finish signing in in the new tab - this page updates once Epic connects.';
-
+  if (log)
+    log.textContent =
+      "Finish signing in in the new tab - this page updates once Epic connects.";
 }
 
-
-
 async function saveFormCredentials(provider) {
+  const card = document.querySelector(
+    `.conn-card[data-provider="${provider}"]`,
+  );
 
-  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
-
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   const fields = {};
 
-  card?.querySelectorAll('[data-field]').forEach(inp => {
-
+  card?.querySelectorAll("[data-field]").forEach((inp) => {
     fields[inp.dataset.field] = inp.value;
-
   });
 
   if (log) {
+    log.classList.remove("hidden");
 
-    log.classList.remove('hidden');
-
-    log.textContent = 'Saving…';
-
+    log.textContent = "Saving…";
   }
 
   const res = await baklogFetch(`/api/auth/${provider}/credentials`, {
+    method: "PUT",
 
-    method: 'PUT',
-
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
 
     body: JSON.stringify({ fields }),
-
   });
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-
     if (log) log.textContent = data.error || `Save failed (${res.status})`;
 
     return;
-
   }
 
-  if (log) log.textContent = 'Saved.';
+  if (log) log.textContent = "Saved.";
 
   await refreshConnections();
-
 }
-
-
 
 function connLogError(provider, message) {
+  const card = document.querySelector(
+    `.conn-card[data-provider="${provider}"]`,
+  );
 
-  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
-
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   if (log) {
-
-    log.classList.remove('hidden');
+    log.classList.remove("hidden");
 
     log.textContent = message;
-
   }
-
 }
-
-
 
 function runConnAction(provider, fn) {
-
-  void fn().catch(err => {
-
-    connLogError(provider, err?.message || 'Action failed');
-
+  void fn().catch((err) => {
+    connLogError(provider, err?.message || "Action failed");
   });
-
 }
 
-
-
 async function disconnectProvider(provider) {
+  const card = document.querySelector(
+    `.conn-card[data-provider="${provider}"]`,
+  );
 
-  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
-
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   let res;
 
   try {
-
-    res = await baklogFetch(`/api/auth/${provider}/disconnect`, { method: 'POST' });
-
+    res = await baklogFetch(`/api/auth/${provider}/disconnect`, {
+      method: "POST",
+    });
   } catch (_) {
-
     if (log) {
+      log.classList.remove("hidden");
 
-      log.classList.remove('hidden');
-
-      log.textContent = 'Could not reach the local server (is server.py running?).';
-
+      log.textContent =
+        "Could not reach the local server (is server.py running?).";
     }
 
     return;
-
   }
 
   if (!res.ok) {
-
     const data = await res.json().catch(() => ({}));
 
     if (log) {
-
-      log.classList.remove('hidden');
+      log.classList.remove("hidden");
 
       log.textContent = data.error || `Disconnect failed (${res.status})`;
-
     }
 
     return;
-
   }
 
   reconnectProviders.delete(provider);
@@ -1700,50 +1543,42 @@ async function disconnectProvider(provider) {
   renderReconnectBanner();
 
   await refreshConnections();
-
 }
-
-
 
 /** Enable a local-only provider (e.g. Amazon launcher) by verifying its
  *  on-disk source exists server-side. No browser sign-in — POST /enable
  *  validates the local data and marks the provider connected. */
 async function enableLocalProvider(provider) {
+  const card = document.querySelector(
+    `.conn-card[data-provider="${provider}"]`,
+  );
 
-  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
-
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   if (log) {
+    log.classList.remove("hidden");
 
-    log.classList.remove('hidden');
-
-    log.textContent = 'Checking for local data on this PC…';
-
+    log.textContent = "Checking for local data on this PC…";
   }
 
   let res;
 
   try {
-
-    res = await baklogFetch(`/api/auth/${provider}/enable`, { method: 'POST' });
-
+    res = await baklogFetch(`/api/auth/${provider}/enable`, { method: "POST" });
   } catch (_) {
-
-    if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
+    if (log)
+      log.textContent =
+        "Could not reach the local server (is server.py running?).";
 
     return;
-
   }
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-
     if (log) log.textContent = data.error || `Could not enable (${res.status})`;
 
     return;
-
   }
 
   reconnectProviders.delete(provider);
@@ -1751,60 +1586,63 @@ async function enableLocalProvider(provider) {
   renderReconnectBanner();
 
   await refreshConnections();
-
 }
 
-
-
 async function startBrowserConnect(provider) {
+  const card = document.querySelector(
+    `.conn-card[data-provider="${provider}"]`,
+  );
 
-  const card = document.querySelector(`.conn-card[data-provider="${provider}"]`);
-
-  const log = card?.querySelector('.conn-log');
+  const log = card?.querySelector(".conn-log");
 
   // A "Reconnect" (status connected/expired) should start a clean sign-in:
   // wipe the old profile cookies server-side so a stale/expired session never
   // carries over. A first-time Connect has nothing to clear.
   // Epic wishlist keeps its browser profile on reconnect — cf_clearance and
   // storefront cookies must survive or Cloudflare re-challenges every time.
-  const current = getAuthStatusSnapshot().find(x => x.key === provider)?.status;
-  const preserveProfile = provider === 'epic_wishlist';
-  const fresh = !preserveProfile && (current === 'connected' || current === 'expired');
+  const current = getAuthStatusSnapshot().find(
+    (x) => x.key === provider,
+  )?.status;
+  const preserveProfile = provider === "epic_wishlist";
+  const fresh =
+    !preserveProfile && (current === "connected" || current === "expired");
 
   if (log) {
+    log.classList.remove("hidden");
 
-    log.classList.remove('hidden');
-
-    log.textContent = fresh ? 'Clearing old session, opening sign-in window…' : 'Opening sign-in window…';
-
+    log.textContent = fresh
+      ? "Clearing old session, opening sign-in window…"
+      : "Opening sign-in window…";
   }
 
   let res;
 
   try {
-
-    res = await baklogFetch(`/api/auth/${provider}/start${fresh ? '?fresh=1' : ''}`, { method: 'POST' });
-
+    res = await baklogFetch(
+      `/api/auth/${provider}/start${fresh ? "?fresh=1" : ""}`,
+      { method: "POST" },
+    );
   } catch (err) {
-    if (log) log.textContent = 'Could not reach the local server (is server.py running?).';
+    if (log)
+      log.textContent =
+        "Could not reach the local server (is server.py running?).";
 
     return;
-
   }
 
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-
     if (log) log.textContent = data.error || `Start failed (${res.status})`;
 
     return;
-
   }
 
   startPostConnectFastPoll();
 
-  const streamUrl = await urlWithStreamTicket(`/api/auth/${data.session_id}/stream`);
+  const streamUrl = await urlWithStreamTicket(
+    `/api/auth/${data.session_id}/stream`,
+  );
   const es = new EventSource(streamUrl);
   let connectUiFinished = false;
 
@@ -1814,72 +1652,74 @@ async function startBrowserConnect(provider) {
     stopPostConnectFastPoll();
     reconnectProviders.delete(provider);
     renderReconnectBanner();
-    try { es.close(); } catch (_) { /* noop */ }
+    try {
+      es.close();
+    } catch (_) {
+      /* noop */
+    }
     try {
       await refreshConnections();
-      const row = getAuthStatusSnapshot().find(r => r.key === provider);
-      if (log && row?.status === 'connected') log.textContent = 'Connected.';
-    } catch (_) { /* noop */ }
+      const row = getAuthStatusSnapshot().find((r) => r.key === provider);
+      if (log && row?.status === "connected") log.textContent = "Connected.";
+    } catch (_) {
+      /* noop */
+    }
   }
 
-  es.addEventListener('waiting_for_user', ev => {
-
+  es.addEventListener("waiting_for_user", (ev) => {
     const msg = JSON.parse(ev.data);
 
-    if (log) log.textContent = msg.message || 'Complete sign-in in the browser window…';
-
+    if (log)
+      log.textContent =
+        msg.message || "Complete sign-in in the browser window…";
   });
 
-  es.addEventListener('signed_in', () => {
-
-    if (log) log.textContent = 'Signed in - extracting credentials…';
-
+  es.addEventListener("signed_in", () => {
+    if (log) log.textContent = "Signed in - extracting credentials…";
   });
 
-  es.addEventListener('extracted', () => {
-
-    if (log) log.textContent = 'Connected.';
+  es.addEventListener("extracted", () => {
+    if (log) log.textContent = "Connected.";
 
     void finishConnectUi();
-
   });
 
-  es.addEventListener('error', ev => {
-
+  es.addEventListener("error", (ev) => {
     try {
-
       const msg = JSON.parse(ev.data);
 
-      if (log) log.textContent = msg.message || 'Sign-in failed';
-
+      if (log) log.textContent = msg.message || "Sign-in failed";
     } catch {
+      if (log) log.textContent = "Sign-in failed or window closed.";
+    }
 
-      if (log) log.textContent = 'Sign-in failed or window closed.';
-
+    // On frozen builds, the server console stderr may contain the actual
+    // error details (e.g. a traceback from the connect callback).
+    if (_serverFrozen && log) {
+      log.textContent += " Check the BAKLOG server console for error details.";
     }
 
     connectUiFinished = true;
     es.close();
-
   });
 
-  es.addEventListener('done', () => {
+  es.addEventListener("done", () => {
     // Belt-and-suspenders: if the extracted event was dropped, still settle the
     // Connections card from the final auth/status poll on session end.
     void finishConnectUi();
   });
-
 }
-
-
 
 async function refreshBrowserPreflight() {
   try {
-    const res = await baklogFetch('/api/config');
+    const res = await baklogFetch("/api/config");
     if (!res.ok) return;
     const data = await res.json();
-    if (typeof data.chromium_available === 'boolean') {
+    if (typeof data.chromium_available === "boolean") {
       _chromiumAvailable = data.chromium_available;
+    }
+    if (typeof data.frozen === "boolean") {
+      _serverFrozen = data.frozen;
     }
   } catch {
     // Older servers omit chromium_available — assume available.
@@ -1887,11 +1727,11 @@ async function refreshBrowserPreflight() {
 }
 
 function renderBrowserWarn() {
-  const el = document.getElementById('connBrowserWarn');
+  const el = document.getElementById("connBrowserWarn");
   if (!el) return;
   if (_chromiumAvailable) {
     el.hidden = true;
-    el.innerHTML = '';
+    el.innerHTML = "";
     return;
   }
   el.hidden = false;
@@ -1902,10 +1742,8 @@ function renderBrowserWarn() {
 }
 
 export async function refreshConnections() {
-
   _connRefreshInFlight = true;
   try {
-
     await refreshBrowserPreflight();
     await fetchAuthStatus();
 
@@ -1916,48 +1754,34 @@ export async function refreshConnections() {
 
     renderReconnectBanner();
 
-    const { applyItchTabVisibility } = await import('./filters-ui.js');
+    const { applyItchTabVisibility } = await import("./filters-ui.js");
     applyItchTabVisibility();
-
   } catch (err) {
-
     const msg = connectionStatusErrorMessage(err);
 
     if (getAuthStatusSnapshot().length > 0) {
-
       renderConnections();
 
       showConnRefreshError(msg);
-
     } else {
-
       clearConnRefreshError();
 
-      const rail = document.getElementById('connRail');
+      const rail = document.getElementById("connRail");
 
-      const pane = document.getElementById('connPane');
+      const pane = document.getElementById("connPane");
 
-      if (rail) rail.innerHTML = '';
+      if (rail) rail.innerHTML = "";
 
       if (pane) {
-
         pane.innerHTML = `<p class="text-sm text-amber-400">${escapeHtml(msg)}</p>`;
-
       }
-
     }
 
     renderHero();
-
   } finally {
-
     _connRefreshInFlight = false;
-
   }
-
 }
-
-
 
 function startPostConnectFastPoll() {
   stopPostConnectFastPoll();
@@ -1992,17 +1816,16 @@ function resumePostConnectFastPollIfActive() {
   }, POST_CONNECT_FAST_POLL_MS);
 }
 
-
 export function startConnectionsPolling() {
   stopConnectionsPolling();
-  if (state.activeView !== 'connections' || isPageHidden()) return;
+  if (state.activeView !== "connections" || isPageHidden()) return;
   pollTimer = setInterval(() => {
-    if (state.activeView !== 'connections' || isPageHidden()) return;
+    if (state.activeView !== "connections" || isPageHidden()) return;
     refreshConnections();
   }, 15000);
 }
 
-if (typeof document !== 'undefined') {
+if (typeof document !== "undefined") {
   registerPausable({
     pause() {
       stopConnectionsPolling();
@@ -2012,85 +1835,73 @@ if (typeof document !== 'undefined') {
       }
     },
     resume() {
-      if (state.activeView === 'connections') startConnectionsPolling();
+      if (state.activeView === "connections") startConnectionsPolling();
       resumePostConnectFastPollIfActive();
     },
   });
 
-  if (typeof BroadcastChannel !== 'undefined') {
+  if (typeof BroadcastChannel !== "undefined") {
     try {
-      const authChannel = new BroadcastChannel('baklog-auth');
+      const authChannel = new BroadcastChannel("baklog-auth");
       authChannel.onmessage = (ev) => {
         if (ev.data?.provider) refreshConnections();
       };
-    } catch (_) { /* ignore */ }
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   // Repaint the open Connections view the instant the auth-status cache changes
   // out-of-band (e.g. a fetcher run just failed with 401 and the fast path called
   // ingestAuthStatusProviders), instead of waiting up to 15s for the next poll.
   // Skip when our own refreshConnections() drove the update — it renders itself.
-  document.addEventListener('baklog:auth-status', () => {
+  document.addEventListener("baklog:auth-status", () => {
     if (_connRefreshInFlight) return;
-    if (state.activeView !== 'connections' || isPageHidden()) return;
+    if (state.activeView !== "connections" || isPageHidden()) return;
     try {
       renderConnections();
       renderReconnectBanner();
-    } catch (_) { /* view not mounted */ }
+    } catch (_) {
+      /* view not mounted */
+    }
   });
 }
 
-
-
 export function stopConnectionsPolling() {
-
   if (pollTimer) clearInterval(pollTimer);
 
   pollTimer = null;
-
 }
 
-
-
 export function wireConnectionsUi() {
-
   wireGridEvents();
 
   wireChromeEvents();
-
 }
 
-
-
 export function initConnections() {
-
   wireConnectionsUi();
 
   return refreshConnections();
-
 }
 
-
-
 export function noteFetcherAuthFailure(fetcherKey, logText) {
-
   const provider = providerForFetcher(fetcherKey);
 
   if (!provider) return false;
 
-  const authish = /401|403|auth|cookie|session|credential|sign in|npsso|rejected/i.test(logText || '');
+  const authish =
+    /401|403|auth|cookie|session|credential|sign in|npsso|rejected/i.test(
+      logText || "",
+    );
 
   if (authish) showReconnectBanner([provider]);
 
   return authish;
-
 }
-
-
 
 /** Jump to Connections and start reconnect for a provider (browser auto-start). */
 export async function reconnectProvider(provider, { autoStart = true } = {}) {
-
   if (!provider) return;
 
   _selectedKey = groupRepFor(provider);
@@ -2098,13 +1909,9 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
   document.querySelector('.view-tab[data-view="connections"]')?.click();
 
   try {
-
     await refreshConnections();
-
   } catch {
-
     renderConnections();
-
   }
 
   // When navigating in from a dashboard chip/affordance we only want to tab
@@ -2113,23 +1920,15 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
   // connect actions (e.g. Steam onboarding button).
   if (!autoStart) return;
 
-  const p = getAuthStatusSnapshot().find(x => x.key === provider);
+  const p = getAuthStatusSnapshot().find((x) => x.key === provider);
 
-  const kind = p?.kind || 'browser';
+  const kind = p?.kind || "browser";
 
-  if (kind === 'local') {
-
+  if (kind === "local") {
     await enableLocalProvider(provider);
-
-  } else if (kind === 'browser') {
-
+  } else if (kind === "browser") {
     await startBrowserConnect(provider);
-
-  } else if (kind === 'manual') {
-
+  } else if (kind === "manual") {
     await openManualUrl(provider);
-
   }
-
 }
-

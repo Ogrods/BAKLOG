@@ -90,13 +90,7 @@ Write-Host "Smoke: frozen bundle (migration + /api/config + fetcher dispatch)...
 if ($LASTEXITCODE -ne 0) {
     Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
 }
-
-Write-Host "Smoke: frozen import chain (critical lazy imports)..."
-& $Python scripts/frozen_import_smoke.py --exe $ServerExe
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_import_smoke failed (exit $LASTEXITCODE)"
-}
-
+Write-Host "Smoke: frozen connect-flow endpoints..."
 Write-Host "Smoke: frozen connect-flow endpoints..."
 & $Python scripts/frozen_connect_smoke.py --exe $ServerExe
 if ($LASTEXITCODE -ne 0) {

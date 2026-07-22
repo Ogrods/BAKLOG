@@ -36,7 +36,7 @@ dev = [
 # System tray launcher (tray_app.py). Optional — the server runs without it.
 tray = [
     "pystray>=0.19",
-    "Pillow>=10.0",
+    "Pillow>=12.3.0",
 ]
 
 [tool.pytest.ini_options]

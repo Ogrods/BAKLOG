@@ -1,7 +1,6 @@
 {
   "ids": [
     "epic-echo-generation-midnight-edition-069026",
-    "epic-luto-0a4ab3",
     "gamerpower-1604",
     "gamerpower-2204",
     "gamerpower-3306",
@@ -12,8 +11,7 @@
     "gamerpower-3697",
     "gamerpower-3709",
     "gamerpower-3712",
-    "gamerpower-3714",
-    "gamerpower-3715",
+    "gamerpower-3717",
     "itad-073a56345192",
     "itad-0a93135bfee3",
     "itad-0c69ed1f1bd8",
@@ -29,12 +27,13 @@
     "itad-b2fe2af076cf",
     "itad-bd4edc3ae553",
     "itad-cb21d42d706e",
-    "itad-d263067e9e67",
     "itad-d85d5bb4128d",
     "itad-dd5b5b16e035",
     "itad-de23882e1f39",
     "itad-eb44ea1d719b",
-    "itad-f0cffe659c19"
+    "itad-f0cffe659c19",
+    "gamerpower-3720",
+    "itad-df07e9ed2270"
   ],
   "store_overrides": {
     "gamerpower-3446": "indiegala",
@@ -72,12 +71,6 @@
     },
     "gamerpower-3712": {
       "title": "Catch Me!"
-    },
-    "gamerpower-3714": {
-      "title": "Luto"
-    },
-    "gamerpower-3715": {
-      "title": "Echo Generation: Midnight Edition"
     },
     "itad-073a56345192": {
       "title": "Songs of Conquest"
@@ -124,9 +117,6 @@
     "itad-cb21d42d706e": {
       "title": "Princess Farmer"
     },
-    "itad-d263067e9e67": {
-      "title": "Together After Dark"
-    },
     "itad-d85d5bb4128d": {
       "title": "Madness Inside"
     },
@@ -141,12 +131,6 @@
     },
     "itad-f0cffe659c19": {
       "title": "Blacklist Mafia"
-    },
-    "itad-0e2b83ac494b": {
-      "title": "Echo Generation: Midnight Edition"
-    },
-    "itad-df07e9ed2270": {
-      "title": "LUTO free on EGS"
     }
   },
   "dismissed": [
@@ -154,28 +138,13 @@
     "gamerpower-3287",
     "gamerpower-3279",
     "gamerpower-3294",
-    "gamerpower-3710",
-    "itad-928b6c2361a4",
-    "itad-0e2b83ac494b",
-    "itad-df07e9ed2270",
     "gamerpower-3716",
-    "gamerpower-3717"
+    "itad-02941627e90c",
+    "itad-0e2b83ac494b",
+    "gamerpower-3715",
+    "epic-luto-0a4ab3",
+    "itad-d263067e9e67",
+    "gamerpower-3714"
   ],
-  "dismissed_keys": [
-    "nova lands",
-    "tattoo tycoon",
-    "madness inside",
-    "mr brocco co",
-    "blacklist mafia",
-    "whiskey mafia leo s family",
-    "keepup survival",
-    "together after dark",
-    "catch me",
-    "luto",
-    "echo generation midnight edition"
-  ],
-  "premium_only_ids": [
-    "gamerpower-3498",
-    "itad-840d262ba7fa"
-  ]
+  "premium_only_ids": ["gamerpower-3498", "itad-840d262ba7fa"]
 }

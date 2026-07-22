@@ -1,9 +1,9 @@
 {
-  "fetched_at": "2026-07-16T19:53:42.027841+00:00",
+  "fetched_at": "2026-07-20T19:19:02.788432+00:00",
   "sources": {
     "epic": 2,
-    "gamerpower": 19,
-    "itad": 18
+    "gamerpower": 14,
+    "itad": 15
   },
   "attribution": [
     "GamerPower.com"
@@ -26,29 +26,32 @@
       "title": "Echo Generation: Midnight Edition",
       "claim_url": "https://store.epicgames.com/en-US/p/echo-generation-midnight-edition-069026",
       "ends_at": "2026-07-23T15:00:00Z",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/d85d8cbcd8bd43308d262ba62af5b5ce/echo-generation-midnight-edition-49ac1.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1072300/header.jpg?t=1763674119",
       "blurb": null,
       "source": "epic",
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+      "first_seen": "2026-07-16T19:44:35.442648+00:00",
+      "review_percent": 93,
+      "steam_appid": 1072300
     },
     {
-      "id": "gamerpower-3717",
+      "id": "gamerpower-3720",
       "store": "steam",
-      "title": "shapez (Steam) Key Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/shapez-steam-key-giveaway",
-      "ends_at": null,
-      "header_image": "https://www.gamerpower.com/offers/1b/6a5913d6ea4c8.jpg",
-      "blurb": "Claim your free Steam key for shapez via Alienware Arena! Please note this Steam Key giveaway requires 50 ARP (Arena Reward Points) to claim a key. Fortunately, you can earn ARP daily for free. shapez is a minimalistic factory building game about the automation of shapes.",
+      "title": "The Life and Suffering of Sir Brante (Steam) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/the-life-and-suffering-of-sir-brante-steam-giveaway",
+      "ends_at": "2026-07-23T23:59:00Z",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1272160/header.jpg?t=1784565992",
+      "blurb": "Looking for a new Steam game? Score The Life and Suffering of Sir Brante for free via Steam until July 23! The Life and Suffering of Sir Brante is a 2d narrative-driven RPG game with an interesting art style. Check it out.",
       "source": "gamerpower",
-      "review_percent": 96,
-      "steam_appid": 1318690,
+      "first_seen": "2026-07-20T19:19:02.788432+00:00",
+      "review_percent": 89,
+      "steam_appid": 1272160,
       "genres": [
-        "Casual",
+        "Adventure",
         "Indie",
+        "RPG",
         "Simulation",
         "Strategy"
-      ],
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+      ]
     },
     {
       "id": "gamerpower-3716",
@@ -80,21 +83,12 @@
       "title": "Luto (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/luto-epic-games-giveaway",
       "ends_at": "2026-07-23T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a58f8a468d50.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1729740/def13c797b5c98624d24fb0b75d2e57ea0fdbf70/header.jpg?t=1784213685",
       "blurb": "Claim Luto for free via Epic Games Store! Luto is a 3d first-person psychological experience game where you take on the role of someone unable to leave their home.",
       "source": "gamerpower",
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
-    },
-    {
-      "id": "gamerpower-3712",
-      "store": "steam",
-      "title": "Catch Me! (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/catch-me-steam-giveaway",
-      "ends_at": "2026-07-17T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a57bece3e05e.jpg",
-      "blurb": "Catch this giveaway! Grab Catch Me! for free via Steam until 17 Jul.  Catch Me! is a fun 2d 4-player game of tag. Don´t miss it!",
-      "source": "gamerpower",
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+      "first_seen": "2026-07-16T19:44:35.442648+00:00",
+      "review_percent": 85,
+      "steam_appid": 1729740
     },
     {
       "id": "gamerpower-3555",
@@ -102,32 +96,12 @@
       "title": "Together After Dark (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/together-after-dark-epic-games-giveaway",
       "ends_at": "2026-07-27T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/69cafab460c8e.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2708790/6df984dadfcb8b4affc211bc05b21438c18901c3/header.jpg?t=1775309343",
       "blurb": "Who does not like to dive deep into a dark and dangerous forest? Together After Dark is free on Epic Games Store until July 27! Together After Dark is a co-op survival game for 1-4 players. Try it out!",
       "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "gamerpower-3710",
-      "store": "epic",
-      "title": "KeepUp Survival (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/keepup-survival-epic-games-giveaway",
-      "ends_at": "2026-07-19T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a53be9cea179.jpg",
-      "blurb": "Looking for a open-world crafting and survival game? Score KeepUp Survival for free via Epic Games Store. KeepUp Survival is a 3d first-person open-world base-building and exploration game with survival elements. Give it a try!",
-      "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "gamerpower-3709",
-      "store": "epic",
-      "title": "NoRush! - Tower Edition (Epic Games) Giveaways",
-      "claim_url": "https://www.gamerpower.com/open/norush-tower-edition-epic-games-giveaways",
-      "ends_at": "2026-07-20T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a53a044a87b6.jpg",
-      "blurb": "No rush to claim this giveaway. Grab NoRush! - Tower Edition for free via Epic Games Store! NoRush is a 3d casual runner game with unexpected twists.",
-      "source": "gamerpower",
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
+      "first_seen": "2026-07-14T04:29:43.833231+00:00",
+      "review_percent": 53,
+      "steam_appid": 2708790
     },
     {
       "id": "gamerpower-3498",
@@ -174,32 +148,6 @@
       "review_percent": 76,
       "steam_appid": 3102000,
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
-    },
-    {
-      "id": "gamerpower-3697",
-      "store": "itch",
-      "title": "NIGHTBELL (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/nightbell-itch-io-giveaway",
-      "ends_at": "2026-07-19T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a456f543d3c9.jpg",
-      "blurb": "Download NIGHTBELL for free on Itch.io until July 12th 2026. NIGHTBELL is a 3d first person game with a creepy atmosphere. Check it out.",
-      "source": "gamerpower",
-      "review_percent": 77,
-      "steam_appid": 4216630,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "gamerpower-3676",
-      "store": "itch",
-      "title": "Dire Echo (itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/dire-echo-itchio-giveaway",
-      "ends_at": "2026-07-19T23:59:00Z",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a27eafa35794.jpg",
-      "blurb": "Explore deep space with this giveaway. Get Dire Echo for free on itch.io, a 3d sci-fi first-person exploration game featuring impressive visuals.",
-      "source": "gamerpower",
-      "review_percent": 72,
-      "steam_appid": 3743180,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
       "id": "gamerpower-3279",
@@ -261,6 +209,17 @@
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },
     {
+      "id": "itad-02941627e90c",
+      "store": "steam",
+      "title": "The Life and Suffering of Sir Brante free on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16403/",
+      "ends_at": null,
+      "header_image": null,
+      "blurb": "<a href=\"https://isthereanydeal.com/game/the-life-and-suffering-of-sir-brante/info/\">The Life and Suffering of Sir Brante</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 23 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1272160/The_Life_and_Suffering_of_Sir_Brante/>go to giveaway</a>",
+      "source": "itad",
+      "first_seen": "2026-07-20T19:19:02.788432+00:00"
+    },
+    {
       "id": "itad-920c69f9fdf1",
       "store": "epic",
       "title": "The Ouroboros King free on MOBILE from EGS on Epic Game Store",
@@ -279,10 +238,12 @@
       "title": "Echo Generation: Midnight Edition free on EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16397/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/echo-generation-midnight-edition/info/\">Echo Generation: Midnight Edition</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 23 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/echo-generation-midnight-edition-069026>go to giveaway</a>",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1072300/header.jpg?t=1763674119",
+      "blurb": "Echo Generation: Midnight Edition",
       "source": "itad",
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+      "first_seen": "2026-07-16T19:44:35.442648+00:00",
+      "review_percent": 93,
+      "steam_appid": 1072300
     },
     {
       "id": "itad-df07e9ed2270",
@@ -290,10 +251,12 @@
       "title": "LUTO free on EGS on Epic Game Store",
       "claim_url": "https://isthereanydeal.com/giveaways/16398/",
       "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/luto/info/\">Luto</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Thu, 23 Jul 2026 17:00:00 +0200\n                                        | <a href=https://store.epicgames.com/p/luto-0a4ab3>go to giveaway</a>",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1729740/library_600x900_2x.jpg",
+      "blurb": "Luto",
       "source": "itad",
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
+      "first_seen": "2026-07-16T19:44:35.442648+00:00",
+      "review_percent": 85,
+      "steam_appid": 1729740
     },
     {
       "id": "itad-840d262ba7fa",
@@ -313,17 +276,6 @@
       "first_seen": "2026-07-16T19:44:35.442648+00:00"
     },
     {
-      "id": "itad-928b6c2361a4",
-      "store": "steam",
-      "title": "Catch Me -  FREE on Steam on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16391/",
-      "ends_at": null,
-      "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/catch-me/info/\">Catch Me</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Fri, 17 Jul 2026 19:00:00 +0200\n                                        | <a href=https://store.steampowered.com/app/1741160/Catch_Me/>go to giveaway</a>",
-      "source": "itad",
-      "first_seen": "2026-07-16T19:44:35.442648+00:00"
-    },
-    {
       "id": "itad-d263067e9e67",
       "store": "epic",
       "title": "Together After Dark free on EGS on Epic Game Store",
@@ -334,32 +286,6 @@
       "source": "itad",
       "review_percent": 53,
       "steam_appid": 2708790,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "itad-eb44ea1d719b",
-      "store": "epic",
-      "title": "KeepUp Survival free on EGS on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16383/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1524630/library_600x900_2x.jpg",
-      "blurb": "KeepUp Survival",
-      "source": "itad",
-      "review_percent": 64,
-      "steam_appid": 1524630,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "itad-bd4edc3ae553",
-      "store": "epic",
-      "title": "NoRush! free on EGS on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16382/",
-      "ends_at": null,
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/3297160/library_600x900_2x.jpg",
-      "blurb": "NoRush!",
-      "source": "itad",
-      "review_percent": 100,
-      "steam_appid": 3297160,
       "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
@@ -382,22 +308,10 @@
       "claim_url": "https://isthereanydeal.com/giveaways/16348/",
       "ends_at": null,
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1300430/header.jpg?t=1687266777",
-      "blurb": "<a href=\"https://isthereanydeal.com/game/whiskey-mafia-leos-family/info/\">Whiskey.Mafia. Leo&#039;s Family</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            unknown expiry\n                                        | <a href=https://freebies.indiegala.com/whiskeymafia-leos-family>go to giveaway</a>",
+      "blurb": "Whiskey.Mafia. Leo&#039;s Family",
       "source": "itad",
       "review_percent": 68,
       "steam_appid": 1300430,
-      "first_seen": "2026-07-14T04:29:43.833231+00:00"
-    },
-    {
-      "id": "itad-0a93135bfee3",
-      "store": "itch",
-      "title": "Slime King free on itch.io on Itch.io",
-      "claim_url": "https://isthereanydeal.com/giveaways/16322/",
-      "ends_at": null,
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4492760/1e33df18bd8306a81a37cf52d7da39beb8869224/header.jpg?t=1778687408",
-      "blurb": "Slime King itch.io",
-      "source": "itad",
-      "steam_appid": 4492760,
       "first_seen": "2026-07-14T04:29:43.833231+00:00"
     },
     {
@@ -470,7 +384,7 @@
       "claim_url": "https://isthereanydeal.com/giveaways/15746/",
       "ends_at": null,
       "header_image": null,
-      "blurb": "<a href=\"https://isthereanydeal.com/game/smiley-dusty/info/\">Smiley Dusty</a>\n                        \n                                                \n                        <br />\n                    \n                    \n                    <br />\n                                            expires on Sat, 21 Nov 2026 17:00:00 +0100\n                                        | <a href=https://polypaw.itch.io/smiley-dusty>go to giveaway</a>",
+      "blurb": "Smiley Dusty",
       "source": "itad",
       "first_seen": "2026-06-11T22:48:59.387102+00:00"
     },

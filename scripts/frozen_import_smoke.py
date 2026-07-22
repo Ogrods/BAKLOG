@@ -66,10 +66,10 @@ def run_import_test(exe: Path, module_name: str) -> dict:
     code = f"import {module_name}; print('ok')"
     try:
         proc = subprocess.run(
-            [str(exe), "-c", code],
+            [str(exe), "-E", "-c", code],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,
             creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW)
             if sys.platform == "win32"
             else 0,

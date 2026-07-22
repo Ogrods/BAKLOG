@@ -29,6 +29,39 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.34] - 2026-07-22
+
+### Fixed
+
+- Bump Pillow minimum version to `>=12.3.0` to resolve 7 Dependabot vulnerabilities (5 high, 2 moderate) in `requirements.txt` and `pyproject.toml`.
+- Bump setuptools to `>=83.0.0` to resolve Dependabot alert (medium).
+- `npm audit fix` to resolve brace-expansion (high) and js-yaml (high) transitive deps.
+- Frozen build parity: `pyproject.toml` copied to bundle root for frozen version detection; bundle layout, data dir migration, fetcher dispatch, and import verification are all gated via `frozen_bundle_smoke.py`.
+- Frozen `_import_smoke` subprocess console windows suppressed via `CREATE_NO_WINDOW`.
+- Ruff lint warnings resolved in `scripts/` and `tools/` (E501, E701, F401, F841, I001).
+- Lint errors in `server.py`, `dev_frozen_parity.py`, `server_internal_routes.py`.
+- Updated curated free claims data (add/remove expired entries, update dismissed).
+
+## [0.8.33] - 2026-07-14
+
+### Fixed
+
+- Steam storesearch/reviews CORS: proxy requests through local server using real browser User-Agent.
+- Nintendo fetch auth failure: reconnect window was closing immediately after stale cookies; `abort_if_browser_closed` guards added to 6 connect extractors.
+- Battle.net connect window closing immediately on stale cookies.
+- Headless Chrome close blocks fetcher exit in `fetch_humble.py`, `fetch_humble_wishlist.py`, `fetch_nintendo.py`, `fetch_nintendo_wishlist.py`, `fetch_psn_wishlist.py`, `fetch_ubisoft.py` — switched to daemon threads.
+- `fetch_amazon_web` lazy import prefix missing (`clients.` → `clients.amazon_web_client`).
+- `fetch_free_claims` missing `enrich` lane in `/api/runs/cancel` validation.
+- Sanitize blurb double-escape reverted in `claim-card.js` (entity decoding restored).
+- Redact sensitive tokens in fetcher progress logging; 30 CodeQL alerts resolved.
+- `insertAdjacentHTML` replaces `innerHTML` in update-check and trophy-popover.
+- Mock pro-view.js in itch-tab-visibility test to prevent async leak after teardown.
+- Test fixes surfaced by CI (two pre-existing failures, monkeypatch kwargs).
+
+### Changed
+
+- Dependabot dependency bumps (pip & npm) for security advisories.
+
 ## [0.8.32] - 2026-07-14
 
 ### Added

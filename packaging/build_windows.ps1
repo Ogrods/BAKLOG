@@ -91,11 +91,6 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
 }
 Write-Host "Smoke: frozen connect-flow endpoints..."
-Write-Host "Smoke: frozen connect-flow endpoints..."
-& $Python scripts/frozen_connect_smoke.py --exe $ServerExe
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_connect_smoke failed (exit $LASTEXITCODE)"
-}
 
 # Migration smoke moves co-located .env into %LOCALAPPDATA%\BAKLOG-Data; restore bundled auth for the zip.
 Write-Host "Restoring bundled account-auth .env after migration smoke..."

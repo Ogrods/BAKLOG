@@ -920,7 +920,7 @@ export const fetcherRunner = (() => {
     const pending = new Set(runIds);
     const deadline = Date.now() + timeoutMs;
     while (pending.size > 0 && Date.now() < deadline) {
-      let snap = null;
+      let snap;
       try {
         snap = await fetchRunsSnapshot({ force: true });
       } catch (_) {

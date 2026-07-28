@@ -20,8 +20,8 @@ export function syncRuntimeModeBanner(cfg = {}) {
   const mode = cfg.runtime_label || (cfg.frozen === true ? 'installed' : 'dev');
   const dataPath = typeof cfg.data_dir_path === 'string' ? cfg.data_dir_path.trim() : '';
   const pathTip = dataPath ? ` Library files: ${dataPath}.` : '';
-  let label = '';
-  let detail = '';
+  let label;
+  let detail;
 
   if (mode === 'dev') {
     label = 'Dev server';

@@ -19,11 +19,9 @@ export default defineConfig({
     testTimeout: 30000,
     environment: "happy-dom",
     pool: "forks",
-    poolOptions: {
-      forks: {
-        execArgv: ["--no-experimental-webstorage"],
-      },
-    },
+    // Vitest 4: poolOptions removed; execArgv is top-level.
+    // Node 22+ experimental Web Storage otherwise shadows happy-dom localStorage.
+    execArgv: ["--no-experimental-webstorage"],
     include: ["tests/**/*.test.js"],
     // admin/ is gitignored (baklog-internal); skip its unit tests on public CI.
     exclude: adminPresent ? [] : adminOnlyTests,

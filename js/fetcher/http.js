@@ -19,7 +19,7 @@ export async function fetchWithTimeout(url, options = {}, ms = FETCH_TIMEOUT_MS)
     return await doFetch(url, { ...merged, signal: ctrl.signal });
   } catch (err) {
     if (err?.name === 'AbortError') {
-      throw new Error('server not responding');
+      throw new Error('server not responding', { cause: err });
     }
     throw err;
   } finally {

@@ -93,7 +93,7 @@ export function loadPrefs() {
     customLists: defaultCustomLists(),
     customListFilter: null,
   };
-  let stored = {};
+  let stored;
   try { stored = JSON.parse(localStorage.getItem(prefsStorageKey()) || "{}"); } catch { return fallback; }
   const merged = { ...fallback, ...stored };
   if (!["off", "any", "online", "local", "both"].includes(merged.coopFilterMode)) {

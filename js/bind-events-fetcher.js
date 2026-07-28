@@ -86,13 +86,15 @@ export function bindFetcherHealthEvents() {
       return;
     }
     const staleBtn = e.target.closest(".fh-run-stale");
-    if (staleBtn && !staleBtn.disabled) {
+    // matches(':disabled') covers attribute + property; happy-dom can fire
+    // programmatic clicks on disabled buttons under Vitest 4.
+    if (staleBtn && !staleBtn.matches(":disabled")) {
       e.preventDefault();
       fetcherRunner.runAllStale();
       return;
     }
     const failedBtn = e.target.closest(".fh-run-failed");
-    if (failedBtn && !failedBtn.disabled) {
+    if (failedBtn && !failedBtn.matches(":disabled")) {
       e.preventDefault();
       fetcherRunner.runAllFailed();
       return;

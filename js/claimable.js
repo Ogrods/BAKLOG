@@ -391,7 +391,7 @@ async function fetchHostedClaims() {
     const doc = await res.json();
     return doc;
   } catch (err) {
-    if (err?.name === 'AbortError') throw new Error('claims feed timeout');
+    if (err?.name === 'AbortError') throw new Error('claims feed timeout', { cause: err });
     throw err;
   } finally {
     clearTimeout(timer);

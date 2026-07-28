@@ -900,10 +900,29 @@ export function bindEvents() {
   }
   fetch('/api/config').then((res) => res.json()).then((cfg) => {
     if (cfg?.frozen === true && bootUpdateRow) bootUpdateRow.classList.remove('hidden');
+    const version =
+      typeof cfg?.version === "string" ? cfg.version.trim() : "";
     const versionEl = document.getElementById('kebabAppVersion');
-    if (versionEl && typeof cfg?.version === 'string' && cfg.version.trim()) {
-      versionEl.textContent = `Version ${cfg.version.trim()}`;
+    if (versionEl && version) {
+      versionEl.textContent = `Version ${version}`;
       versionEl.classList.remove('hidden');
+    }
+    const badge = document.getElementById("brandVersionBadge");
+    const badgeWrap = document.getElementById("brandVersionBadgeWrap");
+    if (badge && version) {
+      badge.textContent = `v${version}`;
+      badge.classList.remove("hidden");
+      badge.removeAttribute("aria-hidden");
+      if (badgeWrap) {
+        badgeWrap.setAttribute("aria-label", `Beta version ${version}`);
+        const runtime =
+          typeof cfg?.runtime_label === "string"
+            ? cfg.runtime_label.trim()
+            : "";
+        badgeWrap.title = runtime
+          ? `BAKLOG v${version} (${runtime})`
+          : `BAKLOG v${version}`;
+      }
     }
   }).catch(() => {});
   document.getElementById("copyDiagnostics")?.addEventListener("click", async () => {

@@ -12,7 +12,7 @@ function extractPyFrozensetKeys(source, name) {
 function extractAdminAdLocations(source) {
   const block = source.match(/const AD_LOCATIONS = \[([\s\S]*?)\];/);
   if (!block) return [];
-  return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  return [...block[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]);
 }
 
 function extractMigratorLocationKeys(source) {

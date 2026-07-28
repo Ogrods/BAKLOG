@@ -4257,13 +4257,12 @@ html:has(#viewLoadingOverlay.show) .app-footer {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
+  gap: 0.3em;
   margin-top: 0.15rem;
   padding: 0.18em 0.45em;
   border-radius: 999px;
   font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   line-height: 1;
   color: var(--accent, #38bdf8);
   background: color-mix(in srgb, var(--accent, #38bdf8) 16%, transparent);
@@ -4271,6 +4270,24 @@ html:has(#viewLoadingOverlay.show) .app-footer {
   white-space: nowrap;
   /* Nudge up and to the left without shifting the header layout. */
   transform: translate(-3px, -3px);
+}
+.brand-beta-label {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.brand-beta-ver {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.92;
+}
+.brand-beta-ver.hidden {
+  display: none;
+}
+.brand-beta-ver:not(.hidden)::before {
+  content: "·";
+  margin-right: 0.3em;
+  opacity: 0.7;
 }
 .runtime-mode-banner {
   display: inline-flex;
@@ -12039,10 +12056,12 @@ html[data-theme="ember"] .conn-primary:hover {
   .app-header-row {
     row-gap: 0.5rem;
   }
-  .app-header-nav {
-    flex-basis: 100%;
+  /* Order the row flex children (brand | nav-wrap | actions), not the nested nav. */
+  .app-header-nav-wrap {
+    flex: 1 1 100%;
     order: 3;
     max-width: 100%;
+    min-width: 0;
   }
   .app-header-actions {
     margin-left: auto;
@@ -12099,7 +12118,7 @@ html[data-theme="ember"] .conn-primary:hover {
     bottom: 0;
     width: 28px;
     pointer-events: none;
-    background: linear-gradient(90deg, transparent, #0f172a 85%);
+    background: linear-gradient(90deg, transparent, var(--bg) 85%);
   }
   .app-header-nav {
     display: flex;

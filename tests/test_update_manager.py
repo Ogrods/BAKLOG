@@ -278,6 +278,112 @@ def test_rehydrate_ready_state_on_init(
     assert status["version"] == "0.8.27"
 
 
+def test_rehydrate_discards_ready_already_installed(
+    tmp_path: Path,
+) -> None:
+    payload = b"verified-package"
+    digest = hashlib.sha256(payload).hexdigest()
+    version_dir = tmp_path / "0.8.34"
+    version_dir.mkdir()
+    zip_path = version_dir / "package.zip"
+    zip_path.write_bytes(payload)
+    from shared.update_ready_state import READY_FILENAME, write_ready_state
+
+    write_ready_state(
+        tmp_path,
+        version="0.8.34",
+        sha256=digest,
+        zip_path=zip_path,
+    )
+
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.34",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    status = mgr.status_dict()
+    assert status["phase"] == "idle"
+    assert status["can_apply"] is False
+    assert not zip_path.is_file()
+    assert not (version_dir / READY_FILENAME).is_file()
+
+
+def test_rehydrate_discards_ready_older_than_current(
+    tmp_path: Path,
+) -> None:
+    payload = b"verified-package"
+    digest = hashlib.sha256(payload).hexdigest()
+    version_dir = tmp_path / "0.8.30"
+    version_dir.mkdir()
+    zip_path = version_dir / "package.zip"
+    zip_path.write_bytes(payload)
+    from shared.update_ready_state import write_ready_state
+
+    write_ready_state(
+        tmp_path,
+        version="0.8.30",
+        sha256=digest,
+        zip_path=zip_path,
+    )
+
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.34",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    assert mgr.status_dict()["phase"] == "idle"
+    assert not zip_path.is_file()
+
+
+def test_acknowledge_apply_result_clears_success_when_current(
+    tmp_path: Path,
+) -> None:
+    from shared.update_ready_state import APPLY_RESULT_FILENAME, write_ready_state
+
+    payload = b"verified-package"
+    digest = hashlib.sha256(payload).hexdigest()
+    version_dir = tmp_path / "0.8.35"
+    version_dir.mkdir()
+    zip_path = version_dir / "package.zip"
+    zip_path.write_bytes(payload)
+    write_ready_state(
+        tmp_path,
+        version="0.8.35",
+        sha256=digest,
+        zip_path=zip_path,
+    )
+    (tmp_path / APPLY_RESULT_FILENAME).write_text(
+        '{"ok": true, "error": "", "version": "0.8.35"}',
+        encoding="utf-8",
+    )
+
+    # Current still behind → do not acknowledge (in-flight apply poll).
+    mgr_old = UpdateManager(
+        current_version=lambda: "0.8.34",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    assert mgr_old.status_dict()["phase"] == "ready"
+    pending = mgr_old.acknowledge_apply_result()
+    assert pending["acknowledged"] is False
+    assert pending["result"]["ok"] is True
+    assert (tmp_path / APPLY_RESULT_FILENAME).is_file()
+
+    # After relaunch on the new version → acknowledge + clear ready.
+    mgr_new = UpdateManager(
+        current_version=lambda: "0.8.35",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    assert mgr_new.status_dict()["phase"] == "idle"
+    ack = mgr_new.acknowledge_apply_result()
+    assert ack["acknowledged"] is True
+    assert ack["success"] is True
+    assert ack["version"] == "0.8.35"
+    assert not (tmp_path / APPLY_RESULT_FILENAME).is_file()
+    assert not zip_path.is_file()
+
+
 def test_discard_ready_update_clears_disk(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

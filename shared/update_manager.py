@@ -82,6 +82,37 @@ class UpdateManager:
     def apply_result_dict(self) -> dict[str, Any] | None:
         return read_apply_result(self._work_root)
 
+    def acknowledge_apply_result(self) -> dict[str, Any]:
+        """Clear a successful apply-result once the installed version catches up.
+
+        Leaves in-flight / failed results alone so the pre-restart poll and error
+        UI can still read them. Returns whether a success was acknowledged.
+        """
+        result = read_apply_result(self._work_root)
+        if not result:
+            return {"ok": True, "acknowledged": False, "result": None}
+        version = str(result.get("version") or "").strip()
+        success = result.get("ok") is True
+        current = str(self._current_version() or "").strip()
+        # Only consume successful applies once we are already on that version
+        # (or newer). During apply the old process still reports the prior version.
+        if not success or not version or update_available(current, version):
+            return {"ok": True, "acknowledged": False, "result": result}
+        clear_ready_state(self._work_root, version)
+        with self._lock:
+            if self._status.version == version:
+                self._zip_path = None
+                self._artifacts = None
+                self._status = UpdateStatus()
+        clear_apply_result(self._work_root)
+        return {
+            "ok": True,
+            "acknowledged": True,
+            "success": True,
+            "version": version,
+            "result": result,
+        }
+
     def _set_status(self, **kwargs: Any) -> None:
         with self._lock:
             for key, value in kwargs.items():
@@ -95,6 +126,12 @@ class UpdateManager:
         sha256 = str(meta.get("sha256") or "").strip().lower()
         zip_path = Path(str(meta.get("zip_path") or ""))
         if not version or not sha256 or not zip_path.is_file():
+            return
+        # Drop packages that are already installed (or older). Otherwise a
+        # successful Install & restart leaves ready.json and the banner returns.
+        current = str(self._current_version() or "").strip()
+        if current and not update_available(current, version):
+            clear_ready_state(self._work_root, version)
             return
         try:
             verify_file_sha256(zip_path, sha256)

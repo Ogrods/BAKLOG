@@ -168,7 +168,38 @@ def test_update_apply_result_public_read(
     status, body = _get(update_api_server, "/api/update/apply-result")
     assert status == 200
     assert body.get("ok") is True
+    assert body.get("acknowledged") is False
     assert body.get("result", {}).get("ok") is False
+
+
+def test_update_apply_result_acknowledges_success_when_current(
+    update_api_server: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from shared.update_manager import UpdateManager, reset_update_manager_for_tests
+
+    reset_update_manager_for_tests()
+    work_root = tmp_path / "BAKLOG-update"
+    work_root.mkdir()
+    (work_root / "apply-result.json").write_text(
+        '{"ok": true, "error": "", "version": "0.8.35"}',
+        encoding="utf-8",
+    )
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.35",
+        has_in_flight_runs=lambda: False,
+        work_root=work_root,
+    )
+    monkeypatch.setattr("shared.update_api.get_update_manager", lambda **kwargs: mgr)
+
+    status, body = _get(update_api_server, "/api/update/apply-result")
+    assert status == 200
+    assert body.get("acknowledged") is True
+    assert body.get("success") is True
+    assert body.get("version") == "0.8.35"
+    assert body.get("result") is None
+    assert not (work_root / "apply-result.json").is_file()
 
 
 def test_update_discard_ready_endpoint(

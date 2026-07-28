@@ -11,7 +11,7 @@
     <!-- Must match pyproject.toml + package.json (see CHANGELOG release discipline). Read at runtime by js/error-boundary.js for bug-bundle metadata. -->
     <!-- Optional override for bug report endpoint during local testing: content="http://127.0.0.1:3000/api/report" -->
     <!-- <meta name="baklog-report-endpoint" content="https://baklog.app/api/report" /> -->
-    <meta name="baklog-version" content="0.8.34" />
+    <meta name="baklog-version" content="0.8.35" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <script>
@@ -438,7 +438,14 @@
             >
               BAKLOG
             </h1>
-            <span class="brand-beta" aria-label="Beta">Beta</span>
+            <span class="brand-beta" id="brandVersionBadgeWrap" aria-label="Beta">
+              <span class="brand-beta-label">Beta</span>
+              <span
+                id="brandVersionBadge"
+                class="brand-beta-ver hidden"
+                aria-hidden="true"
+              ></span>
+            </span>
             <span
               id="runtimeModeBanner"
               class="runtime-mode-banner hidden"

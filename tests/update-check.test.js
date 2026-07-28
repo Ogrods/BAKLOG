@@ -26,6 +26,7 @@ import {
   showUpdateModal,
   showReadyToInstallBanner,
   syncReadyUpdateFromStatus,
+  acknowledgeApplyResultOnBoot,
   cancelUpdateDownload,
   mapUpdateError,
   showUpdateToast,
@@ -478,6 +479,45 @@ describe('dismissUpdateForVersion', () => {
   });
 });
 
+describe('acknowledgeApplyResultOnBoot', () => {
+  it('toasts and hides banner when apply was acknowledged', async () => {
+    document.getElementById('updateAvailableBanner').classList.remove('hidden');
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        acknowledged: true,
+        success: true,
+        version: '0.8.35',
+      }),
+    }));
+    const onNotice = vi.fn();
+    const result = await acknowledgeApplyResultOnBoot({
+      fetchFn,
+      frozen: true,
+      onNotice,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      acknowledged: true,
+      success: true,
+      version: '0.8.35',
+    });
+    expect(document.getElementById('updateAvailableBanner').classList.contains('hidden')).toBe(true);
+    expect(onNotice).toHaveBeenCalledWith('Updated to v0.8.35.');
+    expect(document.getElementById('updateNoticeToast')?.textContent).toBe(
+      'Updated to v0.8.35.',
+    );
+  });
+
+  it('skips when not frozen', async () => {
+    const fetchFn = vi.fn();
+    const result = await acknowledgeApplyResultOnBoot({ fetchFn, frozen: false });
+    expect(result).toEqual({ ok: true, acknowledged: false });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
 describe('syncReadyUpdateFromStatus', () => {
   it('shows ready banner when server reports ready package', async () => {
     const fetchFn = vi.fn(async () => ({
@@ -567,6 +607,23 @@ describe('discardReadyUpdate', () => {
 });
 
 describe('pollPostApplyOutcome', () => {
+  it('resolves when apply-result was acknowledged after relaunch', async () => {
+    const fetchFn = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (
+        url === '/api/update/apply-result'
+          ? { ok: true, acknowledged: true, success: true, version: '0.8.35' }
+          : { ok: true, phase: 'idle' }
+      ),
+    }));
+    const result = await pollPostApplyOutcome({
+      fetchFn,
+      sleepMs: 1,
+      timeoutMs: 50,
+    });
+    expect(result).toEqual({ ok: true, version: '0.8.35' });
+  });
+
   it('shows recovery copy after timeout', async () => {
     vi.useFakeTimers();
     const fetchFn = vi.fn(async (url) => ({

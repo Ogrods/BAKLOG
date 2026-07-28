@@ -674,6 +674,12 @@ export async function pollPostApplyOutcome(opts = {}) {
           fetchFn("/api/update/apply-result"),
         ]);
         const resultPayload = await resultRes.json().catch(() => ({}));
+        if (
+          resultPayload?.acknowledged === true &&
+          resultPayload?.success === true
+        ) {
+          return { ok: true, version: resultPayload.version || null };
+        }
         const applyResult = resultPayload?.result;
         if (applyResult && applyResult.ok === false) {
           const msg = mapUpdateError(
@@ -832,6 +838,39 @@ export async function runInAppUpdateFlow(opts = {}) {
     applied: true,
     version: applyPayload.version || status.version,
   };
+}
+
+/**
+ * @param {{ fetchFn?: typeof fetch, frozen?: boolean, onNotice?: (msg: string, opts?: { error?: boolean }) => void }} [opts]
+ */
+export async function acknowledgeApplyResultOnBoot(opts = {}) {
+  if (opts.frozen === false) return { ok: true, acknowledged: false };
+  const fetchFn = opts.fetchFn || baklogFetch;
+  try {
+    const res = await fetchFn("/api/update/apply-result");
+    if (!res.ok) return { ok: false };
+    const data = await res.json().catch(() => ({}));
+    if (data?.acknowledged === true && data?.success === true) {
+      const version =
+        typeof data.version === "string" && data.version.trim()
+          ? data.version.trim()
+          : "";
+      const msg = version
+        ? `Updated to v${version}.`
+        : "Update installed successfully.";
+      hideUpdateBanner();
+      showUpdateToast(msg);
+      opts.onNotice?.(msg);
+      return { ok: true, acknowledged: true, success: true, version };
+    }
+    return {
+      ok: true,
+      acknowledged: false,
+      result: data?.result ?? null,
+    };
+  } catch {
+    return { ok: false };
+  }
 }
 
 /**

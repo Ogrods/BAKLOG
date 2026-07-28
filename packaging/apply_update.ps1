@@ -174,6 +174,14 @@ try {
 
     Remove-OldBackups -InstallParent $installParent -KeepBackup $backupDir
     Write-ApplyResult -Ok $true -Version $version -Restored $false
+    # Drop ready package so the relaunched app does not rehydrate Install & restart.
+    $versionDir = Join-Path $script:UpdateRoot $version
+    if (Test-Path -LiteralPath $versionDir) {
+        Remove-Item -LiteralPath (Join-Path $versionDir "ready.json") -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $versionDir "package.zip") -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $versionDir "apply-manifest.json") -Force -ErrorAction SilentlyContinue
+        try { Remove-Item -LiteralPath $versionDir -Force -ErrorAction SilentlyContinue } catch {}
+    }
     Start-Process -FilePath $trayExePath -WorkingDirectory $installDir | Out-Null
 } finally {
     if (Test-Path -LiteralPath $staging) {

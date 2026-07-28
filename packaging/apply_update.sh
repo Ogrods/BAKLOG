@@ -169,6 +169,12 @@ fi
 chmod +x "$INSTALL_DIR/BAKLOG" "$INSTALL_DIR/BAKLOG Tray" 2>/dev/null || true
 remove_old_backups "$INSTALL_PARENT" "$BACKUP_DIR"
 write_apply_result true "" "$VERSION" false
+# Drop ready package so the relaunched app does not rehydrate Install & restart.
+VERSION_DIR="$UPDATE_ROOT/$VERSION"
+if [[ -d "$VERSION_DIR" ]]; then
+  rm -f "$VERSION_DIR/ready.json" "$VERSION_DIR/package.zip" "$VERSION_DIR/apply-manifest.json"
+  rmdir "$VERSION_DIR" 2>/dev/null || true
+fi
 
 cd "$INSTALL_DIR"
 exec "./BAKLOG Tray" >/dev/null 2>&1 &

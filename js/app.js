@@ -311,8 +311,13 @@ async function bootstrap() {
         syncRuntimeModeBanner(cfg);
         if (cfg.frozen === true) {
           const bootCheck = state.prefs?.checkUpdatesOnBoot !== false;
-          const { checkForUpdates, syncReadyUpdateFromStatus } =
-            await import("./update-check.js");
+          const {
+            checkForUpdates,
+            syncReadyUpdateFromStatus,
+            acknowledgeApplyResultOnBoot,
+          } = await import("./update-check.js");
+          // Acknowledge a completed apply before rehydrating a ready banner.
+          await acknowledgeApplyResultOnBoot({ frozen: true }).catch(() => {});
           syncReadyUpdateFromStatus({ frozen: true }).catch(() => {});
           checkForUpdates({
             source: "boot",

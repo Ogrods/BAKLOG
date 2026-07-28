@@ -92,7 +92,19 @@ def handle_update_support_get(
         has_active_sessions=has_active_sessions,
     )
     if path == "/api/update/apply-result":
-        send_json(HTTPStatus.OK, {"ok": True, "result": mgr.apply_result_dict()})
+        # Acknowledge successful applies once the running build is already on
+        # (or past) the applied version — clears sticky ready packages on boot.
+        ack = mgr.acknowledge_apply_result()
+        send_json(
+            HTTPStatus.OK,
+            {
+                "ok": True,
+                "result": ack.get("result") if not ack.get("acknowledged") else None,
+                "acknowledged": bool(ack.get("acknowledged")),
+                "success": bool(ack.get("success")) if ack.get("acknowledged") else None,
+                "version": ack.get("version"),
+            },
+        )
         return True
     if path == "/api/update-check":
         sign_in_active = has_active_sessions() if has_active_sessions else False

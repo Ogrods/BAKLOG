@@ -442,13 +442,13 @@ describe('filterClaimsItems stale auto-hide', () => {
   ];
   const approvedIds = new Set(['stale-sel']);
 
-  it('hides stale unselected rows from the default view', () => {
+  it('keeps stale unselected rows visible in the default All view', () => {
     const out = filterClaimsItems(items, { approvedIds }, now);
     const ids = out.map((it) => it.id);
     expect(ids).toContain('fresh');
-    expect(ids).toContain('stale-sel'); // selected stays
-    expect(ids).toContain('stale-live'); // future end date stays
-    expect(ids).not.toContain('stale-unsel');
+    expect(ids).toContain('stale-sel');
+    expect(ids).toContain('stale-live');
+    expect(ids).toContain('stale-unsel');
   });
 
   it('shows only stale rows under the stale filter', () => {

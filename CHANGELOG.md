@@ -29,6 +29,15 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.35] - 2026-07-28
+
+### Fixed
+
+- Sticky **Install & restart** banner after a successful in-app update: ready packages that are already installed (or older) are discarded on boot, apply scripts clear the ready package after success, and a successful `apply-result` is acknowledged once with a short toast instead of re-showing the ready banner.
+- Vitest sync-pair extractor accepts double-quoted `AD_LOCATIONS` in `admin/admin.js`; claims workspace stale-filter test matches the intentional default-All visibility of stale rows.
+- Header brand badge shows Beta plus `vX.Y.Z` from `/api/config` (same source as the kebab version line).
+- Tablet header wrap: order/`flex-basis` now target `.app-header-nav-wrap` so tabs drop to a full-width second row; phone nav fade uses `var(--bg)`.
+
 ## [0.8.34] - 2026-07-22
 
 ### Fixed

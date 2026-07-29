@@ -33,6 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Headed Connect on Windows: Chrome/Edge launcher exit code 0 no longer aborts before CDP attaches (Battle.net and other browser sign-ins were closing immediately with "Browser exited immediately (code 0)"). Wait for `/json/version`, and on exit 0 with no CDP release the profile lock and retry once.
 - Sticky **Install & restart** banner after a successful in-app update: ready packages that are already installed (or older) are discarded on boot, apply scripts clear the ready package after success, and a successful `apply-result` is acknowledged once with a short toast instead of re-showing the ready banner.
 - Vitest sync-pair extractor accepts double-quoted `AD_LOCATIONS` in `admin/admin.js`; claims workspace stale-filter test matches the intentional default-All visibility of stale rows.
 - Header brand badge shows Beta plus `vX.Y.Z` from `/api/config` (same source as the kebab version line).

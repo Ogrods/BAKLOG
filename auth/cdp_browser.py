@@ -1628,17 +1628,24 @@ def launch_persistent_profile(
         )
 
         deadline = time.time() + 30
+        # On Windows the Popen handle is often a short-lived launcher that exits 0
+        # while the real Chrome/Edge child keeps CDP alive on ``port``. Do not
+        # treat exit 0 as fatal — keep polling /json/version (same rule as
+        # browser_session_gone / CdpContext.close).
+        launcher_exited_zero = False
         while time.time() < deadline:
-            if proc.poll() is not None:
-                exit_code = proc.returncode
-                # Capture any early output before the process died.
+            exit_code = proc.poll()
+            if exit_code is not None and exit_code != 0:
                 early_output = ""
                 try:
                     raw = proc.stdout.read(8192) if proc.stdout else b""
                     early_output = raw.decode("utf-8", errors="replace").strip()[:500]
                 except Exception:
                     pass
-                proc.kill()
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
                 if attempt == 0 and exit_code == 21:
                     released_pids = release_chromium_profile_lock(profile)
                     break
@@ -1653,6 +1660,8 @@ def launch_persistent_profile(
                     "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH "
                     "to the browser executable, or try the other installed browser."
                 )
+            if exit_code == 0:
+                launcher_exited_zero = True
             try:
                 version = _fetch_json(f"http://127.0.0.1:{port}/json/version", timeout=2)
                 ws_url = version.get("webSocketDebuggerUrl")
@@ -1663,6 +1672,11 @@ def launch_persistent_profile(
             time.sleep(0.2)
         if ws_url:
             break
+        # Exit 0 with no CDP yet often means SingletonLock handoff (Chrome exits
+        # the second instance cleanly). Release the profile lock and relaunch once.
+        if attempt == 0 and launcher_exited_zero:
+            released_pids = release_chromium_profile_lock(profile)
+            continue
 
     if not ws_url:
         if proc is not None:
@@ -1673,7 +1687,10 @@ def launch_persistent_profile(
                 late_output = raw.decode("utf-8", errors="replace").strip()[:500]
             except Exception:
                 pass
-            proc.kill()
+            try:
+                proc.kill()
+            except Exception:
+                pass
         detail = f" (output: {late_output})" if late_output else ""
         raise _browser_launch_error(
             f"Browser did not start CDP debugging endpoint in time.{detail}"

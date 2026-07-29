@@ -13,9 +13,11 @@ GitHub Actions: run the manual "CDP smoke" workflow after a suspected browser re
 
 from __future__ import annotations
 
+import io
 import os
 import sys
 import tempfile
+import urllib.error
 from pathlib import Path
 
 import pytest
@@ -582,6 +584,215 @@ def test_launch_goto_title() -> None:
         import shutil
 
         shutil.rmtree(profile, ignore_errors=True)
+
+
+class TestLaunchWaitExitZero:
+    """Windows Chrome launcher often exits 0 before CDP attaches."""
+
+    @staticmethod
+    def _popen_only_fake(fake_proc_cls, real_popen):
+        """Return Popen stand-in that fakes Chrome launches only.
+
+        Patching ``subprocess.Popen`` globally breaks conftest leak detection
+        (tasklist/ps), so non-Chrome calls must use the real Popen.
+        """
+
+        def _popen(*args, **kwargs):
+            cmd = args[0] if args else kwargs.get("args")
+            first = str(cmd[0]) if cmd else ""
+            if first.endswith("chrome.exe") or first.endswith("chrome"):
+                return fake_proc_cls()
+            return real_popen(*args, **kwargs)
+
+        return _popen
+
+    def test_exit_zero_waits_for_cdp_then_attaches(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        import auth.cdp_browser as cdp
+
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+        version_hits = {"n": 0}
+        real_popen = cdp.subprocess.Popen
+
+        class FakeProc:
+            stdout = io.BytesIO(b"")
+
+            def poll(self) -> int:
+                return 0
+
+            def kill(self) -> None:
+                return None
+
+            def wait(self, timeout: float | None = None) -> int:
+                return 0
+
+            def terminate(self) -> None:
+                return None
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"", b"")
+
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        class FakeWs:
+            def recv(self) -> str:
+                raise ConnectionError("closed")
+
+            def close(self) -> None:
+                return None
+
+            def send(self, _data: str) -> None:
+                return None
+
+        def fake_fetch(url: str, timeout: float = 2) -> dict | list:
+            if "/json/version" in url:
+                version_hits["n"] += 1
+                if version_hits["n"] < 2:
+                    raise urllib.error.URLError("not ready")
+                return {
+                    "webSocketDebuggerUrl": "ws://127.0.0.1:9222/devtools/browser/x"
+                }
+            if "/json/list" in url:
+                return [{"type": "page", "id": "T1", "url": "about:blank"}]
+            return {}
+
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
+        monkeypatch.setattr(cdp, "_fetch_json", fake_fetch)
+        monkeypatch.setattr(cdp.time, "sleep", lambda _s: None)
+        monkeypatch.setattr(
+            cdp.websocket, "create_connection", lambda *a, **k: FakeWs()
+        )
+        monkeypatch.setattr(
+            cdp.CdpContext,
+            "_send",
+            lambda self, method, params=None, timeout=60: {"result": {}},
+        )
+        monkeypatch.setattr(
+            cdp.CdpContext,
+            "_attach_page",
+            lambda self, target_id: _FakePage(f"S-{target_id}"),
+        )
+        monkeypatch.setattr(cdp.CdpContext, "add_init_script", lambda self, _s: None)
+
+        ctx = launch_persistent_profile(profile, headless=False)
+        assert version_hits["n"] >= 2
+        assert len(ctx.pages) == 1
+        ctx.close = lambda: None  # type: ignore[method-assign]
+
+    def test_exit_zero_without_cdp_times_out(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        import auth.cdp_browser as cdp
+
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+        lock_calls: list[Path] = []
+        clock = {"t": 0.0}
+        real_popen = cdp.subprocess.Popen
+
+        class FakeProc:
+            stdout = io.BytesIO(b"")
+
+            def poll(self) -> int:
+                return 0
+
+            def kill(self) -> None:
+                return None
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"", b"")
+
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        def fake_fetch(url: str, timeout: float = 2) -> dict:
+            raise urllib.error.URLError("never")
+
+        def fake_sleep(_s: float) -> None:
+            # Jump past the 30s CDP wait so each attempt ends quickly.
+            clock["t"] += 40.0
+
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
+        monkeypatch.setattr(cdp, "_fetch_json", fake_fetch)
+        monkeypatch.setattr(cdp.time, "sleep", fake_sleep)
+        monkeypatch.setattr(cdp.time, "time", lambda: clock["t"])
+        monkeypatch.setattr(
+            cdp,
+            "release_chromium_profile_lock",
+            lambda p: lock_calls.append(Path(p)) or [],
+        )
+
+        with pytest.raises(RuntimeError, match="did not start CDP"):
+            launch_persistent_profile(profile, headless=False)
+        assert lock_calls, "exit 0 without CDP should release profile lock and retry"
+
+    def test_nonzero_exit_still_raises_immediately(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        import auth.cdp_browser as cdp
+
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+        real_popen = cdp.subprocess.Popen
+
+        class FakeProc:
+            stdout = io.BytesIO(b"boom")
+
+            def poll(self) -> int:
+                return 1
+
+            def kill(self) -> None:
+                return None
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"boom", b"")
+
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
+        monkeypatch.setattr(cdp.time, "sleep", lambda _s: None)
+        monkeypatch.setattr(
+            cdp,
+            "_fetch_json",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not fetch")),
+        )
+
+        with pytest.raises(RuntimeError, match="exited immediately \\(code 1\\)"):
+            launch_persistent_profile(profile, headless=False)
 
 
 class TestBrowserSessionGone:

@@ -589,6 +589,23 @@ def test_launch_goto_title() -> None:
 class TestLaunchWaitExitZero:
     """Windows Chrome launcher often exits 0 before CDP attaches."""
 
+    @staticmethod
+    def _popen_only_fake(fake_proc_cls, real_popen):
+        """Return Popen stand-in that fakes Chrome launches only.
+
+        Patching ``subprocess.Popen`` globally breaks conftest leak detection
+        (tasklist/ps), so non-Chrome calls must use the real Popen.
+        """
+
+        def _popen(*args, **kwargs):
+            cmd = args[0] if args else kwargs.get("args")
+            first = str(cmd[0]) if cmd else ""
+            if first.endswith("chrome.exe") or first.endswith("chrome"):
+                return fake_proc_cls()
+            return real_popen(*args, **kwargs)
+
+        return _popen
+
     def test_exit_zero_waits_for_cdp_then_attaches(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
@@ -598,6 +615,7 @@ class TestLaunchWaitExitZero:
         exe.write_bytes(b"")
         profile = tmp_path / "profile"
         version_hits = {"n": 0}
+        real_popen = cdp.subprocess.Popen
 
         class FakeProc:
             stdout = io.BytesIO(b"")
@@ -613,6 +631,9 @@ class TestLaunchWaitExitZero:
 
             def terminate(self) -> None:
                 return None
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"", b"")
 
             def __enter__(self) -> FakeProc:
                 return self
@@ -644,7 +665,11 @@ class TestLaunchWaitExitZero:
 
         monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
         monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
-        monkeypatch.setattr(cdp.subprocess, "Popen", lambda *a, **k: FakeProc())
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
         monkeypatch.setattr(cdp, "_fetch_json", fake_fetch)
         monkeypatch.setattr(cdp.time, "sleep", lambda _s: None)
         monkeypatch.setattr(
@@ -677,6 +702,7 @@ class TestLaunchWaitExitZero:
         profile = tmp_path / "profile"
         lock_calls: list[Path] = []
         clock = {"t": 0.0}
+        real_popen = cdp.subprocess.Popen
 
         class FakeProc:
             stdout = io.BytesIO(b"")
@@ -686,6 +712,9 @@ class TestLaunchWaitExitZero:
 
             def kill(self) -> None:
                 return None
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"", b"")
 
             def __enter__(self) -> FakeProc:
                 return self
@@ -702,7 +731,11 @@ class TestLaunchWaitExitZero:
 
         monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
         monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
-        monkeypatch.setattr(cdp.subprocess, "Popen", lambda *a, **k: FakeProc())
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
         monkeypatch.setattr(cdp, "_fetch_json", fake_fetch)
         monkeypatch.setattr(cdp.time, "sleep", fake_sleep)
         monkeypatch.setattr(cdp.time, "time", lambda: clock["t"])
@@ -724,6 +757,7 @@ class TestLaunchWaitExitZero:
         exe = tmp_path / "chrome.exe"
         exe.write_bytes(b"")
         profile = tmp_path / "profile"
+        real_popen = cdp.subprocess.Popen
 
         class FakeProc:
             stdout = io.BytesIO(b"boom")
@@ -734,6 +768,9 @@ class TestLaunchWaitExitZero:
             def kill(self) -> None:
                 return None
 
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"boom", b"")
+
             def __enter__(self) -> FakeProc:
                 return self
 
@@ -742,7 +779,11 @@ class TestLaunchWaitExitZero:
 
         monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
         monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
-        monkeypatch.setattr(cdp.subprocess, "Popen", lambda *a, **k: FakeProc())
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
         monkeypatch.setattr(cdp.time, "sleep", lambda _s: None)
         monkeypatch.setattr(
             cdp,

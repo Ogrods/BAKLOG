@@ -614,6 +614,12 @@ class TestLaunchWaitExitZero:
             def terminate(self) -> None:
                 return None
 
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
         class FakeWs:
             def recv(self) -> str:
                 raise ConnectionError("closed")
@@ -681,6 +687,12 @@ class TestLaunchWaitExitZero:
             def kill(self) -> None:
                 return None
 
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
         def fake_fetch(url: str, timeout: float = 2) -> dict:
             raise urllib.error.URLError("never")
 
@@ -720,6 +732,12 @@ class TestLaunchWaitExitZero:
                 return 1
 
             def kill(self) -> None:
+                return None
+
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
                 return None
 
         monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)

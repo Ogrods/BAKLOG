@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from auth.session_probe import (
     PROBEABLE_QUIET,
+    probe_battlenet_session,
     probe_browser_session,
     probe_epic_session_quiet,
     probe_gog_session,
@@ -16,6 +17,7 @@ from auth.session_probe import (
     probe_steam_session_quiet,
     probe_xbox_wishlist_session,
 )
+from clients.battlenet_client import BattleNetAuthError
 from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError
 
 
@@ -83,6 +85,46 @@ class TestProbeXboxWishlistSession:
         ) as mock:
             assert probe_browser_session("xbox_wishlist", {"XBOX_WISHLIST_PROFILE": "ready"}) is None
         mock.assert_called_once()
+
+
+class TestProbeBattlenetSession:
+    def test_empty_cookie(self) -> None:
+        err = probe_battlenet_session("")
+        assert err is not None
+        assert "No Battle.net session" in err
+
+    def test_ok_when_probe_succeeds(self) -> None:
+        with patch(
+            "clients.battlenet_client.probe_session",
+            return_value={"modernGames": []},
+        ):
+            assert probe_battlenet_session("XSRF-TOKEN=x; BA-tassession=y") is None
+
+    def test_error_on_401(self) -> None:
+        with patch(
+            "clients.battlenet_client.probe_session",
+            side_effect=BattleNetAuthError("Battle.net rejected the session (401)."),
+        ):
+            err = probe_battlenet_session("stale")
+        assert err is not None
+        assert "401" in err
+
+    def test_probe_browser_session_routes_battlenet(self) -> None:
+        with patch(
+            "auth.session_probe.probe_battlenet_session",
+            return_value=None,
+        ) as mock:
+            assert probe_browser_session("battlenet", {"BATTLENET_COOKIE": "c"}) is None
+        mock.assert_called_once_with("c")
+
+    def test_probe_browser_session_battlenet_401(self) -> None:
+        with patch(
+            "auth.session_probe.probe_battlenet_session",
+            return_value="Battle.net rejected the session (401).",
+        ):
+            err = probe_browser_session("battlenet", {"BATTLENET_COOKIE": "bad"})
+        assert err is not None
+        assert "401" in err
 
 
 class TestQuietProbes:

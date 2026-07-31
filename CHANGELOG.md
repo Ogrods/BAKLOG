@@ -29,6 +29,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.40] - 2026-07-31
+
+### Fixed
+
+- Battle.net Connect no longer false-completes from a stale Chrome profile: sniffer matches `games-and-subs` only (not any `/api/`), in-page 401 ignores sniffer/external cookies and keeps the login window open, Connect always clears the Battle.net browser profile on start, and a post-connect `probe_browser_session` vetoes `mark_connected` when the saved cookie still gets 401.
+
 ## [0.8.39] - 2026-07-31
 
 ### Fixed

@@ -90,6 +90,21 @@ def test_plain_connect_does_not_clear_browser_session(
     assert cleared == []
 
 
+def test_battlenet_plain_connect_clears_browser_session(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Battle.net always clears profile so stale cookies cannot false-complete."""
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        auth_manager, "clear_browser_session", lambda p: cleared.append(p)
+    )
+    done = _stub_browser_worker(monkeypatch)
+
+    auth_manager.start_browser_auth("battlenet")
+    assert done.wait(timeout=3.0)
+    assert cleared == ["battlenet"]
+
+
 def test_clear_browser_session_removes_profile_dir(
     profile_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

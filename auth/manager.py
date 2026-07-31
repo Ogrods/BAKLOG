@@ -707,6 +707,10 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
         clear_browser_session(provider)
+    elif provider == "battlenet":
+        # Stale jar + broad API traffic caused false Connect before login.
+        # Always start Battle.net Connect from a clean profile.
+        clear_browser_session(provider)
     elif provider in PRESERVE_PROFILE_ON_RECONNECT:
         # Keep profile on reconnect (connected/expired) but drop ghost cookies
         # when starting from disconnected so connect cannot auto-complete on a

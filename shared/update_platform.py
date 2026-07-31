@@ -89,7 +89,12 @@ def tray_binary_name(platform: str | None = None) -> str:
 
 
 def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: Path) -> subprocess.Popen:
-    """Launch the platform apply helper after server-side security checks."""
+    """Launch the platform apply helper after server-side security checks.
+
+    The helper must outlive the shutting-down server (and survive tray tree-kill),
+    so it is started detached / in a new session — not as a child that dies with
+    BAKLOG.exe or gets swept by ``taskkill /T`` on the server PID.
+    """
     platform = sys.platform
     if platform == "win32":
         cmd = [
@@ -102,12 +107,31 @@ def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: P
             "-ManifestPath",
             str(manifest_path),
         ]
-    elif platform == "darwin":
+        # DETACHED_PROCESS + NEW_PROCESS_GROUP: apply is not in the tray→server tree.
+        flags = int(getattr(subprocess, "DETACHED_PROCESS", 0x00000008))
+        flags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
+        flags |= int(getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+        return subprocess.Popen(  # noqa: S603
+            cmd,
+            cwd=str(install_dir),
+            creationflags=flags,
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    if platform == "darwin":
         cmd = [
             "/bin/bash",
             str(script),
             str(manifest_path),
         ]
-    else:
-        raise OSError(f"In-app apply is not supported on {platform}")
-    return subprocess.Popen(cmd, cwd=str(install_dir))  # noqa: S603
+        return subprocess.Popen(  # noqa: S603
+            cmd,
+            cwd=str(install_dir),
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    raise OSError(f"In-app apply is not supported on {platform}")

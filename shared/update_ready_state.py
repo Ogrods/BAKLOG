@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -12,11 +13,48 @@ from shared.update_release import UpdateSecurityError, verify_file_sha256
 
 READY_FILENAME = "ready.json"
 APPLY_RESULT_FILENAME = "apply-result.json"
+APPLYING_LOCK_FILENAME = "applying.lock"
 PACKAGE_NAME = "package.zip"
+# Stale lock TTL — if apply crashes without clearing, tray may auto-restart again.
+APPLYING_LOCK_MAX_AGE_SEC = 15 * 60
 
 
 def default_work_root() -> Path:
     return (Path(tempfile.gettempdir()) / "BAKLOG-update").resolve()
+
+
+def write_applying_lock(work_root: Path | None = None, *, version: str = "") -> None:
+    """Mark an in-app apply so the tray watchdog does not respawn the server."""
+    root = (work_root or default_work_root()).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": version,
+        "written_at": datetime.now(UTC).isoformat(),
+    }
+    (root / APPLYING_LOCK_FILENAME).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def clear_applying_lock(work_root: Path | None = None) -> None:
+    path = (work_root or default_work_root()) / APPLYING_LOCK_FILENAME
+    path.unlink(missing_ok=True)
+
+
+def is_update_apply_in_progress(
+    work_root: Path | None = None,
+    *,
+    max_age_sec: float = APPLYING_LOCK_MAX_AGE_SEC,
+) -> bool:
+    """True while Install & restart owns the update workspace (fresh lock only)."""
+    path = (work_root or default_work_root()) / APPLYING_LOCK_FILENAME
+    if not path.is_file():
+        return False
+    try:
+        age = time.time() - path.stat().st_mtime
+    except OSError:
+        return False
+    if age < 0 or age > max_age_sec:
+        return False
+    return True
 
 
 def write_ready_state(
@@ -65,15 +103,16 @@ def read_apply_result(work_root: Path | None = None) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return None
     return data if isinstance(data, dict) else None
 
 
 def clear_apply_result(work_root: Path | None = None) -> None:
-    path = (work_root or default_work_root()) / APPLY_RESULT_FILENAME
-    path.unlink(missing_ok=True)
+    root = work_root or default_work_root()
+    (root / APPLY_RESULT_FILENAME).unlink(missing_ok=True)
+    clear_applying_lock(root)
 
 
 def scan_ready_state(work_root: Path) -> dict[str, Any] | None:

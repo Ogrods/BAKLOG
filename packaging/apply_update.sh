@@ -22,6 +22,7 @@ write_apply_result() {
   "finished_at": "$finished"
 }
 EOF
+  rm -f "$UPDATE_ROOT/applying.lock"
 }
 
 fail() {
@@ -117,8 +118,30 @@ wait_pid_gone() {
   done
 }
 
+kill_pid_tree() {
+  local pid="$1"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+  [[ "$pid" -le 0 ]] && return 0
+  # Best-effort: kill descendants then the root (tray owns the server child).
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -TERM -P "$pid" 2>/dev/null || true
+  fi
+  kill -TERM "$pid" 2>/dev/null || true
+  sleep 0.5
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -KILL -P "$pid" 2>/dev/null || true
+  fi
+  kill -KILL "$pid" 2>/dev/null || true
+}
+
+# Apply runs in a new session. Stop tray/server before copying so the tray
+# watchdog cannot respawn BAKLOG over locked install files.
+kill_pid_tree "$TRAY_PID"
+kill_pid_tree "$SERVER_PID"
 wait_pid_gone "$SERVER_PID" 45
 wait_pid_gone "$TRAY_PID" 15
+kill_pid_tree "$TRAY_PID"
+kill_pid_tree "$SERVER_PID"
 
 STAGING="$UPDATE_ROOT/staging-$$-$RANDOM"
 mkdir -p "$STAGING"

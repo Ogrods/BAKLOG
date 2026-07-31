@@ -58,11 +58,11 @@ def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_pat
     manifest.write_text("{}", encoding="utf-8")
     install = tmp_path / "install"
     install.mkdir()
-    calls: list[list[str]] = []
+    calls: list[dict] = []
 
     class FakePopen:
         def __init__(self, cmd, **kwargs):
-            calls.append(cmd)
+            calls.append({"cmd": cmd, "kwargs": kwargs})
 
         def __enter__(self):
             return self
@@ -73,8 +73,9 @@ def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr("shared.update_platform.subprocess.Popen", FakePopen)
     launch_apply_subprocess(script=script, manifest_path=manifest, install_dir=install)
     assert calls
-    assert calls[0][0] == "/bin/bash"
-    assert str(script) in calls[0]
+    assert calls[0]["cmd"][0] == "/bin/bash"
+    assert str(script) in calls[0]["cmd"]
+    assert calls[0]["kwargs"].get("start_new_session") is True
 
 
 @pytest.mark.no_leak_check
@@ -86,11 +87,11 @@ def test_launch_apply_subprocess_win32(monkeypatch: pytest.MonkeyPatch, tmp_path
     manifest.write_text("{}", encoding="utf-8")
     install = tmp_path / "install"
     install.mkdir()
-    calls: list[list[str]] = []
+    calls: list[dict] = []
 
     class FakePopen:
         def __init__(self, cmd, **kwargs):
-            calls.append(cmd)
+            calls.append({"cmd": cmd, "kwargs": kwargs})
 
         def __enter__(self):
             return self
@@ -101,5 +102,8 @@ def test_launch_apply_subprocess_win32(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr("shared.update_platform.subprocess.Popen", FakePopen)
     launch_apply_subprocess(script=script, manifest_path=manifest, install_dir=install)
     assert calls
-    assert "powershell.exe" in calls[0]
-    assert "-ManifestPath" in calls[0]
+    assert "powershell.exe" in calls[0]["cmd"]
+    assert "-ManifestPath" in calls[0]["cmd"]
+    flags = int(calls[0]["kwargs"].get("creationflags") or 0)
+    assert flags & 0x00000008  # DETACHED_PROCESS
+    assert flags & 0x00000200  # CREATE_NEW_PROCESS_GROUP

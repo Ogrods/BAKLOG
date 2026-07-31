@@ -441,6 +441,13 @@ export async function fetchBugBundleServerContext() {
       platform: data.platform ?? null,
       running_from_temp: data.running_from_temp ?? null,
       version: data.version ?? null,
+      update: data.update ?? null,
+      apply_result: data.apply_result ?? null,
+      apply_started: data.apply_started ?? null,
+      applying_lock_age_sec: data.applying_lock_age_sec ?? null,
+      apply_log_tail: data.apply_log_tail ?? null,
+      install_source: data.install_source ?? null,
+      arp_version: data.arp_version ?? null,
     };
   } catch (_) {
     return null;

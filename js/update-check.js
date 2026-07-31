@@ -341,7 +341,7 @@ export function renderUpdateModalHtml(parsed) {
     ? '<button type="button" class="update-modal-apply bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Update now</button>'
     : "";
   return (
-    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-5" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
+    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
     `<h2 id="updateModalTitle" class="text-lg font-semibold text-slate-100">Update available: v${escapeHtml(parsed.latest || "")}</h2>` +
     `<p class="text-sm text-slate-400 mt-1">You have v${escapeHtml(parsed.current)}.</p>` +
     renderApplyBlockedHint(parsed) +
@@ -356,7 +356,7 @@ export function renderUpdateModalHtml(parsed) {
 
 function renderInstallConfirmModalHtml(hints = _installHints) {
   return (
-    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-5" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
+    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
     '<h2 id="updateInstallTitle" class="text-lg font-semibold text-slate-100">Install and restart?</h2>' +
     '<p class="text-sm text-slate-400 mt-2">The update is downloaded and verified. BAKLOG will restart to finish installing. Your library data stays where it is.</p>' +
     renderSetupArpFootnote(hints) +

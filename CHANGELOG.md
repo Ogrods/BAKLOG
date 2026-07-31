@@ -29,6 +29,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.38] - 2026-07-31
+
+### Fixed
+
+- In-app Install & restart on Windows: root cause of the 0.8.36→0.8.37 apply failure. Launching the apply helper with `DETACHED_PROCESS` made `powershell.exe` exit immediately with rc=0 (no console host), so nothing was applied while the server still shut down and `applying.lock` blocked the tray watchdog. Drop `DETACHED_PROCESS`, use `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP`, kill tray/server with a self-excluding process walk (never `taskkill /T` on ourselves), always write `apply-result.json` / clear the lock / relaunch the tray on failure, use .NET zip extraction, and require an `apply-started.json` handshake before shutting the server down. Apply progress goes to `%TEMP%\BAKLOG-update\apply.log`; lock TTL shortened to 120s with heartbeats.
+- Battle.net Connect diagnostics: per-message rate-limited logging teed to `<data>/connect-battlenet.log` (visible under Tray launches), drop forbidden Origin/Referer from the in-page probe, broaden the network sniffer to any `account.battle.net/api` 200, and fall back to `Network.getCookies` with explicit urls when the CDP cookie dump is empty.
+- Bug bundles / `/api/diagnostics`: include update phase, apply result, applying-lock age, and apply log tail so the next stuck-update report is conclusive.
+
 ## [0.8.37] - 2026-07-31
 
 ### Fixed

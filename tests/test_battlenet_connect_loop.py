@@ -206,6 +206,58 @@ def test_stale_page_fails_live_page_succeeds() -> None:
     assert "BATTLENET_COOKIE" in creds
 
 
+def test_sniffer_matches_any_account_api_200() -> None:
+    ctx = _FakeContext(SESSION_COOKIES)
+    sniffer = BattleNetGamesAndSubsSniffer()
+    sniffer.attach(ctx)
+    req = MagicMock()
+    req.url = "https://account.battle.net/api/account-info"
+    req.headers = {"cookie": "BA-tassession=sess"}
+    resp = MagicMock()
+    resp.url = req.url
+    resp.status = 200
+    resp.request = req
+    ctx.response_handlers[0](resp)
+    with patch("clients.battlenet_client.probe_session") as probe:
+        creds = extract_battlenet_session(ctx, None, sniffer=sniffer)
+        probe.assert_not_called()
+    assert creds is not None
+    assert "BA-tassession=sess" in creds["BATTLENET_COOKIE"]
+
+
+def test_cookies_for_urls_fallback_when_dump_empty() -> None:
+    class Ctx(_FakeContext):
+        def cookies_for_urls(self, urls, *, page=None):
+            assert urls
+            return SESSION_COOKIES
+
+    ctx = Ctx([])
+    page = _FakePage({"ok": True, "status": 200})
+    with patch("clients.battlenet_client.probe_session") as probe:
+        creds = extract_battlenet_session(ctx, page)
+        probe.assert_not_called()
+    assert creds is not None
+    assert "BA-tassession=sess" in creds["BATTLENET_COOKIE"]
+
+
+def test_probe_drops_forbidden_origin_referer_headers() -> None:
+    page = _FakePage({"ok": True, "status": 200, "href": "https://account.battle.net/games", "origin": "https://account.battle.net"})
+    assert _battlenet_probe_via_page(page) is True
+    # Capture the evaluate expression from the last call via a recording page.
+    recorded: list[str] = []
+
+    class RecPage(_FakePage):
+        def evaluate(self, expr: str, *, timeout: float = 60) -> Any:
+            recorded.append(expr)
+            return super().evaluate(expr, timeout=timeout)
+
+    rec = RecPage({"ok": True, "status": 200})
+    _battlenet_probe_via_page(rec)
+    assert recorded
+    assert "Origin:" not in recorded[0]
+    assert "Referer:" not in recorded[0]
+
+
 def test_battlenet_live_page_prefers_games_tab() -> None:
     from auth.runner import _battlenet_live_page
 

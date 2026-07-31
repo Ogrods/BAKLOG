@@ -43,8 +43,19 @@ function Test-SafeChildPath([string]$Root, [string]$Relative) {
 }
 
 function Get-FileSha256([string]$Path) {
-    $hash = Get-FileHash -Path $Path -Algorithm SHA256
-    return $hash.Hash.ToLowerInvariant()
+    # Prefer .NET so -NoProfile / minimal runners still work (Get-FileHash may be absent).
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            $hashBytes = $sha.ComputeHash($stream)
+            return ([System.BitConverter]::ToString($hashBytes) -replace "-", "").ToLowerInvariant()
+        } finally {
+            $stream.Dispose()
+        }
+    } finally {
+        $sha.Dispose()
+    }
 }
 
 function Restore-InstallFromBackup([string]$InstallDir, [string]$BackupDir) {

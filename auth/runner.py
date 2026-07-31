@@ -147,11 +147,14 @@ def _battlenet_live_page(page, context):
 def _extract_battlenet_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Open account.battle.net/games and save cookies only after the library API works."""
     from auth.connect_extractors import (
+        _battlenet_log,
         battlenet_connect_hint,
         build_battlenet_games_sniffer,
         extract_battlenet_session,
     )
     from auth.connect_loop import run_connect_poll
+
+    _battlenet_log("connect poll start", key="enter")
 
     sniffer = build_battlenet_games_sniffer()
     sniffer.attach(context)

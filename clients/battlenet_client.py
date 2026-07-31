@@ -15,17 +15,13 @@ import re
 from typing import ClassVar
 from urllib.parse import unquote
 
-import browser_cookie3 as bc3
 import requests
 
 ACCOUNT_URL = "https://account.battle.net/api/games-and-subs"
 
-_BROWSER_LOADERS: dict[str, object] = {
-    "edge": bc3.edge,
-    "chrome": bc3.chrome,
-    "brave": bc3.brave,
-    "firefox": bc3.firefox,
-}
+# Names only — browser_cookie3 is imported inside from_browser() so
+# probe_session / BattleNetClient(cookie) work in frozen builds without it.
+_BROWSER_LOADER_NAMES: tuple[str, ...] = ("edge", "chrome", "brave", "firefox")
 
 
 class BattleNetAuthError(Exception):
@@ -46,7 +42,7 @@ def probe_session(cookie_header: str) -> dict:
 
 
 class BattleNetClient:
-    SUPPORTED_BROWSERS: ClassVar[tuple[str, ...]] = tuple(_BROWSER_LOADERS.keys())
+    SUPPORTED_BROWSERS: ClassVar[tuple[str, ...]] = _BROWSER_LOADER_NAMES
 
     def __init__(self, cookie_header: str, user_agent: str | None = None):
         cookie = (cookie_header or "").strip()
@@ -76,8 +72,22 @@ class BattleNetClient:
 
     @classmethod
     def from_browser(cls, browser: str = "edge", **kw) -> BattleNetClient:
+        try:
+            import browser_cookie3 as bc3
+        except Exception as e:  # noqa: BLE001
+            raise BattleNetAuthError(
+                f"browser_cookie3 is unavailable ({e}). Paste the Cookie header "
+                "into BATTLENET_COOKIE in .env and run with --browser env, or use "
+                "Connect on the Connections tab."
+            ) from e
+        loaders = {
+            "edge": bc3.edge,
+            "chrome": bc3.chrome,
+            "brave": bc3.brave,
+            "firefox": bc3.firefox,
+        }
         name = (browser or "edge").strip().lower()
-        loader = _BROWSER_LOADERS.get(name)
+        loader = loaders.get(name)
         if loader is None:
             supported = ", ".join(cls.SUPPORTED_BROWSERS)
             raise BattleNetAuthError(

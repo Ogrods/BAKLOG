@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from auth.connect_extractors import (
     BattleNetGamesAndSubsSniffer,
@@ -267,3 +270,77 @@ def test_battlenet_live_page_prefers_games_tab() -> None:
     ctx = MagicMock()
     ctx.pages = [blank, login, games]
     assert _battlenet_live_page(blank, ctx) is games
+
+
+def test_extract_succeeds_when_battlenet_client_import_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Frozen builds must not gate sniffer/in-page on browser_cookie3 import."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _block_client(name, *args, **kwargs):
+        if name == "clients.battlenet_client" or name.startswith("clients.battlenet_client"):
+            raise ImportError("simulated frozen missing browser_cookie3")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _block_client)
+    ctx = _FakeContext(SESSION_COOKIES)
+    page = _FakePage({"ok": True, "status": 200})
+    creds = extract_battlenet_session(ctx, page)
+    assert creds is not None
+    assert "BA-tassession=sess" in creds["BATTLENET_COOKIE"]
+
+
+def test_extract_sniffer_succeeds_without_battlenet_client_import(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _block_client(name, *args, **kwargs):
+        if name == "clients.battlenet_client" or (
+            isinstance(name, str) and name.startswith("clients.battlenet_client")
+        ):
+            raise ImportError("simulated frozen missing browser_cookie3")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _block_client)
+    ctx = _FakeContext(SESSION_COOKIES)
+    sniffer = BattleNetGamesAndSubsSniffer()
+    sniffer.attach(ctx)
+    req = MagicMock()
+    req.url = "https://account.battle.net/api/games-and-subs"
+    req.headers = {"cookie": "BA-tassession=sess"}
+    resp = MagicMock()
+    resp.url = req.url
+    resp.status = 200
+    resp.request = req
+    ctx.response_handlers[0](resp)
+    creds = extract_battlenet_session(ctx, None, sniffer=sniffer)
+    assert creds is not None
+    assert "BA-tassession=sess" in creds["BATTLENET_COOKIE"]
+
+
+def test_battlenet_log_creates_file(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from auth import connect_extractors as ce
+
+    monkeypatch.setenv("BAKLOG_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(ce, "_battlenet_log_path", None)
+    monkeypatch.setattr(ce, "_battlenet_last_log_by_key", {})
+    ce._battlenet_log("connect poll start", key="enter")
+    log = tmp_path / "connect-battlenet.log"
+    assert log.is_file()
+    assert "connect poll start" in log.read_text(encoding="utf-8")
+
+
+def test_probe_session_import_does_not_need_browser_cookie3() -> None:
+    """probe_session must load without importing browser_cookie3 at module level."""
+    import clients.battlenet_client as mod
+
+    src = Path(mod.__file__).read_text(encoding="utf-8")
+    # Top-level import removed; only lazy inside from_browser.
+    assert "import browser_cookie3 as bc3" not in src.split("def from_browser")[0]
+    assert "import browser_cookie3 as bc3" in src

@@ -29,6 +29,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.39] - 2026-07-31
+
+### Fixed
+
+- Battle.net Connect hang on the Games page in frozen builds: `extract_battlenet_session` imported `battlenet_client` (and thus `browser_cookie3`) before sniffer/in-page success paths, so a missing frozen dependency returned `None` forever and never wrote `connect-battlenet.log`. Sniffer and in-page probe now run first; `browser_cookie3` is lazy-imported only inside `from_browser()`; Connect completes when the Games SPA proves the session; connect logging always tees under the data dir.
+
 ## [0.8.38] - 2026-07-31
 
 ### Fixed

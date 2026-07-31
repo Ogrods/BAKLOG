@@ -211,7 +211,7 @@ def _battlenet_xsrf_from_cookies(cookies: list[dict]) -> str:
 
 
 def _battlenet_log(message: str, *, key: str | None = None) -> None:
-    """Rate-limited stderr + optional on-disk tee for frozen Tray builds."""
+    """Rate-limited stderr + on-disk tee for frozen Tray builds."""
     global _battlenet_log_path
     now = time.time()
     dedupe_key = key or message
@@ -234,10 +234,35 @@ def _battlenet_log(message: str, *, key: str | None = None) -> None:
             _battlenet_log_path = data_root() / "connect-battlenet.log"
         path = _battlenet_log_path
         if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as fh:
                 fh.write(f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} {line}\n")
     except Exception:  # noqa: BLE001
         pass
+
+
+def _battlenet_resolve_cookie_header(
+    context: Any,
+    page: Any | None,
+    sniffer: BattleNetGamesAndSubsSniffer | None,
+) -> str:
+    """Build a Cookie header from CDP dump, url-scoped dump, then sniffer."""
+    try:
+        cookies = context.cookies()
+    except Exception:  # noqa: BLE001
+        cookies = []
+    header = _cookie_header(cookies, (".battle.net", "battle.net"))
+    if header:
+        return header
+    scoped = _battlenet_cookies_via_urls(context, page)
+    header = _cookie_header(scoped, (".battle.net", "battle.net"))
+    if header:
+        return header
+    if sniffer is not None:
+        _verified, sniffed, _status = sniffer.snapshot()
+        if sniffed:
+            return sniffed
+    return ""
 
 
 def _battlenet_cookie_count(cookies: list[dict]) -> tuple[int, bool]:
@@ -410,30 +435,33 @@ def extract_battlenet_session(
     *,
     sniffer: BattleNetGamesAndSubsSniffer | None = None,
 ) -> dict[str, str] | None:
-    try:
-        from clients.battlenet_client import BattleNetAuthError, probe_session
-    except Exception as exc:
-        print(f"[battlenet] import failed: {exc}", file=sys.stderr, flush=True)
-        return None
+    """Complete Connect from sniffer / in-page proof; external probe is last resort.
 
+    Do **not** import ``battlenet_client`` (and ``browser_cookie3``) before the
+    Games SPA success paths — a failed frozen import used to return None forever
+    and skip all logging.
+    """
     if sniffer is not None:
         sniffed_creds = sniffer.creds_from(context)
         if sniffed_creds:
             _battlenet_log("account.battle.net/api 200 sniffer — session ready", key="sniffer-ready")
             return sniffed_creds
 
-    cookies = context.cookies()
+    try:
+        cookies = context.cookies()
+    except Exception:  # noqa: BLE001
+        cookies = []
     header = _cookie_header(cookies, (".battle.net", "battle.net"))
     xsrf = _battlenet_xsrf_from_cookies(cookies)
     cookie_count, has_xsrf = _battlenet_cookie_count(cookies)
     page_url = (getattr(page, "url", None) or "") if page is not None else ""
     sniffer_verified = False
     sniffer_status = 0
+    sniffed_header = ""
     if sniffer is not None:
-        sniffer_verified, _sniffed, sniffer_status = sniffer.snapshot()
+        sniffer_verified, sniffed_header, sniffer_status = sniffer.snapshot()
 
     # Prefer in-page fetch: HttpOnly session cookies + browser Origin/Referer.
-    # Do not set forbidden Origin/Referer headers — browsers ignore them.
     if page is not None:
         probe = _battlenet_probe_status(page, xsrf=xsrf)
         _battlenet_log(
@@ -445,26 +473,33 @@ def extract_battlenet_session(
             key="poll",
         )
         if probe.get("ok"):
+            header = _battlenet_resolve_cookie_header(context, page, sniffer)
             if header:
+                _battlenet_log("in-page 200 — session ready", key="inpage-ready")
                 return {"BATTLENET_COOKIE": header}
-            # Probe worked but first CDP dump was empty — retry + url-scoped dump.
-            cookies = context.cookies()
-            header = _cookie_header(cookies, (".battle.net", "battle.net"))
-            if not header:
-                scoped = _battlenet_cookies_via_urls(context, page)
-                header = _cookie_header(scoped, (".battle.net", "battle.net"))
-            if header:
-                return {"BATTLENET_COOKIE": header}
-            if sniffer is not None:
-                _verified, sniffed, _status = sniffer.snapshot()
-                if sniffed:
-                    return {"BATTLENET_COOKIE": sniffed}
             _battlenet_log("in-page 200 but cookie dump empty — waiting", key="empty-cookies")
             return None
+
+    # Sniffer saw API 200 but first creds_from had no header — retry dump now.
+    if sniffer_verified:
+        header = _battlenet_resolve_cookie_header(context, page, sniffer)
+        if header:
+            _battlenet_log("sniffer verified + cookies — session ready", key="sniffer-retry")
+            return {"BATTLENET_COOKIE": header}
 
     if not _battlenet_has_session(context):
         return None
     if not header:
+        header = sniffed_header or _battlenet_resolve_cookie_header(context, page, sniffer)
+    if not header:
+        return None
+
+    # External probe only — needs battlenet_client (requests). Never gate above on this.
+    try:
+        from clients.battlenet_client import BattleNetAuthError, probe_session
+    except Exception as exc:  # noqa: BLE001
+        _battlenet_log(f"external probe import failed: {exc}", key="import-fail")
+        # In-page/sniffer already failed; without external probe we cannot verify.
         return None
     try:
         probe_session(header)

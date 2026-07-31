@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import queue
 import threading
 from collections.abc import Callable
@@ -10,6 +11,7 @@ from typing import Any
 HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
 HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
+BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
 
 
 def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
@@ -193,7 +195,54 @@ def humble_connect_hint(page: Any) -> str:
     if "humblebundle.com" not in url:
         return "Open humblebundle.com and sign in if prompted."
     return "On humblebundle.com? We'll open your library to confirm the session."
-def extract_battlenet_session(context: Any) -> dict[str, str] | None:
+
+
+def _battlenet_xsrf_from_cookies(cookies: list[dict]) -> str:
+    for c in cookies:
+        if (c.get("name") or "") == "XSRF-TOKEN" and c.get("value"):
+            return str(c["value"]).strip()
+    return ""
+
+
+def _battlenet_probe_via_page(page: Any, *, xsrf: str = "") -> bool:
+    """Verify games-and-subs via in-page fetch (real jar + origin), like PSN/XBL."""
+    if page is None:
+        return False
+    xsrf_js = json.dumps(xsrf or "")
+    try:
+        result = page.evaluate(
+            f"""async () => {{
+                try {{
+                    const headers = {{ Accept: 'application/json, text/plain, */*' }};
+                    let xsrf = {xsrf_js};
+                    if (!xsrf) {{
+                        const m = document.cookie.match(/(?:^|;\\s*)XSRF-TOKEN=([^;]+)/);
+                        if (m) {{
+                            try {{ xsrf = decodeURIComponent(m[1].trim()); }}
+                            catch (e) {{ xsrf = m[1].trim(); }}
+                        }}
+                    }} else {{
+                        try {{ xsrf = decodeURIComponent(xsrf); }}
+                        catch (e) {{}}
+                    }}
+                    if (xsrf) headers['X-XSRF-TOKEN'] = xsrf;
+                    const res = await fetch({json.dumps(BATTLENET_ACCOUNT_API)}, {{
+                        credentials: 'include',
+                        headers,
+                    }});
+                    return {{ ok: res.status === 200, status: res.status }};
+                }} catch (e) {{
+                    return {{ ok: false, status: 0 }};
+                }}
+            }}""",
+            timeout=20,
+        )
+    except Exception:  # noqa: BLE001
+        return False
+    return isinstance(result, dict) and bool(result.get("ok"))
+
+
+def extract_battlenet_session(context: Any, page: Any | None = None) -> dict[str, str] | None:
     try:
         from clients.battlenet_client import BattleNetAuthError, probe_session
     except Exception as exc:
@@ -201,9 +250,20 @@ def extract_battlenet_session(context: Any) -> dict[str, str] | None:
         print(f"[battlenet] import failed: {exc}", file=sys.stderr, flush=True)
         return None
 
+    cookies = context.cookies()
+    header = _cookie_header(cookies, (".battle.net", "battle.net"))
+    xsrf = _battlenet_xsrf_from_cookies(cookies)
+
+    # Prefer in-page fetch: HttpOnly session cookies + correct Origin/Referer.
+    # External requests.Session often 401s even when the Games SPA is loaded.
+    if page is not None and _battlenet_probe_via_page(page, xsrf=xsrf):
+        if header:
+            return {"BATTLENET_COOKIE": header}
+        # Probe worked but CDP cookie dump was empty — wait for next poll.
+        return None
+
     if not _battlenet_has_session(context):
         return None
-    header = _cookie_header(context.cookies(), (".battle.net", "battle.net"))
     if not header:
         return None
     try:

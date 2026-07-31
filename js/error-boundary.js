@@ -140,6 +140,14 @@ function isStalePersistedError(entry) {
   // linger in bug bundles as if they were live defects.
   if (isStaleChunkError(entry)) return true;
   const msg = String(entry?.message || '');
+  // Expected downtime while Install & restart kills the local server. Survives
+  // in localStorage across the relaunch and polluted bug bundles as "Latest error".
+  if (
+    entry?.kind === 'network' &&
+    /Server unreachable:.*\/api\/update\/(status|apply-result)/i.test(msg)
+  ) {
+    return true;
+  }
   return msg === 'authStatus is not defined'
     || msg === 'enableLocalProvider is not defined'
     || msg === 'lastBarSummary is not defined'

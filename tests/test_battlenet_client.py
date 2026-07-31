@@ -19,6 +19,11 @@ def test_xsrf_token_header_from_cookie():
     assert client.session.headers.get("X-XSRF-TOKEN") == "abc123"
 
 
+def test_xsrf_token_header_url_decoded():
+    client = BattleNetClient("XSRF-TOKEN=tok%3D%3D; session=xyz")
+    assert client.session.headers.get("X-XSRF-TOKEN") == "tok=="
+
+
 def test_empty_cookie_raises():
     with pytest.raises(BattleNetAuthError, match="No Battle.net session"):
         BattleNetClient("")

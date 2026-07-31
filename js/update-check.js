@@ -6,6 +6,8 @@ import { escapeHtml } from "./dom-util.js";
 /** @deprecated legacy session flag; per-version dismiss uses server + localStorage mirror */
 export const UPDATE_BANNER_DISMISS_KEY = "baklog.updateBannerDismissed";
 export const UPDATE_DISMISSED_VERSION_KEY = "baklog.updateDismissedVersion";
+/** Survives post-apply reload so api-client keeps suppressing update-endpoint noise. */
+export const UPDATE_SUPPRESS_NETWORK_KEY = "baklog.suppressNetworkErrors";
 
 const UPDATE_STATUS_POLL_MS = 800;
 const POST_APPLY_POLL_MS = 1000;
@@ -21,6 +23,39 @@ let _modalKeyAbort = null;
 
 /** @type {{ installSource: string | null, arpVersionMismatch: boolean }} */
 let _installHints = { installSource: null, arpVersionMismatch: false };
+
+/**
+ * Mark expected server downtime during Install & restart (window + sessionStorage).
+ * @param {boolean} on
+ */
+export function setUpdateRestartSuppress(on) {
+  if (typeof window === "undefined") return;
+  window.__baklogSuppressNetworkErrors = !!on;
+  try {
+    if (on) window.sessionStorage?.setItem(UPDATE_SUPPRESS_NETWORK_KEY, "1");
+    else window.sessionStorage?.removeItem(UPDATE_SUPPRESS_NETWORK_KEY);
+  } catch {
+    /* private mode / disabled storage */
+  }
+}
+
+/** Restore suppress flag after a post-apply reload (sessionStorage survived). */
+export function restoreUpdateRestartSuppressFromSession() {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.sessionStorage?.getItem(UPDATE_SUPPRESS_NETWORK_KEY) === "1") {
+      window.__baklogSuppressNetworkErrors = true;
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+export function clearUpdateRestartSuppress() {
+  setUpdateRestartSuppress(false);
+}
 
 /**
  * @param {unknown} data
@@ -663,9 +698,8 @@ export async function pollPostApplyOutcome(opts = {}) {
   const sleepMs = opts.sleepMs ?? POST_APPLY_POLL_MS;
   const deadline = Date.now() + (opts.timeoutMs ?? POST_APPLY_TIMEOUT_MS);
   // Server is shutting down for restart — suppress network error persistence
-  // so transient "unreachable" during apply doesn't show as a permanent error.
-  const prev = window.__baklogSuppressNetworkErrors;
-  window.__baklogSuppressNetworkErrors = true;
+  // (window flag + sessionStorage so a mid-apply reload stays quiet until boot).
+  setUpdateRestartSuppress(true);
   try {
     while (Date.now() < deadline) {
       try {
@@ -678,6 +712,7 @@ export async function pollPostApplyOutcome(opts = {}) {
           resultPayload?.acknowledged === true &&
           resultPayload?.success === true
         ) {
+          clearUpdateRestartSuppress();
           return { ok: true, version: resultPayload.version || null };
         }
         const applyResult = resultPayload?.result;
@@ -689,6 +724,7 @@ export async function pollPostApplyOutcome(opts = {}) {
           throw new Error(msg);
         }
         if (applyResult && applyResult.ok === true) {
+          clearUpdateRestartSuppress();
           return { ok: true, version: applyResult.version || null };
         }
         const status = parseUpdateStatusResponse(
@@ -703,7 +739,7 @@ export async function pollPostApplyOutcome(opts = {}) {
         if (
           err instanceof Error &&
           err.message &&
-          !/fetch|network|failed to fetch/i.test(err.message)
+          !/fetch|network|failed to fetch|not responding/i.test(err.message)
         ) {
           throw err;
         }
@@ -715,7 +751,9 @@ export async function pollPostApplyOutcome(opts = {}) {
     );
     opts.onNotice?.(POST_APPLY_RECOVERY_MESSAGE);
   } finally {
-    window.__baklogSuppressNetworkErrors = prev;
+    // Success paths clear suppress. Timeout keeps sessionStorage so the
+    // relaunched tab stays quiet until boot calls clearUpdateRestartSuppress.
+    restoreUpdateRestartSuppressFromSession();
   }
 }
 
@@ -846,6 +884,7 @@ export async function runInAppUpdateFlow(opts = {}) {
 export async function acknowledgeApplyResultOnBoot(opts = {}) {
   if (opts.frozen === false) return { ok: true, acknowledged: false };
   const fetchFn = opts.fetchFn || baklogFetch;
+  restoreUpdateRestartSuppressFromSession();
   try {
     const res = await fetchFn("/api/update/apply-result");
     if (!res.ok) return { ok: false };
@@ -861,6 +900,7 @@ export async function acknowledgeApplyResultOnBoot(opts = {}) {
       hideUpdateBanner();
       showUpdateToast(msg);
       opts.onNotice?.(msg);
+      clearUpdateRestartSuppress();
       return { ok: true, acknowledged: true, success: true, version };
     }
     return {

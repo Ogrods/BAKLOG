@@ -33,6 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- In-app Install & restart on Windows/macOS: stop the tray server watchdog from respawning BAKLOG while files are being replaced (`applying.lock`), launch the apply helper detached from the server process tree, and tree-kill tray/server before copying. Fixes the stuck "Installing update and restarting…" state where the UI never came back on a new build. (Re-released same version.)
 - Battle.net Connect: verify the library session with an in-page `games-and-subs` fetch (real browser cookies + Origin) so arriving on the Games page completes Connect/Reconnect instead of hanging while an external probe keeps getting 401. URL-decode `XSRF-TOKEN` when probing from Python.
 - In-app update: suppress and prune expected `/api/update/status` and `/api/update/apply-result` network errors across Install & restart (sessionStorage survives the relaunch; boot clears the flag). Stops sticky "Server unreachable" entries from dominating bug bundles after a successful update.
 - Vitest forks pass `--no-experimental-webstorage` so Node 25 no longer shadows happy-dom `localStorage` (update-dismiss tests).

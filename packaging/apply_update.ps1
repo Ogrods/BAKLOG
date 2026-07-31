@@ -32,6 +32,8 @@ function Write-ApplyResult {
         finished_at = (Get-Date).ToUniversalTime().ToString("o")
     }
     $payload | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
+    # Allow the tray watchdog to resume auto-restart after apply finishes.
+    Remove-Item -LiteralPath (Join-Path $script:UpdateRoot "applying.lock") -Force -ErrorAction SilentlyContinue
 }
 
 function Test-SafeChildPath([string]$Root, [string]$Relative) {
@@ -116,13 +118,15 @@ function Kill-ProcessTree([int]$ProcessId) {
     taskkill /F /T /PID $ProcessId 2>&1 | Out-Null
 }
 
+# Apply is launched detached from BAKLOG.exe. Stop the tray tree first (it owns
+# the server); waiting alone used to leave the tray watchdog free to respawn
+# BAKLOG.exe and lock install files during copy.
+Kill-ProcessTree -ProcessId $trayPid
+Kill-ProcessTree -ProcessId $serverPid
 Wait-ProcessGone -ProcessId $serverPid -TimeoutSec 45
 Wait-ProcessGone -ProcessId $trayPid -TimeoutSec 15
-
-# Ensure child processes (fetchers, CDP browser windows) are cleaned up
-# before we start moving files — otherwise they can hold file locks.
-Kill-ProcessTree -ProcessId $serverPid
 Kill-ProcessTree -ProcessId $trayPid
+Kill-ProcessTree -ProcessId $serverPid
 
 $staging = Join-Path $script:UpdateRoot ("staging-" + [Guid]::NewGuid().ToString("n"))
 New-Item -ItemType Directory -Path $staging | Out-Null
@@ -132,12 +136,13 @@ try {
     Expand-Archive -LiteralPath $zipPath -DestinationPath $staging -Force
 
     $bundleRoot = $null
-    Get-ChildItem -Path $staging -Recurse -Filter "BAKLOG.exe" -File | ForEach-Object {
-        $parent = $_.Directory.FullName
-        $trayExe = Join-Path $parent "BAKLOG Tray.exe"
-        if (Test-Path -LiteralPath $trayExe) {
-            $script:bundleRoot = $parent
-        }
+    $bundleExe = Get-ChildItem -Path $staging -Recurse -Filter "BAKLOG.exe" -File |
+        Where-Object {
+            Test-Path -LiteralPath (Join-Path $_.Directory.FullName "BAKLOG Tray.exe")
+        } |
+        Select-Object -First 1
+    if ($bundleExe) {
+        $bundleRoot = $bundleExe.Directory.FullName
     }
     if (-not $bundleRoot) {
         Fail "Extracted bundle layout invalid"

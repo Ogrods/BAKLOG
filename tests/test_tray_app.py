@@ -266,6 +266,29 @@ def test_server_watchdog_notifies_on_owned_child_death(monkeypatch):
     assert notified[0][0] == "BAKLOG server stopped"
 
 
+def test_server_watchdog_skips_restart_while_apply_in_progress(monkeypatch):
+    starts: list[float] = []
+
+    monkeypatch.setattr(tray_app, "_port_open", lambda timeout=0.3: False)
+    monkeypatch.setattr(tray_app, "is_update_apply_in_progress", lambda: True)
+    monkeypatch.setattr(
+        tray_app.ServerController,
+        "start",
+        lambda self: starts.append(time.monotonic()) or True,
+    )
+
+    class DeadProc:
+        def poll(self):
+            return 1
+
+    ctl = tray_app.ServerController()
+    ctl.proc = DeadProc()
+    icon = MagicMock()
+    tray_app._start_server_watchdog(icon, ctl)
+    time.sleep(2.5)
+    assert starts == []
+
+
 def test_open_data_folder_opens_data_root(monkeypatch, tmp_path):
     opened: dict[str, str] = {}
     monkeypatch.setattr(tray_app, "data_root", lambda: tmp_path)

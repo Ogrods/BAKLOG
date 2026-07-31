@@ -21,9 +21,11 @@ from shared.update_platform import (
 )
 from shared.update_ready_state import (
     clear_apply_result,
+    clear_applying_lock,
     clear_ready_state,
     read_apply_result,
     scan_ready_state,
+    write_applying_lock,
     write_ready_state,
 )
 from shared.update_release import (
@@ -300,6 +302,7 @@ class UpdateManager:
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
         clear_apply_result(self._work_root)
+        write_applying_lock(self._work_root, version=artifacts.version)
         self._set_status(phase="applying", can_apply=False, ready=False)
 
         try:
@@ -309,6 +312,7 @@ class UpdateManager:
                 install_dir=install_dir,
             )
         except OSError as exc:
+            clear_applying_lock(self._work_root)
             self._set_status(phase="ready", ready=True, can_apply=True, error=str(exc))
             return {"ok": False, "error": f"Failed to launch updater: {exc}"}
 

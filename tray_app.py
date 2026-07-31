@@ -44,6 +44,7 @@ from shared.startup import (
     toggle_startup,
 )
 from shared.tray_lock import acquire_tray_lock
+from shared.update_ready_state import is_update_apply_in_progress
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
@@ -413,6 +414,10 @@ def _start_server_watchdog(icon, controller: ServerController) -> threading.Thre
                 controller.proc = None
 
             if not controller.is_running():
+                # Install & restart shuts the server down on purpose. Do not
+                # respawn it while the apply helper still needs the install dir.
+                if is_update_apply_in_progress():
+                    continue
                 now = time.monotonic()
                 # First crash or last restart was long ago -> one-shot restart
                 if last_restart_time == 0 or (now - last_restart_time) >= RESTART_COOLDOWN:

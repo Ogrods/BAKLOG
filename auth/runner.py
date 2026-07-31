@@ -130,27 +130,57 @@ def _cookie_header(cookies: list[dict], domains: tuple[str, ...]) -> str:
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 
 
+def _battlenet_live_page(page, context):
+    """Prefer the Games SPA tab over blank OAuth popups / stale login tabs."""
+    pages = _connect_pages(page, context)
+    for pg in pages:
+        url = (getattr(pg, "url", None) or "").lower()
+        if "account.battle.net" in url and "/games" in url:
+            return pg
+    for pg in pages:
+        url = (getattr(pg, "url", None) or "").lower()
+        if "battle.net" in url and not is_blank_browser_url(url):
+            return pg
+    return _drive_connect_page(page, context)
+
+
 def _extract_battlenet_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Open account.battle.net/games and save cookies only after the library API works."""
-    from auth.connect_extractors import battlenet_connect_hint, extract_battlenet_session
+    from auth.connect_extractors import (
+        battlenet_connect_hint,
+        build_battlenet_games_sniffer,
+        extract_battlenet_session,
+    )
     from auth.connect_loop import run_connect_poll
+
+    sniffer = build_battlenet_games_sniffer()
+    sniffer.attach(context)
 
     try:
         page.goto(BATTLENET_GAMES_URL, wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
+    def _check() -> dict[str, str] | None:
+        live = _battlenet_live_page(page, context)
+        return extract_battlenet_session(context, live, sniffer=sniffer)
+
+    def _hint() -> str:
+        live = _battlenet_live_page(page, context)
+        return battlenet_connect_hint(live)
+
     def _on_signed_in(_creds: dict[str, str]) -> None:
         if session:
-            session.emit("signed_in", {"url": page.url or BATTLENET_GAMES_URL})
+            live = _battlenet_live_page(page, context)
+            session.emit("signed_in", {"url": getattr(live, "url", None) or BATTLENET_GAMES_URL})
 
     return run_connect_poll(
         context=context,
         session=session,
         deadline=time.time() + SUCCESS_WAIT_SEC,
         poll_sec=POLL_SEC,
-        check=lambda: extract_battlenet_session(context, page),
-        hint=lambda: battlenet_connect_hint(page),
+        check=_check,
+        hint=_hint,
         on_signed_in=_on_signed_in,
         timeout_message=(
             "Could not verify a Battle.net library session — sign in at account.battle.net/games, "

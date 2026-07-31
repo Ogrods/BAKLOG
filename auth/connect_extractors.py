@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import queue
+import sys
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -12,6 +14,8 @@ HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
 HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
+_BATTLENET_LOG_INTERVAL_SEC = 8.0
+_battlenet_last_log_at = 0.0
 
 
 def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
@@ -204,16 +208,107 @@ def _battlenet_xsrf_from_cookies(cookies: list[dict]) -> str:
     return ""
 
 
-def _battlenet_probe_via_page(page: Any, *, xsrf: str = "") -> bool:
-    """Verify games-and-subs via in-page fetch (real jar + origin), like PSN/XBL."""
+def _battlenet_log(message: str) -> None:
+    global _battlenet_last_log_at
+    now = time.time()
+    if now - _battlenet_last_log_at < _BATTLENET_LOG_INTERVAL_SEC:
+        return
+    _battlenet_last_log_at = now
+    print(f"[battlenet] {message}", file=sys.stderr, flush=True)
+
+
+def _battlenet_cookie_count(cookies: list[dict]) -> tuple[int, bool]:
+    count = 0
+    has_xsrf = False
+    for c in cookies:
+        domain = (c.get("domain") or "").lstrip(".")
+        if not domain.endswith("battle.net"):
+            continue
+        if c.get("name") and c.get("value") is not None:
+            count += 1
+            if c.get("name") == "XSRF-TOKEN":
+                has_xsrf = True
+    return count, has_xsrf
+
+
+class BattleNetGamesAndSubsSniffer:
+    """Treat a live SPA games-and-subs 200 as session proof (any tab)."""
+
+    URL_SUBSTR = "account.battle.net/api/games-and-subs"
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.verified = False
+        self.cookie_header = ""
+        self.status = 0
+
+    def attach(self, context: Any) -> None:
+        def on_request(request: Any) -> None:
+            url = (getattr(request, "url", None) or "").lower()
+            if self.URL_SUBSTR not in url:
+                return
+            headers = getattr(request, "headers", {}) or {}
+            cookie = headers.get("cookie") or headers.get("Cookie") or ""
+            if cookie:
+                with self._lock:
+                    self.cookie_header = str(cookie).strip()
+
+        def on_response(response: Any) -> None:
+            url = (getattr(response, "url", None) or "").lower()
+            if self.URL_SUBSTR not in url:
+                return
+            status = int(getattr(response, "status", 0) or 0)
+            if status != 200:
+                return
+            cookie = ""
+            req = getattr(response, "request", None)
+            if req is not None:
+                headers = getattr(req, "headers", {}) or {}
+                cookie = headers.get("cookie") or headers.get("Cookie") or ""
+            with self._lock:
+                self.verified = True
+                self.status = status
+                if cookie:
+                    self.cookie_header = str(cookie).strip()
+
+        context.on("request", on_request)
+        context.on("response", on_response)
+
+    def snapshot(self) -> tuple[bool, str, int]:
+        with self._lock:
+            return self.verified, self.cookie_header, self.status
+
+    def creds_from(self, context: Any) -> dict[str, str] | None:
+        verified, sniffed, _status = self.snapshot()
+        if not verified:
+            return None
+        cookies = context.cookies()
+        header = _cookie_header(cookies, (".battle.net", "battle.net"))
+        if not header:
+            header = sniffed
+        if not header:
+            return None
+        return {"BATTLENET_COOKIE": header}
+
+
+def build_battlenet_games_sniffer() -> BattleNetGamesAndSubsSniffer:
+    return BattleNetGamesAndSubsSniffer()
+
+
+def _battlenet_probe_status(page: Any, *, xsrf: str = "") -> dict[str, Any]:
+    """In-page games-and-subs probe; returns {ok, status}."""
     if page is None:
-        return False
+        return {"ok": False, "status": 0}
     xsrf_js = json.dumps(xsrf or "")
     try:
         result = page.evaluate(
             f"""async () => {{
                 try {{
-                    const headers = {{ Accept: 'application/json, text/plain, */*' }};
+                    const headers = {{
+                        Accept: 'application/json, text/plain, */*',
+                        Origin: 'https://account.battle.net',
+                        Referer: 'https://account.battle.net/games',
+                    }};
                     let xsrf = {xsrf_js};
                     if (!xsrf) {{
                         const m = document.cookie.match(/(?:^|;\\s*)XSRF-TOKEN=([^;]+)/);
@@ -238,29 +333,66 @@ def _battlenet_probe_via_page(page: Any, *, xsrf: str = "") -> bool:
             timeout=20,
         )
     except Exception:  # noqa: BLE001
-        return False
-    return isinstance(result, dict) and bool(result.get("ok"))
+        return {"ok": False, "status": 0}
+    if isinstance(result, dict):
+        return {
+            "ok": bool(result.get("ok")),
+            "status": int(result.get("status") or 0),
+        }
+    return {"ok": False, "status": 0}
 
 
-def extract_battlenet_session(context: Any, page: Any | None = None) -> dict[str, str] | None:
+def _battlenet_probe_via_page(page: Any, *, xsrf: str = "") -> bool:
+    """Verify games-and-subs via in-page fetch (real jar + origin), like PSN/XBL."""
+    return bool(_battlenet_probe_status(page, xsrf=xsrf).get("ok"))
+
+
+def extract_battlenet_session(
+    context: Any,
+    page: Any | None = None,
+    *,
+    sniffer: BattleNetGamesAndSubsSniffer | None = None,
+) -> dict[str, str] | None:
     try:
         from clients.battlenet_client import BattleNetAuthError, probe_session
     except Exception as exc:
-        import sys
         print(f"[battlenet] import failed: {exc}", file=sys.stderr, flush=True)
         return None
+
+    if sniffer is not None:
+        sniffed_creds = sniffer.creds_from(context)
+        if sniffed_creds:
+            _battlenet_log("games-and-subs sniffer 200 — session ready")
+            return sniffed_creds
 
     cookies = context.cookies()
     header = _cookie_header(cookies, (".battle.net", "battle.net"))
     xsrf = _battlenet_xsrf_from_cookies(cookies)
+    cookie_count, has_xsrf = _battlenet_cookie_count(cookies)
+    page_url = (getattr(page, "url", None) or "") if page is not None else ""
 
     # Prefer in-page fetch: HttpOnly session cookies + correct Origin/Referer.
     # External requests.Session often 401s even when the Games SPA is loaded.
-    if page is not None and _battlenet_probe_via_page(page, xsrf=xsrf):
-        if header:
-            return {"BATTLENET_COOKIE": header}
-        # Probe worked but CDP cookie dump was empty — wait for next poll.
-        return None
+    if page is not None:
+        probe = _battlenet_probe_status(page, xsrf=xsrf)
+        _battlenet_log(
+            f"in-page probe ok={probe.get('ok')} status={probe.get('status')} "
+            f"url={page_url!r} cookies={cookie_count} xsrf={has_xsrf}"
+        )
+        if probe.get("ok"):
+            if header:
+                return {"BATTLENET_COOKIE": header}
+            # Probe worked but first CDP dump was empty — retry once.
+            cookies = context.cookies()
+            header = _cookie_header(cookies, (".battle.net", "battle.net"))
+            if header:
+                return {"BATTLENET_COOKIE": header}
+            if sniffer is not None:
+                _verified, sniffed, _status = sniffer.snapshot()
+                if sniffed:
+                    return {"BATTLENET_COOKIE": sniffed}
+            _battlenet_log("in-page 200 but cookie dump empty — waiting")
+            return None
 
     if not _battlenet_has_session(context):
         return None
@@ -268,10 +400,12 @@ def extract_battlenet_session(context: Any, page: Any | None = None) -> dict[str
         return None
     try:
         probe_session(header)
-    except BattleNetAuthError:
+    except BattleNetAuthError as exc:
+        _battlenet_log(f"external probe rejected: {exc}")
         # Stale/expired cookies from a prior session — keep the connect window
         # open so the user can sign in with fresh credentials.
         return None
+    _battlenet_log("external probe accepted")
     return {"BATTLENET_COOKIE": header}
 
 

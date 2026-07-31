@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -105,5 +106,9 @@ def test_launch_apply_subprocess_win32(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert "powershell.exe" in calls[0]["cmd"]
     assert "-ManifestPath" in calls[0]["cmd"]
     flags = int(calls[0]["kwargs"].get("creationflags") or 0)
-    assert flags & 0x00000008  # DETACHED_PROCESS
+    # DETACHED_PROCESS (0x8) makes powershell.exe exit rc=0 instantly — must stay unset.
+    assert not (flags & 0x00000008)
     assert flags & 0x00000200  # CREATE_NEW_PROCESS_GROUP
+    assert flags & 0x08000000  # CREATE_NO_WINDOW
+    assert calls[0]["kwargs"].get("stdout") is not None
+    assert calls[0]["kwargs"].get("stdout") is not subprocess.DEVNULL

@@ -21,10 +21,12 @@ from shared.update_platform import (
 )
 from shared.update_ready_state import (
     clear_apply_result,
+    clear_apply_started,
     clear_applying_lock,
     clear_ready_state,
     read_apply_result,
     scan_ready_state,
+    wait_for_apply_started,
     write_applying_lock,
     write_ready_state,
 )
@@ -302,6 +304,7 @@ class UpdateManager:
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
         clear_apply_result(self._work_root)
+        clear_apply_started(self._work_root)
         write_applying_lock(self._work_root, version=artifacts.version)
         self._set_status(phase="applying", can_apply=False, ready=False)
 
@@ -313,8 +316,22 @@ class UpdateManager:
             )
         except OSError as exc:
             clear_applying_lock(self._work_root)
+            clear_apply_started(self._work_root)
             self._set_status(phase="ready", ready=True, can_apply=True, error=str(exc))
             return {"ok": False, "error": f"Failed to launch updater: {exc}"}
+
+        # Do not shut down until the helper proves it started. DETACHED_PROCESS
+        # (and similar launch bugs) used to exit instantly with no apply work,
+        # leaving applying.lock and a dead server.
+        if not wait_for_apply_started(self._work_root):
+            clear_applying_lock(self._work_root)
+            clear_apply_started(self._work_root)
+            msg = (
+                "Updater helper did not start (no apply-started handshake). "
+                "The app was left running; check %TEMP%\\BAKLOG-update\\apply.log."
+            )
+            self._set_status(phase="ready", ready=True, can_apply=True, error=msg)
+            return {"ok": False, "error": msg}
 
         return {"ok": True, "applying": True, "version": artifacts.version}
 

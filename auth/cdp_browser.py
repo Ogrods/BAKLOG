@@ -1138,6 +1138,39 @@ class CdpContext:
             )
         return out
 
+    def cookies_for_urls(
+        self,
+        urls: list[str],
+        *,
+        page: CdpPage | None = None,
+    ) -> list[dict[str, Any]]:
+        """Network.getCookies scoped to urls on a live page session."""
+        sid: str | None = None
+        if page is not None and not getattr(page, "is_closed", False):
+            sid = getattr(page, "_session_id", None) or None
+        if not sid:
+            sid = self._first_page_session()
+        if not sid or not urls:
+            return []
+        try:
+            result = self._send(
+                "Network.getCookies",
+                {"urls": list(urls)},
+                session_id=sid,
+            )
+        except Exception:
+            return []
+        out: list[dict[str, Any]] = []
+        for c in result.get("cookies") or []:
+            out.append(
+                {
+                    "name": c.get("name", ""),
+                    "value": c.get("value", ""),
+                    "domain": c.get("domain", ""),
+                }
+            )
+        return out
+
     def new_page(self) -> CdpPage:
         result = self._send("Target.createTarget", {"url": "about:blank"})
         target_id = result.get("targetId", "")

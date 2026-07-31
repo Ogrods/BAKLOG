@@ -307,6 +307,26 @@ def build_diagnostics_payload(
     except Exception:  # noqa: BLE001
         update_status = None
 
+    from shared.update_ready_state import (
+        apply_log_tail,
+        applying_lock_age_sec,
+        default_work_root,
+        read_apply_result,
+        read_apply_started,
+    )
+
+    work_root = default_work_root()
+    apply_result = None
+    try:
+        apply_result = read_apply_result(work_root)
+    except Exception:  # noqa: BLE001
+        apply_result = None
+    apply_started = None
+    try:
+        apply_started = read_apply_started(work_root)
+    except Exception:  # noqa: BLE001
+        apply_started = None
+
     return {
         "version": version,
         "platform": sys.platform,
@@ -320,5 +340,9 @@ def build_diagnostics_payload(
         "apply_supported": _apply_supported_for_runtime(),
         "recommended_artifact": recommended_artifact(runtime_label()),
         "update": update_status,
+        "apply_result": apply_result,
+        "apply_started": apply_started,
+        "applying_lock_age_sec": applying_lock_age_sec(work_root),
+        "apply_log_tail": apply_log_tail(work_root),
         **install_visibility_fields(version),
     }

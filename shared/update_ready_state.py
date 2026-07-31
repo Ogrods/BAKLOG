@@ -14,9 +14,14 @@ from shared.update_release import UpdateSecurityError, verify_file_sha256
 READY_FILENAME = "ready.json"
 APPLY_RESULT_FILENAME = "apply-result.json"
 APPLYING_LOCK_FILENAME = "applying.lock"
+APPLY_STARTED_FILENAME = "apply-started.json"
+APPLY_LOG_FILENAME = "apply.log"
 PACKAGE_NAME = "package.zip"
-# Stale lock TTL — if apply crashes without clearing, tray may auto-restart again.
-APPLYING_LOCK_MAX_AGE_SEC = 15 * 60
+# Stale lock TTL — apply script heartbeats the lock; keep short so a dead helper
+# cannot suppress the tray watchdog for long.
+APPLYING_LOCK_MAX_AGE_SEC = 120
+# How long the server waits for apply-started.json before aborting shutdown.
+APPLY_STARTED_WAIT_SEC = 8.0
 
 
 def default_work_root() -> Path:
@@ -39,6 +44,16 @@ def clear_applying_lock(work_root: Path | None = None) -> None:
     path.unlink(missing_ok=True)
 
 
+def applying_lock_age_sec(work_root: Path | None = None) -> float | None:
+    path = (work_root or default_work_root()) / APPLYING_LOCK_FILENAME
+    if not path.is_file():
+        return None
+    try:
+        return max(0.0, time.time() - path.stat().st_mtime)
+    except OSError:
+        return None
+
+
 def is_update_apply_in_progress(
     work_root: Path | None = None,
     *,
@@ -55,6 +70,53 @@ def is_update_apply_in_progress(
     if age < 0 or age > max_age_sec:
         return False
     return True
+
+
+def clear_apply_started(work_root: Path | None = None) -> None:
+    root = work_root or default_work_root()
+    (root / APPLY_STARTED_FILENAME).unlink(missing_ok=True)
+
+
+def read_apply_started(work_root: Path | None = None) -> dict[str, Any] | None:
+    root = (work_root or default_work_root()).resolve()
+    path = root / APPLY_STARTED_FILENAME
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def wait_for_apply_started(
+    work_root: Path | None = None,
+    *,
+    timeout_sec: float = APPLY_STARTED_WAIT_SEC,
+    poll_sec: float = 0.1,
+) -> bool:
+    """Block until apply-started.json appears or timeout. Returns True if seen."""
+    root = work_root or default_work_root()
+    deadline = time.monotonic() + max(0.0, timeout_sec)
+    while time.monotonic() < deadline:
+        if read_apply_started(root) is not None:
+            return True
+        time.sleep(poll_sec)
+    return read_apply_started(root) is not None
+
+
+def apply_log_tail(work_root: Path | None = None, *, max_chars: int = 4000) -> str:
+    root = work_root or default_work_root()
+    path = root / APPLY_LOG_FILENAME
+    if not path.is_file():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
 
 
 def write_ready_state(
@@ -113,6 +175,7 @@ def clear_apply_result(work_root: Path | None = None) -> None:
     root = work_root or default_work_root()
     (root / APPLY_RESULT_FILENAME).unlink(missing_ok=True)
     clear_applying_lock(root)
+    clear_apply_started(root)
 
 
 def scan_ready_state(work_root: Path) -> dict[str, Any] | None:

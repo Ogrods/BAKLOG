@@ -88,50 +88,66 @@ def tray_binary_name(platform: str | None = None) -> str:
     return required_bundle_files(platform)[1]
 
 
+def apply_log_path() -> Path:
+    """Shared apply helper log under the trusted update workspace."""
+    import tempfile
+
+    return Path(tempfile.gettempdir()) / "BAKLOG-update" / "apply.log"
+
+
 def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: Path) -> subprocess.Popen:
     """Launch the platform apply helper after server-side security checks.
 
-    The helper must outlive the shutting-down server (and survive tray tree-kill),
-    so it is started detached / in a new session — not as a child that dies with
-    BAKLOG.exe or gets swept by ``taskkill /T`` on the server PID.
+    On Windows, do **not** use DETACHED_PROCESS: powershell.exe exits immediately
+    with rc=0 when started that way (no console host), so the apply never runs.
+    CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP keeps the helper alive; the apply
+    script must exclude its own PID when killing the tray/server tree.
+    stdout/stderr append to apply.log for frozen-build diagnostics.
     """
     platform = sys.platform
-    if platform == "win32":
-        cmd = [
-            "powershell.exe",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(script),
-            "-ManifestPath",
-            str(manifest_path),
-        ]
-        # DETACHED_PROCESS + NEW_PROCESS_GROUP: apply is not in the tray→server tree.
-        flags = int(getattr(subprocess, "DETACHED_PROCESS", 0x00000008))
-        flags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
-        flags |= int(getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
-        return subprocess.Popen(  # noqa: S603
-            cmd,
-            cwd=str(install_dir),
-            creationflags=flags,
-            close_fds=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    if platform == "darwin":
-        cmd = [
-            "/bin/bash",
-            str(script),
-            str(manifest_path),
-        ]
-        return subprocess.Popen(  # noqa: S603
-            cmd,
-            cwd=str(install_dir),
-            start_new_session=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+    log_path = apply_log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_file = open(log_path, "a", encoding="utf-8")  # noqa: SIM115
+    try:
+        if platform == "win32":
+            cmd = [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(script),
+                "-ManifestPath",
+                str(manifest_path),
+            ]
+            # DETACHED_PROCESS (0x8) makes powershell exit instantly — never use it.
+            flags = int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200))
+            flags |= int(getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000))
+            return subprocess.Popen(  # noqa: S603
+                cmd,
+                cwd=str(install_dir),
+                creationflags=flags,
+                close_fds=True,
+                stdin=subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+            )
+        if platform == "darwin":
+            cmd = [
+                "/bin/bash",
+                str(script),
+                str(manifest_path),
+            ]
+            return subprocess.Popen(  # noqa: S603
+                cmd,
+                cwd=str(install_dir),
+                start_new_session=True,
+                stdin=subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+            )
+    except Exception:
+        log_file.close()
+        raise
+    log_file.close()
     raise OSError(f"In-app apply is not supported on {platform}")

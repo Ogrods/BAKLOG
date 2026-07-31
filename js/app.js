@@ -315,15 +315,23 @@ async function bootstrap() {
             checkForUpdates,
             syncReadyUpdateFromStatus,
             acknowledgeApplyResultOnBoot,
+            restoreUpdateRestartSuppressFromSession,
+            clearUpdateRestartSuppress,
           } = await import("./update-check.js");
-          // Acknowledge a completed apply before rehydrating a ready banner.
-          await acknowledgeApplyResultOnBoot({ frozen: true }).catch(() => {});
-          syncReadyUpdateFromStatus({ frozen: true }).catch(() => {});
-          checkForUpdates({
-            source: "boot",
-            frozen: true,
-            checkOnBoot: bootCheck,
-          }).catch(() => {});
+          // Quiet update-endpoint fetches left over from Install & restart downtime.
+          restoreUpdateRestartSuppressFromSession();
+          try {
+            // Acknowledge a completed apply before rehydrating a ready banner.
+            await acknowledgeApplyResultOnBoot({ frozen: true }).catch(() => {});
+            await syncReadyUpdateFromStatus({ frozen: true }).catch(() => {});
+            await checkForUpdates({
+              source: "boot",
+              frozen: true,
+              checkOnBoot: bootCheck,
+            }).catch(() => {});
+          } finally {
+            clearUpdateRestartSuppress();
+          }
         }
         if (cfg.running_from_temp) {
           const banner = document.getElementById("bootErrorBanner");

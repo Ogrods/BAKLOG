@@ -97,6 +97,19 @@ function mergeFetchInit(url, init, method) {
 
 const _NETWORK_ERROR_RE = /Failed to fetch|network error|NetworkError/i;
 
+/** Session key shared with update-check.js (avoid import cycle). */
+const UPDATE_SUPPRESS_NETWORK_KEY = "baklog.suppressNetworkErrors";
+
+function shouldSuppressNetworkErrors() {
+  if (typeof window === "undefined") return false;
+  if (window.__baklogSuppressNetworkErrors) return true;
+  try {
+    return window.sessionStorage?.getItem(UPDATE_SUPPRESS_NETWORK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Low-level fetch with single retry + descriptive error for network failures.
  * Narrow catch: only intercepts TypeError with "Failed to fetch" (server unreachable).
@@ -128,12 +141,9 @@ async function _fetchWithRetry(
       );
       descriptive.name = "NetworkError";
       // Suppress error persistence when the server is expected to be down
-      // (e.g. during update apply/restart). The poll caller handles retries;
-      // we don't want transient downtime logged as a permanent error.
-      if (
-        typeof window === "undefined" ||
-        !window.__baklogSuppressNetworkErrors
-      ) {
+      // (e.g. during update apply/restart). Window flag covers the live poll;
+      // sessionStorage survives the post-apply reload until boot clears it.
+      if (typeof window === "undefined" || !shouldSuppressNetworkErrors()) {
         reportError(descriptive, {
           source: "fetchWithAuthRetry",
           kind: "network",

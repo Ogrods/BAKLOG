@@ -29,6 +29,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Battle.net Connect: verify the library session with an in-page `games-and-subs` fetch (real browser cookies + Origin) so arriving on the Games page completes Connect/Reconnect instead of hanging while an external probe keeps getting 401. URL-decode `XSRF-TOKEN` when probing from Python.
+- In-app update: suppress and prune expected `/api/update/status` and `/api/update/apply-result` network errors across Install & restart (sessionStorage survives the relaunch; boot clears the flag). Stops sticky "Server unreachable" entries from dominating bug bundles after a successful update.
+
 ## [0.8.35] - 2026-07-28
 
 ### Fixed

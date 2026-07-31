@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   parseUpdateCheckResponse,
   parseUpdateStatusResponse,
@@ -31,6 +31,10 @@ import {
   mapUpdateError,
   showUpdateToast,
   UPDATE_DISMISSED_VERSION_KEY,
+  UPDATE_SUPPRESS_NETWORK_KEY,
+  setUpdateRestartSuppress,
+  clearUpdateRestartSuppress,
+  restoreUpdateRestartSuppressFromSession,
   _resetUpdateBannerForTests,
 } from '../js/update-check.js';
 
@@ -607,6 +611,13 @@ describe('discardReadyUpdate', () => {
 });
 
 describe('pollPostApplyOutcome', () => {
+  beforeEach(() => {
+    clearUpdateRestartSuppress();
+  });
+  afterEach(() => {
+    clearUpdateRestartSuppress();
+  });
+
   it('resolves when apply-result was acknowledged after relaunch', async () => {
     const fetchFn = vi.fn(async (url) => ({
       ok: true,
@@ -622,6 +633,35 @@ describe('pollPostApplyOutcome', () => {
       timeoutMs: 50,
     });
     expect(result).toEqual({ ok: true, version: '0.8.35' });
+    expect(sessionStorage.getItem(UPDATE_SUPPRESS_NETWORK_KEY)).toBeNull();
+  });
+
+  it('keeps session suppress across timeout so relaunch boot stays quiet', async () => {
+    vi.useFakeTimers();
+    const fetchFn = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (
+        url === '/api/update/apply-result'
+          ? { ok: true, result: null }
+          : { ok: true, phase: 'applying' }
+      ),
+    }));
+    const onNotice = vi.fn();
+    const promise = pollPostApplyOutcome({
+      fetchFn,
+      onNotice,
+      timeoutMs: 50,
+      sleepMs: 10,
+    });
+    await vi.advanceTimersByTimeAsync(60);
+    await promise;
+    expect(onNotice).toHaveBeenCalledWith(POST_APPLY_RECOVERY_MESSAGE);
+    expect(sessionStorage.getItem(UPDATE_SUPPRESS_NETWORK_KEY)).toBe('1');
+    expect(restoreUpdateRestartSuppressFromSession()).toBe(true);
+    expect(window.__baklogSuppressNetworkErrors).toBe(true);
+    clearUpdateRestartSuppress();
+    expect(sessionStorage.getItem(UPDATE_SUPPRESS_NETWORK_KEY)).toBeNull();
+    vi.useRealTimers();
   });
 
   it('shows recovery copy after timeout', async () => {
@@ -646,5 +686,21 @@ describe('pollPostApplyOutcome', () => {
     expect(onNotice).toHaveBeenCalledWith(POST_APPLY_RECOVERY_MESSAGE);
     expect(document.getElementById('updateAvailableBanner').textContent).toContain('BAKLOG Tray');
     vi.useRealTimers();
+  });
+});
+
+describe('update restart suppress helpers', () => {
+  afterEach(() => {
+    clearUpdateRestartSuppress();
+  });
+
+  it('round-trips sessionStorage flag', () => {
+    setUpdateRestartSuppress(true);
+    expect(sessionStorage.getItem(UPDATE_SUPPRESS_NETWORK_KEY)).toBe('1');
+    window.__baklogSuppressNetworkErrors = false;
+    expect(restoreUpdateRestartSuppressFromSession()).toBe(true);
+    expect(window.__baklogSuppressNetworkErrors).toBe(true);
+    clearUpdateRestartSuppress();
+    expect(sessionStorage.getItem(UPDATE_SUPPRESS_NETWORK_KEY)).toBeNull();
   });
 });

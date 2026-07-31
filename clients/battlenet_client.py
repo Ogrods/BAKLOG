@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from typing import ClassVar
+from urllib.parse import unquote
 
 import browser_cookie3 as bc3
 import requests
@@ -67,9 +68,10 @@ class BattleNetClient:
         }
         # Battle.net uses double-submit CSRF: token in cookie XSRF-TOKEN must
         # be echoed back as the X-XSRF-TOKEN header for state-aware requests.
+        # Cookie values are often URL-encoded; the header expects the decoded form.
         m = re.search(r"(?:^|;\s*)XSRF-TOKEN=([^;]+)", cookie)
         if m:
-            headers["X-XSRF-TOKEN"] = m.group(1).strip()
+            headers["X-XSRF-TOKEN"] = unquote(m.group(1).strip())
         self.session.headers.update(headers)
 
     @classmethod

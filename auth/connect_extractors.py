@@ -280,9 +280,9 @@ def _battlenet_cookie_count(cookies: list[dict]) -> tuple[int, bool]:
 
 
 class BattleNetGamesAndSubsSniffer:
-    """Treat a live account.battle.net/api 200 as session proof (any tab)."""
+    """Treat a live games-and-subs 200 as session proof (any tab)."""
 
-    URL_SUBSTR = "account.battle.net/api/"
+    URL_SUBSTR = "account.battle.net/api/games-and-subs"
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -328,6 +328,10 @@ class BattleNetGamesAndSubsSniffer:
     def snapshot(self) -> tuple[bool, str, int]:
         with self._lock:
             return self.verified, self.cookie_header, self.status
+
+    def matched_url(self) -> str:
+        with self._lock:
+            return self.last_url
 
     def creds_from(self, context: Any) -> dict[str, str] | None:
         verified, sniffed, _status = self.snapshot()
@@ -435,18 +439,15 @@ def extract_battlenet_session(
     *,
     sniffer: BattleNetGamesAndSubsSniffer | None = None,
 ) -> dict[str, str] | None:
-    """Complete Connect from sniffer / in-page proof; external probe is last resort.
+    """Complete Connect from games-and-subs proof; external probe is last resort.
 
     Do **not** import ``battlenet_client`` (and ``browser_cookie3``) before the
     Games SPA success paths — a failed frozen import used to return None forever
     and skip all logging.
-    """
-    if sniffer is not None:
-        sniffed_creds = sniffer.creds_from(context)
-        if sniffed_creds:
-            _battlenet_log("account.battle.net/api 200 sniffer — session ready", key="sniffer-ready")
-            return sniffed_creds
 
+    If the in-page probe returns 401, never complete from sniffer/external stale
+    cookies — keep polling so the user can sign in.
+    """
     try:
         cookies = context.cookies()
     except Exception:  # noqa: BLE001
@@ -458,10 +459,13 @@ def extract_battlenet_session(
     sniffer_verified = False
     sniffer_status = 0
     sniffed_header = ""
+    sniffer_url = ""
     if sniffer is not None:
         sniffer_verified, sniffed_header, sniffer_status = sniffer.snapshot()
+        sniffer_url = sniffer.matched_url()
 
-    # Prefer in-page fetch: HttpOnly session cookies + browser Origin/Referer.
+    # In-page probe first when we have a page: authoritative for "need login".
+    probe: dict[str, Any] | None = None
     if page is not None:
         probe = _battlenet_probe_status(page, xsrf=xsrf)
         _battlenet_log(
@@ -469,9 +473,16 @@ def extract_battlenet_session(
             f"url={page_url!r} href={probe.get('href')!r} origin={probe.get('origin')!r} "
             f"cookies={cookie_count} xsrf={has_xsrf} "
             f"sniffer_ok={sniffer_verified} sniffer_status={sniffer_status} "
-            f"header_empty={not bool(header)}",
+            f"sniffer_url={sniffer_url!r} header_empty={not bool(header)}",
             key="poll",
         )
+        if int(probe.get("status") or 0) == 401:
+            if sniffer_verified:
+                _battlenet_log(
+                    f"in-page 401 — ignoring sniffer (url={sniffer_url!r})",
+                    key="ignore-sniffer-401",
+                )
+            return None
         if probe.get("ok"):
             header = _battlenet_resolve_cookie_header(context, page, sniffer)
             if header:
@@ -480,12 +491,23 @@ def extract_battlenet_session(
             _battlenet_log("in-page 200 but cookie dump empty — waiting", key="empty-cookies")
             return None
 
-    # Sniffer saw API 200 but first creds_from had no header — retry dump now.
-    if sniffer_verified:
-        header = _battlenet_resolve_cookie_header(context, page, sniffer)
-        if header:
-            _battlenet_log("sniffer verified + cookies — session ready", key="sniffer-retry")
-            return {"BATTLENET_COOKIE": header}
+    # Sniffer: games-and-subs 200 only (narrow URL). Skip if page said 401 above.
+    if sniffer is not None:
+        sniffed_creds = sniffer.creds_from(context)
+        if sniffed_creds:
+            _battlenet_log(
+                f"games-and-subs sniffer 200 — session ready url={sniffer.matched_url()!r}",
+                key="sniffer-ready",
+            )
+            return sniffed_creds
+        if sniffer_verified:
+            header = _battlenet_resolve_cookie_header(context, page, sniffer)
+            if header:
+                _battlenet_log(
+                    f"sniffer verified + cookies — session ready url={sniffer_url!r}",
+                    key="sniffer-retry",
+                )
+                return {"BATTLENET_COOKIE": header}
 
     if not _battlenet_has_session(context):
         return None
@@ -499,14 +521,11 @@ def extract_battlenet_session(
         from clients.battlenet_client import BattleNetAuthError, probe_session
     except Exception as exc:  # noqa: BLE001
         _battlenet_log(f"external probe import failed: {exc}", key="import-fail")
-        # In-page/sniffer already failed; without external probe we cannot verify.
         return None
     try:
         probe_session(header)
     except BattleNetAuthError as exc:
         _battlenet_log(f"external probe rejected: {exc}", key="external-reject")
-        # Stale/expired cookies from a prior session — keep the connect window
-        # open so the user can sign in with fresh credentials.
         return None
     _battlenet_log("external probe accepted", key="external-ok")
     return {"BATTLENET_COOKIE": header}

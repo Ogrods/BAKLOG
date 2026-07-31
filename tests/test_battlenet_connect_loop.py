@@ -77,29 +77,28 @@ def test_extract_prefers_in_page_probe() -> None:
     assert "XSRF-TOKEN=tok%3D%3D" in creds["BATTLENET_COOKIE"]
 
 
-def test_extract_falls_back_to_external_probe_when_page_fails() -> None:
+def test_extract_in_page_401_does_not_use_external_probe() -> None:
+    """Stale jar: in-page 401 must keep polling — never complete via external probe."""
     ctx = _FakeContext(SESSION_COOKIES)
     page = _FakePage({"ok": False, "status": 401})
     with patch(
         "clients.battlenet_client.probe_session",
         return_value={"modernGames": []},
     ) as probe:
-        creds = extract_battlenet_session(ctx, page)
-        probe.assert_called_once()
-    assert creds is not None
-    assert "BATTLENET_COOKIE" in creds
+        assert extract_battlenet_session(ctx, page) is None
+        probe.assert_not_called()
 
 
 def test_extract_returns_none_when_external_probe_rejects() -> None:
     from clients.battlenet_client import BattleNetAuthError
 
     ctx = _FakeContext(SESSION_COOKIES)
-    page = _FakePage({"ok": False, "status": 401})
+    # No page: only external probe path remains.
     with patch(
         "clients.battlenet_client.probe_session",
         side_effect=BattleNetAuthError("401"),
     ):
-        assert extract_battlenet_session(ctx, page) is None
+        assert extract_battlenet_session(ctx, None) is None
 
 
 def test_extract_without_page_uses_external_probe() -> None:
@@ -121,7 +120,7 @@ def test_extract_in_page_ok_but_empty_cookies_waits() -> None:
         probe.assert_not_called()
 
 
-def test_sniffer_200_yields_creds_without_in_page_probe() -> None:
+def test_sniffer_200_without_page_yields_creds() -> None:
     ctx = _FakeContext(SESSION_COOKIES)
     sniffer = BattleNetGamesAndSubsSniffer()
     sniffer.attach(ctx)
@@ -136,13 +135,32 @@ def test_sniffer_200_yields_creds_without_in_page_probe() -> None:
     resp.request = req
     ctx.response_handlers[0](resp)
 
-    page = _FakePage({"ok": False, "status": 401})
     with patch("clients.battlenet_client.probe_session") as probe:
-        creds = extract_battlenet_session(ctx, page, sniffer=sniffer)
+        creds = extract_battlenet_session(ctx, None, sniffer=sniffer)
         probe.assert_not_called()
-        assert page.evaluate_calls == 0
     assert creds is not None
     assert "BA-tassession=sess" in creds["BATTLENET_COOKIE"]
+
+
+def test_in_page_401_ignores_sniffer_verified() -> None:
+    """Stale profile: sniffer must not false-complete when games-and-subs is 401."""
+    ctx = _FakeContext(SESSION_COOKIES)
+    sniffer = BattleNetGamesAndSubsSniffer()
+    sniffer.attach(ctx)
+    req = MagicMock()
+    req.url = "https://account.battle.net/api/games-and-subs"
+    req.headers = {"cookie": "XSRF-TOKEN=tok%3D%3D; BA-tassession=sess"}
+    resp = MagicMock()
+    resp.url = req.url
+    resp.status = 200
+    resp.request = req
+    ctx.response_handlers[0](resp)
+
+    page = _FakePage({"ok": False, "status": 401})
+    with patch("clients.battlenet_client.probe_session") as probe:
+        assert extract_battlenet_session(ctx, page, sniffer=sniffer) is None
+        probe.assert_not_called()
+        assert page.evaluate_calls == 1
 
 
 def test_sniffer_cookie_header_used_when_cdp_dump_empty() -> None:
@@ -209,7 +227,7 @@ def test_stale_page_fails_live_page_succeeds() -> None:
     assert "BATTLENET_COOKIE" in creds
 
 
-def test_sniffer_matches_any_account_api_200() -> None:
+def test_sniffer_ignores_non_games_and_subs_api_200() -> None:
     ctx = _FakeContext(SESSION_COOKIES)
     sniffer = BattleNetGamesAndSubsSniffer()
     sniffer.attach(ctx)
@@ -221,11 +239,33 @@ def test_sniffer_matches_any_account_api_200() -> None:
     resp.status = 200
     resp.request = req
     ctx.response_handlers[0](resp)
-    with patch("clients.battlenet_client.probe_session") as probe:
+    assert sniffer.snapshot()[0] is False
+    with patch(
+        "clients.battlenet_client.probe_session",
+        return_value={"modernGames": []},
+    ) as probe:
+        # No page + no games-and-subs sniffer → may fall through to external.
         creds = extract_battlenet_session(ctx, None, sniffer=sniffer)
-        probe.assert_not_called()
+        probe.assert_called_once()
     assert creds is not None
-    assert "BA-tassession=sess" in creds["BATTLENET_COOKIE"]
+
+
+def test_non_games_api_200_does_not_complete_when_in_page_401() -> None:
+    ctx = _FakeContext(SESSION_COOKIES)
+    sniffer = BattleNetGamesAndSubsSniffer()
+    sniffer.attach(ctx)
+    req = MagicMock()
+    req.url = "https://account.battle.net/api/account-info"
+    req.headers = {"cookie": "BA-tassession=sess"}
+    resp = MagicMock()
+    resp.url = req.url
+    resp.status = 200
+    resp.request = req
+    ctx.response_handlers[0](resp)
+    page = _FakePage({"ok": False, "status": 401})
+    with patch("clients.battlenet_client.probe_session") as probe:
+        assert extract_battlenet_session(ctx, page, sniffer=sniffer) is None
+        probe.assert_not_called()
 
 
 def test_cookies_for_urls_fallback_when_dump_empty() -> None:
@@ -344,3 +384,20 @@ def test_probe_session_import_does_not_need_browser_cookie3() -> None:
     # Top-level import removed; only lazy inside from_browser.
     assert "import browser_cookie3 as bc3" not in src.split("def from_browser")[0]
     assert "import browser_cookie3 as bc3" in src
+
+
+def test_probe_browser_session_battlenet_ok_and_401() -> None:
+    from auth.session_probe import probe_browser_session
+    from clients.battlenet_client import BattleNetAuthError
+
+    with patch(
+        "clients.battlenet_client.probe_session",
+        return_value={"modernGames": []},
+    ):
+        assert probe_browser_session("battlenet", {"BATTLENET_COOKIE": "ok"}) is None
+    with patch(
+        "clients.battlenet_client.probe_session",
+        side_effect=BattleNetAuthError("401"),
+    ):
+        err = probe_browser_session("battlenet", {"BATTLENET_COOKIE": "bad"})
+    assert err == "401"

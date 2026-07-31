@@ -16,7 +16,7 @@ from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 ProbeResult = Literal["ok", "auth_fail", "unreachable"]
 
 # Providers that have a probe implementation in this module.
-PROBEABLE_BROWSER = frozenset({"gog", "xbox_wishlist"})
+PROBEABLE_BROWSER = frozenset({"gog", "xbox_wishlist", "battlenet"})
 
 # Cheap/no-browser providers eligible for silent hourly health checks.
 PROBEABLE_QUIET = frozenset({"gog", "epic", "steam", "itch", "itad", "psn"})
@@ -25,6 +25,8 @@ PROBEABLE_QUIET = frozenset({"gog", "epic", "steam", "itch", "itad", "psn"})
 # the session via the live page before closing, so a headless probe miss must
 # never veto the connect (xbox.com serves signed-out SSR to headless Chrome
 # inconsistently). For these, the probe is advisory — logged, never blocking.
+# Battle.net is NOT advisory: a 401 on the same cookie must veto a false sniffer
+# complete even though headed success paths are otherwise trusted.
 ADVISORY_BROWSER_PROBE = frozenset({"xbox_wishlist", "ea"})
 
 
@@ -34,7 +36,31 @@ def probe_browser_session(provider: str, creds: dict[str, str]) -> str | None:
         return probe_gog_session(creds.get("GOG_AL", ""))
     if provider == "xbox_wishlist":
         return probe_xbox_wishlist_session(creds)
+    if provider == "battlenet":
+        return probe_battlenet_session(creds.get("BATTLENET_COOKIE", ""))
     return None
+
+
+def probe_battlenet_session(cookie: str) -> str | None:
+    """Verify games-and-subs accepts the captured cookie (lazy client import)."""
+    token = (cookie or "").strip()
+    if not token:
+        return (
+            "No Battle.net session cookie captured — sign in at "
+            "account.battle.net and try Connect again."
+        )
+    try:
+        from clients.battlenet_client import BattleNetAuthError, probe_session
+    except Exception as exc:  # noqa: BLE001
+        return f"Could not verify Battle.net session: {exc}"
+    try:
+        probe_session(token)
+        return None
+    except BattleNetAuthError as exc:
+        return str(exc) or (
+            "Battle.net rejected the session. Reconnect and wait until "
+            "your Games list loads."
+        )
 
 
 def probe_xbox_wishlist_session(_creds: dict[str, str]) -> str | None:

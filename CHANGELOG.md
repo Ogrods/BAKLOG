@@ -29,6 +29,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.37] - 2026-07-31
+
 ### Fixed
 
 - Battle.net Connect: when the Games SPA already loads `games-and-subs` successfully, complete Connect from that network 200 (sniffer) instead of hanging on a failing external/in-page probe; re-select the live Games tab each poll; add Origin/Referer to the in-page probe; rate-limited stderr diagnostics for probe status/URL/cookies.

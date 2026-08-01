@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from auth.registry import PROVIDERS, spec_for
-from auth.runner import AuthSession, SUCCESS_WAIT_SEC, run_browser_auth
+from auth.runner import SUCCESS_WAIT_SEC, AuthSession, run_browser_auth
 from auth.secrets import (
     SecretsCorruptError,
     delete_provider_blob,

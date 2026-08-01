@@ -18,7 +18,6 @@ import argparse
 import json
 import re
 import sys
-import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass

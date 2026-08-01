@@ -183,7 +183,7 @@ def test_stale_session_taken_over_by_plain_connect(
     )
 
     # Inject a stale unfinished session older than SUCCESS_WAIT_SEC + 30.
-    from auth.runner import AuthSession, SUCCESS_WAIT_SEC
+    from auth.runner import SUCCESS_WAIT_SEC, AuthSession
 
     stale = AuthSession("staleold", "xbox_wishlist")
     stale.started_at = time.time() - (SUCCESS_WAIT_SEC + 60)

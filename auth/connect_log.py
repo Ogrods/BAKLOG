@@ -11,7 +11,6 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any
 
 _LOG_INTERVAL_SEC = 4.0
 _last_log_by_key: dict[str, float] = {}

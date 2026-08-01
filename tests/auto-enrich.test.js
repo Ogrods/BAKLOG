@@ -259,9 +259,12 @@ describe('recordLibraryFirstSeen', () => {
 describe('repairBulkFirstSeenStamps', () => {
   it('collapses persisted bulk-import batches to baseline', async () => {
     const { repairBulkFirstSeenStamps } = await import('../js/library-load.js');
+    // Align to a second boundary so ts+i never spans two buckets (flaky when
+    // Date.now() % 1000 is near 999).
     const ts = Date.now() - 3 * 60 * 60 * 1000;
+    const base = ts - (ts % 1000);
     const map = {};
-    for (let i = 0; i < 12; i++) map[`steam:${i}`] = ts + i;
+    for (let i = 0; i < 12; i++) map[`steam:${i}`] = base + i;
     expect(repairBulkFirstSeenStamps(map)).toBe(true);
     expect(map['steam:0']).toBe(0);
     expect(map['steam:11']).toBe(0);

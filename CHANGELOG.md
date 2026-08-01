@@ -22,12 +22,20 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 4. **Before tagging:** run `.\scripts\release_preflight.ps1 -TagVersion vX.Y.Z`
    on Windows (includes pytest, Inno ISCC compile, optional full
    `build_windows.ps1`). CI `python-windows` must also compile `baklog.iss`.
-5. **Broken public installer:** do not bump version for a bad build alone. Fix
+5. **Gates:** working tree must be clean and GitHub CI must be green on the release commit on `main` before tagging. Never tag WIP or a red/pending CI commit.
+6. **Broken public installer:** do not bump version for a bad build alone. Fix
    on `main`, keep `pyproject.toml` on the same version, run
    `.\scripts\replace_release_tag.ps1 -Version X.Y.Z -Force` to replace the tag
    and re-publish assets at the same version.
 
 ## [Unreleased]
+
+## [0.8.46] - 2026-08-01
+
+### Fixed
+
+- Dashboard no longer shows leftover Library/Wishlist/itch #summary chips after navigate (including cached dashboard returns).
+- Library/Wishlist/itch status chips (e.g. Backlog) wrap in the same row as store/stat chips instead of a forced extra row.
 
 ## [0.8.45] - 2026-08-01
 

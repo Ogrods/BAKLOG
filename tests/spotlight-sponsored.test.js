@@ -79,6 +79,8 @@ describe('spotlight sponsored slides', () => {
   let resetSpotlightRecentKeysForTest;
   let __setSponsorsForTest;
   let setSpotlightHouseAdsForTest;
+  let setHouseProBannersForTest;
+  let __resetHouseProBannersForTest;
   let state;
 
   beforeEach(async () => {
@@ -103,8 +105,14 @@ describe('spotlight sponsored slides', () => {
       setScoreJitterForTest,
       resetSpotlightRecentKeysForTest,
     } = await import('../js/dashboard-spotlight.js'));
-    ({ __setSponsorsForTest, setSpotlightHouseAdsForTest } = await import('../js/sponsored-deals.js'));
+    ({
+      __setSponsorsForTest,
+      setSpotlightHouseAdsForTest,
+      setHouseProBannersForTest,
+      __resetHouseProBannersForTest,
+    } = await import('../js/sponsored-deals.js'));
 
+    setHouseProBannersForTest(true);
     setSpotlightHouseAdsForTest(true);
     setSpotlightCurrentKey(null);
     setStinkerChanceForTest(0);
@@ -135,6 +143,7 @@ describe('spotlight sponsored slides', () => {
   });
 
   afterEach(() => {
+    __resetHouseProBannersForTest();
     localStorage.clear();
   });
 

@@ -55,6 +55,22 @@ const SPONSORS_FALLBACK_PATH = 'curated/sponsors.json';
 export const SPONSORS_HOSTED_URL = 'https://baklog.app/sponsors.json';
 const SPONSORS_REMOTE_TIMEOUT_MS = 3000;
 
+/** Set true when Pro funnel creatives are ready for stranger beta. */
+export const HOUSE_PRO_BANNERS_ENABLED = false;
+
+/** @type {boolean | null} null = use HOUSE_PRO_BANNERS_ENABLED */
+let _houseProBannersForceForTest = null;
+export function setHouseProBannersForTest(enabled) {
+  _houseProBannersForceForTest = enabled !== false;
+}
+export function __resetHouseProBannersForTest() {
+  _houseProBannersForceForTest = null;
+}
+function houseProBannersLive() {
+  if (_houseProBannersForceForTest != null) return _houseProBannersForceForTest;
+  return HOUSE_PRO_BANNERS_ENABLED;
+}
+
 export function getSponsorsEndpoint() {
   return (document.querySelector('meta[name="baklog-sponsors-endpoint"]')?.content)
     || window.__BAKLOG_SPONSORS_ENDPOINT
@@ -637,10 +653,14 @@ export function getAdsForLocation(locationKey, { count = 1 } = {}) {
   if (!AD_LOCATION_SET.has(key)) return [];
   const ids = state.adLocations?.[key] || [];
   const now = Date.now();
+  const houseLive = houseProBannersLive();
   const eligible = [];
   for (const id of ids) {
     const item = resolveAd(id);
-    if (item && isEligibleAd(item, now)) eligible.push(item);
+    if (!item || !isEligibleAd(item, now)) continue;
+    // Hide in-house Pro creatives when the funnel flag is off; paid sponsors stay.
+    if (!houseLive && String(item.kind || '').toLowerCase() === 'house') continue;
+    eligible.push(item);
   }
   if (!eligible.length) return [];
   const cap = LOCATION_CAPACITY[key] ?? count;
@@ -661,6 +681,7 @@ export function getAdsForLocation(locationKey, { count = 1 } = {}) {
  * @returns {object[]} feed-shaped ad items (empty for Pro users)
  */
 export function getSpotlightHouseAds() {
+  if (!houseProBannersLive()) return [];
   if (!spotlightHouseAdsLive()) return [];
   const out = [];
   for (const id of SPOTLIGHT_PRO_AD_IDS) {
@@ -993,6 +1014,7 @@ export function proPromoBannerHtml(item) {
 
 /** Markup for the dashboard house slot (dash-house — Pro upsell). */
 export function proPromoSlotHtml() {
+  if (!houseProBannersLive()) return '';
   if (isPro()) return '';
   const item = getAdsForLocation('dash-house')[0] || PRO_PROMO_ITEM;
   return proPromoBannerHtml(item);
@@ -1022,6 +1044,11 @@ export function houseStripeCardHtml(item, { variant = 'lib' } = {}) {
 export function renderHouseLocationSlot(locationKey, slotElId, { variant } = {}) {
   const el = document.getElementById(slotElId);
   if (!el) return;
+  if (!houseProBannersLive()) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
   const item = getAdsForLocation(locationKey)[0];
   if (!item) {
     el.classList.add('hidden');
@@ -1078,6 +1105,7 @@ export function sponsoredDealCardHtml(item) {
 
 /** Markup for the wishlist house banner (wish-house location), green accent. */
 export function sponsoredDealSlotHtml() {
+  if (!houseProBannersLive()) return '';
   const item = getAdsForLocation('wish-house')[0];
   if (!item) return '';
   return houseDealBannerHtml(item, { accent: 'green' });

@@ -15,6 +15,9 @@ import {
   rotateLocationAd,
   getSpotlightHouseAds,
   setSpotlightHouseAdsForTest,
+  setHouseProBannersForTest,
+  __resetHouseProBannersForTest,
+  HOUSE_PRO_BANNERS_ENABLED,
   itemPlacements,
   sponsorCoverUrl,
   sponsorActionAttrs,
@@ -101,10 +104,13 @@ beforeEach(() => {
   __resetDismissedSponsorsForTest();
   __resetSpotlightHouseAdsForTest();
   __resetLocationCursorsForTest();
+  // Existing house-creative suites exercise the on path; flag-off coverage is separate.
+  setHouseProBannersForTest(true);
   __setSponsorsForTest({ version: 2, ads: {}, locations: {} });
 });
 
 afterEach(() => {
+  __resetHouseProBannersForTest();
   state.sponsoredDeals = [];
   state.sponsoredAds = {};
   state.adLocations = {};
@@ -583,6 +589,64 @@ describe('sponsorToSpotlightGame', () => {
       scheme: 'rainbow',
     });
     expect(unknown._spotlightAd.scheme).toBe('');
+  });
+});
+
+describe('HOUSE_PRO_BANNERS_ENABLED', () => {
+  beforeEach(() => {
+    setHouseProBannersForTest(false);
+  });
+
+  it('defaults to false for stranger beta', () => {
+    expect(HOUSE_PRO_BANNERS_ENABLED).toBe(false);
+  });
+
+  it('filters house creatives from locations but keeps paid placements', () => {
+    __setSponsorsForTest(v2Doc(
+      {
+        house: { id: 'house', kind: 'house', title: 'Pro stripe' },
+        paid: sponsor({ id: 'paid', kind: 'sponsor', title: 'Paid Deal' }),
+      },
+      { 'dash-house': ['house'], 'wish-deal-hero': ['paid'], 'lib-pick': ['paid'] },
+    ));
+    expect(getAdsForLocation('dash-house')).toEqual([]);
+    expect(getAdsForLocation('wish-deal-hero').map((x) => x.id)).toEqual(['paid']);
+    expect(getAdsForLocation('lib-pick').map((x) => x.id)).toEqual(['paid']);
+  });
+
+  it('returns no spotlight house slides', () => {
+    setSpotlightHouseAdsForTest(true);
+    expect(getSpotlightHouseAds()).toEqual([]);
+  });
+
+  it('returns empty markup for dash/wish house slots', () => {
+    wireWishHouse();
+    expect(sponsoredDealSlotHtml()).toBe('');
+    expect(proPromoSlotHtml()).toBe('');
+  });
+
+  it('hides renderHouseLocationSlot DOM when the funnel flag is off', () => {
+    document.body.innerHTML = '<div id="dashHouse">stale</div><div id="libHouse">stale</div>';
+    __setSponsorsForTest(v2Doc(
+      { pro: { kind: 'house', title: 'Pro slot', tagline: 'Upsell', cta: 'Go', url: 'https://baklog.app/' } },
+      { 'dash-house': ['pro'], 'lib-house': ['pro'] },
+    ));
+    renderHouseLocationSlot('dash-house', 'dashHouse');
+    renderHouseLocationSlot('lib-house', 'libHouse', { variant: 'lib' });
+    const dash = document.getElementById('dashHouse');
+    const lib = document.getElementById('libHouse');
+    expect(dash.classList.contains('hidden')).toBe(true);
+    expect(dash.innerHTML).toBe('');
+    expect(lib.classList.contains('hidden')).toBe(true);
+    expect(lib.innerHTML).toBe('');
+  });
+
+  it('restores house creatives when setHouseProBannersForTest(true)', () => {
+    setHouseProBannersForTest(true);
+    setSpotlightHouseAdsForTest(true);
+    wireWishHouse();
+    expect(sponsoredDealSlotHtml()).toContain('sponsored-deal-house');
+    expect(getSpotlightHouseAds().length).toBeGreaterThan(0);
   });
 });
 

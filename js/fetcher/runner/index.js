@@ -1079,14 +1079,36 @@ export const fetcherRunner = (() => {
       if (!state || state === 'failed') continue;
       if (inFlightKeys.has(key)) continue;
       const runId = runIdByKey.get(key);
-      if (runId && sourcesByRunId.has(runId)) continue;
       const hist = historyByKey.get(key);
+      if (runId && sourcesByRunId.has(runId)) {
+        // A CONNECTING/zombie EventSource used to block reconcile forever after
+        // a missed `done` (Free/claims and every other store). If the server
+        // already finished this key, drop the stream and apply history.
+        const serverFinished = hist && (
+          hist.status === 'done'
+          || hist.status === 'cancelled'
+          || hist.status === 'failed'
+        );
+        if (!serverFinished) continue;
+        const attached = sourcesByRunId.get(runId);
+        if (attached?.es) {
+          attached.es.onerror = null;
+          try { attached.es.close(); } catch (_) {}
+        }
+        sourcesByRunId.delete(runId);
+      }
       if (hist) {
         if (hist.status === 'done' && hist.exit_code === 0) {
+          lastRunFailedByKey.delete(key);
           markChipState(key, null);
+          if (hist.id && hist.id !== _lastAppliedDoneRunId) {
+            _lastAppliedDoneRunId = hist.id;
+            void refreshAfterFetch(key);
+          }
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
         } else {
+          lastRunFailedByKey.set(key, Date.now());
           markChipState(key, 'failed');
         }
         if (hist.id) clearLastSeq(hist.id);
@@ -1657,8 +1679,10 @@ export const fetcherRunner = (() => {
       try {
         const snap = await fetchRunsSnapshot();
         if (!snap) throw new Error('no snapshot');
-        const stillActive = snap.active?.id === runId;
-        const inQueue = (snap.queue || []).some(r => r.id === runId);
+        const stillActive = snap.active?.id === runId
+          || snap.enrich_active?.id === runId;
+        const inQueue = (snap.queue || []).some(r => r.id === runId)
+          || (snap.enrich_queue || []).some(r => r.id === runId);
         const finished = (snap.history || []).find(r => r.id === runId);
         if (stillActive || inQueue) {
           const queuedOnly = inQueue && !stillActive;
@@ -1666,19 +1690,37 @@ export const fetcherRunner = (() => {
           return;
         }
         if (finished) {
+          const cancelled = finished.status === 'cancelled';
           const ok = finished.status === 'done' && finished.exit_code === 0;
           logEvent('info', `[${src.label}: stream dropped after exit ${finished.exit_code}]`);
-          if (liveRunId === runId) setStatus(ok ? 'done' : 'failed');
-          if (ok) fetchSuccessLabels.add(src.label || key);
-          if (ok) markChipState(key, null);
-          if (ok && finished.id !== _lastAppliedDoneRunId) {
-            _lastAppliedDoneRunId = finished.id;
-            await refreshAfterFetch(key);
+          if (liveRunId === runId) {
+            setStatus(cancelled ? 'failed' : ok ? 'done' : 'failed');
+            updateCancelButton();
           }
-          if (!ok && finished.status === 'done') {
+          if (ok) {
+            lastRunFailedByKey.delete(key);
+            fetchSuccessLabels.add(src.label || key);
+            markChipState(key, null);
+            if (finished.id !== _lastAppliedDoneRunId) {
+              _lastAppliedDoneRunId = finished.id;
+              await refreshAfterFetch(key);
+            }
+            clearAuthCooldown(key);
+          } else if (cancelled) {
+            markChipState(key, null);
+          } else {
+            lastRunFailedByKey.set(key, Date.now());
+            markChipState(key, 'failed');
             handleFetcherAuthOutcome(key, finished, '');
+            setTimeout(() => {
+              if (runStateByKey.get(key) === 'failed') {
+                runStateByKey.delete(key);
+                renderDashboardFetcherHealth();
+              }
+            }, 10000);
           }
           if (liveRunId === runId) liveRunId = null;
+          revertFetcherLayoutIfIdle();
           return;
         }
       } catch (_) {}
@@ -1920,6 +1962,16 @@ export const fetcherRunner = (() => {
     recordLineSeqForTest: recordLineSeq,
     getLastSeqForTest: getLastSeq,
     reconcileRunStateFromSnapshot,
+    attachStreamForTest(runId, key, es) {
+      sourcesByRunId.set(runId, {
+        es: es || { readyState: 0, close() {}, onerror: null },
+        key,
+        src: { key, label: key },
+      });
+    },
+    hasStreamForTest(runId) {
+      return sourcesByRunId.has(runId);
+    },
     isCancelInFlightForTest: () => cancelInFlight,
     getInFlightCountForTest: () => runStateByKey.size,
     getCancelEpoch,

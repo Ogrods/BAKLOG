@@ -6,6 +6,7 @@ import {
   toggleLegendTips,
   formatRefreshIntervalLabel,
   primaryFailureNavigateTarget,
+  dismissStickyFailedState,
 } from './fetcher-health.js';
 import { reconnectProvider } from './connections.js';
 
@@ -17,9 +18,14 @@ export function handleGlobalStatusClick(e) {
     fetcherRunner.openFetcherLog({ focusPanel: false });
     return;
   }
-  const navTarget = pill.classList.contains('fh-global-status-failed')
-    ? primaryFailureNavigateTarget()
-    : null;
+  const isFailed = pill.classList.contains('fh-global-status-failed');
+  // Capture navigate target before clearing sticky failed (map drives routing).
+  const navTarget = isFailed ? primaryFailureNavigateTarget() : null;
+  if (isFailed) {
+    // Always clear — otherwise a red pill with an already-connected provider
+    // (or a non-auth failure) stays red and bricks subsequent fetcher UI.
+    dismissStickyFailedState({ all: true });
+  }
   if (navTarget) {
     fetcherRunner.hideFetcherPopover();
     void reconnectProvider(navTarget.provider, { autoStart: false });
@@ -104,6 +110,10 @@ export function bindFetcherHealthEvents() {
     if (chip.dataset.fetcherConnect) {
       e.preventDefault();
       fetcherRunner.hideFetcherPopover();
+      dismissStickyFailedState({
+        fetcherKey: chip.dataset.fetcherKey,
+        provider: chip.dataset.fetcherConnect,
+      });
       reconnectProvider(chip.dataset.fetcherConnect, { autoStart: false });
       return;
     }

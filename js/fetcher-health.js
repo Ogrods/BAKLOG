@@ -80,6 +80,7 @@ export {
   primaryFailureNavigateTarget,
   connectProviderForFetcher,
   isFetcherDisconnected,
+  dismissStickyFailedState,
 } from './fetcher/reconnect.js';
 export {
   staleSweepRank,

@@ -16,7 +16,11 @@ the row:
 
 The script never calls the Steam *search* endpoint — that's
 ``enrich_steam_reviews.py``'s job. If a row's appid hasn't been mapped yet, we
-skip it; running review enrichment first is the prerequisite.
+skip it; running review enrichment first is the prerequisite. When Steam
+``appdetails`` returns ``success: false`` (delisted / bad match / cached miss),
+we still write ``coop_online`` / ``coop_local`` as ``False`` so the dashboard
+chip does not keep counting the row as "new". Transient network errors leave
+the fields unset so a later run can retry.
 
 Covered stores: gog, epic, psn, amazon, xbox, battlenet, ubisoft, nintendo,
 itch (videogame classification only).
@@ -174,12 +178,15 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 result = steam.get_app_details(int(appid), refresh=args.refresh)
             except Exception as e:  # noqa: BLE001 - log + continue
+                # Transient network/parse failure: leave coop fields unset so a
+                # later run can still count the row as pending.
                 stats.warn(f"appdetails error for {g.get('name')} ({appid}): {e}")
                 continue
-            if not result or not result.get("success"):
-                continue
-
-            enrichment = enrichment_from_appdetails(result.get("data"))
+            # Steam returns success:false for delisted / bad / region-blocked
+            # appids (and caches that result). Still write coop false/false so
+            # the Co-op tags chip stops counting the row as "N new" forever.
+            details = result.get("data") if result and result.get("success") else None
+            enrichment = enrichment_from_appdetails(details)
             before = {k: g.get(k) for k in ALWAYS_WRITE_FIELDS | FILL_IF_MISSING_FIELDS}
             apply_enrichment_to_row(g, enrichment)
             if _row_changed(before, g):

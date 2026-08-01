@@ -149,6 +149,61 @@ def test_enricher_writes_coop_and_fills_missing_genres(
     assert "fetched_at" in meta
 
 
+def test_enricher_marks_failed_appdetails_as_checked(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """success:false must still write coop false/false so the chip clears."""
+    for mod in ("enrichers.enrich_steam_tags", "clients.steam_client"):
+        sys.modules.pop(mod, None)
+    import enrichers.enrich_steam_tags as enrich_steam_tags
+    from clients.steam_client import SteamClient
+
+    def fake_get_app_details(self, appid: int, refresh: bool = False) -> dict | None:
+        return {"success": False, "data": None}
+
+    monkeypatch.setattr(SteamClient, "get_app_details", fake_get_app_details)
+
+    exit_code = enrich_steam_tags.main([])
+    assert exit_code == 0
+
+    written = json.loads((workspace / "games_gog.json").read_text(encoding="utf-8"))
+    rows = {g["id"]: g for g in written["games"]}
+
+    g1 = rows["1"]
+    assert g1["coop_online"] is False
+    assert g1["coop_local"] is False
+    # Failed details must not invent genres / release date.
+    assert "genres" not in g1
+    assert "release_date" not in g1
+
+    # Unmapped / known-miss rows stay untouched.
+    assert "coop_online" not in rows["2"]
+    assert "coop_online" not in rows["3"]
+
+
+def test_enricher_leaves_pending_on_appdetails_exception(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Network errors must not clear the pending chip — retry later."""
+    for mod in ("enrichers.enrich_steam_tags", "clients.steam_client"):
+        sys.modules.pop(mod, None)
+    import enrichers.enrich_steam_tags as enrich_steam_tags
+    from clients.steam_client import SteamClient
+
+    def fake_get_app_details(self, appid: int, refresh: bool = False) -> dict | None:
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(SteamClient, "get_app_details", fake_get_app_details)
+
+    exit_code = enrich_steam_tags.main([])
+    assert exit_code == 0
+
+    written = json.loads((workspace / "games_gog.json").read_text(encoding="utf-8"))
+    rows = {g["id"]: g for g in written["games"]}
+    assert "coop_online" not in rows["1"]
+    assert "coop_local" not in rows["1"]
+
+
 def test_enricher_dry_run_does_not_write(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -29,6 +29,19 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.45] - 2026-08-01
+
+### Fixed
+
+- Reviews and Co-op tags no longer hit the global 30-minute kill on large libraries (`maxRunSeconds: 0`, same as HLTB).
+- Reviews/Tags flush catalog JSON mid-store so cancel or timeout keeps progress already written.
+- Auto-enrich runs Reviews before Tags (Tags needs the appid map); empty-map Tags skips with exit 0 instead of sticky failed.
+- Auto-enrich is true opt-in: missing/`undefined` pref no longer enables the checkbox or queues enrichers.
+
+### Changed
+
+- Reviews storesearch delay 1.0s → 0.4s; appreviews throttle 1.5s → 0.75s (appdetails for Tags/Covers stays at 1.5s).
+
 ## [0.8.44] - 2026-07-31
 
 ### Fixed

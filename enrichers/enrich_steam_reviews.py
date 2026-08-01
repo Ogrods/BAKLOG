@@ -32,7 +32,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 def mapping_file() -> Path:
     return cache_json_path("steam_review_map.json")
-SEARCH_DELAY_SEC = 1.0
+SEARCH_DELAY_SEC = 0.4
 SEARCH_URL = "https://store.steampowered.com/api/storesearch/"
 HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
 
@@ -231,6 +231,9 @@ def main() -> int:
                     f"({g['name']} -> {reviews['percent_positive']}%)",
                     flush=True,
                 )
+                data["game_count"] = len(games)
+                write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
+                save_mapping(mapping)
 
         data["game_count"] = len(games)
         write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))

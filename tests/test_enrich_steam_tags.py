@@ -189,4 +189,4 @@ def test_enricher_bails_without_mapping(
     import enrichers.enrich_steam_tags as enrich_steam_tags
 
     exit_code = enrich_steam_tags.main([])
-    assert exit_code == 1
+    assert exit_code == 0

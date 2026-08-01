@@ -671,9 +671,9 @@ def disconnect(provider: str) -> None:
     clear_browser_session(provider)
 
 
-# Cloudflare-gated storefronts where wiping the profile on reconnect forces a
-# new cf_clearance challenge every time and Epic drops the storefront session.
-PRESERVE_PROFILE_ON_RECONNECT = frozenset({"epic_wishlist"})
+# Cloudflare-gated Epic flows where wiping the profile on reconnect forces a
+# new cf_clearance challenge every time.
+PRESERVE_PROFILE_ON_RECONNECT = frozenset({"epic", "epic_wishlist"})
 
 
 def _should_clear_on_reconnect(provider: str) -> bool:

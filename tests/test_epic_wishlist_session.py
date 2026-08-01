@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from auth.epic_wishlist_session import (
+    cloudflare_embedded_challenge,
     cloudflare_interstitial,
     enrich_wishlist_elements_with_catalog,
     extract_catalog_offers_from_html,
@@ -81,12 +82,14 @@ def test_cloudflare_interstitial_real_challenge() -> None:
 
 
 def test_cloudflare_interstitial_managed_challenge_html() -> None:
+    """Embedded CF markers in a form error must not classify as a challenge page."""
     managed = (
         "<html><body><script>window._cf_chl_opt={cType: 'managed'};</script>"
         "Enable JavaScript and cookies to continue</body></html>"
     )
     login_url = "https://www.epicgames.com/id/login"
-    assert cloudflare_interstitial(managed, login_url)
+    assert not cloudflare_interstitial(managed, login_url)
+    assert cloudflare_embedded_challenge(managed)
 
 
 def test_cloudflare_interstitial_not_normal_epic_login_html() -> None:

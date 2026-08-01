@@ -78,33 +78,28 @@ def test_epic_library_captures_redirect_on_non_first_tab(monkeypatch: pytest.Mon
     assert creds == {"EPIC_AUTH_CODE": "epic-lib-code-123"}
 
 
-def test_epic_library_inline_waits_on_cloudflare_managed_html(
+def test_epic_library_inline_does_not_poll_content_on_login(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from auth.epic_wishlist_session import EPIC_CF_CONNECT_HINT
-
+    """Regression: never call content() every poll tick on the Epic ID login page."""
     clock = _FakeTime(step_s=6.0)
     monkeypatch.setattr(runner, "time", clock)
     monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
     monkeypatch.setattr(runner, "POLL_SEC", 0.1)
 
-    cf_html = (
-        "<html><body><script>window._cf_chl_opt={cType: 'managed'};</script>"
-        "Enable JavaScript and cookies to continue</body></html>"
-    )
     page = _FakePage("https://www.epicgames.com/id/login")
-    page.content = lambda: cf_html  # type: ignore[method-assign]
-    ctx = _FakeContext([page])
-    events: list[tuple[str, dict]] = []
+    content_calls = 0
+    original_content = page.content
 
-    class _Session:
-        def emit(self, event: str, data: dict) -> None:
-            events.append((event, data))
+    def _counting_content() -> str:
+        nonlocal content_calls
+        content_calls += 1
+        return original_content()
+
+    page.content = _counting_content  # type: ignore[method-assign]
+    ctx = _FakeContext([page])
 
     with pytest.raises(RuntimeError, match="Could not capture your Epic authorization code"):
-        runner._extract_epic_inline(page, ctx, session=_Session())  # type: ignore[arg-type]
+        runner._extract_epic_inline(page, ctx, session=None)
 
-    assert any(
-        e == "waiting_for_user" and (d or {}).get("message") == EPIC_CF_CONNECT_HINT
-        for e, d in events
-    )
+    assert content_calls == 0

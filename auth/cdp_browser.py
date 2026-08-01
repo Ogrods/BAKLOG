@@ -1616,7 +1616,6 @@ def launch_persistent_profile(
     window_size: tuple[int, int] | None = None,
     start_minimized: bool = False,
     initial_url: str | None = None,
-    allow_extensions: bool = False,
 ) -> CdpContext:
     """Launch Chrome/Edge with a persistent profile and return a CDP context.
 
@@ -1630,9 +1629,6 @@ def launch_persistent_profile(
 
     When ``initial_url`` is set, the first connect page navigates there after CDP attach
     (used by EA Connect to open the login page immediately).
-
-    ``allow_extensions`` keeps Chrome extensions enabled. Default is off (cleaner
-    OAuth); Epic Connect sets this True to reduce Cloudflare Bot Management flags.
     """
     exe = find_chromium_executable()
     port = _free_port()
@@ -1651,17 +1647,13 @@ def launch_persistent_profile(
         "--remote-allow-origins=http://127.0.0.1,http://localhost,http://[::1]",
         "--no-first-run",
         "--no-default-browser-check",
-    ]
-    if not allow_extensions:
         # Sign-in uses an isolated profile, but extensions synced into that profile
         # (or enterprise policy) can redirect OAuth flows — keep the window clean.
-        # Epic Connect opts out: --disable-extensions worsens CF bot scores.
-        args.append("--disable-extensions")
-    args.append(
+        "--disable-extensions",
         # Omit --disable-blink-features=AutomationControlled: Chrome/Edge show a
         # persistent "unsupported command-line flag" infobar that blocks the login UI.
         "--disable-features=IsolateOrigins,site-per-process",
-    )
+    ]
     if headless:
         mode = "new" if headless is True else str(headless).lower()
         if mode in ("legacy", "old"):

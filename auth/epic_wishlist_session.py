@@ -232,12 +232,7 @@ def wishlist_capture_complete_from_html(html: str) -> bool:
 
 
 def cloudflare_interstitial(html: str, url: str) -> bool:
-    """True for an active Cloudflare challenge (page or managed challenge HTML).
-
-    Matches challenge pages and Epic ID managed challenges that dump
-    ``_cf_chl_opt`` / ``Enable JavaScript and cookies`` into the login form —
-    without treating every page that merely loads a generic CF script as blocked.
-    """
+    """True only for an active Cloudflare challenge page (not embedded CF scripts)."""
     u = (url or "").lower()
     if "/cdn-cgi/challenge" in u:
         return True
@@ -246,19 +241,21 @@ def cloudflare_interstitial(html: str, url: str) -> bool:
         return True
     if "cf_challenge_container" in body or "cf_challenge_text" in body:
         return True
-    # Managed challenge embedded in Epic ID login / XHR error HTML.
-    if "window._cf_chl_opt" in body or "_cf_chl_opt" in body:
-        return True
-    if "cType: 'managed'" in body or 'cType: "managed"' in body:
-        return True
-    if "Enable JavaScript and cookies to continue" in body:
-        return True
     return False
 
 
-EPIC_CF_CONNECT_HINT = (
-    "Complete the Cloudflare check in the browser window, then continue sign-in."
-)
+def cloudflare_embedded_challenge(html: str) -> bool:
+    """CF managed-challenge HTML embedded in an XHR response (not a challenge page).
+
+    Diagnostics only — do not use for Connect/fetch classification. Epic's login
+    SPA can dump ``_cf_chl_opt`` into a form error element on an otherwise-normal
+    login page; treating that as a page-mode challenge misclassifies sign-in.
+    """
+    body = html or ""
+    return (
+        "_cf_chl_opt" in body
+        or "Enable JavaScript and cookies to continue" in body
+    )
 
 
 def storefront_bounced_to_home(url: str) -> bool:

@@ -29,6 +29,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.42] - 2026-07-31
+
+### Fixed
+
+- Epic Connect: revert 0.8.41 Epic fingerprint/DOM-polling/CF-classification changes that triggered Cloudflare managed challenges on `/id/api/email/exists` (restore `--disable-extensions`, stop per-tick `content()` scraping on the login page, page-mode-only CF detection). Epic library Reconnect now preserves the browser profile so `cf_clearance` survives retries; Disconnect still wipes clean.
+
 ## [0.8.41] - 2026-07-31
 
 ### Fixed

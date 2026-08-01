@@ -258,34 +258,3 @@ def test_epic_wishlist_inline_post_login_goto_without_graphql_times_out(
         runner._extract_epic_wishlist_inline(page, context, session)  # type: ignore[attr-defined]
 
     assert page.goto_calls == 2
-
-
-def test_epic_wishlist_inline_waits_on_cloudflare_managed_html(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from auth.epic_wishlist_session import EPIC_CF_CONNECT_HINT
-
-    page = _FakePage(url="https://www.epicgames.com/id/login")
-    page.content = lambda: (  # type: ignore[method-assign]
-        "<html><body>window._cf_chl_opt={cType: 'managed'};"
-        "Enable JavaScript and cookies to continue</body></html>"
-    )
-    context = _FakeContext()
-    events: list[tuple[str, dict]] = []
-
-    class _Session:
-        def emit(self, event: str, data: dict) -> None:
-            events.append((event, data))
-
-    fake_time = _FakeTime(step_s=6.0)
-    monkeypatch.setattr(runner.time, "time", fake_time.time)
-    monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
-    monkeypatch.setattr(runner, "POLL_SEC", 0.1)
-
-    with pytest.raises(RuntimeError, match="Could not detect Epic wishlist sign-in"):
-        runner._extract_epic_wishlist_inline(page, context, _Session())  # type: ignore[arg-type]
-
-    assert any(
-        e == "waiting_for_user" and (d or {}).get("message") == EPIC_CF_CONNECT_HINT
-        for e, d in events
-    )

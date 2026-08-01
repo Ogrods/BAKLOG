@@ -343,7 +343,6 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     the fetcher can reuse it. On any failure the user can still paste the code manually.
     """
     from auth.cdp_browser import abort_if_browser_closed
-    from auth.epic_wishlist_session import EPIC_CF_CONNECT_HINT, cloudflare_interstitial
 
     login_url = spec_for("epic").login_url
     try:
@@ -408,26 +407,8 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
                 page.wait_for_timeout(int(POLL_SEC * 1000))
                 continue
 
-        drive_url = drive.url or ""
-        drive_html = ""
-        try:
-            drive_html = drive.content() if hasattr(drive, "content") else ""
-        except Exception:  # noqa: BLE001
-            drive_html = ""
-        if not drive_html:
-            try:
-                drive_html = page.content()
-            except Exception:  # noqa: BLE001
-                drive_html = ""
+        url = (drive.url or "").lower()
         now = time.time()
-        if cloudflare_interstitial(drive_html, drive_url):
-            if session and now - last_hint > 6:
-                last_hint = now
-                session.emit("waiting_for_user", {"message": EPIC_CF_CONNECT_HINT})
-            page.wait_for_timeout(int(POLL_SEC * 1000))
-            continue
-
-        url = drive_url.lower()
         if session and now - last_hint > 10:
             last_hint = now
             if "login" in url or "id.epicgames.com" in url:
@@ -664,8 +645,6 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     from auth.cdp_browser import abort_if_browser_closed
     from auth.connect_extractors import build_epic_wishlist_graphql_sniffer
     from auth.epic_wishlist_session import (
-        EPIC_CF_CONNECT_HINT,
-        cloudflare_interstitial,
         storefront_bounced_to_home,
         wishlist_capture_complete_from_html,
     )
@@ -738,21 +717,11 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
             return {"EPIC_STORE_COOKIE": "ready"}
 
         now = time.time()
-        try:
-            html = page.content()
-        except Exception:  # noqa: BLE001
-            html = ""
-        if cloudflare_interstitial(html, url):
-            if session and now - last_msg > 6:
-                last_msg = now
-                session.emit("waiting_for_user", {"message": EPIC_CF_CONNECT_HINT})
-            page.wait_for_timeout(int(POLL_SEC * 1000))
-            continue
 
         if session and now - last_msg > 8:
             last_msg = now
             if "challenge" in ul or "cloudflare" in ul:
-                msg = EPIC_CF_CONNECT_HINT
+                msg = "Cloudflare challenge — click the checkbox if shown."
             elif _epic_on_login_page(url) or "signin" in ul:
                 msg = (
                     "Sign in to Epic in this window — you'll be returned to your "
@@ -1818,12 +1787,10 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
 
     release_chromium_profile_lock(user_data)
 
-    allow_extensions = provider in ("epic", "epic_wishlist")
     with launch_persistent_profile(
         user_data,
         headless=False,
         initial_url=spec.login_url if provider == "ea" else None,
-        allow_extensions=allow_extensions,
     ) as context:
         try:
             context.add_init_script(_STEALTH_INIT)

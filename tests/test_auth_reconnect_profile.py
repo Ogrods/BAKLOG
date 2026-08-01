@@ -9,12 +9,20 @@ def test_epic_wishlist_preserves_profile_on_reconnect() -> None:
     assert _should_clear_on_reconnect("epic_wishlist") is False
 
 
+def test_epic_library_preserves_profile_on_reconnect() -> None:
+    assert _should_clear_on_reconnect("epic") is False
+
+
 def test_gog_clears_profile_on_reconnect() -> None:
     assert _should_clear_on_reconnect("gog") is True
 
 
 def test_epic_wishlist_in_preserve_set() -> None:
     assert "epic_wishlist" in PRESERVE_PROFILE_ON_RECONNECT
+
+
+def test_epic_library_in_preserve_set() -> None:
+    assert "epic" in PRESERVE_PROFILE_ON_RECONNECT
 
 
 def test_epic_wishlist_clears_profile_when_disconnected() -> None:

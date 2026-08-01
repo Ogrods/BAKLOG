@@ -8,11 +8,10 @@ visible browser.
 
 from __future__ import annotations
 
-import threading
 import time
 from typing import Literal
 
-from auth.cdp_browser import launch_persistent_profile
+from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 from auth.runner import (
     _STEALTH_INIT,
     XBOX_WISHLIST_POLL_SEC,
@@ -97,7 +96,7 @@ def _capture_once(
             "Could not find __PRELOADED_STATE__ in the xbox.com/wishlist HTML response."
         )
     finally:
-        threading.Thread(target=ctx.close, daemon=True).start()
+        close_browser_bounded(ctx, profile=profile)
 
 
 def capture_xbox_wishlist_preloaded_state(

@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from auth.registry import PROVIDERS, spec_for
-from auth.runner import AuthSession, run_browser_auth
+from auth.runner import AuthSession, SUCCESS_WAIT_SEC, run_browser_auth
 from auth.secrets import (
     SecretsCorruptError,
     delete_provider_blob,
@@ -687,6 +688,24 @@ def _unfinished_session_for(provider: str) -> AuthSession | None:
     return None
 
 
+def cancel_browser_auth(provider: str) -> bool:
+    """Cancel an in-flight headed sign-in. Returns True when a session was found."""
+    existing = _unfinished_session_for(provider)
+    if existing is None:
+        return False
+    existing.cancel()
+    existing.finish()
+    return True
+
+
+def _session_is_stale(session: AuthSession) -> bool:
+    """True when the session was cancelled or has outlived the connect timeout."""
+    if session.is_cancelled():
+        return True
+    age = time.time() - float(getattr(session, "started_at", 0.0) or 0.0)
+    return age > (SUCCESS_WAIT_SEC + 30)
+
+
 def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
     spec = spec_for(provider)
     if spec.kind == "manual":
@@ -695,14 +714,16 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
         raise ValueError(f"{provider} does not support browser sign-in")
     existing = _unfinished_session_for(provider)
     if existing is not None:
-        if not fresh:
+        if fresh or _session_is_stale(existing):
+            # Reconnect, Cancel, or a stuck session past the connect timeout:
+            # finish the old gate so the user can retry without waiting.
+            existing.cancel()
+            existing.finish()
+        else:
             raise ValueError(
                 f"A sign-in window for {spec.label} is already open. "
                 "Finish or close it before starting again."
             )
-        # Reconnect with a stale session still running: finish the old one
-        # so the user can retry without waiting for the 5-minute timeout.
-        existing.finish()
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.

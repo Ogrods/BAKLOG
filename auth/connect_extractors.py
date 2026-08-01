@@ -14,7 +14,7 @@ HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
 HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
-# Per-message-key dedupe interval (same key suppressed this long).
+# Per-message-key dedupe interval kept for tests that monkeypatch these.
 _BATTLENET_LOG_INTERVAL_SEC = 4.0
 _battlenet_last_log_by_key: dict[str, float] = {}
 _battlenet_log_path: Any | None = None
@@ -212,33 +212,9 @@ def _battlenet_xsrf_from_cookies(cookies: list[dict]) -> str:
 
 def _battlenet_log(message: str, *, key: str | None = None) -> None:
     """Rate-limited stderr + on-disk tee for frozen Tray builds."""
-    global _battlenet_log_path
-    now = time.time()
-    dedupe_key = key or message
-    last = _battlenet_last_log_by_key.get(dedupe_key, 0.0)
-    if now - last < _BATTLENET_LOG_INTERVAL_SEC:
-        return
-    _battlenet_last_log_by_key[dedupe_key] = now
-    # Cap key map growth.
-    if len(_battlenet_last_log_by_key) > 64:
-        cutoff = now - (_BATTLENET_LOG_INTERVAL_SEC * 4)
-        stale = [k for k, t in _battlenet_last_log_by_key.items() if t < cutoff]
-        for k in stale:
-            _battlenet_last_log_by_key.pop(k, None)
-    line = f"[battlenet] {message}"
-    print(line, file=sys.stderr, flush=True)
-    try:
-        if _battlenet_log_path is None:
-            from shared.install_paths import data_root
+    from auth.connect_log import connect_log
 
-            _battlenet_log_path = data_root() / "connect-battlenet.log"
-        path = _battlenet_log_path
-        if path is not None:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as fh:
-                fh.write(f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} {line}\n")
-    except Exception:  # noqa: BLE001
-        pass
+    connect_log("battlenet", message, key=key)
 
 
 def _battlenet_resolve_cookie_header(

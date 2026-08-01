@@ -289,6 +289,30 @@ def release_chromium_profile_lock(
     return pids
 
 
+def close_browser_bounded(
+    context: Any,
+    *,
+    profile: str | Path | None = None,
+    join_timeout: float = 10.0,
+) -> None:
+    """Close ``context`` without leaving an orphan holding the profile lock.
+
+    ``CdpContext.close`` can hang on a dead CDP socket. Running it on a daemon
+    thread alone is unsafe in short-lived fetcher subprocesses: the interpreter
+    exits before close finishes and Chrome stays alive on ``--user-data-dir``,
+    poisoning the next Connect. Join for ``join_timeout``, then force-release
+    any remaining profile holders.
+    """
+    closer = getattr(context, "close", None)
+    if not callable(closer):
+        return
+    t = threading.Thread(target=closer, daemon=True, name="cdp-close-bounded")
+    t.start()
+    t.join(join_timeout)
+    if profile is not None and pids_holding_chromium_profile(profile):
+        release_chromium_profile_lock(profile, wait_sec=3.0)
+
+
 _BLANK_URLS = frozenset({"", "about:blank", "chrome://newtab/"})
 
 
@@ -1592,6 +1616,7 @@ def launch_persistent_profile(
     window_size: tuple[int, int] | None = None,
     start_minimized: bool = False,
     initial_url: str | None = None,
+    allow_extensions: bool = False,
 ) -> CdpContext:
     """Launch Chrome/Edge with a persistent profile and return a CDP context.
 
@@ -1605,6 +1630,9 @@ def launch_persistent_profile(
 
     When ``initial_url`` is set, the first connect page navigates there after CDP attach
     (used by EA Connect to open the login page immediately).
+
+    ``allow_extensions`` keeps Chrome extensions enabled. Default is off (cleaner
+    OAuth); Epic Connect sets this True to reduce Cloudflare Bot Management flags.
     """
     exe = find_chromium_executable()
     port = _free_port()
@@ -1623,13 +1651,17 @@ def launch_persistent_profile(
         "--remote-allow-origins=http://127.0.0.1,http://localhost,http://[::1]",
         "--no-first-run",
         "--no-default-browser-check",
+    ]
+    if not allow_extensions:
         # Sign-in uses an isolated profile, but extensions synced into that profile
         # (or enterprise policy) can redirect OAuth flows — keep the window clean.
-        "--disable-extensions",
+        # Epic Connect opts out: --disable-extensions worsens CF bot scores.
+        args.append("--disable-extensions")
+    args.append(
         # Omit --disable-blink-features=AutomationControlled: Chrome/Edge show a
         # persistent "unsupported command-line flag" infobar that blocks the login UI.
         "--disable-features=IsolateOrigins,site-per-process",
-    ]
+    )
     if headless:
         mode = "new" if headless is True else str(headless).lower()
         if mode in ("legacy", "old"):
@@ -1652,6 +1684,26 @@ def launch_persistent_profile(
     proc: subprocess.Popen[Any] | None = None
     ws_url = None
     released_pids: list[int] = []
+    # Snapshot holders BEFORE our Popen so recovery never kills the window we
+    # just launched (that was closing the Connect UI under the user).
+    pre_existing = set(pids_holding_chromium_profile(profile))
+    extended_wait = False
+
+    def _release_pre_existing_only() -> list[int]:
+        current = pids_holding_chromium_profile(profile)
+        stale = [p for p in current if p in pre_existing]
+        if stale:
+            print(
+                f"[cdp] releasing {len(stale)} pre-existing profile holder(s) "
+                f"(not our launch): {stale}",
+                file=sys.stderr,
+                flush=True,
+            )
+            _kill_pids(stale, wait_sec=3.0)
+            return stale
+        _clear_stale_chromium_profile_lock_files(profile)
+        return []
+
     for attempt in range(2):
         proc = subprocess.Popen(
             args,
@@ -1680,7 +1732,7 @@ def launch_persistent_profile(
                 except Exception:
                     pass
                 if attempt == 0 and exit_code == 21:
-                    released_pids = release_chromium_profile_lock(profile)
+                    released_pids = _release_pre_existing_only()
                     break
                 hint = (
                     "Close any other window using this profile and try again."
@@ -1706,9 +1758,55 @@ def launch_persistent_profile(
         if ws_url:
             break
         # Exit 0 with no CDP yet often means SingletonLock handoff (Chrome exits
-        # the second instance cleanly). Release the profile lock and relaunch once.
+        # the second instance cleanly). Kill only pre-existing holders — never
+        # the window we just opened. If nothing was holding the profile, extend
+        # the CDP wait once instead of kill-and-relaunch.
         if attempt == 0 and launcher_exited_zero:
-            released_pids = release_chromium_profile_lock(profile)
+            if pre_existing:
+                released_pids = _release_pre_existing_only()
+                print(
+                    f"[cdp] exit-0 no CDP yet; killed pre-existing holders={released_pids}; relaunching",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                continue
+            if not extended_wait:
+                extended_wait = True
+                print(
+                    "[cdp] exit-0 no CDP yet; no pre-existing holders — extending wait +20s",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                deadline = time.time() + 20
+                while time.time() < deadline:
+                    try:
+                        version = _fetch_json(
+                            f"http://127.0.0.1:{port}/json/version", timeout=2
+                        )
+                        ws_url = version.get("webSocketDebuggerUrl")
+                        if ws_url:
+                            break
+                    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+                        pass
+                    time.sleep(0.2)
+                if ws_url:
+                    break
+            # Still no CDP after extend: drop whatever is on our debug port
+            # (our failed attempt) then relaunch — do not blanket-kill the
+            # whole profile (that closed the user's Connect window).
+            print(
+                "[cdp] CDP still missing after extend; clearing debug port and relaunching",
+                file=sys.stderr,
+                flush=True,
+            )
+            port_pids = _pids_listening_on_local_port(port)
+            if port_pids:
+                _kill_pids(port_pids, wait_sec=2.0)
+            if proc is not None:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
             continue
 
     if not ws_url:

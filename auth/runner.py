@@ -83,7 +83,17 @@ _STEALTH_INIT = STEALTH_INIT_SCRIPT
 
 
 class AuthSession:
-    __slots__ = ("id", "provider", "fresh_connect", "events", "_listeners", "_finished", "_lock")
+    __slots__ = (
+        "id",
+        "provider",
+        "fresh_connect",
+        "events",
+        "started_at",
+        "_listeners",
+        "_finished",
+        "_cancelled",
+        "_lock",
+    )
 
     def __init__(self, session_id: str, provider: str, *, fresh_connect: bool = False) -> None:
         self.id = session_id
@@ -92,6 +102,8 @@ class AuthSession:
         self.events: queue.Queue[tuple[str, dict]] = queue.Queue()
         self._listeners: list[Callable[[str, dict], None]] = []
         self._finished = threading.Event()
+        self._cancelled = threading.Event()
+        self.started_at = time.time()
         self._lock = threading.Lock()
 
     def emit(self, event: str, data: dict[str, Any]) -> None:
@@ -107,12 +119,27 @@ class AuthSession:
         with self._lock:
             self._listeners.append(callback)
 
+    def cancel(self) -> None:
+        """Ask the poll loop to abort; finish() is still called by the worker."""
+        self._cancelled.set()
+
+    def is_cancelled(self) -> bool:
+        return self._cancelled.is_set()
+
     def finish(self) -> None:
         self._finished.set()
         self.emit("done", {})
 
     def wait(self, timeout: float | None = None) -> bool:
         return self._finished.wait(timeout)
+
+
+def abort_if_cancelled(session: AuthSession | None) -> None:
+    """Raise ConnectBrowserClosed when the user cancelled this sign-in session."""
+    if session is not None and session.is_cancelled():
+        from auth.cdp_browser import ConnectBrowserClosed
+
+        raise ConnectBrowserClosed()
 
 
 def _cookie_header(cookies: list[dict], domains: tuple[str, ...]) -> str:
@@ -316,6 +343,7 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     the fetcher can reuse it. On any failure the user can still paste the code manually.
     """
     from auth.cdp_browser import abort_if_browser_closed
+    from auth.epic_wishlist_session import EPIC_CF_CONNECT_HINT, cloudflare_interstitial
 
     login_url = spec_for("epic").login_url
     try:
@@ -380,8 +408,26 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
                 page.wait_for_timeout(int(POLL_SEC * 1000))
                 continue
 
-        url = (drive.url or "").lower()
+        drive_url = drive.url or ""
+        drive_html = ""
+        try:
+            drive_html = drive.content() if hasattr(drive, "content") else ""
+        except Exception:  # noqa: BLE001
+            drive_html = ""
+        if not drive_html:
+            try:
+                drive_html = page.content()
+            except Exception:  # noqa: BLE001
+                drive_html = ""
         now = time.time()
+        if cloudflare_interstitial(drive_html, drive_url):
+            if session and now - last_hint > 6:
+                last_hint = now
+                session.emit("waiting_for_user", {"message": EPIC_CF_CONNECT_HINT})
+            page.wait_for_timeout(int(POLL_SEC * 1000))
+            continue
+
+        url = drive_url.lower()
         if session and now - last_hint > 10:
             last_hint = now
             if "login" in url or "id.epicgames.com" in url:
@@ -618,6 +664,8 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     from auth.cdp_browser import abort_if_browser_closed
     from auth.connect_extractors import build_epic_wishlist_graphql_sniffer
     from auth.epic_wishlist_session import (
+        EPIC_CF_CONNECT_HINT,
+        cloudflare_interstitial,
         storefront_bounced_to_home,
         wishlist_capture_complete_from_html,
     )
@@ -690,11 +738,21 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
             return {"EPIC_STORE_COOKIE": "ready"}
 
         now = time.time()
+        try:
+            html = page.content()
+        except Exception:  # noqa: BLE001
+            html = ""
+        if cloudflare_interstitial(html, url):
+            if session and now - last_msg > 6:
+                last_msg = now
+                session.emit("waiting_for_user", {"message": EPIC_CF_CONNECT_HINT})
+            page.wait_for_timeout(int(POLL_SEC * 1000))
+            continue
 
         if session and now - last_msg > 8:
             last_msg = now
             if "challenge" in ul or "cloudflare" in ul:
-                msg = "Cloudflare challenge — click the checkbox if shown."
+                msg = EPIC_CF_CONNECT_HINT
             elif _epic_on_login_page(url) or "signin" in ul:
                 msg = (
                     "Sign in to Epic in this window — you'll be returned to your "
@@ -943,6 +1001,7 @@ def _xbox_wishlist_connect_creds(sniffer) -> dict[str, str]:
 
 def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     from auth.cdp_browser import abort_if_browser_closed
+    from auth.connect_log import connect_log
     """Open xbox.com/wishlist, wait for MSA sign-in (detected via SSR HTML),
     then capture the Emerald wishlist API token for headless replay. The
     persistent profile remains the fallback credential.
@@ -981,6 +1040,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
         return _drive_connect_page(page, context)
 
     _attach_sniffer(page)
+    connect_log("xbox_wishlist", "connect poll start", key="enter")
 
     try:
         page.goto(XBOX_WISHLIST_URL, wait_until="domcontentloaded", timeout=20000)
@@ -993,6 +1053,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
     last_ssr_refresh = 0.0
     while time.time() < deadline:
         abort_if_browser_closed(context)
+        abort_if_cancelled(session)
         for pg in context.pages:
             if not pg.is_closed:
                 _attach_sniffer(pg)
@@ -1019,6 +1080,14 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
         dom_signed_in_any, dom_page = _xbox_any_wishlist_dom_signed_in(context)
         dom_signed_in = dom_signed_in_any
         token_ready = bool(sniffer.token)
+        msa_ready = _xbox_has_msa_session(context)
+        connect_log(
+            "xbox_wishlist",
+            f"poll url={url!r} login={on_login} wishlist={on_wishlist} "
+            f"handoff={on_handoff} mid={mid_exchange} done={handoff_done} "
+            f"dom_signed_in={dom_signed_in_any} msa={msa_ready} token={token_ready}",
+            key="poll",
+        )
         if token_ready and dom_signed_in_any and not on_login:
             if session:
                 session.emit(
@@ -1026,6 +1095,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
                     {"message": "Signed in \u2014 capturing your wishlist session..."},
                 )
             sniffer.dump()
+            connect_log("xbox_wishlist", "token + DOM signed-in — session ready", key="ready")
             return _xbox_wishlist_connect_creds(sniffer)
         # Cookie exchange complete (action=loggedin) but the SPA stalled on the
         # handoff page: drive forward to /wishlist so the Emerald wishlist XHR
@@ -1077,6 +1147,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
                     {"message": "Signed in \u2014 capturing your wishlist session..."},
                 )
             sniffer.dump()
+            connect_log("xbox_wishlist", "token + DOM signed-in — session ready", key="ready2")
             return _xbox_wishlist_connect_creds(sniffer)
         if state is not None or (dom_signed_in_any and msa_ready and not on_login):
             if session:
@@ -1086,6 +1157,11 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
                 )
             _xbox_capture_wishlist_api(dom_page or active, sniffer)
             sniffer.dump()
+            connect_log(
+                "xbox_wishlist",
+                f"SSR/MSA proof — session ready token={bool(sniffer.token)}",
+                key="ready-ssr",
+            )
             return _xbox_wishlist_connect_creds(sniffer)
 
         now = time.time()
@@ -1112,26 +1188,51 @@ NINTENDO_WISHLIST_POLL_SEC = 2.5
 
 
 def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any]) -> bool:
-    """True when storefront GraphQL confirms a signed-in wish-list session."""
-    from fetchers.fetch_nintendo_wishlist import _wishlist_graphql_ok, parse_wishlist_sources
+    """True when storefront GraphQL confirms a signed-in wish-list session.
+
+    Empty wishlists still count, but only after customer auth is proven — a guest
+    storefront answering ``wishList.items: []`` must not false-complete Connect.
+    """
+    from fetchers.fetch_nintendo_wishlist import (
+        _customer_graphql_authed,
+        _signed_out,
+        _wishlist_graphql_ok,
+        parse_wishlist_sources,
+    )
 
     u = (url or "").lower()
     if "accounts.nintendo.com/login" in u:
         return False
-    if any(_wishlist_graphql_ok(p) for p in api_payloads):
+    if _signed_out(html, url):
+        return False
+    # Guest Authorization typename in embedded page state.
+    if "GuestAuthorization" in (html or ""):
+        return False
+    graphql_ok = any(_wishlist_graphql_ok(p) for p in api_payloads)
+    customer_ok = any(_customer_graphql_authed(p) for p in api_payloads)
+    if graphql_ok and not customer_ok:
+        # Wishlist answered without a customer id — treat as guest/anonymous.
+        return False
+    if graphql_ok or customer_ok:
         return True
+    # HTML-only parse: require items so empty guest SSR cannot complete.
     return bool(parse_wishlist_sources(html, api_payloads))
 
 
 def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     """Open nintendo.com/us/wish-list/, wait for sign-in, return marker cred."""
     from auth.cdp_browser import abort_if_browser_closed
+    from auth.connect_log import connect_log
     from fetchers.fetch_nintendo_wishlist import (
+        _customer_graphql_authed,
         _drain_nintendo_candidates,
         _is_nintendo_graphql_url,
+        _signed_out,
+        _wishlist_graphql_ok,
     )
 
     candidates: list[Any] = []
+    connect_log("nintendo_wishlist", "connect poll start", key="enter")
 
     def _stash_graphql(response) -> None:
         try:
@@ -1156,17 +1257,29 @@ def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     last_msg = 0.0
     while time.time() < deadline:
         abort_if_browser_closed(context)
+        abort_if_cancelled(session)
         api_payloads = _drain_nintendo_candidates(candidates)
         try:
             html = page.content()
         except Exception:  # noqa: BLE001
             html = ""
         url = page.url or ""
-        if _nintendo_wishlist_session_ready(html, url, api_payloads):
+        graphql_ok = any(_wishlist_graphql_ok(p) for p in api_payloads)
+        customer_ok = any(_customer_graphql_authed(p) for p in api_payloads)
+        signed_out = _signed_out(html, url)
+        ready = _nintendo_wishlist_session_ready(html, url, api_payloads)
+        connect_log(
+            "nintendo_wishlist",
+            f"poll url={url!r} signed_out={signed_out} graphql_ok={graphql_ok} "
+            f"customer_ok={customer_ok} ready={ready}",
+            key="poll",
+        )
+        if ready:
             try:
                 page.wait_for_timeout(800)
             except Exception:  # noqa: BLE001
                 pass
+            connect_log("nintendo_wishlist", "session ready", key="ready")
             return {"NINTENDO_WISHLIST_PROFILE": "ready"}
 
         now = time.time()
@@ -1705,10 +1818,12 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
 
     release_chromium_profile_lock(user_data)
 
+    allow_extensions = provider in ("epic", "epic_wishlist")
     with launch_persistent_profile(
         user_data,
         headless=False,
         initial_url=spec.login_url if provider == "ea" else None,
+        allow_extensions=allow_extensions,
     ) as context:
         try:
             context.add_init_script(_STEALTH_INIT)

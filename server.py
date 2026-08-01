@@ -22,6 +22,7 @@ Endpoints:
     DELETE /api/profiles/<id> -> delete non-active profile
     GET  /api/auth/status     -> per-provider connection state
     POST /api/auth/<p>/start  -> begin CDP browser sign-in (returns session_id)
+    POST /api/auth/<p>/cancel -> cancel an in-flight headed sign-in
     GET  /api/auth/<id>/stream -> SSE auth flow events
     PUT  /api/auth/<p>/credentials -> save form API keys
     POST /api/auth/<p>/disconnect  -> wipe stored credentials
@@ -1395,6 +1396,10 @@ class Handler(SimpleHTTPRequestHandler):
             provider = path[len("/api/auth/") : -len("/disconnect")].strip("/")
             self._handle_auth_disconnect(provider)
             return
+        if path.startswith("/api/auth/") and path.endswith("/cancel"):
+            provider = path[len("/api/auth/") : -len("/cancel")].strip("/")
+            self._handle_auth_cancel(provider)
+            return
         if path.startswith("/api/auth/") and path.endswith("/enable"):
             provider = path[len("/api/auth/") : -len("/enable")].strip("/")
             self._handle_auth_enable(provider)
@@ -2154,6 +2159,17 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
         except Exception as exc:  # noqa: BLE001
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_disconnect_failed", exc)
+
+    def _handle_auth_cancel(self, provider: str) -> None:
+        try:
+            from auth.manager import cancel_browser_auth
+
+            cancelled = cancel_browser_auth(provider)
+            _send_json(self, HTTPStatus.OK, {"ok": True, "cancelled": cancelled})
+        except KeyError:
+            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
+        except Exception as exc:  # noqa: BLE001
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_cancel_failed", exc)
 
     def _handle_auth_enable(self, provider: str) -> None:
         try:

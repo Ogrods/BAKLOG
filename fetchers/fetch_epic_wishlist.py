@@ -306,7 +306,7 @@ def _drain_wishlist_candidates(
 
 
 def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:
-    from auth.cdp_browser import STEALTH_INIT_SCRIPT, launch_persistent_profile
+    from auth.cdp_browser import STEALTH_INIT_SCRIPT, close_browser_bounded, launch_persistent_profile
 
     profile = profile_dir("epic_wishlist")
     if not profile.exists():
@@ -411,7 +411,7 @@ def _fetch_with_profile_once(*, dump: bool = False, timeout_s: int = 45) -> tupl
 
         return html, url, api_payloads
     finally:
-        threading.Thread(target=ctx.close, daemon=True).start()
+        close_browser_bounded(ctx, profile=profile)
 
 
 def _fetch_with_profile(*, dump: bool = False, timeout_s: int = 45) -> tuple[str, str, list[Any]]:

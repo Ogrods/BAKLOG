@@ -688,6 +688,36 @@ function handleLayoutClick(ev) {
     return;
   }
 
+  const cancelBtn = target.closest("[data-cancel-connect]");
+
+  if (cancelBtn?.dataset.provider) {
+    const provider = cancelBtn.dataset.provider;
+    const card = document.querySelector(
+      `.conn-card[data-provider="${provider}"]`,
+    );
+    const log = card?.querySelector(".conn-log");
+    cancelBtn.disabled = true;
+    if (log) {
+      log.classList.remove("hidden");
+      log.textContent = "Cancelling sign-in…";
+    }
+    void (async () => {
+      const ok = await cancelBrowserConnect(provider);
+      if (log) {
+        log.textContent = ok
+          ? "Sign-in cancelled."
+          : "No active sign-in to cancel.";
+      }
+      hideConnectCancelControl(card);
+      try {
+        await refreshConnections();
+      } catch (_) {
+        /* noop */
+      }
+    })();
+    return;
+  }
+
   const saveBtn = target.closest(".conn-save");
 
   if (saveBtn?.dataset.provider) {
@@ -1588,6 +1618,40 @@ async function enableLocalProvider(provider) {
   await refreshConnections();
 }
 
+async function cancelBrowserConnect(provider) {
+  try {
+    const res = await baklogFetch(`/api/auth/${provider}/cancel`, {
+      method: "POST",
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok && data.cancelled !== false;
+  } catch {
+    return false;
+  }
+}
+
+function showConnectCancelControl(card, provider, log) {
+  if (!card || !log) return;
+  let cancelBtn = card.querySelector("[data-cancel-connect]");
+  if (!cancelBtn) {
+    cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "conn-disconnect";
+    cancelBtn.dataset.cancelConnect = "1";
+    cancelBtn.dataset.provider = provider;
+    cancelBtn.title = "Cancel the in-progress sign-in window";
+    cancelBtn.textContent = "Cancel sign-in";
+    log.insertAdjacentElement("afterend", cancelBtn);
+  }
+  cancelBtn.hidden = false;
+  cancelBtn.disabled = false;
+}
+
+function hideConnectCancelControl(card) {
+  const cancelBtn = card?.querySelector("[data-cancel-connect]");
+  if (cancelBtn) cancelBtn.hidden = true;
+}
+
 async function startBrowserConnect(provider) {
   const card = document.querySelector(
     `.conn-card[data-provider="${provider}"]`,
@@ -1630,14 +1694,41 @@ async function startBrowserConnect(provider) {
     return;
   }
 
-  const data = await res.json().catch(() => ({}));
+  let data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    if (log) log.textContent = data.error || `Start failed (${res.status})`;
-
-    return;
+    const alreadyOpen = /already open/i.test(String(data.error || ""));
+    if (alreadyOpen) {
+      if (log) {
+        log.textContent =
+          data.error ||
+          "A sign-in window is already open. Cancelling so you can retry…";
+      }
+      showConnectCancelControl(card, provider, log);
+      const cancelled = await cancelBrowserConnect(provider);
+      if (cancelled) {
+        if (log) log.textContent = "Previous sign-in cancelled. Retrying…";
+        hideConnectCancelControl(card);
+        try {
+          res = await baklogFetch(`/api/auth/${provider}/start?fresh=1`, {
+            method: "POST",
+          });
+          data = await res.json().catch(() => ({}));
+        } catch {
+          if (log)
+            log.textContent =
+              "Could not reach the local server (is server.py running?).";
+          return;
+        }
+      }
+    }
+    if (!res.ok) {
+      if (log) log.textContent = data.error || `Start failed (${res.status})`;
+      return;
+    }
   }
 
+  showConnectCancelControl(card, provider, log);
   startPostConnectFastPoll();
 
   const streamUrl = await urlWithStreamTicket(
@@ -1649,6 +1740,7 @@ async function startBrowserConnect(provider) {
   async function finishConnectUi() {
     if (connectUiFinished) return;
     connectUiFinished = true;
+    hideConnectCancelControl(card);
     stopPostConnectFastPoll();
     reconnectProviders.delete(provider);
     renderReconnectBanner();
@@ -1700,6 +1792,7 @@ async function startBrowserConnect(provider) {
     }
 
     connectUiFinished = true;
+    hideConnectCancelControl(card);
     es.close();
   });
 

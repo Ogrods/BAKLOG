@@ -350,7 +350,7 @@ class NintendoVgcClient:
         return self._fetch_via_browser_profile(self._profile_path)
 
     def _fetch_via_browser_profile(self, profile_path: Path) -> list[dict[str, Any]]:
-        from auth.cdp_browser import launch_persistent_profile
+        from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 
         collected: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
@@ -434,4 +434,4 @@ class NintendoVgcClient:
                 raise NintendoVgcCaptureError("VGC portal returned zero game cards.")
             return collected
         finally:
-            threading.Thread(target=context.close, daemon=True).start()
+            close_browser_bounded(context, profile=profile_path)

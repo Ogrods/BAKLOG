@@ -651,7 +651,7 @@ def sniff_claims(
     dump_path: Path | str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Replay saved browser profile; return (raw_claims, records, outcome)."""
-    from auth.cdp_browser import launch_persistent_profile
+    from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
     from auth.secrets import profile_dir
 
     profile = profile_dir(PROFILE_KEY)
@@ -765,7 +765,7 @@ def sniff_claims(
 
             return outcome
         finally:
-            threading.Thread(target=ctx.close, daemon=True).start()
+            close_browser_bounded(ctx, profile=profile)
 
     headless_timeout_s = min(timeout_s, 30)
     headed_timeout_s = min(timeout_s, 25)

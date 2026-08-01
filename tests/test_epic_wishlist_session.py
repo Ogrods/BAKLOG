@@ -80,6 +80,25 @@ def test_cloudflare_interstitial_real_challenge() -> None:
     assert storefront_auth_blocked(cf_html, wishlist_url)
 
 
+def test_cloudflare_interstitial_managed_challenge_html() -> None:
+    managed = (
+        "<html><body><script>window._cf_chl_opt={cType: 'managed'};</script>"
+        "Enable JavaScript and cookies to continue</body></html>"
+    )
+    login_url = "https://www.epicgames.com/id/login"
+    assert cloudflare_interstitial(managed, login_url)
+
+
+def test_cloudflare_interstitial_not_normal_epic_login_html() -> None:
+    login_html = (
+        "<html><head><title>Sign in to your Epic Games account</title></head>"
+        "<body><form><input name='email'/><button>Continue</button></form>"
+        "<script src='/cdn-cgi/challenge-platform/scripts/jsd/main.js'></script>"
+        "</body></html>"
+    )
+    assert not cloudflare_interstitial(login_html, "https://www.epicgames.com/id/login")
+
+
 def test_cloudflare_interstitial_not_store_home_js_bundle() -> None:
     snippet = (
         "<html><body><script>"

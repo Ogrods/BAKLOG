@@ -8,7 +8,7 @@ include = ["auth*", "clients*", "fetchers*", "enrichers*", "shared*"]
 
 [project]
 name = "steam-backlog"
-version = "0.8.40"
+version = "0.8.41"
 description = "Local multi-store game library dashboard and fetchers"
 readme = "README.md"
 license = { file = "LICENSE" }

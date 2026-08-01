@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -138,3 +139,58 @@ def test_start_browser_auth_rejects_overlapping_provider_session(
         auth_manager.start_browser_auth("steam")
 
     release.set()
+
+
+def test_cancel_browser_auth_finishes_session(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_run(_provider: str, session: object) -> dict[str, str]:
+        started.set()
+        # Cooperative cancel: abort when asked.
+        from auth.runner import abort_if_cancelled
+
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            try:
+                abort_if_cancelled(session)  # type: ignore[arg-type]
+            except Exception:
+                return {}
+            if release.wait(timeout=0.05):
+                break
+        return {"token": "x"}
+
+    monkeypatch.setattr(auth_manager, "run_browser_auth", slow_run)
+    monkeypatch.setattr(auth_manager, "mark_connected", lambda _p, _c: None)
+    monkeypatch.setattr(auth_manager, "mark_invalid", lambda _p, error=None: None)
+
+    auth_manager.start_browser_auth("xbox_wishlist")
+    assert started.wait(timeout=3.0)
+    assert auth_manager.cancel_browser_auth("xbox_wishlist") is True
+    assert auth_manager._unfinished_session_for("xbox_wishlist") is None
+    release.set()
+
+
+def test_stale_session_taken_over_by_plain_connect(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    done = _stub_browser_worker(monkeypatch)
+    cleared: list[str] = []
+    monkeypatch.setattr(
+        auth_manager, "clear_browser_session", lambda p: cleared.append(p)
+    )
+
+    # Inject a stale unfinished session older than SUCCESS_WAIT_SEC + 30.
+    from auth.runner import AuthSession, SUCCESS_WAIT_SEC
+
+    stale = AuthSession("staleold", "xbox_wishlist")
+    stale.started_at = time.time() - (SUCCESS_WAIT_SEC + 60)
+    with auth_manager._sessions_lock:
+        auth_manager._active_sessions["staleold"] = stale
+
+    auth_manager.start_browser_auth("xbox_wishlist")
+    assert done.wait(timeout=3.0)
+    assert stale._finished.is_set()
+    assert auth_manager._unfinished_session_for("xbox_wishlist") is not None or done.is_set()

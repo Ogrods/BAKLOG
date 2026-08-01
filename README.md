@@ -2,7 +2,7 @@
 
 > **One honest backlog across every store.**
 
-![BAKLOG dashboard — KPI cards, store/status charts, and a deduped cross-store library](dashboard.png)
+![BAKLOG dashboard: KPI cards, store and status charts, and a deduped cross-store library](dashboard.png)
 
 **BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
 
@@ -39,9 +39,17 @@ End-user help lives in **[guide/](guide/README.md)** (install, connect each stor
 
 ## Screenshots
 
-[![BAKLOG dashboard — analytics, KPI cards, and charts](dashboard.png)](dashboard.png)
+Every shot below is the app itself, running on a sample library. The titles and cover art are made up so these can be refreshed without publishing anyone's real collection (`scripts/capture-screenshots.ps1`).
 
-The shot above is the real dashboard. Prefer to click around before installing? The **[interactive demo at baklog.app/#demo](https://baklog.app/#demo)** mirrors the full app UX with sample data — no install, no sign-in.
+[![Dashboard: games owned across 12 stores, hours played vs backlog hours, store and status charts](assets/screenshots/dashboard.png)](assets/screenshots/dashboard.png)
+
+[![Library: cover grid with per-store counts, status chips, and pick tabs for top rated and quick wins](assets/screenshots/library.png)](assets/screenshots/library.png)
+
+[![Wishlist: Claimable Now giveaway feed above wishlist deals with discounts and historical lows](assets/screenshots/wishlist.png)](assets/screenshots/wishlist.png)
+
+[![Connections: per-store sign-in rail with connect and verify, and auto-refresh options](assets/screenshots/connections.png)](assets/screenshots/connections.png)
+
+Want to click something before installing? The **[live sample at baklog.app/#demo](https://baklog.app/#demo)** runs the dashboard on dummy data, no install and no sign-in. It is a taste of the UI, not the whole app: the tabs above only fill in once you connect your own stores.
 
 > Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
 

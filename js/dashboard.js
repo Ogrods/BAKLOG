@@ -458,7 +458,7 @@ function renderDashboardOnboard() {
     el.innerHTML = `
       <div class="conn-onboard" role="region" aria-label="Next step">
         <p class="conn-onboard-title">Stores connected</p>
-        <p class="conn-onboard-lead">Run a library fetch from Connections or the fetcher log, then open Library to browse your games.</p>
+        <p class="conn-onboard-lead">Your first fetch normally starts on its own. Watch the fetcher chips light up, or start one from Connections if nothing is moving.</p>
         <div class="conn-onboard-actions">
           <button type="button" class="conn-onboard-btn" data-dash-goto-connections>Connections</button>
           <button type="button" class="conn-onboard-btn conn-onboard-btn--ghost" data-dash-goto-library>Open Library</button>

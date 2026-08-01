@@ -56,7 +56,7 @@ export function autoStaleLastRunKey() {
   return profileScopedStorageKey(LS_AUTO_STALE_LAST_RUN);
 }
 
-const ENRICH_ORDER = ['steamTags', 'steamCovers', 'steamReviews', 'protondb', 'hltb'];
+const ENRICH_ORDER = ['steamReviews', 'steamTags', 'steamCovers', 'protondb', 'hltb'];
 
 let autoEnrichCooldownUntil = 0;
 const AUTO_ENRICH_COOLDOWN_MS = 3000;
@@ -206,7 +206,7 @@ export function maybeAutoFetchStale24h(deps = {}) {
 }
 
 export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
-  if (state.prefs.autoEnrichOnAdd === false) return false;
+  if (!state.prefs.autoEnrichOnAdd) return false;
   if (!newCount || newCount <= 0) return false;
   const now = deps.now ?? Date.now();
   if (now < autoEnrichCooldownUntil) return false;

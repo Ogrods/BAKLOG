@@ -407,6 +407,7 @@
       ],
       "metaKey": "steamReviews",
       "color": "#ea580c",
+      "maxRunSeconds": 0,
       "requires": [
         {
           "env": "STEAM_API_KEY",
@@ -439,6 +440,7 @@
       ],
       "metaKey": "steamTags",
       "color": "#ea580c",
+      "maxRunSeconds": 0,
       "requires": [
         {
           "env": "STEAM_API_KEY",

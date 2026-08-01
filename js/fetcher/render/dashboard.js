@@ -316,7 +316,7 @@ export function renderDashboardFetcherHealth() {
             </div>`;
         } else if (group === 'enrich') {
           groupToggle = `<label class="fh-toggle" title="After a library fetch adds new games, queue HLTB, Reviews, Covers, and Co-op tags">
-              <input id="autoEnrichOnAddToggle" type="checkbox" class="rounded" ${state.prefs.autoEnrichOnAdd !== false ? 'checked' : ''} />
+              <input id="autoEnrichOnAddToggle" type="checkbox" class="rounded" ${state.prefs.autoEnrichOnAdd === true ? 'checked' : ''} />
               Auto-enrich new games
             </label>`;
         }

@@ -7,6 +7,8 @@ from pathlib import Path
 import requests
 
 STORE_DELAY_SEC = 1.5
+# Lighter throttle for appreviews only (storesearch uses SEARCH_DELAY_SEC).
+REVIEW_DELAY_SEC = 0.75
 _STORE_RETRY_BACKOFF = (2, 5, 10)
 _RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
 
@@ -74,10 +76,11 @@ class SteamClient:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
-    def _throttle_store(self) -> None:
+    def _throttle_store(self, delay: float | None = None) -> None:
+        min_gap = STORE_DELAY_SEC if delay is None else delay
         elapsed = time.time() - self._last_store_call
-        if elapsed < STORE_DELAY_SEC:
-            time.sleep(STORE_DELAY_SEC - elapsed)
+        if elapsed < min_gap:
+            time.sleep(min_gap - elapsed)
         self._last_store_call = time.time()
 
     def get_owned_games(self) -> list[dict]:
@@ -143,7 +146,7 @@ class SteamClient:
             if cached is not None:
                 return cached
 
-        self._throttle_store()
+        self._throttle_store(REVIEW_DELAY_SEC)
         url = f"https://store.steampowered.com/appreviews/{appid}"
         params = {
             "json": 1,

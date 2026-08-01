@@ -1,6 +1,6 @@
 /**
  * Regression repro for "queue wait timeout" aborting the enrich chain so
- * steamReviews (3rd in ENRICH_ORDER) silently never runs.
+ * later enrichers in ENRICH_ORDER silently never run.
  *
  * Beta report: wishlist view, lib:259, persisted unhandledrejection
  * "queue wait timeout" + "steam review enrichment didn't work".
@@ -10,7 +10,7 @@
  * slow preceding enricher like Covers over hundreds of rows) keeps the single
  * server slot busy past the cap, so the next waitForQueueSlot rejects
  * "queue wait timeout" even though the run is alive and making progress. In the
- * enrich chain that rejection breaks the loop before steamReviews runs.
+ * enrich chain that rejection breaks the loop before remaining enrichers run.
  *
  * Fix: the cap is a NO-PROGRESS timeout. While the active run keeps advancing
  * (new run id or growing line_count, surfaced via applyServerSnapshotInFlight),
@@ -124,7 +124,7 @@ describe('enrich chain reaction to a queue wait timeout', () => {
     expect(runFn.mock.calls.map((c) => c[0])).toContain('steamReviews');
   });
 
-  it('aborts steamReviews/protondb/hltb when the slot wait times out after Covers', async () => {
+  it('aborts remaining enrichers when the slot wait times out after Tags', async () => {
     const runFn = vi.fn().mockResolvedValue(undefined);
     let slotCalls = 0;
     const waitForQueueSlot = vi.fn().mockImplementation(() => {
@@ -150,7 +150,8 @@ describe('enrich chain reaction to a queue wait timeout', () => {
     });
 
     const ran = runFn.mock.calls.map((c) => c[0]);
-    expect(ran).toEqual(['steamTags', 'steamCovers']);
-    expect(ran).not.toContain('steamReviews');
+    // ENRICH_ORDER: Reviews → Tags → Covers…; 3rd wait fails before Covers.
+    expect(ran).toEqual(['steamReviews', 'steamTags']);
+    expect(ran).not.toContain('steamCovers');
   });
 });

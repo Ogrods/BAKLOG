@@ -32,6 +32,19 @@ describe('maybeAutoEnrichNewAdditions', () => {
     expect(runFn).not.toHaveBeenCalled();
   });
 
+  it('does nothing when pref is undefined (opt-in)', async () => {
+    delete state.prefs.autoEnrichOnAdd;
+    const runFn = vi.fn();
+    const ok = await maybeAutoEnrichNewAdditions(5, {
+      isApiAvailable: () => true,
+      runFn,
+      loadFetcherSources: async () => {},
+      sources: enrichSources,
+    });
+    expect(ok).toBe(false);
+    expect(runFn).not.toHaveBeenCalled();
+  });
+
   it('does nothing when newCount is zero', async () => {
     const runFn = vi.fn();
     const ok = await maybeAutoEnrichNewAdditions(0, {
@@ -61,9 +74,9 @@ describe('maybeAutoEnrichNewAdditions', () => {
     });
     expect(ok).toBe(true);
     expect(runFn.mock.calls.map(c => c[0])).toEqual([
+      'steamReviews',
       'steamTags',
       'steamCovers',
-      'steamReviews',
       'hltb',
     ]);
     expect(runFn.mock.calls.every(c => c[1]?.auto === true)).toBe(true);
@@ -101,7 +114,7 @@ describe('maybeAutoEnrichNewAdditions', () => {
       authCooldownRemainingMs: () => 0,
       isFetcherDisconnected: () => false,
     });
-    expect(runFn.mock.calls.map(c => c[0])).toEqual(['steamTags', 'steamCovers', 'steamReviews']);
+    expect(runFn.mock.calls.map(c => c[0])).toEqual(['steamReviews', 'steamTags', 'steamCovers']);
   });
 
   it('stops queuing remaining enrichers after cancel epoch bumps mid-batch', async () => {
@@ -125,7 +138,7 @@ describe('maybeAutoEnrichNewAdditions', () => {
       isFetcherDisconnected: () => false,
       appendLine,
     });
-    expect(runFn.mock.calls.map(c => c[0])).toEqual(['steamTags', 'steamCovers']);
+    expect(runFn.mock.calls.map(c => c[0])).toEqual(['steamReviews', 'steamTags', 'steamCovers']);
     expect(appendLine).toHaveBeenCalledWith('[auto-enrich aborted: cancelled]', 'meta');
   });
 

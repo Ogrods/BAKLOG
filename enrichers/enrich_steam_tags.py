@@ -130,11 +130,11 @@ def main(argv: list[str] | None = None) -> int:
 
     mapping = load_mapping()
     if not mapping:
-        stats.error(
-            "cache/steam_review_map.json is missing or empty. "
-            "Run enrich_steam_reviews.py first to build the appid map."
+        stats.warn(
+            "cache/steam_review_map.json is missing or empty — "
+            "skipping (run Reviews first to build the appid map)."
         )
-        return stats.finish("enrich_steam_tags", t0, exit_code=1)
+        return stats.finish("enrich_steam_tags", t0, exit_code=0)
 
     steam = SteamClient(api_key=api_key, steam_id=steam_id)
     hb = HeartbeatTimer(45.0)
@@ -199,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
                     f"(last: {g.get('name')})",
                     flush=True,
                 )
+                if not args.dry_run:
+                    data["game_count"] = len(games)
+                    write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
 
         if not args.dry_run and rows_updated:
             data["game_count"] = len(games)

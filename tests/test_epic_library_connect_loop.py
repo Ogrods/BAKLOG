@@ -76,3 +76,35 @@ def test_epic_library_captures_redirect_on_non_first_tab(monkeypatch: pytest.Mon
 
     creds = runner._extract_epic_inline(primary, ctx, session=None)
     assert creds == {"EPIC_AUTH_CODE": "epic-lib-code-123"}
+
+
+def test_epic_library_inline_waits_on_cloudflare_managed_html(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from auth.epic_wishlist_session import EPIC_CF_CONNECT_HINT
+
+    clock = _FakeTime(step_s=6.0)
+    monkeypatch.setattr(runner, "time", clock)
+    monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
+    monkeypatch.setattr(runner, "POLL_SEC", 0.1)
+
+    cf_html = (
+        "<html><body><script>window._cf_chl_opt={cType: 'managed'};</script>"
+        "Enable JavaScript and cookies to continue</body></html>"
+    )
+    page = _FakePage("https://www.epicgames.com/id/login")
+    page.content = lambda: cf_html  # type: ignore[method-assign]
+    ctx = _FakeContext([page])
+    events: list[tuple[str, dict]] = []
+
+    class _Session:
+        def emit(self, event: str, data: dict) -> None:
+            events.append((event, data))
+
+    with pytest.raises(RuntimeError, match="Could not capture your Epic authorization code"):
+        runner._extract_epic_inline(page, ctx, session=_Session())  # type: ignore[arg-type]
+
+    assert any(
+        e == "waiting_for_user" and (d or {}).get("message") == EPIC_CF_CONNECT_HINT
+        for e, d in events
+    )

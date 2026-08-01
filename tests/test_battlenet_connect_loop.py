@@ -366,10 +366,10 @@ def test_extract_sniffer_succeeds_without_battlenet_client_import(
 
 def test_battlenet_log_creates_file(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     from auth import connect_extractors as ce
+    from auth.connect_log import reset_connect_log_for_tests
 
     monkeypatch.setenv("BAKLOG_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(ce, "_battlenet_log_path", None)
-    monkeypatch.setattr(ce, "_battlenet_last_log_by_key", {})
+    reset_connect_log_for_tests()
     ce._battlenet_log("connect poll start", key="enter")
     log = tmp_path / "connect-battlenet.log"
     assert log.is_file()

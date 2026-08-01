@@ -130,3 +130,44 @@ def test_empty_authenticated_wishlist_counts_as_session() -> None:
     assert _wishlist_graphql_ok(payload)
     assert _wishlist_session_authenticated([payload])
     assert parse_wishlist_sources("", [payload]) == []
+
+
+def test_nintendo_wishlist_session_ready_rejects_guest_empty_graphql() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    guest_empty = {
+        "data": {
+            "customer": {
+                "wishList": {"items": [], "hasNextPage": False},
+            }
+        }
+    }
+    html = '<script>{"__typename":"GuestAuthorization"}</script>'
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert not _nintendo_wishlist_session_ready(html, url, [guest_empty])
+    assert not _nintendo_wishlist_session_ready("", url, [guest_empty])
+
+
+def test_nintendo_wishlist_session_ready_accepts_authenticated_empty() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    authed_empty = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {"items": [], "hasNextPage": False},
+            }
+        }
+    }
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert _nintendo_wishlist_session_ready("", url, [authed_empty])
+
+
+def test_nintendo_wishlist_session_ready_rejects_signed_out_html() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    assert not _nintendo_wishlist_session_ready(
+        "<html>Sign in</html>",
+        "https://accounts.nintendo.com/login",
+        [],
+    )

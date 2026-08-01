@@ -17,6 +17,7 @@ import io
 import os
 import sys
 import tempfile
+import time
 import urllib.error
 from pathlib import Path
 
@@ -334,6 +335,32 @@ class TestLaunchArgs:
 
         assert "--disable-extensions" in exc.value.args
 
+    def test_headed_launch_allow_extensions_skips_disable(self, tmp_path: Path) -> None:
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+
+        class LaunchArgsCaptured(Exception):
+            def __init__(self, args: list[str]) -> None:
+                self.args = args
+
+        def fake_popen(args, **kwargs):
+            raise LaunchArgsCaptured(list(args))
+
+        import auth.cdp_browser as cdp
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(cdp.subprocess, "Popen", fake_popen)
+        try:
+            with pytest.raises(LaunchArgsCaptured) as exc:
+                launch_persistent_profile(profile, headless=False, allow_extensions=True)
+        finally:
+            monkeypatch.undo()
+
+        assert "--disable-extensions" not in exc.value.args
+
     def test_headed_default_uses_start_maximized(self, tmp_path: Path) -> None:
         exe = tmp_path / "chrome.exe"
         exe.write_bytes(b"")
@@ -377,6 +404,33 @@ class TestProfileLockRelease:
         out = cdp.release_chromium_profile_lock(profile)
         assert out == [4242, 5151]
         assert killed == [4242, 5151]
+
+    def test_close_browser_bounded_force_releases_when_close_hangs(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        import auth.cdp_browser as cdp
+
+        profile = tmp_path / "xbox-profile"
+        profile.mkdir()
+        released: list[Path] = []
+
+        class HangCtx:
+            def close(self) -> None:
+                time.sleep(5.0)
+
+        monkeypatch.setattr(
+            cdp,
+            "pids_holding_chromium_profile",
+            lambda _p: [999] if not released else [],
+        )
+        monkeypatch.setattr(
+            cdp,
+            "release_chromium_profile_lock",
+            lambda p, wait_sec=3.0: released.append(Path(p)) or [999],
+        )
+
+        cdp.close_browser_bounded(HangCtx(), profile=profile, join_timeout=0.05)
+        assert released == [profile]
 
 
 class TestGracefulClose:
@@ -700,7 +754,7 @@ class TestLaunchWaitExitZero:
         exe = tmp_path / "chrome.exe"
         exe.write_bytes(b"")
         profile = tmp_path / "profile"
-        lock_calls: list[Path] = []
+        kill_calls: list[list[int]] = []
         clock = {"t": 0.0}
         real_popen = cdp.subprocess.Popen
 
@@ -739,15 +793,88 @@ class TestLaunchWaitExitZero:
         monkeypatch.setattr(cdp, "_fetch_json", fake_fetch)
         monkeypatch.setattr(cdp.time, "sleep", fake_sleep)
         monkeypatch.setattr(cdp.time, "time", lambda: clock["t"])
+        monkeypatch.setattr(cdp, "pids_holding_chromium_profile", lambda _p: [])
+        monkeypatch.setattr(cdp, "_pids_listening_on_local_port", lambda _p: [])
+        monkeypatch.setattr(
+            cdp,
+            "_kill_pids",
+            lambda pids, wait_sec=3.0: kill_calls.append(list(pids)) or [],
+        )
+        lock_calls: list[Path] = []
         monkeypatch.setattr(
             cdp,
             "release_chromium_profile_lock",
-            lambda p: lock_calls.append(Path(p)) or [],
+            lambda p, wait_sec=3.0: lock_calls.append(Path(p)) or [],
         )
 
         with pytest.raises(RuntimeError, match="did not start CDP"):
             launch_persistent_profile(profile, headless=False)
-        assert lock_calls, "exit 0 without CDP should release profile lock and retry"
+        # No pre-existing holders: extend wait + relaunch, never blanket-kill
+        # the profile (that closed the Connect window under the user).
+        assert lock_calls == []
+
+    def test_exit_zero_kills_only_pre_existing_holders(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        import auth.cdp_browser as cdp
+
+        exe = tmp_path / "chrome.exe"
+        exe.write_bytes(b"")
+        profile = tmp_path / "profile"
+        kill_calls: list[list[int]] = []
+        clock = {"t": 0.0}
+        real_popen = cdp.subprocess.Popen
+        holders = {"pids": [4242]}
+
+        class FakeProc:
+            stdout = io.BytesIO(b"")
+
+            def poll(self) -> int:
+                return 0
+
+            def kill(self) -> None:
+                return None
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002
+                return (b"", b"")
+
+            def __enter__(self) -> FakeProc:
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+        def fake_fetch(url: str, timeout: float = 2) -> dict:
+            raise urllib.error.URLError("never")
+
+        def fake_sleep(_s: float) -> None:
+            clock["t"] += 40.0
+
+        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
+        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
+        monkeypatch.setattr(
+            cdp.subprocess,
+            "Popen",
+            self._popen_only_fake(FakeProc, real_popen),
+        )
+        monkeypatch.setattr(cdp, "_fetch_json", fake_fetch)
+        monkeypatch.setattr(cdp.time, "sleep", fake_sleep)
+        monkeypatch.setattr(cdp.time, "time", lambda: clock["t"])
+        monkeypatch.setattr(
+            cdp,
+            "pids_holding_chromium_profile",
+            lambda _p: list(holders["pids"]),
+        )
+        monkeypatch.setattr(cdp, "_pids_listening_on_local_port", lambda _p: [])
+        monkeypatch.setattr(
+            cdp,
+            "_kill_pids",
+            lambda pids, wait_sec=3.0: kill_calls.append(list(pids)) or holders.update(pids=[]) or [],
+        )
+
+        with pytest.raises(RuntimeError, match="did not start CDP"):
+            launch_persistent_profile(profile, headless=False)
+        assert any(4242 in call for call in kill_calls)
 
     def test_nonzero_exit_still_raises_immediately(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

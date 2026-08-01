@@ -29,6 +29,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.41] - 2026-07-31
+
+### Fixed
+
+- Xbox / Nintendo wishlist Connect no longer flash-closes from orphaned fetcher Chrome: bounded profile close joins then force-releases holders; launch retry kills only pre-existing PIDs (not the new window); cancel API + UI when Connect stalls.
+- Nintendo wishlist Connect no longer false-completes on an empty guest GraphQL wishlist; requires customer auth proof and logs polls to `connect-nintendo_wishlist.log`.
+- Epic / Epic wishlist Connect: detect Cloudflare managed challenge HTML (`_cf_chl_opt` / Enable JavaScript and cookies), keep polling with a clear wait hint, and launch Epic Connect without `--disable-extensions` to reduce Bot Management flags.
+
 ## [0.8.40] - 2026-07-31
 
 ### Fixed

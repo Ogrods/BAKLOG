@@ -18,7 +18,6 @@ import argparse
 import json
 import re
 import sys
-import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -891,7 +890,7 @@ def _fetch_with_profile(
     dump: bool = False,
     timeout_s: int = 45,
 ) -> tuple[str, str, list[Any]]:
-    from auth.cdp_browser import launch_persistent_profile
+    from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 
     profile = profile_dir("nintendo_wishlist")
     if not profile.exists():
@@ -1072,10 +1071,8 @@ def _fetch_with_profile(
             print(f"  wrote {dump_html()} and {dump_json()}", flush=True)
         return html, url, api_payloads
     finally:
-        # Spawn browser cleanup on a daemon thread so killing the headless
-        # Chrome process never blocks the fetcher from exiting. The OS will
-        # clean up orphaned Chrome when the Python process terminates.
-        threading.Thread(target=ctx.close, daemon=True).start()
+        # Bounded close: never leave an orphan Chrome holding the wishlist profile.
+        close_browser_bounded(ctx, profile=profile)
 
 
 

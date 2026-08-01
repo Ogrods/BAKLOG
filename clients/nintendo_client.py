@@ -18,7 +18,6 @@ History is limited to ~2 years per Nintendo support.
 from __future__ import annotations
 
 import json
-import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -306,7 +305,7 @@ class NintendoClient:
             pass
 
     def _fetch_via_browser_profile(self, profile_path: Path) -> list[dict]:
-        from auth.cdp_browser import launch_persistent_profile
+        from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 
         collected: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
@@ -416,7 +415,7 @@ class NintendoClient:
             self._write_debug(debug)
             return [_map_graphql_item(item) for item in collected]
         finally:
-            threading.Thread(target=context.close, daemon=True).start()
+            close_browser_bounded(context, profile=profile_path)
 
     def _paginate_transactions_ui(self, page) -> None:
         """Click numeric pagination buttons to load additional GraphQL pages."""

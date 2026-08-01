@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -118,7 +117,7 @@ def _wishlist_page_ready(html: str) -> bool:
 
 def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
     """Load the wishlist page with the saved Ubisoft profile, headless."""
-    from auth.cdp_browser import launch_persistent_profile
+    from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 
     profile = profile_dir("ubisoft")
     if not profile.exists():
@@ -151,7 +150,7 @@ def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
 
 
     finally:
-        threading.Thread(target=ctx.close, daemon=True).start()
+        close_browser_bounded(ctx, profile=profile)
 
 def _classify_kind(name: str, edition: str | None) -> str:
     """Best-effort split between base games and DLC/cosmetics/currency packs.

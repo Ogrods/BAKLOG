@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -192,7 +191,7 @@ def _lookup_products(page, slugs: list[str]) -> list[dict]:
 
 def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
     """Return (items, signed_out) from the headed Humble wishlist page."""
-    from auth.cdp_browser import STEALTH_INIT_SCRIPT, launch_persistent_profile
+    from auth.cdp_browser import STEALTH_INIT_SCRIPT, close_browser_bounded, launch_persistent_profile
 
     profile = profile_dir("humble")
     if not profile.exists():
@@ -251,7 +250,7 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
 
         return items, False
     finally:
-        threading.Thread(target=ctx.close, daemon=True).start()
+        close_browser_bounded(ctx, profile=profile)
 
 
 def _build_row(item: WishlistItem, hltb: dict | None) -> dict:

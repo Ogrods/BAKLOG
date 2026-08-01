@@ -30,6 +30,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.47] - 2026-08-01
+
+### Changed
+
+- Hide in-house Pro upgrade banners (dashboard/wishlist/library/itch stripes and spotlight house slides) behind `HOUSE_PRO_BANNERS_ENABLED` until the Pro funnel is ready for stranger beta. Paid placement paths are unchanged.
+
 ## [0.8.46] - 2026-08-01
 
 ### Fixed

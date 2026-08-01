@@ -42,6 +42,7 @@ import {
   isFetcherAuthHealthy,
   coverableRows,
   primaryFailureNavigateTarget,
+  dismissStickyFailedState,
 } from '../js/fetcher-health.js';
 import { state } from '../js/state.js';
 
@@ -714,6 +715,12 @@ describe('reconnect-required state', () => {
     }));
     expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
   });
+
+  it('dismissStickyFailedState clears sticky failed for dual-source amazon_web', () => {
+    fetcherRunner.markRunFailedForTest('amazon');
+    dismissStickyFailedState({ provider: 'amazon_web' });
+    expect(fetcherRunner.isRunFailedForTest('amazon')).toBe(false);
+  });
 });
 
 describe('syncLogPanelChrome', () => {
@@ -863,6 +870,31 @@ describe('reconcileRunStateFromSnapshot', () => {
       ],
     });
     expect(fetcherRunner.stateFor('hltb')).toBeNull();
+  });
+
+  it('clears zombie EventSource when history shows finished (missed done)', () => {
+    fetcherRunner.markChipStateForTest('claims', 'running', '732655ccd4fc');
+    fetcherRunner.attachStreamForTest('732655ccd4fc', 'claims', {
+      readyState: 0, // EventSource.CONNECTING
+      close() {},
+      onerror: null,
+    });
+    expect(fetcherRunner.hasStreamForTest('732655ccd4fc')).toBe(true);
+    fetcherRunner.reconcileRunStateFromSnapshot({
+      active: null,
+      queue: [],
+      history: [
+        {
+          id: '732655ccd4fc',
+          key: 'claims',
+          status: 'done',
+          exit_code: 0,
+          ended_at: Date.now() / 1000,
+        },
+      ],
+    });
+    expect(fetcherRunner.stateFor('claims')).toBeNull();
+    expect(fetcherRunner.hasStreamForTest('732655ccd4fc')).toBe(false);
   });
 
   it('tracks enrich lane runs in inFlightKeys', () => {
@@ -1391,7 +1423,23 @@ describe('global failure nav', () => {
     handleGlobalStatusClick({ shiftKey: false });
 
     expect(reconnectProvider).toHaveBeenCalledWith('xbox_wishlist', { autoStart: false });
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(false);
     clearReconnectRequired('xbox_wishlist');
+  });
+
+  it('pill click clears sticky failed even when already connected', () => {
+    processAuthStatusTransitions([{ key: 'xbox_wishlist', status: 'connected' }]);
+    connMock.statuses.xbox_wishlist = 'connected';
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    fetcherRunner.refreshGlobalIndicator();
+    const pill = document.getElementById('fetcherGlobalStatus');
+    expect(pill?.classList.contains('fh-global-status-failed')).toBe(true);
+
+    handleGlobalStatusClick({ shiftKey: false });
+
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(false);
+    fetcherRunner.refreshGlobalIndicator();
+    expect(pill?.classList.contains('fh-global-status-failed')).toBe(false);
   });
 
   it('shift+click pill opens log even when auth failure would route to Connections', async () => {
@@ -1428,6 +1476,7 @@ describe('global failure nav', () => {
 
     expect(reconnectProvider).not.toHaveBeenCalled();
     expect(openSpy).toHaveBeenCalledWith({ focusPanel: false });
+    expect(fetcherRunner.isRunFailedForTest('hltb')).toBe(false);
     openSpy.mockRestore();
   });
 });

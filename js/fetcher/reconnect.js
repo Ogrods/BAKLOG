@@ -136,11 +136,20 @@ export function clearReconnectRequired(provider) {
   if (reconnectDismissed.delete(provider)) persistReconnectDismissed();
 }
 
-/** Fetcher chip keys whose mapped auth provider is `provider`. */
+/** Fetcher chip keys whose mapped auth provider is `provider`.
+ *  Dual-source groups (amazon_web/gog_galaxy/itch_local) are included even
+ *  when FETCHER_AUTH_PROVIDER points at the sibling key. */
 function fetcherKeysForProvider(provider) {
-  return Object.keys(FETCHER_AUTH_PROVIDER).filter(
-    k => FETCHER_AUTH_PROVIDER[k] === provider,
+  if (!provider) return [];
+  const keys = new Set(
+    Object.keys(FETCHER_AUTH_PROVIDER).filter(
+      k => FETCHER_AUTH_PROVIDER[k] === provider,
+    ),
   );
+  for (const [fetcherKey, group] of Object.entries(FETCHER_PROVIDER_GROUP)) {
+    if (group.includes(provider)) keys.add(fetcherKey);
+  }
+  return [...keys];
 }
 
 /** A provider just reconnected (was reconnect-required -> connected): clear
@@ -150,6 +159,27 @@ function clearFailedStateForReconnectedProvider(provider) {
     lastRunFailedByKey.delete(key);
     clearAuthCooldown(key);
   }
+}
+
+/**
+ * Dismiss sticky failed pill/chip state immediately.
+ * Red-pill / connect-chip clicks must clear every time — waiting for a
+ * reconnect transition leaves the UI stuck when the provider is already
+ * connected or the failure was non-auth.
+ */
+export function dismissStickyFailedState({
+  all = false,
+  provider = null,
+  fetcherKey = null,
+} = {}) {
+  if (all) {
+    lastRunFailedByKey.clear();
+  } else {
+    if (fetcherKey) lastRunFailedByKey.delete(fetcherKey);
+    if (provider) clearFailedStateForReconnectedProvider(provider);
+  }
+  try { _refreshGlobalIndicator(); } catch (_) { /* runner not ready */ }
+  try { _renderDashboard(); } catch (_) { /* not mounted */ }
 }
 
 /** User dismissed the inline reconnect chip affordance for this provider. */

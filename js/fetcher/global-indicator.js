@@ -156,7 +156,7 @@ export function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   if (!running.length && !queued.length) {
     // Failed takes precedence over done: a broken run is the most important
     // thing to surface. lastRunFailedByKey is sticky until that source's next
-    // success or the next run starts, mirroring the per-chip failed styling.
+    // success or the user dismisses via the red pill / connect chip.
     const failedKeys = [...lastRunFailedByKey.keys()];
     if (failedKeys.length > 0) {
       const labels = failedKeys.map(k => sourceFn(k)?.label || k);

@@ -2,7 +2,7 @@
  * Tests for js/table-ui.js::tableFingerprint — cache invalidation inputs.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { state } from '../js/state.js';
 import { loadSessionPrefs } from '../js/prefs.js';
 import { syncSponsoredTableAfterDismiss, tableFingerprint } from '../js/table-ui.js';
@@ -10,6 +10,8 @@ import {
   dismissSponsoredDeal,
   __resetDismissedSponsorsForTest,
   __setSponsorsForTest,
+  setHouseProBannersForTest,
+  __resetHouseProBannersForTest,
   sponsoredTableRowHtml,
 } from '../js/sponsored-deals.js';
 
@@ -97,7 +99,13 @@ describe('tableFingerprint', () => {
 describe('syncSponsoredTableAfterDismiss', () => {
   beforeEach(() => {
     __resetDismissedSponsorsForTest();
+    // House fallback creative coverage; production HOUSE_PRO_BANNERS_ENABLED stays false.
+    setHouseProBannersForTest(true);
     __setSponsorsForTest({ version: 2, ads: {}, locations: {} });
+  });
+
+  afterEach(() => {
+    __resetHouseProBannersForTest();
   });
 
   it('removes the sponsored table row when no creative remains', () => {

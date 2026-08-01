@@ -44,6 +44,9 @@ describe('dashboard picks row', () => {
     vi.resetModules();
     ({ state } = await import('../js/state.js'));
     ({ applyItchVisibility } = await import('../js/dashboard-cards.js'));
+    const { setHouseProBannersForTest } = await import('../js/sponsored-deals.js');
+    // Suite exercises house versus creatives; production flag stays off for stranger beta.
+    setHouseProBannersForTest(true);
     state.itchGames = [];
     state.prefs = { quickWinMaxHours: 15 };
     state.personal = {
@@ -52,7 +55,9 @@ describe('dashboard picks row', () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    const { __resetHouseProBannersForTest } = await import('../js/sponsored-deals.js');
+    __resetHouseProBannersForTest();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -156,7 +161,9 @@ describe('dashboard picks row', () => {
     const authGate = await import('../js/auth-gate.js');
     vi.spyOn(authGate, 'isPro').mockReturnValue(false);
     const { renderDashboardPicksVersus } = await import('../js/dashboard-cards.js');
-    const { __setSponsorsForTest } = await import('../js/sponsored-deals.js');
+    const { __setSponsorsForTest, setHouseProBannersForTest } = await import('../js/sponsored-deals.js');
+    // Versus suites still cover house creatives; production flag stays off until funnel refresh.
+    setHouseProBannersForTest(true);
     __setSponsorsForTest({
       version: 2,
       ads: {
@@ -216,14 +223,19 @@ describe('dashboard picks row', () => {
     const authGate = await import('../js/auth-gate.js');
     vi.spyOn(authGate, 'isPro').mockReturnValue(false);
     const { renderDashboardPicksVersus } = await import('../js/dashboard-cards.js');
-    const { dismissSponsoredDeal, __resetDismissedSponsorsForTest } = await import('../js/sponsored-deals.js');
+    const {
+      dismissSponsoredDeal,
+      __resetDismissedSponsorsForTest,
+      __setSponsorsForTest,
+      setHouseProBannersForTest,
+    } = await import('../js/sponsored-deals.js');
+    setHouseProBannersForTest(true);
     __resetDismissedSponsorsForTest();
     // itch present => maxPicks caps each column at 5 rows; ad displaces the last slot.
     state.itchGames = [{ store: 'itch', id: 'x', name: 'X' }];
     state.personal = Object.fromEntries(
       Array.from({ length: 7 }, (_, i) => [`steam:g${i}`, { status: 'backlog' }]),
     );
-    const { __setSponsorsForTest } = await import('../js/sponsored-deals.js');
     __setSponsorsForTest({
       version: 2,
       ads: {

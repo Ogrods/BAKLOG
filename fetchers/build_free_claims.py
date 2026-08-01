@@ -323,6 +323,9 @@ def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str
 
 
 DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower", "itad"})
+# Null ends_at older than DEFAULT_EXPIRY_DAYS from first_seen are pruned:
+# publish/enrich via _resolve_ends_at; approved selection + carry-forward via
+# _ends_at_for_prune so re-approved ITAD lingerers cannot resurrect.
 DEFAULT_EXPIRY_DAYS = 14
 
 
@@ -553,7 +556,7 @@ def _carry_forward_missing_approved(
         keys = claim_match_keys(row)
         if keys & published_keys or keys & seen_keys:
             continue
-        if _is_expired(row.get("ends_at"), now):
+        if _is_expired(_ends_at_for_prune(row), now):
             continue
         carried.append(dict(row))
         seen_keys |= keys or {f"id:{item_id}"}
@@ -956,7 +959,11 @@ def _select_approved_auto_items(
             field_overrides=field_overrides,
             field_overrides_by_key=field_overrides_by_key,
         )
-        if _is_expired(ends_at, now):
+        # When ends_at is still null after overrides, apply the 14d first_seen
+        # default so stale null-dated rows are pruned from approved (not only
+        # dropped later at enrich / carry-forward).
+        prune_ends = _ends_at_for_prune({**item, "ends_at": ends_at})
+        if _is_expired(prune_ends, now):
             if item_id in approved_ids:
                 expired_approved_ids.add(item_id)
             continue
@@ -1039,6 +1046,29 @@ def _is_expired(ends_at: object, now: datetime) -> bool:
     if parsed is None:
         return False
     return parsed < now
+
+
+def _ends_at_for_prune(item: dict) -> object:
+    """ends_at used for expiry / prune / carry-forward decisions.
+
+    When ``ends_at`` is null/empty and ``first_seen`` is known, treat expiry as
+    ``first_seen + DEFAULT_EXPIRY_DAYS`` (14d). Null ends_at older than that
+    window are pruned so approved carry-forward cannot resurrect lingerers.
+    """
+    ends = item.get("ends_at")
+    if ends is not None and str(ends).strip():
+        return ends
+    first_seen = _parse_ends_at(item.get("first_seen"))
+    if first_seen is None:
+        return None
+    default_end = first_seen + timedelta(days=DEFAULT_EXPIRY_DAYS)
+    return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _is_expired_for_publish(raw: dict, now: datetime) -> bool:
+    """True when source default ends_at or null-ends_at first_seen+14d is past."""
+    resolved = _resolve_ends_at(raw, now=now)
+    return _is_expired(_ends_at_for_prune({**raw, "ends_at": resolved}), now)
 
 
 def _live_items_by_id(live_items: list[dict] | None) -> dict[str, dict]:
@@ -1228,7 +1258,7 @@ def preview_publish_items(
             continue
         if not has_valid_claim_links(raw) or not raw.get("store"):
             continue
-        if _is_expired(_resolve_ends_at(raw, now=now), now):
+        if _is_expired_for_publish(raw, now):
             continue
         item_id = str(raw.get("id") or "").strip()
         items.append(
@@ -1776,7 +1806,7 @@ def main() -> int:
         if isinstance(raw, dict)
         and has_valid_claim_links(raw)
         and raw.get("store")
-        and not _is_expired(_resolve_ends_at(raw, now=now), now)
+        and not _is_expired_for_publish(raw, now)
     )
     enrich_hb = HeartbeatTimer(interval=45.0)
     enrich_idx = 0
@@ -1787,7 +1817,7 @@ def main() -> int:
         if not has_valid_claim_links(raw) or not raw.get("store"):
             stats.warn(f"skipped item missing store or claim link(s): {raw!r}")
             continue
-        if _is_expired(_resolve_ends_at(raw, now=now), now):
+        if _is_expired_for_publish(raw, now):
             stats.warn(f"skipped expired item: {raw.get('id')!r}")
             continue
         enrich_idx += 1

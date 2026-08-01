@@ -1662,12 +1662,12 @@ async function startBrowserConnect(provider) {
   // A "Reconnect" (status connected/expired) should start a clean sign-in:
   // wipe the old profile cookies server-side so a stale/expired session never
   // carries over. A first-time Connect has nothing to clear.
-  // Epic wishlist keeps its browser profile on reconnect — cf_clearance and
-  // storefront cookies must survive or Cloudflare re-challenges every time.
+  // Epic library + wishlist keep their browser profiles on reconnect —
+  // cf_clearance and storefront cookies must survive or Cloudflare re-challenges every time.
   const current = getAuthStatusSnapshot().find(
     (x) => x.key === provider,
   )?.status;
-  const preserveProfile = provider === "epic_wishlist";
+  const preserveProfile = provider === "epic" || provider === "epic_wishlist";
   const fresh =
     !preserveProfile && (current === "connected" || current === "expired");
 

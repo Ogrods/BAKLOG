@@ -138,6 +138,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         success_url_pattern=r"id/api/redirect",
         expiry_days=30,
         fetcher_keys=("epic",),
+        preserve_profile_on_reconnect=True,
         tips=(
             "Click Connect and sign in — we grab the authorizationCode for you, no copy/paste.",
             (

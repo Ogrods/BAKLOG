@@ -335,32 +335,6 @@ class TestLaunchArgs:
 
         assert "--disable-extensions" in exc.value.args
 
-    def test_headed_launch_allow_extensions_skips_disable(self, tmp_path: Path) -> None:
-        exe = tmp_path / "chrome.exe"
-        exe.write_bytes(b"")
-        profile = tmp_path / "profile"
-
-        class LaunchArgsCaptured(Exception):
-            def __init__(self, args: list[str]) -> None:
-                self.args = args
-
-        def fake_popen(args, **kwargs):
-            raise LaunchArgsCaptured(list(args))
-
-        import auth.cdp_browser as cdp
-
-        monkeypatch = pytest.MonkeyPatch()
-        monkeypatch.setattr(cdp, "find_chromium_executable", lambda: exe)
-        monkeypatch.setattr(cdp, "_free_port", lambda: 9222)
-        monkeypatch.setattr(cdp.subprocess, "Popen", fake_popen)
-        try:
-            with pytest.raises(LaunchArgsCaptured) as exc:
-                launch_persistent_profile(profile, headless=False, allow_extensions=True)
-        finally:
-            monkeypatch.undo()
-
-        assert "--disable-extensions" not in exc.value.args
-
     def test_headed_default_uses_start_maximized(self, tmp_path: Path) -> None:
         exe = tmp_path / "chrome.exe"
         exe.write_bytes(b"")

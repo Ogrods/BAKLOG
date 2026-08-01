@@ -1,0 +1,16 @@
+---
+description: Release gates — clean tree and green CI before tag/publish
+alwaysApply: true
+---
+
+# Release gates
+
+Before tagging or publishing any release (`vX.Y.Z`, `replace_release_tag.ps1`, GitHub Release):
+
+1. **Working tree clean** on the release commit (`git status` shows nothing to commit). No leftover WIP, untracked release-critical files, or half-staged changes.
+2. **CI green** on that commit after it is on `main` (or on the PR that will merge to `main`). Do not tag from a red or still-running required check. Wait for GitHub Actions CI on the merge commit to pass before `git tag` / push tag.
+3. Version stamps match (`pyproject.toml`, `package.json`, `index.html` meta/`brandVersionBadge`) and CHANGELOG has `[X.Y.Z]` notes.
+4. Prefer: merge PR → confirm `main` clean + CI green on the merge commit → then tag `vX.Y.Z` and push the tag so `release.yml` builds assets.
+
+Do **not** tag a dirty tree, an unmerged feature branch, or a commit whose CI failed/is pending.
+

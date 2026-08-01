@@ -400,6 +400,7 @@ export async function refreshFilterUI(options) {
   renderFiltersButtonBadge();
   renderActiveFilterPills();
   if (state.activeView === "dashboard") {
+    renderSummary(); // empties #summary on dashboard
     if (!options?.skipDashboardSchedule) scheduleDashboardRender();
     return;
   }
@@ -694,7 +695,9 @@ export function switchView(view) {
     updateBulkBar();
     const skipDashboardSchedule = view === "dashboard";
     const deferTableChrome = useOverlay && !drillIn && view !== "dashboard";
-    updateViewChrome({ drillIn, skipDashboardSchedule, deferTableChrome, skipSummary: true });
+    // skipSummary avoids double paint on table views (refreshFilterUI paints).
+    // Dashboard early-returns from refreshFilterUI without clearing #summary.
+    updateViewChrome({ drillIn, skipDashboardSchedule, deferTableChrome, skipSummary: view !== "dashboard" });
     void flushDeferredRenders();
     const refreshDone = refreshFilterUI({ force: true, drillIn, skipDashboardSchedule });
     const paintDashboard = () => {
@@ -816,8 +819,8 @@ export function renderSummary() {
         ${onSaleChip}
         ${lowChip}
         ${ownedChip}
-      </div>
-      ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
+        ${statusChips || ""}
+      </div>`;
     return;
   }
   if (state.activeView === "itch") {
@@ -843,8 +846,8 @@ export function renderSummary() {
         <div class="summary-stat-chip summary-stat-chip--itch" title="itch.io items with a community rating">Rated <span class="text-slate-100 font-semibold ml-1">${rated.length}</span></div>
         <div class="summary-stat-chip summary-stat-chip--itch" title="Mean itch.io review % (rated items)">Avg rating <span class="text-slate-100 font-semibold ml-1">${avg}${avg !== " - " ? "%" : ""}</span></div>
         ${fetched ? `<div class="summary-stat-chip summary-stat-chip--itch text-slate-400" title="Last itch.io library fetch time">Fetched ${escapeHtml(fetched)}</div>` : ""}
-      </div>
-      ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
+        ${statusChips || ""}
+      </div>`;
     return;
   }
   const visibleAll = filterOutHidden(state.allGames.filter(g => !state.crossStoreHiddenKeys.has(gameKey(g))));
@@ -901,8 +904,8 @@ export function renderSummary() {
       ${noiseChip}
       ${staleChip}
       ${storeChips}
-    </div>
-    ${statusChips ? `<div class="w-full flex flex-wrap gap-2">${statusChips}</div>` : ""}`;
+      ${statusChips || ""}
+    </div>`;
 }
 
 export function renderStoreChips() {

@@ -47,6 +47,15 @@ describe('renderSummary noise chip', () => {
     expect(chip.textContent).toMatch(/1/);
     expect(chip.textContent).toMatch(/non-games/);
   });
+
+  it('puts status chips in the same wrapper as store/stat chips', () => {
+    renderSummary();
+    const summary = document.getElementById('summary');
+    expect(summary.children.length).toBe(1);
+    const wrap = summary.firstElementChild;
+    expect(wrap.querySelector('.summary-stat-chip, .summary-store-chip')).toBeTruthy();
+    expect(wrap.querySelector('.status-chip')).toBeTruthy();
+  });
 });
 
 describe('summary noise chip opens hidden panel', () => {

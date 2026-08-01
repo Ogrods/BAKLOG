@@ -11655,6 +11655,12 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 .conn-log:not(.hidden) {
   color: var(--text-mute);
 }
+/* Cancel sign-in sits under .conn-log (not in the footer). Give it air above
+   the button without shifting footer Disconnect (also .conn-disconnect). */
+.conn-card [data-cancel-connect] {
+  margin-top: 10px;
+  margin-left: 0;
+}
 .conn-card-footer {
   display: flex;
   align-items: center;

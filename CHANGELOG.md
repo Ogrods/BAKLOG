@@ -29,6 +29,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.44] - 2026-07-31
+
+### Fixed
+
+- Red fetcher status pill / failed chip click always clears sticky failed state (including already-connected and non-auth failures), so the UI cannot stay bricked on a red pill; dual-source reconnect (`amazon_web` / `gog_galaxy` / `itch_local`) now clears the matching library chip too.
+- Fetcher chips no longer spin forever after a missed SSE `done`: reconcile closes zombie EventSource streams when `/api/runs` history already finished, applies post-fetch reload, and stream-drop handling covers enrich lanes plus failed/cancelled outcomes.
+- Connections "Cancel sign-in" control has spacing above the button under the connect log.
+
 ## [0.8.43] - 2026-07-31
 
 ### Fixed

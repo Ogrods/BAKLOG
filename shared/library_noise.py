@@ -12,6 +12,7 @@ _TRADEMARK_RE = re.compile(r"[™®©]")
 NOISE_EXACT_TITLES = frozenset(
     {
         "live",
+        "fab listing live",
         "hbo max",
         "hbo go",
         "shadow costume for sonic",

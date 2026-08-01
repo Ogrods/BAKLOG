@@ -7,6 +7,7 @@ const TRADEMARK_RE = /[™®©]/g;
 
 export const NOISE_EXACT_TITLES = new Set([
   "live",
+  "fab listing live",
   "hbo max",
   "hbo go",
   "shadow costume for sonic",

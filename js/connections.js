@@ -213,7 +213,7 @@ function renderOnboard() {
 
       <p class="conn-onboard-title">You have 0 stores connected</p>
 
-      <p class="conn-onboard-lead">Start with Steam - it imports your whole library in one sign-in. You can add the rest after.</p>
+      <p class="conn-onboard-lead">Start with Steam if that is where your games live - one sign-in imports the whole library. Nothing on Steam? Epic, GOG, and Prime Gaming connect the same way, and their free games fill a backlog fast.</p>
 
       <button type="button" class="conn-onboard-btn" data-conn-start-steam title="Connect Steam - imports your library via browser sign-in">Start with Steam</button>
 

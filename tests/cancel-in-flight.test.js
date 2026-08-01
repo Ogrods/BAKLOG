@@ -525,3 +525,242 @@ describe('cancelInFlightRuns server truth', () => {
     expect(runPosts).toBe(1);
   });
 });
+
+describe('Cancel button after finished runs', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    localStorage.clear();
+    sessionStorage.clear();
+    document.body.innerHTML = '<div id="fetcherRunLog"></div>';
+    installMockEventSource();
+  });
+
+  afterEach(() => {
+    delete global.EventSource;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  async function setupRunner(runsHandler) {
+    const fetchMock = vi.fn(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/runs') && !u.includes('/cancel')) {
+        return { ok: true, json: async () => runsHandler() };
+      }
+      if (u.includes('/api/fetchers') || u.includes('manifest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [
+              {
+                key: 'steamCovers',
+                label: 'Covers',
+                group: 'enrich',
+                metaKey: 'steamCovers',
+                available: true,
+                cmd: 'enrich_steam_covers.py',
+              },
+              {
+                key: 'hltb',
+                label: 'HLTB',
+                group: 'enrich',
+                metaKey: 'hltb',
+                available: true,
+                cmd: 'enrich_hltb.py',
+              },
+              {
+                key: 'steam',
+                label: 'Steam',
+                group: 'library',
+                metaKey: 'steam',
+                available: true,
+                cmd: 'fetch_steam.py',
+              },
+            ],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    global.fetch = fetchMock;
+    const { fetcherRunner, loadFetcherSources } = await import('../js/fetcher-health.js');
+    await fetcherRunner.probeApi(true);
+    await loadFetcherSources(true);
+    return { fetcherRunner, fetchMock };
+  }
+
+  function cancelHidden(fetcherRunner) {
+    fetcherRunner.ensurePanelForTest({ label: 'Covers', key: 'steamCovers' }, 'done');
+    const btn = document.querySelector('[data-role="cancel"]');
+    return !!btn?.classList.contains('hidden');
+  }
+
+  it('hides Cancel after steamCovers chip clears when server is idle', async () => {
+    const idle = {
+      active: null,
+      queue: [],
+      enrich_active: null,
+      enrich_queue: [],
+      history: [],
+    };
+    const { fetcherRunner } = await setupRunner(() => idle);
+    fetcherRunner.ensurePanelForTest({ label: 'Covers', key: 'steamCovers' }, 'running');
+    fetcherRunner.applyServerSnapshotInFlight({
+      enrich_active: { id: 'cover-1', key: 'steamCovers', status: 'running' },
+      enrich_queue: [],
+      active: null,
+      queue: [],
+      history: [],
+    });
+    fetcherRunner.markChipStateForTest('steamCovers', 'running', 'cover-1');
+    expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(false);
+
+    fetcherRunner.markChipStateForTest('steamCovers', null);
+    await vi.waitFor(() => {
+      expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+      expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  it('force-refreshes idle snap so coalesced in-flight snap cannot re-latch Cancel', async () => {
+    let runsCalls = 0;
+    const { fetcherRunner } = await setupRunner(() => {
+      runsCalls += 1;
+      // First non-force call during the coalesce window would return stale
+      // enrich_active; force:true after chip clear must get idle.
+      if (runsCalls === 1) {
+        return {
+          active: null,
+          queue: [],
+          enrich_active: { id: 'cover-2', key: 'steamCovers', status: 'running', line_count: 3 },
+          enrich_queue: [],
+          history: [],
+        };
+      }
+      return {
+        active: null,
+        queue: [],
+        enrich_active: null,
+        enrich_queue: [],
+        history: [
+          {
+            id: 'cover-2',
+            key: 'steamCovers',
+            status: 'done',
+            exit_code: 0,
+            ended_at: Date.now() / 1000,
+          },
+        ],
+      };
+    });
+
+    fetcherRunner.ensurePanelForTest({ label: 'Covers', key: 'steamCovers' }, 'running');
+    // Seed coalesce cache with the stale in-flight snap (call 1).
+    await fetcherRunner.syncFromServer();
+    expect(fetcherRunner.stateFor('steamCovers')).toBe('running');
+    expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(false);
+
+    // Chip clear forces a fresh idle snap (call 2+), not the coalesced one.
+    fetcherRunner.markChipStateForTest('steamCovers', null);
+    await vi.waitFor(() => {
+      expect(runsCalls).toBeGreaterThanOrEqual(2);
+      expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+      expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  it('does not keep Cancel visible for failed-only chip state', async () => {
+    const { fetcherRunner } = await setupRunner(() => ({
+      active: null,
+      queue: [],
+      enrich_active: null,
+      enrich_queue: [],
+      history: [],
+    }));
+    fetcherRunner.applyServerSnapshotInFlight({});
+    fetcherRunner.markChipStateForTest('hltb', 'failed');
+    expect(fetcherRunner.cancellableCount()).toBe(0);
+    expect(fetcherRunner.isQueueFull()).toBe(false);
+    expect(cancelHidden(fetcherRunner)).toBe(true);
+  });
+
+  it('reconcile failed schedules clear so Cancel is not held indefinitely', async () => {
+    vi.useFakeTimers();
+    const { fetcherRunner } = await setupRunner(() => ({
+      active: null,
+      queue: [],
+      enrich_active: null,
+      enrich_queue: [],
+      history: [],
+    }));
+    fetcherRunner.ensurePanelForTest({ label: 'HLTB', key: 'hltb' }, 'running');
+    fetcherRunner.markChipStateForTest('hltb', 'running', 'hltb-fail-1');
+    fetcherRunner.reconcileRunStateFromSnapshot({
+      active: null,
+      queue: [],
+      enrich_active: null,
+      enrich_queue: [],
+      history: [
+        {
+          id: 'hltb-fail-1',
+          key: 'hltb',
+          status: 'failed',
+          exit_code: 1,
+          ended_at: Date.now() / 1000,
+        },
+      ],
+    });
+    expect(fetcherRunner.stateFor('hltb')).toBe('failed');
+    expect(fetcherRunner.cancellableCount()).toBe(0);
+    expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetcherRunner.stateFor('hltb')).toBeNull();
+    expect(fetcherRunner.isRunFailedForTest('hltb')).toBe(true);
+  });
+
+  it('syncFromServer reattaches enrich_active and clears Cancel when history says done', async () => {
+    let phase = 'running';
+    const { fetcherRunner } = await setupRunner(() => {
+      if (phase === 'running') {
+        return {
+          active: null,
+          queue: [],
+          enrich_active: { id: 'cover-3', key: 'steamCovers', status: 'running', line_count: 2 },
+          enrich_queue: [],
+          history: [],
+        };
+      }
+      return {
+        active: null,
+        queue: [],
+        enrich_active: null,
+        enrich_queue: [],
+        history: [
+          {
+            id: 'cover-3',
+            key: 'steamCovers',
+            status: 'done',
+            exit_code: 0,
+            ended_at: Date.now() / 1000,
+          },
+        ],
+      };
+    });
+
+    await fetcherRunner.syncFromServer();
+    expect(fetcherRunner.stateFor('steamCovers')).toBe('running');
+    expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(false);
+
+    phase = 'done';
+    // Let the /api/runs coalesce window expire so the next sync sees idle truth.
+    await new Promise((r) => setTimeout(r, 1600));
+    await fetcherRunner.syncFromServer();
+    await vi.waitFor(() => {
+      expect(fetcherRunner.stateFor('steamCovers')).toBeNull();
+      expect(fetcherRunner.getLastServerInFlight()).toBe(false);
+      expect(document.querySelector('[data-role="cancel"]')?.classList.contains('hidden')).toBe(true);
+    });
+  });
+});

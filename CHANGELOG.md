@@ -37,6 +37,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Reviews/Tags flush catalog JSON mid-store so cancel or timeout keeps progress already written.
 - Auto-enrich runs Reviews before Tags (Tags needs the appid map); empty-map Tags skips with exit 0 instead of sticky failed.
 - Auto-enrich is true opt-in: missing/`undefined` pref no longer enables the checkbox or queues enrichers.
+- Fetcher Cancel no longer sticks after short enrichers finish: ignore non-cancellable chip states, force-refresh idle `/api/runs` snaps, and reattach enrich-lane runs in `syncFromServer`.
 
 ### Changed
 

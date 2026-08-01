@@ -252,14 +252,21 @@ export const fetcherRunner = (() => {
 
   function ensureInFlightPolling() {
     if (inFlightPollTimer || !isApiAvailable()) return;
-    if (runStateByKey.size === 0 && sourcesByRunId.size === 0) return;
+    if (runStateByKey.size === 0 && sourcesByRunId.size === 0 && !lastServerInFlight) return;
     inFlightPollTimer = setInterval(() => {
       syncFromServer().catch(() => {});
-      if (runStateByKey.size === 0 && sourcesByRunId.size === 0) {
+      if (runStateByKey.size === 0 && sourcesByRunId.size === 0 && !lastServerInFlight) {
         clearInterval(inFlightPollTimer);
         inFlightPollTimer = null;
       }
     }, IN_FLIGHT_POLL_MS);
+  }
+
+  function clearServerInFlightLatch() {
+    lastServerInFlight = false;
+    lastFetcherLaneInFlight = false;
+    lastEnrichLaneInFlight = false;
+    lastInFlightSig = '';
   }
 
   function stopInFlightPolling() {
@@ -717,8 +724,17 @@ export const fetcherRunner = (() => {
   // cap of 1 (no queuing); we mirror that here so the UI can disable other
   // chips before the user wastes a click on a 409.
   const MAX_IN_FLIGHT = 1;
+  /** Chip states that mean something is still cancellable / occupying a lane. */
+  const CANCELLABLE_CHIP_STATES = new Set(['running', 'queued']);
   function inFlightCount() {
     return runStateByKey.size;
+  }
+  function cancellableCount() {
+    let n = 0;
+    for (const st of runStateByKey.values()) {
+      if (CANCELLABLE_CHIP_STATES.has(st)) n += 1;
+    }
+    return n;
   }
   function isEnrichKey(key) {
     return source(key)?.group === 'enrich';
@@ -727,13 +743,14 @@ export const fetcherRunner = (() => {
     const enrich = isEnrichKey(key);
     const laneBusy = enrich ? lastEnrichLaneInFlight : lastFetcherLaneInFlight;
     if (laneBusy) return true;
-    for (const [k] of runStateByKey) {
+    for (const [k, st] of runStateByKey) {
+      if (!CANCELLABLE_CHIP_STATES.has(st)) continue;
       if (isEnrichKey(k) === enrich) return true;
     }
     return false;
   }
   function isQueueFull() {
-    return inFlightCount() >= MAX_IN_FLIGHT || lastServerInFlight;
+    return cancellableCount() >= MAX_IN_FLIGHT || lastServerInFlight;
   }
   const WAIT_QUEUE_SNAPSHOT_POLL_MS = 2000;
   function waitForQueueSlot({ batchEpoch, key } = {}) {
@@ -890,7 +907,7 @@ export const fetcherRunner = (() => {
     if (!panel) return;
     const btn = panel.querySelector('[data-role="cancel"]');
     if (!btn) return;
-    const show = isApiAvailable() && (inFlightCount() > 0 || lastServerInFlight);
+    const show = isApiAvailable() && (cancellableCount() > 0 || lastServerInFlight);
     btn.classList.toggle('hidden', !show);
     if (cancelInFlight) {
       btn.disabled = true;
@@ -1041,7 +1058,7 @@ export const fetcherRunner = (() => {
       for (const q of snap?.queue || []) ids.push(q.id);
       if (snap?.enrich_active) ids.push(snap.enrich_active.id);
       for (const q of snap?.enrich_queue || []) ids.push(q.id);
-      const clientStale = inFlightCount() > 0;
+      const clientStale = cancellableCount() > 0;
       if (!ids.length && !force && !clientStale && !lastServerInFlight) {
         return;
       }
@@ -1110,6 +1127,7 @@ export const fetcherRunner = (() => {
         } else {
           lastRunFailedByKey.set(key, Date.now());
           markChipState(key, 'failed');
+          scheduleFailedChipClear(key);
         }
         if (hist.id) clearLastSeq(hist.id);
       } else {
@@ -1313,20 +1331,45 @@ export const fetcherRunner = (() => {
     }
     updateGlobalFetcherIndicator(runStateByKey, source);
     renderDashboardFetcherHealth();
-    if (runState) ensureInFlightPolling();
-    else if (runStateByKey.size === 0) {
-      stopInFlightPolling();
+    if (runState) {
+      ensureInFlightPolling();
+      updateCancelButton();
+    } else if (runStateByKey.size === 0) {
       revertFetcherLayoutIfIdle();
-      // Client chip cleared — re-check server truth so stale lastServerInFlight
-      // does not keep isQueueFull() latched after a run ends locally.
-      void fetchRunsSnapshot()
+      // Force a fresh snapshot so a coalesced in-flight /api/runs response
+      // (common for short enrichers like Covers) cannot re-latch Cancel after
+      // the client chip already cleared. Keep polling until server is idle.
+      void fetchRunsSnapshot({ force: true })
         .then((snap) => {
           if (snap) applyServerSnapshotInFlight(snap);
+          else clearServerInFlightLatch();
           updateCancelButton();
+          if (lastServerInFlight || sourcesByRunId.size > 0 || runStateByKey.size > 0) {
+            ensureInFlightPolling();
+          } else {
+            stopInFlightPolling();
+          }
         })
-        .catch(() => {});
+        .catch(() => {
+          clearServerInFlightLatch();
+          updateCancelButton();
+          if (sourcesByRunId.size === 0 && runStateByKey.size === 0) {
+            stopInFlightPolling();
+          }
+        });
+    } else {
+      updateCancelButton();
     }
     updateFetcherBar();
+  }
+
+  const FAILED_CHIP_CLEAR_MS = 10_000;
+  function scheduleFailedChipClear(key) {
+    setTimeout(() => {
+      if (runStateByKey.get(key) === 'failed') {
+        markChipState(key, null);
+      }
+    }, FAILED_CHIP_CLEAR_MS);
   }
 
   // Returns true only when a run was actually submitted to the server; false on
@@ -1644,12 +1687,7 @@ export const fetcherRunner = (() => {
           lastRunFailedByKey.set(key, Date.now());
           markChipState(key, 'failed');
           handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
-          setTimeout(() => {
-            if (runStateByKey.get(key) === 'failed') {
-              runStateByKey.delete(key);
-              renderDashboardFetcherHealth();
-            }
-          }, 10000);
+          scheduleFailedChipClear(key);
         }
       } catch (err) {
         logEvent('error', `[client] parse error on done: ${err}`);
@@ -1712,12 +1750,7 @@ export const fetcherRunner = (() => {
             lastRunFailedByKey.set(key, Date.now());
             markChipState(key, 'failed');
             handleFetcherAuthOutcome(key, finished, '');
-            setTimeout(() => {
-              if (runStateByKey.get(key) === 'failed') {
-                runStateByKey.delete(key);
-                renderDashboardFetcherHealth();
-              }
-            }, 10000);
+            scheduleFailedChipClear(key);
           }
           if (liveRunId === runId) liveRunId = null;
           revertFetcherLayoutIfIdle();
@@ -1774,25 +1807,32 @@ export const fetcherRunner = (() => {
     const pending = [];
     if (snap.active) pending.push(snap.active);
     for (const q of snap.queue || []) pending.push(q);
+    if (snap.enrich_active) pending.push(snap.enrich_active);
+    for (const q of snap.enrich_queue || []) pending.push(q);
 
     const visiblePending = pending.filter(r => !suppressedRunIds.has(r.id));
     if (visiblePending.length) {
-      const panelSrc = source(snap.active?.key) || source(visiblePending[0].key);
+      const panelSrc = source(snap.active?.key)
+        || source(snap.enrich_active?.key)
+        || source(visiblePending[0].key);
       ensurePanel(panelSrc);
       const isFirstSync = !syncedOnce;
       syncedOnce = true;
       if (isFirstSync) {
         const parts = [];
-        if (snap.active && !suppressedRunIds.has(snap.active.id)) {
-          const aLabel = source(snap.active.key)?.label || snap.active.key;
-          const aState = snap.active.status === 'launching'
+        const describeActive = (run) => {
+          if (!run || suppressedRunIds.has(run.id)) return;
+          const aLabel = source(run.key)?.label || run.key;
+          const aState = run.status === 'launching'
             ? 'launching'
-            : snap.active.status === 'cancelling'
+            : run.status === 'cancelling'
               ? 'cancelling'
               : 'running';
           parts.push(`${aLabel} ${aState}`);
-        }
-        for (const q of snap.queue || []) {
+        };
+        describeActive(snap.active);
+        describeActive(snap.enrich_active);
+        for (const q of [...(snap.queue || []), ...(snap.enrich_queue || [])]) {
           if (suppressedRunIds.has(q.id)) continue;
           const qLabel = source(q.key)?.label || q.key;
           parts.push(`${qLabel} queued`);
@@ -1804,24 +1844,27 @@ export const fetcherRunner = (() => {
       for (const run of visiblePending) {
         const src = source(run.key);
         if (!src) continue;
-        const chipState = serverChipState(run.status) || 'queued';
+        const chipState = serverChipState(run.status);
+        if (!chipState) continue;
         markChipState(run.key, chipState, run.id);
         if (run.status === 'running' || run.status === 'launching' || run.status === 'cancelling') {
           liveRunId = run.id;
         }
         if (run.status === 'cancelling') continue;
         if (sourcesByRunId.has(run.id)) continue;
-        if (run.status === 'queued' && snap.active?.id !== run.id) continue;
+        const isLaneActive = snap.active?.id === run.id || snap.enrich_active?.id === run.id;
+        if (run.status === 'queued' && !isLaneActive) continue;
         subscribe(run.id, run.key, src, { reconnect: true, quiet: true });
       }
       updateCancelButton();
-      if (snap.active && panelSrc) {
-        const st = snap.active.status;
+      const chromeRun = snap.active || snap.enrich_active;
+      if (chromeRun && panelSrc) {
+        const st = chromeRun.status;
         if (st === 'cancelling') syncLogPanelChrome(panelSrc, 'cancelling');
         else if (st === 'launching' || st === 'running') syncLogPanelChrome(panelSrc, st);
         else syncLogPanelChrome(panelSrc, 'running');
-      } else if (snap.queue?.length) {
-        const qRun = snap.queue[0];
+      } else if ((snap.queue?.length || snap.enrich_queue?.length)) {
+        const qRun = snap.queue?.[0] || snap.enrich_queue?.[0];
         const qSrc = source(qRun.key) || panelSrc;
         if (qSrc) {
           const qExtra = queueStatusExtra(snap, qRun.id);
@@ -1905,6 +1948,7 @@ export const fetcherRunner = (() => {
     apiProbeFinished,
     stateFor,
     inFlightCount,
+    cancellableCount,
     isQueueFull,
     isQueueFullForKey,
     waitForQueueSlot,

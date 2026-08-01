@@ -69,6 +69,15 @@
       ]
     },
     {
+      "source": "/free-claims.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=600, stale-while-revalidate=3600"
+        }
+      ]
+    },
+    {
       "source": "/success",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=300" },

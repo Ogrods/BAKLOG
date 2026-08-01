@@ -1299,6 +1299,90 @@ def test_preview_publish_items_carries_forward_approved_missing_from_feed() -> N
     assert [it["id"] for it in items] == ["itad-9dcfdf2b0b35"]
 
 
+def test_ends_at_for_prune_applies_14d_first_seen_when_null() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 20, 12, 0, 0, tzinfo=UTC)
+    # first_seen + 14d = 2026-06-15 → past now → expired via prune helper
+    stale = {
+        "id": "itad-stale",
+        "ends_at": None,
+        "first_seen": "2026-06-01T00:00:00Z",
+    }
+    assert bfc._ends_at_for_prune(stale) == "2026-06-15T00:00:00Z"
+    assert bfc._is_expired(bfc._ends_at_for_prune(stale), now)
+    assert bfc._is_expired_for_publish(stale, now)
+
+    fresh = {
+        "id": "itad-fresh",
+        "ends_at": None,
+        "first_seen": "2026-06-15T00:00:00Z",
+    }
+    assert bfc._ends_at_for_prune(fresh) == "2026-06-29T00:00:00Z"
+    assert not bfc._is_expired(bfc._ends_at_for_prune(fresh), now)
+    assert not bfc._is_expired_for_publish(fresh, now)
+
+    dated = {"id": "x", "ends_at": "2026-08-01T00:00:00Z", "first_seen": "2026-01-01T00:00:00Z"}
+    assert bfc._ends_at_for_prune(dated) == "2026-08-01T00:00:00Z"
+    assert not bfc._is_expired_for_publish(dated, now)
+
+
+def test_carry_forward_skips_null_ends_at_past_first_seen_default() -> None:
+    """Approved carry-forward must not resurrect null-dated lingerers past the
+    14-day first_seen window (same prune as publish defaults)."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 20, 12, 0, 0, tzinfo=UTC)
+    carried = bfc._carry_forward_missing_approved(
+        [],
+        approved_ids={"itad-stale", "itad-fresh"},
+        dismissed_ids=set(),
+        prior_rows_by_id={
+            "itad-stale": {
+                "id": "itad-stale",
+                "store": "other",
+                "title": "Stale Lingerer",
+                "claim_url": "https://example.com/stale",
+                "ends_at": None,
+                "first_seen": "2026-06-01T00:00:00Z",
+            },
+            "itad-fresh": {
+                "id": "itad-fresh",
+                "store": "other",
+                "title": "Fresh Null End",
+                "claim_url": "https://example.com/fresh",
+                "ends_at": None,
+                "first_seen": "2026-06-15T00:00:00Z",
+            },
+        },
+        now=now,
+    )
+    assert [row["id"] for row in carried] == ["itad-fresh"]
+
+
+def test_preview_publish_items_does_not_carry_stale_null_ends_at() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 20, 12, 0, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[],
+        approved_ids={"itad-stale"},
+        live_items=[
+            {
+                "id": "itad-stale",
+                "store": "other",
+                "title": "Stale Lingerer",
+                "claim_url": "https://example.com/stale",
+                "ends_at": None,
+                "first_seen": "2026-06-01T00:00:00Z",
+            },
+        ],
+        now=now,
+    )
+    assert items == []
+
+
 def test_preview_publish_items_does_not_carry_dismissed_or_expired() -> None:
     from datetime import UTC, datetime
 

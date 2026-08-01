@@ -205,19 +205,24 @@ vercel dev   # run from landing/  (uses .env / Vercel env)
 
 The local app and read-only mode pull a maintainer-curated list of free giveaways from `https://baklog.app/free-claims.json`. The feed aggregates active giveaways from Epic, GamerPower, and IsThereAnyDeal (Epic, GOG, Steam, Prime, and more). This file is **not** built by Vercel — you publish it from the repo.
 
-### Maintainer workflow (admin console recommended)
+### Maintainer workflow (CLI primary)
 
-With `BAKLOG_ADMIN=1`, open `/admin/` → **Claims**:
+From the repo root, set `PYTHONPATH` so `fetchers/` / `shared/` imports resolve:
 
-1. **Fetch latest** — runs `fetch_claim_sources.py` → `curated/free_claims.auto.json` (Epic, GamerPower, ITAD RSS). Epic is the most reliable source; GamerPower and ITAD broaden coverage. **GamerPower requires attribution** — the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
-2. **Review auto rows** — only checked (**Publish**) rows in `curated/free_claims.approved.json` reach the public feed. Use **Hide** (soft, restorable) or **Block** (permanent kill list) for noise. **Hide stale (30d+)** bulk-soft-hides old rows. Selection auto-saves to `approved.json`.
-3. **Manual rows** (optional) — edit `free-claims.input.json` or use **Add manual row**. Each manual row has a **Publish** checkbox (unchecked rows write `approved: false` and are skipped on build). Legacy rows without `approved` still publish. Strict shops: `build_free_claims.py --require-manual-approval` or `BAKLOG_REQUIRE_MANUAL_APPROVAL=1` (only `approved: true` ships).
-4. **Enrich in place** (optional) — Steam metadata without a full publish rebuild; persists to both `curated/free_claims.auto.json` and `free-claims.input.json`.
-5. **Publish selected** — runs `build_free_claims.py` (refuses an empty publish unless `--allow-empty`). Writes:
-   - `landing/free-claims.json` (hosted on Vercel)
-   - `curated/free_claims.fallback.json` (bundled offline fallback)
-   - active profile `free_claims.json` (local app; use `--no-profile` to skip)
-6. **Deploy** — commit and deploy `landing/` (or copy `landing/free-claims.json` to production).
+```powershell
+$env:PYTHONPATH = (Get-Location).Path
+.\.venv\Scripts\python.exe fetchers/fetch_claim_sources.py
+# curate curated/free_claims.approved.json (ids to publish)
+.\.venv\Scripts\python.exe fetchers/build_free_claims.py
+```
+
+`build_free_claims.py` writes disk only:
+
+- `landing/free-claims.json` (hosted on Vercel)
+- `curated/free_claims.fallback.json` (bundled offline fallback)
+- active profile `free_claims.json` (local app; use `--no-profile` to skip)
+
+**Prod** still needs a commit/push of `landing/free-claims.json` (and usually the fallback) or a Vercel deploy hook — publish alone does not update baklog.app.
 
 **Pre-deploy check** (fetch → dry-run build → audit → optional Vercel hook):
 
@@ -226,15 +231,30 @@ With `BAKLOG_ADMIN=1`, open `/admin/` → **Claims**:
 # optional: $env:BAKLOG_VERCEL_DEPLOY_HOOK = "https://api.vercel.com/v1/integrations/deploy/..."
 ```
 
-**Pro bonus claims (`premium_only`)** — the hosted feed is one JSON file for all users; free-tier clients filter `premium_only` rows client-side (`js/claimable.js`). A separate Pro-gated feed endpoint is a possible future option.
-
-CLI equivalent:
+**Stale-feed nag** (WARN + non-zero exit if `generated_at` is older than 7 days):
 
 ```powershell
-.\.venv\Scripts\python.exe fetch_claim_sources.py
-# curate curated/free_claims.approved.json (or use admin)
-.\.venv\Scripts\python.exe build_free_claims.py
+.\scripts\check_claims_feed_age.ps1
+.\scripts\check_claims_feed_age.ps1 -Live   # fetch https://baklog.app/free-claims.json
 ```
+
+### Admin console (optional)
+
+`admin/` is synced from the private `baklog-internal` repo (`scripts/sync-internal-repo.ps1` / `scripts/internal-manifest.txt`) and is **gitignored** — it is for maintainers only and is not shipped to end users.
+
+```powershell
+$env:BAKLOG_ADMIN = "1"
+.\.venv\Scripts\python.exe server.py
+# open http://127.0.0.1:8765/admin/ → Claims
+```
+
+If port **8765** is already taken (e.g. a frozen BAKLOG build), use a free port (`$env:PORT = "8766"`) or stop the other process first.
+
+With admin up: **Fetch latest** → review **Publish** / Hide / Block → optional manual rows / enrich → **Publish selected** (same disk writes as the CLI). Selection lives in `curated/free_claims.approved.json`. **GamerPower requires attribution** — the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
+
+Strict manual shops: `build_free_claims.py --require-manual-approval` or `BAKLOG_REQUIRE_MANUAL_APPROVAL=1` (only `approved: true` ships).
+
+**Pro bonus claims (`premium_only`)** — the hosted feed is one JSON file for all users; free-tier clients filter `premium_only` rows client-side (`js/claimable.js`). A separate Pro-gated feed endpoint is a possible future option.
 
 Other machines pull the hosted feed via **Prices → Free** or `python fetch_free_claims.py` (also in `refresh.ps1` / `refresh.sh` after ITAD).
 

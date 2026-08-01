@@ -8,6 +8,8 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+from auth.url_hosts import cookie_domain_matches, host_matches
+
 HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
 HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
@@ -66,8 +68,8 @@ def _humble_has_session(context: Any) -> bool:
 
 def _battlenet_has_session(context: Any) -> bool:
     for c in context.cookies():
-        domain = (c.get("domain") or "").lstrip(".")
-        if domain.endswith("battle.net") and c.get("name") and c.get("value"):
+        domain = c.get("domain") or ""
+        if cookie_domain_matches(domain, "battle.net") and c.get("name") and c.get("value"):
             return True
     return False
 
@@ -243,8 +245,8 @@ def _battlenet_cookie_count(cookies: list[dict]) -> tuple[int, bool]:
     count = 0
     has_xsrf = False
     for c in cookies:
-        domain = (c.get("domain") or "").lstrip(".")
-        if not domain.endswith("battle.net"):
+        domain = c.get("domain") or ""
+        if not cookie_domain_matches(domain, "battle.net"):
             continue
         if c.get("name") and c.get("value") is not None:
             count += 1
@@ -506,10 +508,11 @@ def extract_battlenet_session(
 
 
 def battlenet_connect_hint(page: Any) -> str:
-    url = (getattr(page, "url", None) or "").lower()
-    if "login" in url or "signin" in url or "authorize" in url:
+    url = getattr(page, "url", None) or ""
+    url_low = url.lower()
+    if "login" in url_low or "signin" in url_low or "authorize" in url_low:
         return "Sign in to your Battle.net account in the browser window."
-    if "battle.net" not in url:
+    if not host_matches(url, "battle.net"):
         return "Open account.battle.net/games after signing in."
     return (
         "On your Games page? Wait until your library list finishes loading, "

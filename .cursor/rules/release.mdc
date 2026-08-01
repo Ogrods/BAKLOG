@@ -1,16 +1,17 @@
 ---
-description: Release gates — clean tree and green CI before tag/publish
+description: Release gates — clean tree and green CI before tag/publish only
 alwaysApply: true
 ---
 
 # Release gates
 
-Before tagging or publishing any release (`vX.Y.Z`, `replace_release_tag.ps1`, GitHub Release):
+**Ship code** (commit → push → merge) is separate from cutting a release. Do not block merge on a long CI wait unless branch protection requires it.
 
-1. **Working tree clean** on the release commit (`git status` shows nothing to commit). No leftover WIP, untracked release-critical files, or half-staged changes.
-2. **CI green** on that commit after it is on `main` (or on the PR that will merge to `main`). Do not tag from a red or still-running required check. Wait for GitHub Actions CI on the merge commit to pass before `git tag` / push tag.
+Before **tagging or publishing** any release (`vX.Y.Z`, `replace_release_tag.ps1`, GitHub Release):
+
+1. **Working tree clean** on the release commit on `main` (`git status` shows nothing to commit).
+2. **CI green** on that `main` commit. Do not tag while required checks are red or still pending. Wait for GitHub Actions on the merge commit to pass, then tag.
 3. Version stamps match (`pyproject.toml`, `package.json`, `index.html` meta/`brandVersionBadge`) and CHANGELOG has `[X.Y.Z]` notes.
-4. Prefer: merge PR → confirm `main` clean + CI green on the merge commit → then tag `vX.Y.Z` and push the tag so `release.yml` builds assets.
+4. Flow: commit → push → merge to `main` → confirm clean tree + CI green on that commit → `git tag -a vX.Y.Z` and `git push origin vX.Y.Z` so `release.yml` builds assets.
 
 Do **not** tag a dirty tree, an unmerged feature branch, or a commit whose CI failed/is pending.
-

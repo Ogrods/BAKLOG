@@ -24,10 +24,15 @@ class _FakePage:
         self.url = url
         self.is_closed = False
         self.goto_calls = 0
+        self._listeners: dict[str, list] = {}
+        self.closed = False
+
+    def on(self, event: str, callback) -> None:
+        self._listeners.setdefault(event, []).append(callback)
 
     def goto(self, _url: str, *, wait_until: str | None = None, timeout: int | None = None) -> None:
         self.goto_calls += 1
-        if "id/login" in _url:
+        if "id/login" in _url or "__cf_chl_tk" in _url:
             self.url = _url
 
     def evaluate(self, _fn: str) -> str:
@@ -41,12 +46,19 @@ class _FakePage:
     def wait_for_timeout(self, _ms: int) -> None:
         return None
 
+    def close(self) -> None:
+        self.closed = True
+        self.is_closed = True
+
 
 class _FakeContext:
     def __init__(self, pages: list[_FakePage]) -> None:
         self.pages = pages
+        self.background_new_pages = 0
 
-    def new_page(self) -> _FakePage:
+    def new_page(self, *, background: bool = False) -> _FakePage:
+        if background:
+            self.background_new_pages += 1
         page = _FakePage()
         self.pages.append(page)
         return page
@@ -103,3 +115,53 @@ def test_epic_library_inline_does_not_poll_content_on_login(
         runner._extract_epic_inline(page, ctx, session=None)
 
     assert content_calls == 0
+
+
+def test_epic_library_opens_background_cf_challenge_tab(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = _FakeTime(step_s=6.0)
+    monkeypatch.setattr(runner, "time", clock)
+    monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
+    monkeypatch.setattr(runner, "POLL_SEC", 0.1)
+
+    token = "cf-tok-xyz"
+    challenge_url = f"https://www.epicgames.com/id/api/email/exists?__cf_chl_tk={token}"
+
+    page = _FakePage("https://www.epicgames.com/id/login")
+    ctx = _FakeContext([page])
+    events: list[tuple[str, dict]] = []
+
+    class _Session:
+        def emit(self, event: str, data: dict) -> None:
+            events.append((event, data))
+
+    class _FakeCfSniffer:
+        def __init__(self) -> None:
+            self._once = True
+
+        def attach(self, _page) -> None:
+            return None
+
+        def drain_challenge_url(self) -> str | None:
+            if self._once:
+                self._once = False
+                return challenge_url
+            return None
+
+    monkeypatch.setattr(
+        "auth.connect_extractors.EpicEmailExistsCfSniffer",
+        _FakeCfSniffer,
+    )
+
+    with pytest.raises(RuntimeError, match="Could not capture your Epic authorization code"):
+        runner._extract_epic_inline(page, ctx, session=_Session())  # type: ignore[arg-type]
+
+    assert ctx.background_new_pages == 1
+    assert any(
+        e == "waiting_for_user"
+        and runner.EPIC_CF_CHALLENGE_HINT in ((d or {}).get("message") or "")
+        for e, d in events
+    )
+    # Login page must not be content()-polled while waiting.
+    assert page.content() == ""

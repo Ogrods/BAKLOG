@@ -1081,6 +1081,7 @@ class CdpContext:
         self._init_scripts: list[str] = []
         self._page_handlers: list[Callable[[CdpPage], None]] = []
         self._ubisoft_native_popup_targets: set[str] = set()
+        self._background_targets: set[str] = set()
         self._ws_dead = False
         self.request = CdpHttpClient(self)
 
@@ -1195,9 +1196,16 @@ class CdpContext:
             )
         return out
 
-    def new_page(self) -> CdpPage:
-        result = self._send("Target.createTarget", {"url": "about:blank"})
+    def new_page(self, *, background: bool = False) -> CdpPage:
+        params: dict[str, Any] = {"url": "about:blank"}
+        if background:
+            # Create without activating — keeps Epic login form focused while a
+            # Cloudflare challenge tab loads in the background.
+            params["background"] = True
+        result = self._send("Target.createTarget", params)
         target_id = result.get("targetId", "")
+        if background and target_id:
+            self._background_targets.add(target_id)
         page = self._attach_page(target_id)
         if page not in self.pages:
             self.pages.append(page)
@@ -1237,6 +1245,11 @@ class CdpContext:
                 time.sleep(0.25)
             url = (page.url or "").strip()
             others = [p for p in self.pages if p is not page and not p.is_closed]
+
+            # Programmatic background tabs (Epic CF challenge) must stay quiet —
+            # never steal focus from the login form via bring_to_front.
+            if getattr(page, "_target_id", "") in self._background_targets:
+                return
 
             if _should_preserve_popup(url):
                 # Blank OAuth popups must stay open but should not steal focus

@@ -29,6 +29,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.8.43] - 2026-07-31
+
+### Fixed
+
+- Epic Connect Cloudflare managed challenge on `/id/api/email/exists`: passively sniff the XHR body for `__cf_chl_tk`, open that URL in a background tab so CF's orchestrator can run (Epic was dumping challenge HTML into the form error as text, so the script never executed). Skip heavy STEALTH_INIT for Epic to reduce Bot Management noise; keep the system-browser OAuth escape hatch in the wait hint.
+
 ## [0.8.42] - 2026-07-31
 
 ### Fixed

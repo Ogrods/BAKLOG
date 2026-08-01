@@ -9,6 +9,7 @@ from auth.epic_wishlist_session import (
     cloudflare_interstitial,
     enrich_wishlist_elements_with_catalog,
     extract_catalog_offers_from_html,
+    extract_epic_cf_challenge_url,
     extract_wishlist_payloads_from_html,
     is_epic_graphql_url,
     storefront_auth_blocked,
@@ -90,6 +91,23 @@ def test_cloudflare_interstitial_managed_challenge_html() -> None:
     login_url = "https://www.epicgames.com/id/login"
     assert not cloudflare_interstitial(managed, login_url)
     assert cloudflare_embedded_challenge(managed)
+
+
+def test_extract_epic_cf_challenge_url_from_form_error_payload() -> None:
+    token = "VQWokJZi5HM99Z2C2PZC_DfijqpJciNvxx_RvlerJgE-1785556737-1.0.1.1-abc"
+    managed = (
+        "Enable JavaScript and cookies to continue"
+        f"(function(){{window._cf_chl_opt = {{cType: 'managed',"
+        f'cUPMDTk:"/id/api/email/exists?__cf_chl_tk={token}",'
+        f'fa:"/id/api/email/exists?__cf_chl_f_tk={token}"}};}})();'
+    )
+    url = extract_epic_cf_challenge_url(managed)
+    assert url == f"https://www.epicgames.com/id/api/email/exists?__cf_chl_tk={token}"
+    assert not cloudflare_interstitial(managed, "https://www.epicgames.com/id/login")
+
+
+def test_extract_epic_cf_challenge_url_ignores_normal_json() -> None:
+    assert extract_epic_cf_challenge_url('{"exists":true}') is None
 
 
 def test_cloudflare_interstitial_not_normal_epic_login_html() -> None:

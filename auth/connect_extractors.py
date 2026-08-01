@@ -626,6 +626,55 @@ def build_epic_wishlist_graphql_sniffer() -> DeferredGraphqlResponseSniffer:
     )
 
 
+class EpicEmailExistsCfSniffer:
+    """Stash ``/id/api/email/exists`` responses; drain CF challenge URLs off-thread.
+
+    Cloudflare often returns non-200 HTML for the email-exists XHR. Epic dumps that
+    body into the login form error so the challenge script never runs — Connect
+    must open the ``__cf_chl_tk`` URL as a top-level document instead.
+    """
+
+    def __init__(self) -> None:
+        self._pending: list[Any] = []
+        self._seen_tokens: set[str] = set()
+        self._lock = threading.Lock()
+
+    def attach(self, page: Any) -> None:
+        def on_response(response: Any) -> None:
+            try:
+                url = (getattr(response, "url", None) or "").lower()
+                if "/id/api/email/exists" not in url:
+                    return
+                self._pending.append(response)
+            except Exception:  # noqa: BLE001
+                pass
+
+        page.on("response", on_response)
+
+    def drain_challenge_url(self) -> str | None:
+        from urllib.parse import parse_qs, urlparse
+
+        from auth.epic_wishlist_session import extract_epic_cf_challenge_url
+
+        while self._pending:
+            resp = self._pending.pop(0)
+            try:
+                body = resp.text()
+            except Exception:  # noqa: BLE001
+                continue
+            url = extract_epic_cf_challenge_url(body or "")
+            if not url:
+                continue
+            qs = parse_qs(urlparse(url).query)
+            token = (qs.get("__cf_chl_tk") or [None])[0] or url
+            with self._lock:
+                if token in self._seen_tokens:
+                    continue
+                self._seen_tokens.add(token)
+            return url
+        return None
+
+
 UBISOFT_API_HOST = "public-ubiservices.ubi.com"
 
 

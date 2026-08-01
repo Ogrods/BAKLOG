@@ -118,6 +118,7 @@ class _FakeLoginThenStorePage:
 class _FakeContext:
     def __init__(self, *, signed_in: bool = False) -> None:
         self._signed_in = signed_in
+        self.pages: list = []
 
     def cookies(self) -> list[dict]:
         if not self._signed_in:
@@ -129,6 +130,11 @@ class _FakeContext:
                 "domain": ".epicgames.com",
             }
         ]
+
+    def new_page(self, *, background: bool = False):
+        page = _FakePage()
+        self.pages.append(page)
+        return page
 
 
 class _FakeSession:
@@ -232,9 +238,11 @@ def test_epic_wishlist_inline_post_login_goto_without_graphql_times_out(
     session = _FakeSession()
     page.url = "https://www.epicgames.com/id/login"
 
-    fake_time = _FakeTime(step_s=6.0)
+    # FakeTime advances on every time.time() call; keep steps small enough that
+    # post-login wishlist navigation still runs before the deadline.
+    fake_time = _FakeTime(step_s=2.0)
     monkeypatch.setattr(runner.time, "time", fake_time.time)
-    monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 20.0)
+    monkeypatch.setattr(runner, "SUCCESS_WAIT_SEC", 40.0)
     monkeypatch.setattr(runner, "POLL_SEC", 0.1)
 
     def _goto(url: str, *, wait_until: str | None = None, timeout: int | None = None) -> None:

@@ -332,6 +332,46 @@ EPIC_CORRECTIVE_ACTION_ERROR = (
     "accept the privacy policy / complete the prompt, then refresh the page and "
     "click Connect again."
 )
+EPIC_CF_CHALLENGE_HINT = (
+    "Cloudflare opened a check in a background tab — complete it there, then "
+    "continue signing in on this page. Or use Sign in with your browser instead."
+)
+EPIC_CF_CHALLENGE_COOLDOWN_SEC = 30.0
+
+
+def _close_epic_cf_challenge_tabs(pages: list) -> None:
+    for pg in list(pages):
+        try:
+            pg.close()
+        except Exception:  # noqa: BLE001
+            pass
+    pages.clear()
+
+
+def _maybe_open_epic_cf_challenge(
+    context,
+    sniffer,
+    session: AuthSession | None,
+    *,
+    opened_until: list[float],
+    challenge_pages: list,
+) -> None:
+    """Open a background tab for a sniffed CF challenge URL (once per cooldown)."""
+    now = time.time()
+    if opened_until and opened_until[0] > now:
+        return
+    challenge_url = sniffer.drain_challenge_url()
+    if not challenge_url:
+        return
+    try:
+        bg = context.new_page(background=True)
+        challenge_pages.append(bg)
+        bg.goto(challenge_url, wait_until="domcontentloaded", timeout=25_000)
+    except Exception:  # noqa: BLE001
+        pass
+    opened_until[:] = [now + EPIC_CF_CHALLENGE_COOLDOWN_SEC]
+    if session:
+        session.emit("waiting_for_user", {"message": EPIC_CF_CHALLENGE_HINT})
 
 
 def _extract_epic_inline(page, context, session: AuthSession | None = None) -> dict[str, str]:
@@ -343,8 +383,13 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
     the fetcher can reuse it. On any failure the user can still paste the code manually.
     """
     from auth.cdp_browser import abort_if_browser_closed
+    from auth.connect_extractors import EpicEmailExistsCfSniffer
 
     login_url = spec_for("epic").login_url
+    cf_sniffer = EpicEmailExistsCfSniffer()
+    cf_sniffer.attach(page)
+    cf_opened_until: list[float] = [0.0]
+    cf_pages: list = []
     try:
         page.goto(login_url, wait_until="domcontentloaded", timeout=25_000)
     except Exception:
@@ -352,77 +397,89 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_hint = 0.0
-    while time.time() < deadline:
-        abort_if_browser_closed(context)
-        drive = _drive_connect_page(page, context)
+    try:
+        while time.time() < deadline:
+            abort_if_browser_closed(context)
+            _maybe_open_epic_cf_challenge(
+                context,
+                cf_sniffer,
+                session,
+                opened_until=cf_opened_until,
+                challenge_pages=cf_pages,
+            )
+            drive = _drive_connect_page(page, context)
 
-        redirect_page = None
-        for pg in _connect_pages(page, context):
-            if EPIC_REDIRECT_MARKER in (pg.url or "").lower():
-                redirect_page = pg
-                break
-        if redirect_page is not None:
-            main = redirect_page
-            url = (main.url or "").lower()
-            body = ""
-            try:
-                body = main.evaluate("() => document.body ? document.body.innerText : ''") or ""
-            except Exception:
+            redirect_page = None
+            for pg in _connect_pages(page, context):
+                if EPIC_REDIRECT_MARKER in (pg.url or "").lower():
+                    redirect_page = pg
+                    break
+            if redirect_page is not None:
+                main = redirect_page
+                url = (main.url or "").lower()
                 body = ""
-            code = _epic_code_from_text(body)
-            html = ""
-            if not code:
                 try:
-                    html = main.content()
+                    body = main.evaluate("() => document.body ? document.body.innerText : ''") or ""
                 except Exception:
-                    html = ""
-                code = _epic_code_from_text(html)
-            if code:
-                from clients.epic_client import (
-                    EpicAuthError,
-                    EpicClient,
-                    EpicCorrectiveActionError,
-                    default_epic_cache_dir,
-                )
+                    body = ""
+                code = _epic_code_from_text(body)
+                html = ""
+                if not code:
+                    try:
+                        html = main.content()
+                    except Exception:
+                        html = ""
+                    code = _epic_code_from_text(html)
+                if code:
+                    from clients.epic_client import (
+                        EpicAuthError,
+                        EpicClient,
+                        EpicCorrectiveActionError,
+                        default_epic_cache_dir,
+                    )
 
-                try:
-                    EpicClient(auth_code=code, cache_dir=default_epic_cache_dir()).login()
-                except EpicCorrectiveActionError as exc:
-                    raise RuntimeError(EPIC_CORRECTIVE_ACTION_ERROR) from exc
-                except EpicAuthError as exc:
-                    raise RuntimeError(
-                        f"Epic rejected the captured code ({exc}). Refresh the Epic page so a new "
-                        "code appears, or paste the authorizationCode into the fallback field below."
-                    ) from exc
-                return {"EPIC_AUTH_CODE": code}
+                    try:
+                        EpicClient(auth_code=code, cache_dir=default_epic_cache_dir()).login()
+                    except EpicCorrectiveActionError as exc:
+                        raise RuntimeError(EPIC_CORRECTIVE_ACTION_ERROR) from exc
+                    except EpicAuthError as exc:
+                        raise RuntimeError(
+                            f"Epic rejected the captured code ({exc}). Refresh the Epic page so a new "
+                            "code appears, or paste the authorizationCode into the fallback field below."
+                        ) from exc
+                    return {"EPIC_AUTH_CODE": code}
 
-            # No code yet: if Epic is showing its corrective-action gate (e.g.
-            # privacy-policy acceptance), guide the user to complete it and keep
-            # polling instead of silently timing out.
-            if _epic_error_from_text(body) or _epic_error_from_text(html):
-                now = time.time()
-                if session and now - last_hint > 8:
-                    last_hint = now
-                    session.emit("waiting_for_user", {"message": EPIC_CORRECTIVE_ACTION_HINT})
-                page.wait_for_timeout(int(POLL_SEC * 1000))
-                continue
+                # No code yet: if Epic is showing its corrective-action gate (e.g.
+                # privacy-policy acceptance), guide the user to complete it and keep
+                # polling instead of silently timing out.
+                if _epic_error_from_text(body) or _epic_error_from_text(html):
+                    now = time.time()
+                    if session and now - last_hint > 8:
+                        last_hint = now
+                        session.emit("waiting_for_user", {"message": EPIC_CORRECTIVE_ACTION_HINT})
+                    page.wait_for_timeout(int(POLL_SEC * 1000))
+                    continue
 
-        url = (drive.url or "").lower()
-        now = time.time()
-        if session and now - last_hint > 10:
-            last_hint = now
-            if "login" in url or "id.epicgames.com" in url:
-                msg = "Sign in to your Epic account in the browser window."
-            else:
-                msg = "Capturing your Epic authorization code — keep the window open."
-            session.emit("waiting_for_user", {"message": msg})
+            url = (drive.url or "").lower()
+            now = time.time()
+            if session and now - last_hint > 10:
+                last_hint = now
+                if cf_pages and cf_opened_until and cf_opened_until[0] > now:
+                    msg = EPIC_CF_CHALLENGE_HINT
+                elif "login" in url or "id.epicgames.com" in url:
+                    msg = "Sign in to your Epic account in the browser window."
+                else:
+                    msg = "Capturing your Epic authorization code — keep the window open."
+                session.emit("waiting_for_user", {"message": msg})
 
-        page.wait_for_timeout(int(POLL_SEC * 1000))
+            page.wait_for_timeout(int(POLL_SEC * 1000))
 
-    raise RuntimeError(
-        "Could not capture your Epic authorization code in time. If the Epic page shows an "
-        "authorizationCode, paste it into the fallback field below and click Save key."
-    )
+        raise RuntimeError(
+            "Could not capture your Epic authorization code in time. If the Epic page shows an "
+            "authorizationCode, paste it into the fallback field below and click Save key."
+        )
+    finally:
+        _close_epic_cf_challenge_tabs(cf_pages)
 
 
 def pick_gog_al_from_cookies(cookies: list[dict]) -> str:
@@ -643,16 +700,22 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
     either a GraphQL response or Epic's dehydrated React Query HTML state.
     """
     from auth.cdp_browser import abort_if_browser_closed
-    from auth.connect_extractors import build_epic_wishlist_graphql_sniffer
+    from auth.connect_extractors import (
+        EpicEmailExistsCfSniffer,
+        build_epic_wishlist_graphql_sniffer,
+    )
     from auth.epic_wishlist_session import (
         storefront_bounced_to_home,
         wishlist_capture_complete_from_html,
     )
 
     sniffer = build_epic_wishlist_graphql_sniffer()
+    cf_sniffer = EpicEmailExistsCfSniffer()
     wishlist_loaded = False
     saw_id_login = False
     did_post_login_nav = False
+    cf_opened_until: list[float] = [0.0]
+    cf_pages: list = []
 
     try:
         _debug_path = profile_dir("epic_wishlist").parent / "epic_wishlist_connect_debug.json"
@@ -672,6 +735,7 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
             pass
 
     sniffer.attach(page)
+    cf_sniffer.attach(page)
     try:
         page.goto(epic_store_login_url(), wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
@@ -679,73 +743,85 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
 
     deadline = time.time() + SUCCESS_WAIT_SEC
     last_msg = 0.0
-    while time.time() < deadline:
-        abort_if_browser_closed(context)
-        if not wishlist_loaded and sniffer.drain():
-            wishlist_loaded = True
-            _write_debug()
-        url = page.url or ""
-        ul = url.lower()
-        on_wishlist = _epic_on_wishlist(url)
-        if not wishlist_loaded and on_wishlist:
-            try:
-                if wishlist_capture_complete_from_html(page.content()):
-                    wishlist_loaded = True
-            except Exception:  # noqa: BLE001
-                pass
-        if _epic_on_login_page(url):
-            saw_id_login = True
-        if (
-            not wishlist_loaded
-            and not did_post_login_nav
-            and saw_id_login
-            and storefront_bounced_to_home(url)
-        ):
-            did_post_login_nav = True
-            try:
-                page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
-            except Exception:  # noqa: BLE001
-                pass
+    try:
+        while time.time() < deadline:
+            abort_if_browser_closed(context)
+            _maybe_open_epic_cf_challenge(
+                context,
+                cf_sniffer,
+                session,
+                opened_until=cf_opened_until,
+                challenge_pages=cf_pages,
+            )
             if not wishlist_loaded and sniffer.drain():
                 wishlist_loaded = True
                 _write_debug()
-        if wishlist_loaded:
-            try:
-                page.wait_for_timeout(800)
-            except Exception:  # noqa: BLE001
-                pass
-            return {"EPIC_STORE_COOKIE": "ready"}
+            url = page.url or ""
+            ul = url.lower()
+            on_wishlist = _epic_on_wishlist(url)
+            if not wishlist_loaded and on_wishlist:
+                try:
+                    if wishlist_capture_complete_from_html(page.content()):
+                        wishlist_loaded = True
+                except Exception:  # noqa: BLE001
+                    pass
+            if _epic_on_login_page(url):
+                saw_id_login = True
+            if (
+                not wishlist_loaded
+                and not did_post_login_nav
+                and saw_id_login
+                and storefront_bounced_to_home(url)
+            ):
+                did_post_login_nav = True
+                try:
+                    page.goto(EPIC_WISHLIST_URL, wait_until="domcontentloaded", timeout=25_000)
+                except Exception:  # noqa: BLE001
+                    pass
+                if not wishlist_loaded and sniffer.drain():
+                    wishlist_loaded = True
+                    _write_debug()
+            if wishlist_loaded:
+                try:
+                    page.wait_for_timeout(800)
+                except Exception:  # noqa: BLE001
+                    pass
+                return {"EPIC_STORE_COOKIE": "ready"}
 
-        now = time.time()
+            now = time.time()
 
-        if session and now - last_msg > 8:
-            last_msg = now
-            if "challenge" in ul or "cloudflare" in ul:
-                msg = "Cloudflare challenge — click the checkbox if shown."
-            elif _epic_on_login_page(url) or "signin" in ul:
-                msg = (
-                    "Sign in to Epic in this window — you'll be returned to your "
-                    "wishlist automatically. Clear any Cloudflare check if shown."
-                )
-            elif on_wishlist:
-                msg = "On the wishlist page? Give it a moment to load."
-            elif "store.epicgames.com" in ul:
-                msg = (
-                    "Signed in? Opening your wishlist — give it a moment to load."
-                )
-            else:
-                msg = (
-                    "Sign in to Epic in this window — you'll be returned to your "
-                    "wishlist automatically."
-                )
-            session.emit("waiting_for_user", {"message": msg})
+            if session and now - last_msg > 8:
+                last_msg = now
+                if cf_pages and cf_opened_until and cf_opened_until[0] > now:
+                    msg = EPIC_CF_CHALLENGE_HINT
+                elif "challenge" in ul or "cloudflare" in ul:
+                    msg = "Cloudflare challenge — click the checkbox if shown."
+                elif _epic_on_login_page(url) or "signin" in ul:
+                    msg = (
+                        "Sign in to Epic in this window — you'll be returned to your "
+                        "wishlist automatically. Clear any Cloudflare check if shown."
+                    )
+                elif on_wishlist:
+                    msg = "On the wishlist page? Give it a moment to load."
+                elif "store.epicgames.com" in ul:
+                    msg = (
+                        "Signed in? Opening your wishlist — give it a moment to load."
+                    )
+                else:
+                    msg = (
+                        "Sign in to Epic in this window — you'll be returned to your "
+                        "wishlist automatically."
+                    )
+                session.emit("waiting_for_user", {"message": msg})
 
-        page.wait_for_timeout(int(POLL_SEC * 1000))
+            page.wait_for_timeout(int(POLL_SEC * 1000))
 
-    raise RuntimeError(
-        "Could not detect Epic wishlist sign-in — sign in at store.epicgames.com/wishlist, "
-        "clear any Cloudflare challenge, and let your wishlist finish loading."
-    )
+        raise RuntimeError(
+            "Could not detect Epic wishlist sign-in — sign in at store.epicgames.com/wishlist, "
+            "clear any Cloudflare challenge, and let your wishlist finish loading."
+        )
+    finally:
+        _close_epic_cf_challenge_tabs(cf_pages)
 
 
 XBOX_WISHLIST_URL = "https://www.xbox.com/en-us/wishlist"
@@ -1793,7 +1869,11 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
         initial_url=spec.login_url if provider == "ea" else None,
     ) as context:
         try:
-            context.add_init_script(_STEALTH_INIT)
+            # Epic: skip heavy STEALTH_INIT — fake plugins/permissions/hardware
+            # worsen Cloudflare Bot Management scores. Launch already applies the
+            # light webdriver mask (_AUTOMATION_MASK_SCRIPT).
+            if provider not in ("epic", "epic_wishlist"):
+                context.add_init_script(_STEALTH_INIT)
             # Paint a persistent, click-through banner inside the popup so users see
             # the same guidance there (not just on the dashboard). Keep it in sync
             # with the live waiting_for_user / signed_in messages.

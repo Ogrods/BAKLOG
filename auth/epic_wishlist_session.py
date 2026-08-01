@@ -258,6 +258,34 @@ def cloudflare_embedded_challenge(html: str) -> bool:
     )
 
 
+_CUPMDTK_RE = re.compile(r"""cUPMDTk\s*:\s*["']([^"']+)["']""")
+_CF_CHL_TK_RE = re.compile(r"__cf_chl_tk=([A-Za-z0-9_.\-]+)")
+_EPIC_CF_ORIGIN = "https://www.epicgames.com"
+
+
+def extract_epic_cf_challenge_url(html: str) -> str | None:
+    """Build a top-level CF challenge URL from managed-challenge HTML/XHR body.
+
+    Epic dumps challenge HTML into the login form error; the orchestrator never
+    runs there. Opening ``cUPMDTk`` / ``__cf_chl_tk`` as a document lets CF set
+    ``cf_clearance`` for ``www.epicgames.com``.
+    """
+    body = html or ""
+    if not cloudflare_embedded_challenge(body):
+        return None
+    m = _CUPMDTK_RE.search(body)
+    if m:
+        path = (m.group(1) or "").strip()
+        if path.startswith("/"):
+            return f"{_EPIC_CF_ORIGIN}{path}"
+        if path.startswith("http://") or path.startswith("https://"):
+            return path
+    tk = _CF_CHL_TK_RE.search(body)
+    if tk:
+        return f"{_EPIC_CF_ORIGIN}/id/api/email/exists?__cf_chl_tk={tk.group(1)}"
+    return None
+
+
 def storefront_bounced_to_home(url: str) -> bool:
     """True when the storefront URL is not the wishlist after a wishlist navigation."""
     parsed = urlparse(url or "")

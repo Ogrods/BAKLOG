@@ -92,6 +92,34 @@ class TestShouldPreservePopup:
         )
 
 
+class TestNewPageBackground:
+    def test_new_page_background_passes_create_target_flag(self) -> None:
+        ctx = _bare_context()
+        ctx.pages = []
+        ctx._pages_by_session = {}
+        ctx._pages_by_target = {}
+        ctx._background_targets = set()
+        ctx._init_scripts = []
+        ctx._apply_init_script = lambda page, source: None  # type: ignore[method-assign]
+        sent: list[tuple[str, dict | None]] = []
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):
+            sent.append((method, params))
+            if method == "Target.createTarget":
+                return {"targetId": "bg-target-1"}
+            if method == "Target.attachToTarget":
+                return {"sessionId": "sess-bg-1"}
+            return {}
+
+        ctx._send = fake_send  # type: ignore[method-assign]
+        page = ctx.new_page(background=True)
+        create = next(p for m, p in sent if m == "Target.createTarget")
+        assert create is not None
+        assert create.get("background") is True
+        assert "bg-target-1" in ctx._background_targets
+        assert page._target_id == "bg-target-1"
+
+
 class TestRegisterPageDebugger:
     def test_register_page_skips_debugger_for_storefront_auth(self) -> None:
         ctx = _bare_context()

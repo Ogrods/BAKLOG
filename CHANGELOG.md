@@ -22,7 +22,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 4. **Before tagging:** run `.\scripts\release_preflight.ps1 -TagVersion vX.Y.Z`
    on Windows (includes pytest, Inno ISCC compile, optional full
    `build_windows.ps1`). CI `python-windows` must also compile `baklog.iss`.
-5. **Gates:** working tree must be clean and GitHub CI must be green on the release commit on `main` before tagging. Never tag WIP or a red/pending CI commit.
+5. **Gates (tagging only):** working tree must be clean and GitHub CI must be green on the release commit on `main` before tagging — not before merge. Ship via commit → push → merge; wait for clean tree + green CI only before `git tag`. Never tag WIP or a red/pending CI commit.
 6. **Broken public installer:** do not bump version for a bad build alone. Fix
    on `main`, keep `pyproject.toml` on the same version, run
    `.\scripts\replace_release_tag.ps1 -Version X.Y.Z -Force` to replace the tag
@@ -36,6 +36,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - Dashboard no longer shows leftover Library/Wishlist/itch #summary chips after navigate (including cached dashboard returns).
 - Library/Wishlist/itch status chips (e.g. Backlog) wrap in the same row as store/stat chips instead of a forced extra row.
+- Connect URL/host checks use hostname allowlists (Battle.net/Epic) instead of substring/endswith host matching (CodeQL).
+- Release gates rule: commit/push/merge first; clean tree + green CI only before tag.
+- Connect URL/host checks use hostname allowlists (Battle.net/Epic) instead of substring/`endswith` host matching (CodeQL).
+- Release gates rule: commit/push/merge first; clean tree + green CI only before tag.
 
 ## [0.8.45] - 2026-08-01
 

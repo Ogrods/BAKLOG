@@ -28,6 +28,7 @@ from auth.cdp_browser import (
 from auth.epic_wishlist_session import EPIC_WISHLIST_URL, epic_store_login_url
 from auth.registry import spec_for
 from auth.secrets import profile_dir
+from auth.url_hosts import host_matches
 
 SUCCESS_WAIT_SEC = 300
 POLL_SEC = 0.5
@@ -161,12 +162,12 @@ def _battlenet_live_page(page, context):
     """Prefer the Games SPA tab over blank OAuth popups / stale login tabs."""
     pages = _connect_pages(page, context)
     for pg in pages:
-        url = (getattr(pg, "url", None) or "").lower()
-        if "account.battle.net" in url and "/games" in url:
+        url = getattr(pg, "url", None) or ""
+        if host_matches(url, "account.battle.net") and "/games" in (urlparse(url).path or "").lower():
             return pg
     for pg in pages:
-        url = (getattr(pg, "url", None) or "").lower()
-        if "battle.net" in url and not is_blank_browser_url(url):
+        url = getattr(pg, "url", None) or ""
+        if host_matches(url, "battle.net") and not is_blank_browser_url(url):
             return pg
     return _drive_connect_page(page, context)
 
@@ -466,7 +467,7 @@ def _extract_epic_inline(page, context, session: AuthSession | None = None) -> d
                 last_hint = now
                 if cf_pages and cf_opened_until and cf_opened_until[0] > now:
                     msg = EPIC_CF_CHALLENGE_HINT
-                elif "login" in url or "id.epicgames.com" in url:
+                elif "login" in url or host_matches(url, "id.epicgames.com"):
                     msg = "Sign in to your Epic account in the browser window."
                 else:
                     msg = "Capturing your Epic authorization code — keep the window open."
@@ -684,12 +685,12 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
 
 def _epic_on_wishlist(url: str) -> bool:
     ul = (url or "").lower()
-    return "store.epicgames.com" in ul and "wishlist" in ul
+    return host_matches(url, "store.epicgames.com") and "wishlist" in ul
 
 
 def _epic_on_login_page(url: str) -> bool:
     ul = (url or "").lower()
-    return "id.epicgames.com" in ul or "/id/login" in ul
+    return host_matches(url, "id.epicgames.com") or "/id/login" in ul
 
 
 def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
@@ -803,7 +804,7 @@ def _extract_epic_wishlist_inline(page, context, session) -> dict[str, str]:
                     )
                 elif on_wishlist:
                     msg = "On the wishlist page? Give it a moment to load."
-                elif "store.epicgames.com" in ul:
+                elif host_matches(url, "store.epicgames.com"):
                     msg = (
                         "Signed in? Opening your wishlist — give it a moment to load."
                     )
@@ -856,8 +857,7 @@ def _xbox_url_on_wishlist(url: str) -> bool:
         parsed = urlparse(url or "")
     except Exception:  # noqa: BLE001
         return False
-    host = (parsed.hostname or "").lower()
-    if host != "xbox.com" and not host.endswith(".xbox.com"):
+    if not host_matches(url, "xbox.com"):
         return False
     return "/wishlist" in (parsed.path or "").lower()
 

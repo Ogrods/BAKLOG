@@ -85,5 +85,5 @@ def port_collision_message(
 ) -> str:
     return (
         f"port {host}:{port} already in use by pid {holder}; "
-        "run scripts/stop_baklog.py --dedupe"
+        "run scripts/stop_baklog.py"
     )

@@ -33,6 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Windows release build fully stops stray servers on port 8765 before frozen smoke (was `--dedupe`, which keeps a live listener and can fail the installer publish).
+- In-app update modals (Install and restart / Update available) follow the active theme tokens instead of fixed slate/sky defaults; extend sky utility remaps (`bg-sky-500/700`, hover variants) to `--accent`.
 
 ## [0.8.47] - 2026-08-02
 

@@ -578,6 +578,18 @@ describe('renderUpdateModalHtml', () => {
     expect(html).toContain('Remind me later');
   });
 
+  it('uses themed app-modal-panel classes (not fixed sky-700)', () => {
+    const html = renderUpdateModalHtml({
+      current: '0.8.25',
+      latest: '0.8.26',
+      url: 'https://example.com',
+      applySupported: true,
+    });
+    expect(html).toContain('app-modal-panel');
+    expect(html).toContain('bg-cyan-700');
+    expect(html).not.toContain('bg-sky-700');
+  });
+
   it('hides Update now when fetchers are in flight', () => {
     const html = renderUpdateModalHtml({
       current: '0.8.25',

@@ -72,8 +72,20 @@ def test_infer_store_from_text_mobile_epic():
         "TMNT free on Mobile from EGS on Epic Game Store",
         None,
         "https://isthereanydeal.com/giveaways/1/",
+        {"ios": "https://apps.apple.com/app/id1"},
     )
     assert store == "epic_mobile"
+
+
+def test_infer_store_from_text_mobile_epic_keeps_claim_url_without_platform_urls():
+    """ITAD mobile-from-EGS titles must not become unlinkable epic_mobile rows."""
+    store = _infer_store_from_text(
+        "epic",
+        "Mutazione free on MOBILE from EGS on Epic Game Store",
+        "Mutazione",
+        "https://isthereanydeal.com/giveaways/16439/",
+    )
+    assert store == "epic"
 
 
 def test_preview_publish_items_epic_mobile_manual(tmp_path: Path, monkeypatch):

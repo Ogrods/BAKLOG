@@ -1033,8 +1033,25 @@ def test_internal_lane_parallel_to_fetcher(runs_env, internal_jobs) -> None:
     assert snap["queue"] == []
 
 
-def test_fetcher_lane_parallel_to_internal(runs_env, internal_jobs) -> None:
+def test_fetcher_lane_parallel_to_internal(
+    runs_env, internal_jobs, monkeypatch: pytest.MonkeyPatch
+) -> None:
     mgr, runs_dir = runs_env
+    # Keep the fetcher alive long enough for the worker to admit it; print('ok')
+    # alone races past _active on fast CI hosts.
+    monkeypatch.setitem(
+        server.FETCHERS,
+        "demo",
+        {
+            "label": "Demo",
+            "argv": [server.sys.executable, "-c", "import time; time.sleep(30)"],
+            "refreshArgs": [],
+            "metaKey": "demo",
+            "group": "library",
+            "color": "#fff",
+            "requires": [],
+        },
+    )
     internal = server.Run(
         "buildClaims",
         runs_dir=runs_dir,
@@ -1049,9 +1066,18 @@ def test_fetcher_lane_parallel_to_internal(runs_env, internal_jobs) -> None:
     fetcher = mgr.submit("demo")
 
     assert not fetcher._internal
+    deadline = time.time() + 5
     snap = mgr.snapshot()
+    while time.time() < deadline:
+        snap = mgr.snapshot()
+        if snap.get("active") and snap["active"]["id"] == fetcher.id:
+            break
+        time.sleep(0.02)
+    else:
+        pytest.fail(f"fetcher never became active: {snap}")
     assert snap["internal_active"]["key"] == "buildClaims"
     assert snap["active"]["key"] == "demo"
+    mgr.cancel(fetcher.id)
 
 
 def test_enrich_lane_parallel_to_fetcher(runs_env) -> None:

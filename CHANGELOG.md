@@ -30,11 +30,28 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
-## [0.8.47] - 2026-08-01
+## [0.8.47] - 2026-08-02
 
 ### Changed
 
 - Hide in-house Pro upgrade banners (dashboard/wishlist/library/itch stripes and spotlight house slides) behind `HOUSE_PRO_BANNERS_ENABLED` until the Pro funnel is ready for stranger beta. Paid placement paths are unchanged.
+- README screenshot gallery uses Dashboard / Library / Wishlist / Connections shots from a generated fictional profile; hosted `#demo` copy no longer claims it mirrors the full app.
+- Connections zero-state lead covers Epic, GOG, and Prime Gaming alongside Steam so free-start matches the landing narrative.
+- Connected-but-empty dashboard hint points at fetcher chips instead of telling people to start a library fetch by hand (`autoFetchOnConnect` is the default).
+- Hosted free-claims feed gets explicit CDN cache headers (`s-maxage=600`, stale-while-revalidate=3600).
+- Refresh curated / landing free-claims feeds; dismiss null-end lingerers and prune stale null `ends_at` on carry-forward.
+
+### Fixed
+
+- Co-op tags chip no longer sticks at "N new" when Steam `appdetails` returns `success:false` (write `coop_online` / `coop_local` false; network exceptions still leave fields unset for retry).
+- Free-claims publish no longer promotes mobile+EGS ITAD titles to unlinkable `epic_mobile` rows without `claim_urls` (keep `epic` + `claim_url`); fetch warning names dropped ids.
+- Auto-hide exact title `fab-listing-live` as library noise like other non-game listings.
+- Vitest house-creative suites opt into `setHouseProBannersForTest(true)` so CI stays green while production keeps house Pro banners off.
+
+### Added
+
+- Demo screenshot capture tooling (`scripts/generate-demo-profile.mjs`, `scripts/capture-screenshots.ps1` / `.mjs`) with a row-count contamination guard against real local libraries.
+- `scripts/check_claims_feed_age.ps1` to warn when the free-claims feed is older than N days.
 
 ## [0.8.46] - 2026-08-01
 

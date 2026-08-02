@@ -306,13 +306,28 @@ _MOBILE_EPIC_HINT = re.compile(r"mobile", re.IGNORECASE)
 _EGS_EPIC_HINT = re.compile(r"\b(epic|egs)\b", re.IGNORECASE)
 
 
-def _infer_store_from_text(store: str, title: str, blurb: object, claim_url: str) -> str:
-    """GamerPower often tags itch.io/IndieGala giveaways as store='other'. Infer from text."""
+def _infer_store_from_text(
+    store: str,
+    title: str,
+    blurb: object,
+    claim_url: str,
+    claim_urls: object = None,
+) -> str:
+    """GamerPower often tags itch.io/IndieGala giveaways as store='other'. Infer from text.
+
+    Epic Mobile is only used when we actually have platform claim_urls. Title
+    text alone (ITAD "free on MOBILE from EGS") must not upgrade a clickable
+    epic+claim_url row into an unlinkable epic_mobile row with no claim_urls.
+    """
     haystack = " ".join(
         part for part in (title, str(blurb or ""), claim_url) if part
     )
     if _MOBILE_EPIC_HINT.search(haystack) and _EGS_EPIC_HINT.search(haystack):
-        return EPIC_MOBILE_STORE
+        if normalize_claim_urls(claim_urls):
+            return EPIC_MOBILE_STORE
+        if store and store != "other":
+            return store
+        return "epic"
     if store and store != "other":
         return store
     if _ITCH_HINT.search(haystack):
@@ -387,6 +402,7 @@ def _enrich_item(
         title,
         raw.get("blurb"),
         claim_url,
+        raw.get("claim_urls"),
     )
     appid = raw.get("steam_appid")
     if appid is not None:
@@ -1100,6 +1116,7 @@ def _enrich_item_light(
         title,
         raw.get("blurb"),
         claim_url,
+        raw.get("claim_urls"),
     )
     appid = raw.get("steam_appid")
     if appid is not None:

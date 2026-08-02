@@ -887,7 +887,10 @@ def test_enrich_item_resolves_steam_cover_for_non_steam_row(
 
     out = bfc._enrich_item(raw, [0.0])
 
-    assert out["store"] == "epic_mobile"
+    # Title says mobile/EGS but there are no claim_urls - keep epic + claim_url.
+    assert out["store"] == "epic"
+    assert out["claim_url"] == "https://isthereanydeal.com/giveaways/16242/"
+    assert "claim_urls" not in out
     assert out["steam_appid"] == 1016800
     assert out["header_image"] == bfc._steam_portrait_cover(1016800)
     assert out["review_percent"] == 91

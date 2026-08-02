@@ -61,17 +61,25 @@ def main() -> int:
     raw_items = data.get("items") or []
     valid_items: list[dict] = []
     invalid = 0
+    dropped_ids: list[str] = []
     for item in raw_items:
         if not isinstance(item, dict):
             invalid += 1
+            dropped_ids.append("<non-object>")
             continue
         if not item.get("id") or not item.get("store") or not has_valid_claim_links(item):
             invalid += 1
+            dropped_ids.append(str(item.get("id") or "<missing-id>"))
             continue
         valid_items.append(item)
     valid = len(valid_items)
     if invalid:
-        stats.warn(f"dropped {invalid} malformed claim row(s) (need id, store, and valid claim link(s))")
+        sample = ", ".join(dropped_ids[:5])
+        more = f" (+{invalid - 5} more)" if invalid > 5 else ""
+        stats.warn(
+            f"dropped {invalid} malformed claim row(s) "
+            f"(need id, store, and valid claim link(s)): {sample}{more}"
+        )
 
     # Refuse to overwrite the user's claims with nothing unless explicitly allowed.
     if valid == 0 and not args.allow_empty:

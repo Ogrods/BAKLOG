@@ -30,6 +30,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Windows release build fully stops stray servers on port 8765 before frozen smoke (was `--dedupe`, which keeps a live listener and can fail the installer publish).
+
 ## [0.8.47] - 2026-08-02
 
 ### Changed

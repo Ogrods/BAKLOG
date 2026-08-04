@@ -13,7 +13,11 @@
 
 import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
-import { countUpDurationForDelta, heroCountRollMs } from './dashboard-shared.js';
+import {
+  countUpDurationForDelta,
+  easeInOutCubic,
+  heroCountRollMs,
+} from './dashboard-shared.js';
 
 // Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
 const COUNT_ROLL_MS = 1000;
@@ -30,6 +34,8 @@ const JITTER_PX = 4;
 const SURFACE_KEY = '__baklogLibCountAnim';
 /** Every surface with an in-flight episode (survives DOM detachment on tab switch). */
 const _activeSurfaces = new Set();
+/** Episodes whose roll finished but timed +1 spawns may still be pending. */
+const _lingeringEpisodes = new Set();
 
 function fmtPlain(n) { return String(Math.round(n)); }
 function fmtCommas(n) {
@@ -74,6 +80,31 @@ function cancelEpisode(node, opts = {}) {
     document.querySelectorAll(`.library-count-popup[data-libcount-surface="${prev.node.id}"]`)
       .forEach(el => el.remove());
   }
+  _lingeringEpisodes.delete(prev);
+  node[SURFACE_KEY] = null;
+  _activeSurfaces.delete(node);
+}
+
+/**
+ * Natural end of a roll: drop the animating flag so handoff / charts / a
+ * second burst can proceed, but leave CSS popups climbing until animationend.
+ * Timed spawn callbacks stay on a lingering episode so cancelAll can still
+ * clearTimeout them (do not clear spawnTimers here).
+ */
+function finishEpisode(node) {
+  if (!node) return;
+  const prev = node[SURFACE_KEY];
+  if (!prev) return;
+  if (prev.rafId) {
+    cancelAnimationFrame(prev.rafId);
+    prev.rafId = 0;
+  }
+  try {
+    if (prev.format && prev.to != null) node.textContent = prev.format(prev.to);
+  } catch (_) { /* ignore */ }
+  if (prev.spawnTimers && prev.spawnTimers.length) {
+    _lingeringEpisodes.add(prev);
+  }
   node[SURFACE_KEY] = null;
   _activeSurfaces.delete(node);
 }
@@ -101,7 +132,9 @@ function nodeStillAlive(node) {
 
 function popupSpawnDelays(delta, popupCount, durationMs) {
   if (popupCount <= 0) return [];
-  if (popupCount === 1) return [durationMs];
+  // Fire slightly before roll end so finishEpisode never clearTimeouts a
+  // same-ms spawn (linger path keeps timers, but early is smoother anyway).
+  if (popupCount === 1) return [Math.max(0, durationMs - 80)];
   const gapMs = Math.max(
     80,
     Math.min(SEQ_POPUP_GAP_MS, Math.floor((durationMs * 0.92) / (popupCount - 1))),
@@ -122,7 +155,7 @@ export function strictSyncRollMs(delta, popupCap) {
   let durationMs = countUpDurationForDelta(delta);
   if (popupCap > 0) {
     const popupTrainMs = (popupCap - 1) * SEQ_POPUP_GAP_MS + countUpDurationForDelta(1);
-    durationMs = Math.max(durationMs, popupTrainMs);
+    durationMs = Math.max(durationMs, popupTrainMs, POPUP_LIFETIME_MS);
   }
   return Math.max(120, durationMs);
 }
@@ -218,6 +251,9 @@ function spawnPopups(host, popupCount, opts) {
     const id = setTimeout(() => {
       if (!host.isConnected && !anchorNode.isConnected) return;
       mountOnePopup(host, anchorNode, i);
+      if (i === popupCount - 1 && opts?.episode) {
+        _lingeringEpisodes.delete(opts.episode);
+      }
     }, delay);
     timers.push(id);
   }
@@ -280,6 +316,14 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
   } else {
     durationMs = Math.max(120, durationMs);
   }
+  // Keep the digit roll alive at least as long as one +1 CSS flight so a
+  // single acquisition does not "finish" while the popup is still climbing.
+  if (!userDuration && popupCap > 0) {
+    durationMs = Math.max(durationMs, POPUP_LIFETIME_MS);
+  }
+  // Strict sync stays linear so integer ticks stay evenly spaced; large
+  // capped trains ease for a softer stop.
+  const easeRoll = !strictSync;
   const episode = {
     node,
     host,
@@ -302,6 +346,7 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
       anchorNode: node,
       delta,
       durationMs,
+      episode,
     });
   }
 
@@ -321,7 +366,8 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
     }
     const elapsed = (now || performance.now()) - start;
     const t = Math.min(1, elapsed / durationMs);
-    const v = safeFrom + (safeTo - safeFrom) * t;
+    const eased = easeRoll ? easeInOutCubic(t) : t;
+    const v = safeFrom + (safeTo - safeFrom) * eased;
     node.textContent = format(v);
     if (episode.tickPopups) syncPopupsOnTick(episode, v);
     if (t < 1) {
@@ -330,6 +376,8 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
       node.textContent = format(safeTo);
       if (episode.tickPopups) syncPopupsOnTick(episode, safeTo);
       episode.rafId = 0;
+      // Clear sticky animating flag; CSS popups finish on their own.
+      finishEpisode(node);
     }
   }
   episode.rafId = requestAnimationFrame(tick);
@@ -439,6 +487,13 @@ export function isSurfaceAnimating(node) {
  */
 export function cancelAllLibraryCountAnimations() {
   for (const node of [..._activeSurfaces]) cancelEpisode(node, { keepPopups: false });
+  for (const ep of [..._lingeringEpisodes]) {
+    if (ep.spawnTimers) {
+      for (const id of ep.spawnTimers) clearTimeout(id);
+    }
+    ep.spawnTimers = [];
+    _lingeringEpisodes.delete(ep);
+  }
   document.querySelectorAll('[data-count-target]').forEach(n => cancelEpisode(n, { keepPopups: false }));
   const hero = document.getElementById('dashHeroCount');
   if (hero) cancelEpisode(hero, { keepPopups: false });

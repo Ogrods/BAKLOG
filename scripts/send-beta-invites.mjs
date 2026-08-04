@@ -79,43 +79,56 @@ function parseArgs(argv) {
 }
 
 function buildEmail(releaseUrl) {
-  const subject = 'Your BAKLOG beta invite is ready';
-  const text = `Your BAKLOG beta spot is open.
+  // Keep in sync with baklog-internal/waitlist/waitlist.html inviteDraft()
+  // and tracker.html panelBeta "You're in" template.
+  const subject = "You're in - your BAKLOG beta invite";
+  const text = `Hi,
 
-Thanks for joining the waitlist. The Windows beta is ready to install.
+Thanks for requesting an invite. A spot just opened in the current beta wave, so you're in.
 
-Download it here: ${releaseUrl}
+Quick context: BAKLOG is a local-first app that pulls your game libraries from every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more - into one honest backlog that lives on your machine. No cloud account, nothing uploaded, free forever to import your library.
 
-Quick start:
-- Grab BAKLOG-Setup.exe (or the portable zip) from the release page.
-- If Windows SmartScreen warns about an unknown publisher, click More info, then Run anyway. The build is not code-signed yet.
-- Launch BAKLOG, open the Connections tab, and connect the stores you use.
+Getting started takes about 5 minutes:
+1. Download and set up: ${releaseUrl}
+2. Connect a store or two (start with Steam - it's the fastest).
+3. Hit Refresh and watch your real library appear.
 
-Your library and credentials stay on your machine. Nothing is uploaded by default.
+A few honest notes:
+- This is an early beta. You'll hit rough edges - that's exactly what I need you to find.
+- Nothing leaves your machine. Your store logins stay encrypted locally.
+- If something breaks, just reply to this email, or use Copy bug bundle in the app menu and paste it back to me. It's scrubbed and local-only.
 
-Hit a snag? Reply to this email or use Report a bug in the app menu.
+I read every reply. Tell me what confused you, what broke, and what you wish it did.
 
-- The BAKLOG team
-https://baklog.app`;
+Thanks for helping shape it,
+Dan
+baklog.app`;
 
   const html = `<!doctype html>
 <html>
   <body style="margin:0;background:#0f172a;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e2e8f0;">
     <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
-      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">Your BAKLOG beta invite is ready</h1>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for joining the waitlist. The Windows beta is ready to install.</p>
+      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">You're in - your BAKLOG beta invite</h1>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Hi,</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for requesting an invite. A spot just opened in the current beta wave, so you're in.</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Quick context: BAKLOG is a local-first app that pulls your game libraries from every store - Steam, Epic, GOG, PlayStation, Xbox, Nintendo, Amazon, EA, itch, Humble, and more - into one honest backlog that lives on your machine. No cloud account, nothing uploaded, free forever to import your library.</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">Getting started takes about 5 minutes:</p>
+      <ol style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
+        <li>Download and set up: <a href="${releaseUrl}" style="color:#38bdf8;">${releaseUrl}</a></li>
+        <li>Connect a store or two (start with Steam - it's the fastest).</li>
+        <li>Hit Refresh and watch your real library appear.</li>
+      </ol>
       <p style="margin:0 0 20px;">
         <a href="${releaseUrl}" style="display:inline-block;background:#38bdf8;color:#0f172a;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Download the beta</a>
       </p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">Quick start:</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">A few honest notes:</p>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
-        <li>Grab BAKLOG-Setup.exe (or the portable zip) from the release page.</li>
-        <li>If Windows SmartScreen warns about an unknown publisher, click More info, then Run anyway. The build is not code-signed yet.</li>
-        <li>Launch BAKLOG, open the Connections tab, and connect the stores you use.</li>
+        <li>This is an early beta. You'll hit rough edges - that's exactly what I need you to find.</li>
+        <li>Nothing leaves your machine. Your store logins stay encrypted locally.</li>
+        <li>If something breaks, just reply to this email, or use Copy bug bundle in the app menu and paste it back to me. It's scrubbed and local-only.</li>
       </ul>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Your library and credentials stay on your machine. Nothing is uploaded by default.</p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Hit a snag? Reply to this email or use Report a bug in the app menu.</p>
-      <p style="font-size:14px;line-height:1.6;margin:0;color:#94a3b8;">- The BAKLOG team<br /><a href="https://baklog.app" style="color:#38bdf8;">baklog.app</a></p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">I read every reply. Tell me what confused you, what broke, and what you wish it did.</p>
+      <p style="font-size:14px;line-height:1.6;margin:0;color:#94a3b8;">Thanks for helping shape it,<br />Dan<br /><a href="https://baklog.app" style="color:#38bdf8;">baklog.app</a></p>
     </div>
   </body>
 </html>`;

@@ -1054,7 +1054,7 @@ describe('syncLogHeightToCard', () => {
     const card = document.getElementById('dashboardFetcherHealth');
     Object.defineProperty(card, 'offsetHeight', { configurable: true, value: 120 });
     vi.stubGlobal('matchMedia', (query) => ({
-      matches: query.includes('768px') ? matchMediaDesktop : false,
+      matches: query.includes('1024px') ? matchMediaDesktop : false,
       media: query,
     }));
   });
@@ -1504,6 +1504,47 @@ describe('fetcher header popover', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     fetcherRunner.hideFetcherPopover?.();
+  });
+
+  it('showFetcherPopover toggles fetcher-popover--sheet on phone viewport', () => {
+    const mqList = {
+      matches: true,
+      media: '(max-width: 639.98px), (max-height: 480px) and (hover: none)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    };
+    const mm = vi.spyOn(window, 'matchMedia').mockImplementation((query) => {
+      if (String(query).includes('639.98')) return mqList;
+      return {
+        matches: false,
+        media: String(query),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      };
+    });
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    expect(document.getElementById('fetcherPopover').classList.contains('fetcher-popover--sheet')).toBe(true);
+    fetcherRunner.hideFetcherPopover();
+    expect(document.getElementById('fetcherPopover').classList.contains('fetcher-popover--sheet')).toBe(false);
+    mm.mockRestore();
+  });
+
+  it('showFetcherPopover skips sheet class on desktop viewport', () => {
+    const mm = vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: false,
+      media: String(query),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    }));
+    fetcherRunner.showFetcherPopover({ focusPanel: false });
+    expect(document.getElementById('fetcherPopover').classList.contains('fetcher-popover--sheet')).toBe(false);
+    mm.mockRestore();
   });
 
   it('showFetcherPopover opens dialog without dashboard switch', () => {

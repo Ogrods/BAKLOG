@@ -45,9 +45,14 @@ import {
   cancelPendingScrollTarget,
   clearRowAdAnchor,
   initTablePhoneLayout,
+  initTableDensity,
   syncSponsoredTableAfterDismiss,
   syncRowCountLabel,
 } from './table-ui.js';
+import {
+  bindNotesDialog,
+  handleNotesAffordanceClick,
+} from './notes-dialog.js';
 import {
   renderPicks,
   normalizePicksLimit,
@@ -105,6 +110,7 @@ import { reloadGames } from './library-load.js';
 import { bindAddGameModal } from './add-game-modal.js';
 import { openBugReportDialog } from './bug-report.js';
 import { initFullscreenToggle } from './fullscreen-toggle.js';
+import { initHeaderNavMenu } from './header-nav-menu.js';
 import { reportError } from './error-boundary.js';
 import { bindOrphanPruneUI } from './orphan-prune.js';
 import { bindHiddenPanelUI, openHiddenPanel } from './hidden-panel.js';
@@ -753,11 +759,8 @@ export function bindEvents() {
     if (tr) preloadRowHeroEl(tr);
   });
   document.getElementById("tbody").addEventListener("click", e => {
-    const notesDot = e.target.closest(".has-notes-dot");
-    if (notesDot) {
+    if (handleNotesAffordanceClick(e.target)) {
       e.stopPropagation();
-      const tr = notesDot.closest("tr[data-row-key]");
-      tr?.querySelector(".notes-input")?.focus();
       return;
     }
     const coverEl = e.target.closest(".cover-wrap, .cover");
@@ -769,7 +772,7 @@ export function bindEvents() {
         return;
       }
     }
-    if (!e.target.closest("select, input, a, button, [data-hltb-edit], .has-notes-dot")) {
+    if (!e.target.closest("select, input, a, button, [data-hltb-edit], .has-notes-dot, .notes-open-btn")) {
       const tr = e.target.closest("tr[data-row-key]");
       if (tr) {
         state.focusedRowIndex = Number(tr.dataset.rowIndex || -1);
@@ -981,4 +984,7 @@ export function bindEvents() {
     e.target.value = "";
   });
   initTablePhoneLayout();
+  initTableDensity();
+  bindNotesDialog();
+  initHeaderNavMenu();
 }

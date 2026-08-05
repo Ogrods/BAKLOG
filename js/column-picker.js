@@ -10,6 +10,7 @@ import {
   showAllColumns,
   applyColumnVisibility,
 } from './table-columns.js';
+import { scheduleTableDensitySync } from './table-density.js';
 
 const MODAL_ID = 'columnsModal';
 const LIST_ID = 'columnsList';
@@ -42,6 +43,7 @@ function render() {
 function persistAndApply(view) {
   savePrefs();
   applyColumnVisibility(view);
+  scheduleTableDensitySync((v) => applyColumnVisibility(v), view);
 }
 
 function open() {

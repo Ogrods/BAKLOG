@@ -50,7 +50,7 @@ import { commitRenderedMetrics, restoreNotedMetricKeysFromArtifacts, snapshotNot
 import { connectedProviderCount, authStatusLoaded } from './connections.js';
 import { getLibrarySnapshot } from './sabermetrics.js';
 import { THEME_CHANGE_EVENT } from './theme.js';
-import { storeLogoStripHtml } from './store-logos.js';
+import { observeHeroStoreStrip, storeLogoStripHtml } from './store-logos.js';
 
 // Re-exports — dashboard.js stays the single public entry point for the
 // dashboard surface. External callers (app.js / bind-events.js / etc.)
@@ -309,6 +309,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
       ? storeLogoStripHtml(stats.storeKeys, { size: 'md' })
       : '';
     storeStrip.hidden = !stats.storeKeys.length;
+    if (stats.storeKeys.length) observeHeroStoreStrip(storeStrip);
   }
   const countHost = el.querySelector('.library-count-host, #dashHeroCount');
   if (countHost) countHost.title = 'Total games in your merged library across all connected stores';
@@ -420,6 +421,8 @@ function renderDashboardMega(games, snap, agg) {
 
   applyMegaHeroCounters(stats);
   primeSpotlightArt(document.getElementById('dashboardSpotlight'));
+  const storeHost = el.querySelector('.dash-hero-stores');
+  if (storeHost && !storeHost.hidden) observeHeroStoreStrip(storeHost);
   startInsightRotation(insightPool);
   commitRenderedMetrics();
   startSpotlightRotation(spotlightPool);

@@ -32,8 +32,41 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- R5 responsive closeout: type tokens for ribbon/insight/score digits; tablet insight wrap; reduced-motion for error toast + pick/coop hover lifts; year-chart Chart.js duration gated; short-landscape chart/ribbon height trim; leftover app.css media (`640`/`760`/`767`/`768`/`520`/`420`) onto `1023.98`/`639.98`/`400`; fetcher `LOG_DESKTOP_MQ` `768`→`1024`.
+- Responsive final UX audit: A–Z hit slop ≤1023.98; update/install `app-modal` sheets; sheet-mode MQ for phone landscape (`max-height: 480px` + `hover: none`) on modals/fetcher; auth gate bottom sheet + toast safe-area; `#picksGrid` holds 4 cols through tablet (6 at 1024); coop-versus 3-panel at 1024; scoreboards 1-col in sheet mode; Connections sticky Steam wrap + scrollIntoView; Pro compare `min-width` 22rem on phone; `test:responsive` adds 844×390 + Columns/Filters overlay smoke.
+- p45 viewport leftovers: phone modals/dialogs/popovers as bottom sheets (safe-area + touch close); Connections sticky selected rail chip + pane body scroll + `conn-hint-row` on 1023.98 ladder; dash chart/ribbon heights on tablet/phone; retire leftover 900px library-count-host rule. Opt-in `npm run test:responsive` (`scripts/responsive-overflow-audit.mjs`) asserts no page overflow at 1024/768/390/360 × five views.
+- Phone/tablet UX audit: dashboard picks stack at ≤1023.98 even with sponsored slot (`:has` 4-col override); wishlist/dash deal radar 1-col below 1024 (scoreboards no longer crush); filter pills + bulk bar horizontal scroll with 10px scrollbar pad; `#tableShell` A-Z gutter; phone sticky safe-area + back-to-top pin via bar bottom; Pro compare `overflow-x`; filter drawer safe-area + close touch; row-loading overlay centered above sticky; house banner breakpoints on 1023.98 / 639.98 ladder.
+- Picks grid stays at least 2 columns on phone (`#picksGrid` CSS; committed Tailwind lacked `.grid-cols-2`, so the class alone collapsed to 1 col). Wider breakpoints still 4 / 6 / 8.
+- Phone `#summary` chips hug content (not fixed equal width) with padded edges; the chip row scrolls inside `#summary` (`max-width: 100%`) so pills never widen the page.
+- Phone LIBRARY sticky: compact rail back-to-top (no 44px touch inflate); header `#backToTopPhone` in the sticky strip (stand-in for thead `#backToTopCover`, which is hidden in card mode) shows while the table is pinned.
+- Phone LIBRARY sticky bar: square top (no corner radius), opaque panel background, light bottom shadow so card chrome cannot peek through; A-Z rail / back-to-top raised and given a solid touch target so the arrow stays reachable.
+- Phone library cards: keep store badges at fixed 16px (phone hug rule no longer sets `width: auto` on them, which collapsed Steam glyphs into a blank indent before coop pills); slightly stronger Steam badge outline on the default theme.
+- Phone library cards: hide low-confidence `HLTB match:` hint to keep the three-line card compact (still available above phone / via HLTB override).
+- Phone library cards: EA / hidden-gem sit immediately after the title (left, vertically centered on the title row) instead of trailing on the right.
+- Phone library toolbar: Columns (|||) and kebab sit at the front of the Filters / Add game row (not above search); both icon buttons stay identical square size including touch targets.
+- Phone library cards: keep three content lines (title + EA/gem beside title, meta chips, status under meta) - outer name flex stays row so badges are not a fourth line.
+- Phone library cards: Status select stacks under the title/meta row (left-aligned in the content column) instead of floating end-aligned on the right.
+- Phone library cards: coop/EA pills no longer stretch full width (scoped `.table-phone` name-cell flex to the direct child; meta chips wrap and hug; status select stays auto-width).
+- Library Game column: revert fixed 14rem / max-width Game + sticky left cluster (they truncated titles and left empty mid-table gaps at full width); Game is fluid again (`width: 100%`); mid-width density + crush detection kept, with `min-width: 11.5rem` only under `#tableWrap.table-density`.
+- Library mid-width table: denser auto-hide (through Steam/Played/HLTB if needed) when the Game title would crush.
+- Library mid-width table: auto density hides Notes/Genres (then Last played/Released, then Price) so sticky thead survives (no `#tableWrap overflow-x:auto`); A–Z rail stays available below 1280px; phone sticky chrome bar; drill-to-row uses rect scroll on `table-phone` so spotlight/picks land correctly; notes mini-dialog when Notes column is hidden.
+- Dashboard hero store strip snaps wrapped rows to balanced columns (e.g. 12 logos → 6+6, not 11+1).
+- Dashboard stacked spotlight parks portrait/low-res covers about two-thirds across (right of center); `applySpotlightArtFit` stamps the offset so inline `object-position` no longer keeps them centered.
+- Dashboard stacked spotlight caption hugs its text (`width: fit-content`) instead of stretching edge-to-edge.
+- Dashboard mega-hero phone polish: stacked spotlight bleeds to the card top/sides so left/right corners match; phone pillars prefer a centered 2-over-1 row and wrap to a centered stack when too wide; insight pill hugs its text (`fit-content`, not full-bleed `display:block`).
+- Dashboard mega-hero tagline on phone stacks one stat per line and hides the · separators.
+- Header sheet: fetcher status circle is slightly smaller than the hamburger (1.75rem) and vertically centered (no upward translate).
+- Dashboard picks on tablet/phone: Recently added (and versus) hug content height instead of keeping a desktop equal-row empty tail under a short list.
+- Dashboard mega-hero on tablet/phone: spotlight art is contained to a stacked band (relative wrap + clip) so pillars/insight no longer cover the caption; pillars hug content width instead of full-bleed `1fr` cells; hero breakpoints migrate to the 1023.98 / 639.98 / 1024 ladder.
+- Header sheet chrome: fetcher control sits left of the hamburger, sheet-mode fetcher pill matches icon-button size, and the beta pill keeps its full border (no upward translate under brand `overflow: hidden`).
+- Phone/tablet usability: header brand/actions density, phone fullscreen fetcher sheet (reuse `#fetcherPopover`), connections stack on the tablet ladder (retire ad-hoc 720px), and dashboard strip containment so views stay usable without page-level horizontal scroll.
 - Windows release build fully stops stray servers on port 8765 before frozen smoke (was `--dedupe`, which keeps a live listener and can fail the installer publish).
 
+### Changed
+
+- Permanent Discord invite is `https://discord.gg/VFvxN5nCCB` (`shared/community.json`); linked from app kebab + footer socials, landing footer icons + Community column, README, and guide/getting-help.
+- Fetcher health on phone opens as a fullscreen overlay sheet with sticky titled head; tablet keeps the anchored popover (dvh-capped).
+- Main view tabs collapse to a hamburger sheet at tablet and below (replaces the phone horizontal scroll strip), and also when the inline header would wrap; sheet mode hides fullscreen and moves Report bug + profile into the overlay.
 ## [0.8.47] - 2026-08-02
 
 ### Changed

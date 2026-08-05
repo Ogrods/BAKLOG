@@ -11,6 +11,24 @@
    (--touch-min in phone block below).
    ========================================================================== */
 
+/* R5 type tokens — tablet/phone only; desktop keeps literal sizes below. */
+@media (max-width: 1023.98px) {
+  :root {
+    --type-ribbon: 0.78rem;
+    --type-insight: 0.8rem;
+    --type-score-lg: 1.45rem;
+    --type-score-coop: 1.05rem;
+  }
+}
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  :root {
+    --type-ribbon: 0.75rem;
+    --type-insight: 0.78rem;
+    --type-score-lg: 1.35rem;
+    --type-score-coop: 1rem;
+  }
+}
+
 /* === Global error toast ===
    Surfaces uncaught errors + unhandled promise rejections. Top-right so it
    never collides with the bottom-right undoToast / debug overlay. Sticky
@@ -18,8 +36,8 @@
    actively dismiss or fix them. */
 .baklog-error-toast {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 10000;
   width: min(420px, calc(100vw - 32px));
   background: rgba(15, 23, 42, 0.97);
@@ -31,6 +49,23 @@
   font-size: 13px;
   line-height: 1.45;
   animation: baklogErrorIn 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .baklog-error-toast {
+    animation: none;
+  }
+}
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  .baklog-error-toast {
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    width: auto;
+    max-width: none;
+  }
+  .baklog-error-toast-dismiss,
+  .baklog-error-toast-btn {
+    min-height: var(--touch-min, 44px);
+  }
 }
 @keyframes baklogErrorIn {
   from {
@@ -601,6 +636,39 @@ html[data-theme] body {
   background: var(--bg);
   padding: 1.5rem;
 }
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  #authGateOverlay:not([hidden]) {
+    align-items: flex-end;
+    justify-content: stretch;
+    padding: 0;
+  }
+  #authGateOverlay .auth-gate-card {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    overflow-y: auto;
+    padding: 1.25rem 1.25rem max(1.25rem, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+  #authGateOverlay .auth-gate-input,
+  #authGateOverlay .auth-gate-submit,
+  #authGateOverlay .auth-gate-link {
+    min-height: var(--touch-min, 44px);
+  }
+  #authGateOverlay .auth-gate-input {
+    box-sizing: border-box;
+  }
+  #authGateOverlay .auth-gate-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
 /* While the sign-in gate is up, suppress the boot curtain entirely so its
    spinner/tips don't bleed or flicker behind the (now opaque) auth card. */
 html[data-auth-required] #bootLoadingOverlay {
@@ -763,7 +831,7 @@ html[data-boot-loading] #bootLoadingOverlay {
 .boot-loading-tip.is-fading {
   opacity: 0;
 }
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   .boot-loading-tip {
     max-width: 42ch;
     text-wrap: balance;
@@ -1075,12 +1143,38 @@ button[disabled] {
     background 0.1s ease;
   background: var(--accent-subtle);
 }
+/* Tailwind's committed build has .grid-cols-3 but not .grid-cols-2 - without
+   an explicit template the grid collapses to 1 col. Always keep >=2.
+   Ladder: 2 → 4 through tablet → 6 at desktop → 8 at xl (not 6 at 768). */
+#picksGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 640px) {
+  #picksGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  #picksGrid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  #picksGrid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
 .pick-card:hover {
   transform: translateY(-2px);
   background: color-mix(in srgb, var(--accent) 24%, transparent);
 }
 .picks-grid--custom-reorder .pick-card:hover {
   transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pick-card:hover {
+    transform: none;
+  }
 }
 .pick-card-drag-handle {
   position: absolute;
@@ -1904,7 +1998,7 @@ input[type="range"] {
    slate background - outline it like Epic so the glyph stays legible. Scoped to
    the default theme only; other themes have enough contrast. */
 html[data-theme="default"] .store-badge.steam {
-  box-shadow: inset 0 0 0 1px #64748b;
+  box-shadow: inset 0 0 0 1px #94a3b8;
 }
 .store-badge.gog {
   background: var(--brand-gog);
@@ -2152,12 +2246,18 @@ html[data-theme="default"] .store-badge.steam {
   transform: translate(-1px, 0);
 }
 
-/* Store badge strip layout — js/store-logos.js */
+/* Store badge strip layout — js/store-logos.js (balanced wrap via
+   .is-balanced-wrap + --store-strip-cols when a lonely last row would appear). */
 .store-logo-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+.store-logo-strip.is-balanced-wrap {
+  display: grid;
+  grid-template-columns: repeat(var(--store-strip-cols), max-content);
+  justify-content: start;
 }
 .store-logo-strip [role="listitem"] {
   display: inline-flex;
@@ -2976,7 +3076,7 @@ html[data-theme="default"] .store-badge.steam {
   white-space: nowrap;
   padding: 0.3rem 0.7rem;
 }
-@media (max-width: 768px) {
+@media (max-width: 639.98px) {
   .claim-rows-header {
     display: none;
   }
@@ -3776,19 +3876,14 @@ html[data-page-hidden] .dash-spotlight-hero-zoom img {
 html[data-boot-loading] .view-tab {
   visibility: hidden;
 }
-/* === A–Z jump nav === */
+/* === A–Z jump nav (visible on all library widths; compact below desktop) === */
 #alphaNavWrap {
   position: fixed;
   right: 4px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 35;
-  display: none;
-}
-@media (min-width: 1280px) {
-  #alphaNavWrap {
-    display: block;
-  }
+  display: block;
 }
 #alphaNav {
   position: relative;
@@ -3822,12 +3917,67 @@ html[data-boot-loading] .view-tab {
 .alpha-nav-btn.enabled:hover {
   color: var(--accent);
 }
+@media (max-width: 1279.98px) {
+  #alphaNav {
+    max-height: calc(100vh - 100px);
+    padding: 3px 1px;
+    gap: 0;
+  }
+  .alpha-nav-btn {
+    font-size: 9px;
+    line-height: 1.05;
+    padding: 1px 3px;
+    min-width: 14px;
+  }
+}
+/* Expand A–Z hit targets without growing glyph size (tablet + phone). */
+@media (max-width: 1023.98px) {
+  .alpha-nav-btn.enabled {
+    position: relative;
+    z-index: 0;
+  }
+  .alpha-nav-btn.enabled::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 28px);
+    height: max(100%, 22px);
+    z-index: -1;
+  }
+}
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  .alpha-nav-btn.enabled::before {
+    width: max(100%, 36px);
+    height: max(100%, 28px);
+  }
+}
+@media (max-width: 639.98px) {
+  #alphaNavWrap {
+    right: 2px;
+    top: auto;
+    /* Clear bulk bar / home indicator and leave room for #backToTop above the rail */
+    bottom: max(88px, calc(env(safe-area-inset-bottom, 0px) + 72px));
+    transform: none;
+    z-index: 40;
+  }
+  #alphaNav {
+    max-height: min(48vh, 320px);
+  }
+  #backToTop {
+    /* Keep compact (match desktop rail control) - solid so it reads on cards */
+    background: var(--bg-panel);
+    bottom: calc(100% + 6px);
+  }
+}
 /* === Back to top ===
    Two variants share one look: #backToTop sits above the A–Z rail (shows past
    400px scroll); #backToTopCover lives in the cover-art column of the sticky
    table header and only shows while that header is pinned. */
 #backToTop,
-#backToTopCover {
+#backToTopCover,
+#backToTopPhone {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3854,24 +4004,28 @@ html[data-boot-loading] .view-tab {
   width: 100%;
 }
 #backToTop.show,
-#backToTopCover.show {
+#backToTopCover.show,
+#backToTopPhone.show {
   opacity: 0.85;
   pointer-events: auto;
 }
 #backToTop:hover,
-#backToTopCover:hover {
+#backToTopCover:hover,
+#backToTopPhone:hover {
   opacity: 1;
   color: var(--accent);
   transform: translateY(-1px);
 }
 #backToTop:focus-visible,
-#backToTopCover:focus-visible {
+#backToTopCover:focus-visible,
+#backToTopPhone:focus-visible {
   opacity: 1;
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 #backToTop svg,
-#backToTopCover svg {
+#backToTopCover svg,
+#backToTopPhone svg {
   width: 14px;
   height: 14px;
 }
@@ -3887,12 +4041,14 @@ html[data-boot-loading] .view-tab {
   }
 }
 #backToTop.show svg,
-#backToTopCover.show svg {
+#backToTopCover.show svg,
+#backToTopPhone.show svg {
   animation: backToTopBob 1.8s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   #backToTop.show svg,
-  #backToTopCover.show svg {
+  #backToTopCover.show svg,
+  #backToTopPhone.show svg {
     animation: none;
   }
 }
@@ -4638,7 +4794,7 @@ html[data-theme="ember"] .brand-logo-pills {
 .sponsored-deal-banner:hover .house-banner-cta {
   background: #7dd3fc;
 }
-@media (max-width: 900px) {
+@media (max-width: 1023.98px) {
   .house-banner-grid {
     flex-wrap: wrap;
   }
@@ -4653,7 +4809,7 @@ html[data-theme="ember"] .brand-logo-pills {
     margin-left: auto;
   }
 }
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   .house-banner-features {
     flex-direction: column;
     gap: 0.6rem;
@@ -5225,7 +5381,7 @@ html[data-theme="ember"] .brand-logo-pills {
   color: #fff;
   background: rgba(2, 6, 23, 0.85);
 }
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   .sponsored-feature-blurb {
     max-width: none;
   }
@@ -5352,7 +5508,7 @@ html[data-theme="ember"] .brand-logo-pills {
   margin-left: auto;
   align-self: center;
 }
-@media (max-width: 760px) {
+@media (max-width: 1023.98px) {
   .sponsored-feature-card--banner .sponsored-feature-art {
     width: 100%;
   }
@@ -5460,7 +5616,7 @@ html[data-theme="ember"] .brand-logo-pills {
 .sponsored-claim-feature .sponsored-feature-stat {
   min-width: 0;
 }
-@media (max-width: 767px) {
+@media (max-width: 1023.98px) {
   .sponsored-claim-feature {
     flex-basis: 100%;
   }
@@ -5543,6 +5699,11 @@ html[data-theme="ember"] .brand-logo-pills {
   background: color-mix(in srgb, #f87171 12%, var(--bg-elev));
   color: #fecaca;
   border-color: rgba(248, 113, 113, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-notice-toast {
+    transition: none;
+  }
 }
 .update-available-banner-body,
 .update-ready-banner-body,
@@ -6643,7 +6804,7 @@ html[data-theme="ember"] .brand-logo-pills {
   color: #64748b;
   font-style: italic;
 }
-@media (max-width: 767px) {
+@media (max-width: 1023.98px) {
   .fh-row.is-expanded {
     grid-template-columns: 1fr;
   }
@@ -7714,6 +7875,22 @@ html[data-theme="dark"]
   max-height: 180px;
   max-width: 100%;
 }
+@media (max-width: 1023.98px) {
+  .dash-ribbon-chart {
+    height: 150px;
+  }
+  .dash-ribbon-chart canvas {
+    max-height: 150px;
+  }
+}
+@media (max-width: 639.98px) {
+  .dash-ribbon-chart {
+    height: 140px;
+  }
+  .dash-ribbon-chart canvas {
+    max-height: 140px;
+  }
+}
 
 /* While the viewport is actively resizing (js toggles html.ui-resizing with a
    ~200ms trailing debounce), pause the spotlight float/sheen animations only.
@@ -7727,7 +7904,7 @@ html.ui-resizing
 }
 .dash-ribbon-headline {
   text-align: center;
-  font-size: 13px;
+  font-size: var(--type-ribbon, 13px);
   color: #cbd5e1;
 }
 .dash-ribbon-headline strong {
@@ -7738,7 +7915,7 @@ html.ui-resizing
   display: inline-block;
   margin-top: 16px;
   max-width: 100%;
-  font-size: 12px;
+  font-size: var(--type-insight, 12px);
   line-height: 1.5;
   min-height: calc(
     1em * 1.5 + 12px + 2px
@@ -7782,40 +7959,94 @@ html.ui-resizing
 /* Desktop: bleed the spotlight art to the card's top/right edges so it fills the
    full height of the mega hero. The .dash-mega padding (28px top / 32px right)
    otherwise insets the absolutely-positioned wrap; cancel it with negative
-   offsets. The card clips via overflow:hidden + border-radius. Below 900px the
-   wrap is position:static (stacked), so this is scoped to the desktop layout. */
-@media (min-width: 901px) {
+   offsets. The card clips via overflow:hidden + border-radius. Below 1024px the
+   wrap is a stacked relative band, so this is scoped to the desktop layout. */
+@media (min-width: 1024px) {
   .dash-mega--has-spotlight .dash-spotlight-wrap {
     top: -28px;
     right: -32px;
   }
 }
-@media (max-width: 900px) {
+/* Tablet/phone: stack spotlight above hero copy. Wrap must be position:relative
+   (not static) so .dash-spotlight absolute;inset:0 binds to the band, not
+   .dash-mega-hero - otherwise art fills the whole hero and pillars cover the
+   caption. Ladder: 1023.98 / 639.98 (retire legacy 900 / 640 / 901). */
+@media (max-width: 1023.98px) {
   .dash-ribbon {
     grid-template-columns: 1fr;
   }
+  /* Hug text; do not stretch full hero width (display:block was the culprit). */
   .dash-insight,
   .dash-mega--has-spotlight .dash-insight {
-    max-width: none;
-    display: block;
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    white-space: normal;
+    overflow: visible;
+    text-wrap: balance;
+  }
+  /* Bleed band to mega top/sides so card overflow+radius clips both edges
+     equally (inset band looked square-left / round-right). Base mega padding
+     is 28px 32px; phone retunes below. */
+  .dash-mega--has-spotlight .dash-spotlight-wrap {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: calc(100% + 64px);
+    height: 170px;
+    margin: -28px -32px 16px;
+    overflow: hidden;
+    border-radius: 0;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    z-index: 0;
   }
   .dash-spotlight-wrap {
-    position: static;
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
     width: 100%;
-    height: 140px;
+    height: 170px;
     margin-bottom: 16px;
+    overflow: hidden;
+    border-radius: 10px;
+    z-index: 0;
   }
   .dash-spotlight {
-    border-radius: 10px;
+    border-radius: 0;
+    overflow: hidden;
   }
-  .dash-spotlight-art {
+  .dash-mega--has-spotlight .dash-spotlight {
+    border-radius: 0;
+  }
+  .dash-spotlight-art,
+  .dash-spotlight-art-bg,
+  .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
     -webkit-mask-image: none;
     mask-image: none;
   }
+  /* Park cover ~2/3 across (right of center). Inline object-position from
+     js/covers.js applySpotlightArtFit also stamps 66% on this ladder. */
+  .dash-spotlight-art {
+    object-position: 66% 40%;
+  }
+  .dash-spotlight.is-lowres-art .dash-spotlight-art {
+    object-position: 66% 40%;
+  }
+  .dash-spotlight.has-portrait-art .dash-spotlight-art {
+    object-position: 66% 40%;
+  }
+  .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
+    left: 66%;
+  }
   .dash-spotlight-body {
     left: 16px;
-    right: 16px;
-    max-width: none;
+    right: auto;
+    width: fit-content;
+    max-width: calc(100% - 32px);
     text-align: left;
     align-items: flex-start;
   }
@@ -7825,8 +8056,9 @@ html.ui-resizing
   }
   .dash-spotlight.has-logo-art .dash-spotlight-body {
     left: 16px;
-    right: 16px;
-    max-width: none;
+    right: auto;
+    width: fit-content;
+    max-width: calc(100% - 32px);
     text-align: left;
     align-items: flex-start;
   }
@@ -7856,10 +8088,51 @@ html.ui-resizing
   .dash-mega .dash-hero-pillars {
     max-width: none;
   }
-}
-@media (max-width: 640px) {
+  /* Content-width pillars: snug 3-col under the tagline, not full-bleed 1fr. */
   .dash-hero-pillars {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, max-content);
+    width: fit-content;
+    max-width: 100%;
+  }
+  .dash-hero-pillar {
+    width: fit-content;
+    max-width: 100%;
+  }
+}
+@media (max-width: 639.98px) {
+  /* Phone mega padding is 1.1rem 1rem - retune spotlight bleed to match. */
+  .dash-mega--has-spotlight .dash-spotlight-wrap {
+    width: calc(100% + 2rem);
+    margin: -1.1rem -1rem 16px;
+  }
+  /* Prefer 2-over-1 centered; wrap to a centered stack when two abreast
+     do not fit (flex-wrap, not a rigid 2-col grid). */
+  .dash-hero-pillars {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .dash-hero-pillar {
+    width: fit-content;
+    max-width: 100%;
+    flex: 0 1 auto;
+  }
+  .dash-insight,
+  .dash-mega--has-spotlight .dash-insight {
+    white-space: normal;
+  }
+  /* Stack tagline stats one per line; drop the · separators (avoid orphan seps on wrap). */
+  .dash-hero-tagline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .dash-hero-tagline .sep {
+    display: none;
   }
 }
 /* === Wishlist deal dashboard cards === */
@@ -8102,7 +8375,7 @@ html.ui-resizing
   color: #94a3b8;
 }
 .sale-stat-value {
-  font-size: 1.75rem;
+  font-size: var(--type-score-lg, 1.75rem);
   font-weight: 800;
   color: #f1f5f9;
   line-height: 1.1;
@@ -8246,7 +8519,7 @@ html.ui-resizing
   grid-template-columns: 1fr;
   gap: 0.75rem;
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .coop-versus {
     grid-template-columns: 1fr 140px 1fr;
     gap: 0;
@@ -8270,6 +8543,11 @@ html.ui-resizing
 }
 .coop-side:hover {
   transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .coop-side:hover {
+    transform: none;
+  }
 }
 .coop-side:focus-visible {
   outline: 2px solid var(--accent);
@@ -8307,7 +8585,7 @@ html.ui-resizing
     color-mix(in srgb, var(--bg-hover) 65%, transparent) 80%
   );
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .coop-side-online {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
@@ -8369,7 +8647,7 @@ html.ui-resizing
   color: #94a3b8;
 }
 .coop-side-stat-value {
-  font-size: 1.1rem;
+  font-size: var(--type-score-coop, 1.1rem);
   font-weight: 800;
   color: #f1f5f9;
   line-height: 1.1;
@@ -8485,7 +8763,7 @@ html.ui-resizing
   padding: 0.6rem 0.5rem;
   position: relative;
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .coop-connector {
     flex-direction: column;
     border-radius: 0;
@@ -8543,7 +8821,7 @@ button.coop-connector-stat:focus-visible {
   height: 60%;
   background: rgba(71, 85, 105, 0.5);
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .coop-connector-divider {
     width: 60%;
     height: 1px;
@@ -8749,6 +9027,37 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 }
 .dash-chart-wrap.tall {
   height: 320px;
+}
+@media (max-width: 1023.98px) {
+  .dash-chart-wrap {
+    height: 240px;
+  }
+  .dash-chart-wrap.tall {
+    height: 280px;
+  }
+}
+@media (max-width: 639.98px) {
+  .dash-chart-wrap {
+    height: 200px;
+  }
+  .dash-chart-wrap.tall {
+    height: 240px;
+  }
+}
+/* Short landscape (tablet width, phone height): trim further than tablet defaults. */
+@media (max-height: 480px) and (hover: none) {
+  .dash-chart-wrap {
+    height: 160px;
+  }
+  .dash-chart-wrap.tall {
+    height: 190px;
+  }
+  .dash-ribbon-chart {
+    height: 110px;
+  }
+  .dash-ribbon-chart canvas {
+    max-height: 110px;
+  }
 }
 #dashboardContent .dash-chart-wrap canvas,
 #dashboardContent .dash-chart-wrap canvas:hover {
@@ -9065,6 +9374,109 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 .table-hide-notes col.col-notes {
   width: 0;
 }
+
+/* Mid-width density: drop forced 1280 min-width so hidden cols free space.
+   Title-fit is driven by js density (crushed game cell bumps tier). */
+#tableWrap.table-density .games-table {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Floor Game title width only when density is active - never cap/fix width
+   at full viewport (that truncated titles while metric cols left empty gaps). */
+#tableWrap.table-density .games-table th.col-game,
+#tableWrap.table-density .games-table td.col-game,
+#tableWrap.table-density .games-table td.game-name-cell {
+  min-width: 11.5rem;
+}
+
+.notes-open-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--accent) 85%, #94a3b8);
+  font-size: 11px;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.notes-open-btn--empty {
+  color: #64748b;
+}
+.notes-open-btn:hover {
+  color: var(--text-bright);
+}
+.notes-dialog-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  resize: vertical;
+  min-height: 7rem;
+}
+
+/* Phone sticky chrome (thead is display:none in card mode).
+   Square top + opaque fill so first-card chrome cannot peek through corner
+   cutouts / blur when the bar sticks. */
+.table-phone-sticky {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: 0 6px 12px -8px color-mix(in srgb, #000 55%, transparent);
+}
+.table-phone-sticky[hidden] {
+  display: none !important;
+}
+/* Compact header back-to-top (phone stand-in for #backToTopCover / thead). */
+#backToTopPhone.table-phone-sticky-top {
+  flex: 0 0 auto;
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0;
+  background: var(--bg-elev);
+}
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  #backToTopPhone.table-phone-sticky-top {
+    width: var(--touch-min, 44px);
+    height: var(--touch-min, 44px);
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+  }
+  .sponsored-deal-dismiss {
+    width: var(--touch-min, 44px);
+    height: var(--touch-min, 44px);
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+    box-sizing: border-box;
+  }
+}
+.table-phone-sticky-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.table-phone-sticky-count {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+}
+#tableWrap.table-phone {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 .columns-picker-row input {
   flex-shrink: 0;
 }
@@ -9076,10 +9488,16 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   width: 2.375rem;
   height: 2.375rem;
+  min-width: 2.375rem;
+  min-height: 2.375rem;
+  max-width: 2.375rem;
+  max-height: 2.375rem;
   padding: 0;
   line-height: 1;
+  flex: 0 0 2.375rem;
 }
 #kebabBtn {
   font-size: 1.125rem;
@@ -9197,6 +9615,125 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   margin: auto;
 }
 
+/* === Phone / short-viewport modal sheets (R4+) — bottom-anchored, safe-area.
+   Sheet mode: portrait phone OR short coarse viewport (phone landscape). === */
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  :root {
+    --touch-min: 44px;
+  }
+  .app-modal {
+    align-items: flex-end;
+    justify-content: stretch;
+    padding: 0 !important;
+  }
+  .app-modal > [role="dialog"],
+  .app-modal > .profile-modal-card,
+  .app-modal > .baklog-bug-report-card,
+  .app-modal > .update-modal-panel {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 0.75rem !important;
+    border-top-right-radius: 0.75rem !important;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+  .app-modal .baklog-bug-report-card {
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+  }
+  .app-modal [aria-label="Close"],
+  .app-modal [aria-label="Close filters"],
+  .app-modal .baklog-bug-report-close,
+  .app-modal button.text-2xl,
+  .app-modal button.text-xl,
+  .app-modal .update-modal-later,
+  .app-modal .update-modal-apply,
+  .app-modal .update-install-decline,
+  .app-modal .update-install-confirm {
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .app-modal .app-modal-panel,
+  #secretsBundleDialog.app-modal-panel,
+  #secretsBundleDialog[open] {
+    width: 100% !important;
+    max-width: none !important;
+    margin: auto 0 0 !important;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    border-radius: 0.75rem 0.75rem 0 0 !important;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+  #customListsDialog[open] {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    border-radius: 0.75rem 0.75rem 0 0;
+    padding-bottom: max(1.1rem, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    overflow: auto;
+  }
+  .claim-detail-dialog[open],
+  .cover-gallery-dialog[open] {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    border-radius: 0.75rem 0.75rem 0 0;
+  }
+  .claim-detail-dialog[open] .claim-detail-panel {
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    border-radius: 0.75rem 0.75rem 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+  .claim-detail-close,
+  .cover-gallery-dialog button {
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+  }
+  .conn-popover {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    max-height: min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px)));
+    border-radius: 0.75rem 0.75rem 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+  .conn-popover-close {
+    min-width: var(--touch-min, 44px);
+    min-height: var(--touch-min, 44px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .custom-lists-dialog__btn,
+  .custom-lists-dialog__footer button,
+  .baklog-bug-report-btn {
+    min-height: var(--touch-min, 44px);
+  }
+  .sale-scoreboard,
+  .itch-value-grid,
+  .coop-side-stats {
+    grid-template-columns: 1fr;
+  }
+  .pro-view-compare {
+    min-width: 22rem;
+    font-size: 0.84rem;
+  }
+}
+
 /* Multi-column (not grid) so checkboxes read top-to-bottom down the first
    column, then continue down the second — i.e. in order as you go down. */
 #columnsList {
@@ -9215,7 +9752,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   color: var(--text);
 }
 
-@media (max-width: 420px) {
+@media (max-width: 400px) {
   #columnsList {
     column-count: 1;
   }
@@ -9240,9 +9777,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   tbody
   tr:not(.virtual-spacer):not(.table-empty-state-row) {
   display: grid;
-  grid-template-columns: 36px 56px 1fr auto;
+  grid-template-columns: 36px 56px 1fr;
   grid-template-rows: auto auto;
-  gap: 0 8px;
+  gap: 4px 8px;
   align-items: center;
   height: auto;
   min-height: 72px;
@@ -9266,22 +9803,50 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   align-self: center;
 }
 #tableWrap.table-phone .games-table tbody tr td:nth-child(3) {
-  grid-column: 3 / span 2;
+  grid-column: 3;
   grid-row: 1;
   min-width: 0;
 }
 #tableWrap.table-phone .games-table tbody tr td:nth-child(4) {
-  grid-column: 4;
+  grid-column: 3;
   grid-row: 2;
-  justify-self: end;
+  justify-self: start;
 }
 #tableWrap.table-phone .games-table tbody tr td:nth-child(n + 5) {
   display: none;
 }
-#tableWrap.table-phone .game-name-cell .flex {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
+/* Title row holds EA/gem beside the name (left, vertically centered via
+   items-center). Meta chips + status stay below for three visual lines.
+   Do not use a descendant .flex rule with stretch (full-width coop/EA bars). */
+#tableWrap.table-phone .game-name-cell .row-meta {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+}
+/* Hug chips - do not override .store-badge's fixed 16px box (width:auto
+   collapsed glyph badges into a near-invisible indent before coop pills). */
+#tableWrap.table-phone .game-name-cell .row-meta > *:not(.store-badge),
+#tableWrap.table-phone .game-name-cell .ea-pill,
+#tableWrap.table-phone .game-name-cell .coop-pill {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 100%;
+  align-self: auto;
+}
+#tableWrap.table-phone .game-name-cell .store-badge {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  max-width: 16px;
+}
+#tableWrap.table-phone .col-status select {
+  width: auto;
+  max-width: 100%;
+}
+#tableWrap.table-phone .hltb-match-hint {
+  display: none;
 }
 #tableWrap.table-phone .cover-wrap {
   width: 48px;
@@ -10017,8 +10582,15 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   flex-shrink: 0;
   font-size: 12px;
 }
-@media (max-width: 900px) {
+/* Stack picks on the tablet ladder. Drop desktop equal-height reservation so
+   Recently added / versus do not keep a tall empty tail under a few rows. */
+@media (max-width: 1023.98px) {
   .dash-picks-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  /* Beat .dash-picks-row:has(sponsored) repeat(4) so versus/recent stay stacked. */
+  .dash-picks-row:has(.dash-sponsored-pick-slot:not(.hidden)) {
     grid-template-columns: 1fr;
   }
   .dash-picks-row .dash-picks-versus,
@@ -10026,15 +10598,25 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   .dash-picks-row .dash-recent-card,
   .dash-picks-row .dash-sponsored-pick-slot {
     grid-column: auto;
+    height: auto;
   }
   .dash-picks-row .dash-versus-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto 1fr;
+    grid-template-rows: auto auto auto;
   }
   .dash-picks-row .dash-versus-divider {
     width: 100%;
     height: 1px;
     min-height: 1px;
+  }
+  .dash-picks-row .dash-versus-list {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+  }
+  .dash-picks-row .dash-recent-list {
+    flex: 0 0 auto;
+    grid-template-rows: none;
+    grid-auto-rows: auto;
   }
 }
 .dash-picks-versus {
@@ -10182,7 +10764,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   font-weight: 700;
   margin-left: 4px;
 }
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   .dash-versus-grid {
     grid-template-columns: 1fr;
   }
@@ -10311,7 +10893,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   min-width: 0;
   margin: 0;
 }
-@media (max-width: 720px) {
+@media (max-width: 1023.98px) {
   .conn-hint-row {
     flex-direction: column;
   }
@@ -10445,7 +11027,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 .pro-view-hero .pro-view-pricing .pro-view-founder {
   text-align: right;
 }
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
   .pro-view-hero .pro-view-pricing {
     flex-basis: 100%;
     align-items: flex-start;
@@ -10552,6 +11134,8 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg-panel);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .pro-view-compare-lead {
   margin: 0 0 0.75rem;
@@ -10561,6 +11145,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 }
 .pro-view-compare {
   width: 100%;
+  min-width: 28rem;
   border-collapse: collapse;
   font-size: 0.8rem;
 }
@@ -10767,7 +11352,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   line-height: 1.45;
   color: var(--text-mute);
 }
-@media (max-width: 720px) {
+@media (max-width: 639.98px) {
   .pro-view-perk-grid,
   .pro-view-trust-list {
     grid-template-columns: 1fr;
@@ -11012,9 +11597,13 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 .conn-rail-item * {
   cursor: pointer;
 }
-@media (max-width: 720px) {
+/* Connections stack on tablet+phone (ladder). R3: sticky selected chip + pane clip. */
+@media (max-width: 1023.98px) {
   #connLayout {
     grid-template-columns: 1fr;
+    min-width: 0;
+    max-width: 100%;
+    gap: 10px;
   }
   #connRail {
     flex-direction: row;
@@ -11024,7 +11613,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
     position: static;
     max-height: none;
     gap: 8px;
-    padding-bottom: 4px;
+    padding-bottom: 10px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
   .conn-rail-steam-wrap {
     flex-direction: row;
@@ -11034,7 +11625,40 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   }
   .conn-rail-item {
     flex-shrink: 0;
-    min-width: 180px;
+    min-width: 160px;
+  }
+  /* Keep the active provider visible while the rail scrolls. */
+  .conn-rail-item.is-selected {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    box-shadow: 6px 0 10px -6px color-mix(in srgb, #000 55%, transparent);
+  }
+  /* Steam wrap: sticky as a unit so rec caption stays with the selected chip. */
+  .conn-rail-steam-wrap:has(.conn-rail-item.is-selected) {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    box-shadow: 6px 0 10px -6px color-mix(in srgb, #000 55%, transparent);
+  }
+  .conn-rail-steam-wrap:has(.conn-rail-item.is-selected) .conn-rail-item.is-selected {
+    position: static;
+    box-shadow: none;
+  }
+  #connPane {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+    min-height: 0;
+  }
+  #connPane .conn-card {
+    min-height: 0;
+  }
+  #connPane .conn-card-body {
+    max-height: min(70vh, 36rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 }
 /* Header icon buttons (full screen, report bug, etc.) */
@@ -11579,7 +12203,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   align-self: flex-end;
 }
 /* Narrow cards: notes stack full-width beneath the main content. */
-@media (max-width: 520px) {
+@media (max-width: 639.98px) {
   .conn-notes {
     max-width: none;
     flex-basis: 100%;
@@ -11944,7 +12568,7 @@ html[data-theme="ember"] .conn-primary:hover {
   max-width: none;
   display: block;
 }
-@media (max-width: 900px) {
+@media (max-width: 1023.98px) {
   .dash-mega .library-count-host:has(> .dash-hero-number) {
     max-width: none;
   }
@@ -12046,35 +12670,229 @@ html[data-theme="ember"] .conn-primary:hover {
 }
 #tableWrap {
   /* clip (not auto) keeps overflow-y visible so thead sticky pins to the page,
-     not this wrapper — page scroll drives virtualization in table-ui.js */
+     not this wrapper — page scroll drives virtualization in table-ui.js.
+     Do not switch to overflow-x:auto on shrink: that kills sticky thead.
+     Mid-width fit comes from table density (js/table-density.js). */
   overflow-x: clip;
   max-width: 100%;
 }
-@media (max-width: 1327.98px) {
-  #tableWrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+
+/* --- Header main-nav hamburger (sheet mode: tablet ladder OR fit overflow) --- */
+.header-nav-toggle {
+  display: none;
+}
+.header-nav-backdrop {
+  display: none;
+}
+/* Desktop / inline: panel is a passthrough so .app-header-nav stays in the header flex row. */
+.header-nav-panel {
+  display: contents;
+}
+.header-nav-sheet-extras {
+  display: none;
+}
+.header-nav-sheet-action-label {
+  display: none;
+}
+/* Prefer a single header row; sheet mode engages before wrap (JS fit check). */
+.app-header-row {
+  flex-wrap: nowrap;
+}
+
+html.header-nav-sheet .app-header-row {
+  row-gap: 0.5rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+html.header-nav-sheet .app-header-brand {
+  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+html.header-nav-sheet .app-header-actions {
+  margin-left: auto;
+  order: 2;
+  flex-shrink: 0;
+  gap: 0.55rem;
+}
+/* Sheet mode: compact fetcher circle (slightly under hamburger 2rem); hide label. */
+html.header-nav-sheet .fh-global-status {
+  position: relative;
+  box-sizing: border-box;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  max-width: 1.75rem;
+  padding: 0;
+  justify-content: center;
+  align-items: center;
+  align-self: center;
+  /* Base pill uses translateY(-1px) for desktop text row - cancel for icon align. */
+  transform: none;
+}
+html.header-nav-sheet .fetcher-popover-anchor {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+}
+html.header-nav-sheet .fh-global-status .fh-global-status-tail {
+  display: none;
+}
+html.header-nav-sheet .fh-global-status #fetcherGlobalStatusText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Beta pill: drop upward translate so overflow:hidden on brand does not clip
+   the top/left border in sheet/phone density. */
+html.header-nav-sheet .brand-beta {
+  transform: none;
+}
+html.header-nav-sheet .header-nav-toggle {
+  display: inline-flex;
+}
+html.header-nav-sheet #headerFullscreenBtn {
+  display: none !important;
+}
+/* Keep wrap out of the header flex flow; panel is a fixed sheet. */
+html.header-nav-sheet .app-header-nav-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible;
+  pointer-events: none;
+  order: 0;
+}
+html.header-nav-sheet .app-header-nav-wrap.is-open {
+  pointer-events: auto;
+}
+html.header-nav-sheet .header-nav-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-scrim-soft);
+  z-index: 0;
+}
+html.header-nav-sheet .header-nav-backdrop[hidden] {
+  display: none !important;
+}
+html.header-nav-sheet .header-nav-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(18.5rem, 86vw);
+  max-width: 100%;
+  padding: max(0.85rem, env(safe-area-inset-top, 0px))
+    0.85rem
+    max(0.85rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
+  transform: translateX(-105%);
+  transition: transform 0.18s ease;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+html.header-nav-sheet .app-header-nav-wrap.is-open .header-nav-panel {
+  transform: translateX(0);
+}
+html.header-nav-sheet .header-nav-panel[hidden] {
+  display: none !important;
+}
+html.header-nav-sheet .app-header-nav {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.4rem;
+  width: 100%;
+}
+html.header-nav-sheet .app-header-nav .view-tab {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: var(--touch-min, 44px);
+  padding: 0.65rem 0.85rem;
+}
+html.header-nav-sheet .header-nav-sheet-extras {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}
+html.header-nav-sheet .header-nav-sheet-extras #reportBugHeader {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-min, 44px);
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0 0.85rem;
+}
+html.header-nav-sheet .header-nav-sheet-action-label {
+  display: inline;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+html.header-nav-sheet .header-nav-sheet-extras .profile-menu-wrap {
+  width: 100%;
+}
+html.header-nav-sheet .header-nav-sheet-extras .profile-menu-trigger {
+  width: 100%;
+  min-height: var(--touch-min, 44px);
+  max-width: none;
+  justify-content: space-between;
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+}
+html.header-nav-sheet .header-nav-sheet-extras .profile-menu-label {
+  max-width: none;
+}
+html.header-nav-sheet .header-nav-sheet-extras .profile-menu-panel {
+  position: static;
+  width: 100%;
+  margin-top: 0.35rem;
+  box-shadow: none;
 }
 
 /* --- Tablet (<= 1023.98px) --- */
 @media (max-width: 1023.98px) {
-  .app-header-row {
-    row-gap: 0.5rem;
+  .runtime-mode-banner-detail {
+    max-width: 9rem;
   }
-  /* Order the row flex children (brand | nav-wrap | actions), not the nested nav. */
-  .app-header-nav-wrap {
-    flex: 1 1 100%;
-    order: 3;
-    max-width: 100%;
-    min-width: 0;
+  /* Wishlist / dash deal radar: sm:grid-cols-3 crushes 3-col scoreboards mid-tablet. */
+  .dash-wishlist-stats-target {
+    grid-template-columns: 1fr;
   }
-  .app-header-actions {
-    margin-left: auto;
-    order: 2;
+  /* Clear fixed A-Z rail on library/wishlist/itch (not dash/connections/pro). */
+  html:not([data-init-view="dashboard"]):not([data-init-view="connections"]):not([data-init-view="pro"])
+    #tableShell {
+    padding-right: 1.25rem;
   }
-  .app-header-brand {
-    order: 1;
+}
+@media (min-width: 1024px) {
+  .dash-wishlist-stats-target {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -12087,8 +12905,13 @@ html[data-theme="ember"] .conn-primary:hover {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
   }
+  header.app-header {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
   .app-header-row {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 0.5rem 0.75rem;
   }
@@ -12097,6 +12920,8 @@ html[data-theme="ember"] .conn-primary:hover {
     flex: 1 1 auto;
     min-width: 0;
     margin-right: 0 !important;
+    /* Brand stays one line; overflow clips beta/runtime chrome, not the wordmark. */
+    overflow: hidden;
   }
   .app-header-brand h1 {
     font-size: 1.25rem;
@@ -12104,57 +12929,45 @@ html[data-theme="ember"] .conn-primary:hover {
   .app-header-brand img {
     height: 24px !important;
   }
+  .brand-logo-mark {
+    height: 26px;
+  }
+  .runtime-mode-banner {
+    display: none;
+  }
   .app-header-actions {
     order: 2;
     margin-left: auto;
     flex-shrink: 0;
+    gap: 0.45rem;
   }
-  .app-header-nav-wrap {
-    order: 3;
-    flex: 1 1 100%;
-    min-width: 0;
+  .fh-global-status,
+  html.header-nav-sheet .fh-global-status {
     position: relative;
-    max-width: 100%;
-  }
-  .app-header-nav-wrap::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 28px;
-    pointer-events: none;
-    background: linear-gradient(90deg, transparent, var(--bg) 85%);
-  }
-  .app-header-nav {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 0.35rem;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-  }
-  .app-header-nav .view-tab {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-    min-height: var(--touch-min);
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-  }
-  .fh-global-status {
-    position: relative;
-    min-height: var(--touch-min);
-    min-width: var(--touch-min);
-    padding: 0 0.55rem;
+    /* Slightly under hamburger touch box; keep optical center (no translateY). */
+    box-sizing: border-box;
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    max-width: 1.75rem;
+    padding: 0;
     justify-content: center;
+    align-items: center;
+    align-self: center;
+    transform: none;
   }
-  .fh-global-status .fh-global-status-tail {
+  .fetcher-popover-anchor {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+  }
+  .fh-global-status .fh-global-status-tail,
+  html.header-nav-sheet .fh-global-status .fh-global-status-tail {
     display: none;
   }
-  .fh-global-status #fetcherGlobalStatusText {
+  .fh-global-status #fetcherGlobalStatusText,
+  html.header-nav-sheet .fh-global-status #fetcherGlobalStatusText {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -12164,6 +12977,10 @@ html[data-theme="ember"] .conn-primary:hover {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+  .brand-beta,
+  html.header-nav-sheet .brand-beta {
+    transform: none;
   }
   .profile-menu-trigger {
     min-height: var(--touch-min);
@@ -12178,10 +12995,15 @@ html[data-theme="ember"] .conn-primary:hover {
     overflow-x: auto;
     overflow-y: hidden;
     gap: 0.5rem;
-    padding-bottom: 4px;
+    /* Space chips above the horizontal scrollbar so they don't sit on the track. */
+    padding-bottom: 10px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     align-items: stretch;
+    max-width: 100%;
+    min-width: 0;
+    /* Keep the scroll strip inside the viewport - never widen the page. */
+    overscroll-behavior-x: contain;
   }
   #summary > .summary-scroll-row,
   #summary > div {
@@ -12192,16 +13014,40 @@ html[data-theme="ember"] .conn-primary:hover {
     width: max-content;
     max-width: none;
   }
+  /* Hug label width; pad so text clears the accent; clip if somehow overlong. */
   #summary .summary-store-chip,
   #summary .summary-deal-chip,
   #summary .summary-stat-chip,
   #summary .summary-jump-chip,
   #summary > div > div,
   #summary button {
-    flex-shrink: 0;
-    min-height: var(--touch-min);
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: max-content;
+    max-width: min(100%, 18rem);
+    min-width: 0;
+    min-height: 1.85rem;
+    height: auto;
     display: inline-flex;
     align-items: center;
+    justify-content: flex-start;
+    gap: 0.25rem;
+    padding: 0.25rem 0.65rem 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #summary .summary-stat-chip .font-semibold,
+  #summary .summary-store-chip .font-semibold,
+  #summary .summary-deal-chip .font-semibold,
+  #summary .summary-jump-chip .font-semibold,
+  #summary .summary-stat-chip .text-slate-100,
+  #summary button .font-semibold {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    margin-left: 0;
   }
   #toolbarSection .toolbar-row {
     gap: 0.5rem;
@@ -12213,11 +13059,33 @@ html[data-theme="ember"] .conn-primary:hover {
     order: 1;
     min-height: var(--touch-min);
   }
-  #toolbarSection #openFiltersBtn,
-  #toolbarSection #addGameBtn,
-  #toolbarSection #kebabBtn {
+  /* Action row: ||| , ⋯ , Filters, Add game (columns/kebab were order 0 and
+     sat alone above search because kebab order targeted the inner button). */
+  #toolbarSection #openColumnsBtn {
     order: 2;
+  }
+  #toolbarSection .toolbar-kebab-wrap {
+    order: 3;
+  }
+  #toolbarSection #openFiltersBtn {
+    order: 4;
     min-height: var(--touch-min);
+  }
+  #toolbarSection #addGameBtn {
+    order: 5;
+    min-height: var(--touch-min);
+  }
+  #toolbarSection #openColumnsBtn,
+  #toolbarSection #kebabBtn {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    max-width: var(--touch-min);
+    max-height: var(--touch-min);
+    flex: 0 0 var(--touch-min);
+    box-sizing: border-box;
+    padding: 0;
   }
   #toolbarSection #pickForMe {
     display: none;
@@ -12231,10 +13099,55 @@ html[data-theme="ember"] .conn-primary:hover {
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    padding-bottom: 2px;
+    padding-bottom: 10px;
+    overscroll-behavior-x: contain;
   }
   #activeFilterPills > * {
     flex-shrink: 0;
+  }
+
+  /* Bulk bar: one horizontal row so 56px body pad stays valid (no wrap over table). */
+  #bulkBar > div {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 10px;
+    overscroll-behavior-x: contain;
+  }
+  #bulkBar > div > *,
+  #bulkStatusButtons {
+    flex-shrink: 0;
+  }
+  #bulkStatusButtons {
+    flex-wrap: nowrap;
+  }
+
+  /* Phone sticky: already uses safe-area top; keep pin detection via bar bottom. */
+  .row-loading-overlay {
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 13;
+  }
+
+  #filterDrawer {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  #closeFiltersBtn {
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .pro-view-toggle-btn,
+  .pro-view-btn {
+    min-height: var(--touch-min);
   }
 
   /* Phone spacing pass: tighten hero cards and stack deal/conn chrome. */
@@ -12285,6 +13198,18 @@ html[data-theme="ember"] .conn-primary:hover {
     min-width: 0;
     width: auto;
   }
+
+  /* Contain dashboard strips so KPI/ribbon never force page-level overflow. */
+  .dash-ribbon,
+  .dash-mega,
+  .dash-hero,
+  #viewDashboard {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .dash-ribbon {
+    overflow-x: clip;
+  }
 }
 
 #toolbarSection .toolbar-kebab-pick--phone {
@@ -12301,6 +13226,19 @@ html[data-theme="ember"] .conn-primary:hover {
     font-size: 0.75rem;
     padding-left: 0.5rem;
     padding-right: 0.5rem;
+  }
+  .app-header-brand h1 {
+    font-size: 1.125rem;
+  }
+  .brand-logo-mark {
+    height: 22px;
+  }
+  .brand-beta {
+    font-size: 0.52rem;
+    padding: 0.14em 0.35em;
+  }
+  #summary {
+    gap: 0.35rem;
   }
 }
 
@@ -12339,6 +13277,12 @@ body {
   z-index: 91;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
   color: var(--text-dim);
+}
+/* Tablet: keep anchored popover; tighten cap + respect safe-area. */
+@media (max-width: 1023.98px) and (min-width: 640px) {
+  .fetcher-popover {
+    max-height: min(85dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px));
+  }
 }
 /* Slimmer in compact, wider in landscape so source chips get more room.
    Layout flag lives on the nested #dashboardFetcherHealth (data-stat-layout). */
@@ -13011,23 +13955,75 @@ body {
   overflow-y: auto;
   overscroll-behavior: auto;
 }
-@media (max-width: 639.98px) {
-  .fetcher-popover {
+/* Phone / short coarse viewport: fetcher module becomes a fullscreen sheet. */
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  .fetcher-popover,
+  .fetcher-popover.fetcher-popover--sheet {
     position: fixed;
-    top: 10px;
-    right: 10px;
-    left: 10px;
-    bottom: 10px;
-    width: auto;
+    inset: 0;
+    top: env(safe-area-inset-top, 0px);
+    right: env(safe-area-inset-right, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
+    left: env(safe-area-inset-left, 0px);
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
     max-height: none;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    z-index: 95;
+  }
+  .fetcher-popover:has([data-stat-layout="compact"]),
+  .fetcher-popover:has([data-stat-layout="landscape"]),
+  .fetcher-popover.fetcher-popover--sheet:has([data-stat-layout="compact"]),
+  .fetcher-popover.fetcher-popover--sheet:has([data-stat-layout="landscape"]) {
+    width: 100%;
+  }
+  .fetcher-popover-head {
+    position: sticky;
+    top: 0;
+    right: auto;
+    left: auto;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.65rem 0.75rem;
+    margin: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-panel);
+  }
+  .fetcher-popover-title {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-bright);
+  }
+  .fetcher-stat-layout-toggle {
+    margin-left: auto;
   }
   .fetcher-popover-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    padding: 0.75rem 0.75rem 1rem;
+    margin-right: 0;
+    padding-right: 0.75rem;
   }
   .fetcher-popover-close,
   .fetcher-stat-layout-toggle {
     min-height: var(--touch-min, 44px);
     min-width: var(--touch-min, 44px);
+    height: auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;

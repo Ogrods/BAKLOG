@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { storeLogoHtml, storeLogoStripHtml, storeGlyphHtml, storeDisplayName, storeLetter, STORE_BADGE_LETTERS, STORE_RAIL_GLYPH_OFFSET } from '../js/store-logos.js';
+import { storeLogoHtml, storeLogoStripHtml, storeGlyphHtml, storeDisplayName, storeLetter, STORE_BADGE_LETTERS, STORE_RAIL_GLYPH_OFFSET, balancedWrapColumns } from '../js/store-logos.js';
 
 describe('storeLetter', () => {
   it('maps known store keys to canonical letters', () => {
@@ -147,6 +147,24 @@ describe('storeLogoStripHtml', () => {
     expect(html).toContain("url('assets/store-logos/steam.svg')");
     expect(html).toContain("url('assets/store-logos/epic.svg')");
     expect(html).not.toContain("url('assets/store-logos/gog.svg')");
+  });
+});
+
+describe('balancedWrapColumns', () => {
+  it('keeps a single row when everything fits', () => {
+    expect(balancedWrapColumns(12, 12)).toBe(12);
+    expect(balancedWrapColumns(5, 8)).toBe(5);
+  });
+
+  it('splits evenly instead of leaving a lonely last row', () => {
+    expect(balancedWrapColumns(12, 11)).toBe(6);
+    expect(balancedWrapColumns(12, 7)).toBe(6);
+    expect(balancedWrapColumns(10, 9)).toBe(5);
+  });
+
+  it('balances across three rows when needed', () => {
+    expect(balancedWrapColumns(12, 5)).toBe(4);
+    expect(balancedWrapColumns(11, 5)).toBe(4);
   });
 });
 

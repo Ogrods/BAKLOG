@@ -1,4 +1,11 @@
 import { state } from './state.js';
+import {
+  densityWouldHide,
+  getDensityTier,
+  clearDensityPins,
+  pinAllDensityColumns,
+  setDensityPinned,
+} from './table-density.js';
 
 export const TABLE_VIEWS = ['library', 'wishlist', 'itch'];
 
@@ -60,22 +67,41 @@ export function setColumnVisible(view, id, on) {
     state.prefs.columns[vk] = {};
   }
   state.prefs.columns[vk][id] = !!on;
+  // Explicit show pins against density; hide clears the pin.
+  setDensityPinned(view, id, !!on);
 }
 
 export function resetColumns(view) {
   ensureColumnsPrefs();
   state.prefs.columns[viewKey(view)] = {};
+  clearDensityPins(view);
 }
 
 export function showAllColumns(view) {
-  for (const col of toggleableColumns()) setColumnVisible(view, col.id, true);
+  for (const col of toggleableColumns()) {
+    ensureColumnsPrefs();
+    const vk = viewKey(view);
+    if (!state.prefs.columns[vk] || typeof state.prefs.columns[vk] !== 'object') {
+      state.prefs.columns[vk] = {};
+    }
+    state.prefs.columns[vk][col.id] = true;
+  }
+  pinAllDensityColumns(view);
 }
 
-export function applyColumnVisibility(view) {
+/**
+ * Apply table-hide-* from prefs + current density tier.
+ * @param {string} view
+ * @param {{ skipDensity?: boolean }} [opts]
+ */
+export function applyColumnVisibility(view, opts = {}) {
   const wrap = document.getElementById('tableWrap');
   if (!wrap) return;
+  const tier = opts.skipDensity ? 0 : getDensityTier();
   for (const col of toggleableColumns()) {
-    wrap.classList.toggle(`table-hide-${col.id}`, !isColumnVisible(view, col.id));
+    const userHide = !isColumnVisible(view, col.id);
+    const densityHide = !opts.skipDensity && densityWouldHide(view, col.id, tier);
+    wrap.classList.toggle(`table-hide-${col.id}`, userHide || densityHide);
   }
 }
 
@@ -83,6 +109,9 @@ export function applyColumnVisibility(view) {
 export function migrateColumnPrefs(merged) {
   if (!merged.columns || typeof merged.columns !== 'object') {
     merged.columns = {};
+  }
+  if (!merged.columnDensityPins || typeof merged.columnDensityPins !== 'object') {
+    merged.columnDensityPins = {};
   }
   const hadScore = merged.showScoreColumn;
   const hadMc = merged.showMetacriticColumn;

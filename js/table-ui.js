@@ -1006,7 +1006,9 @@ function syncTablePhoneLayout() {
   wrap.classList.toggle('table-phone', phone);
   syncTablePhoneStickyChrome();
   if (wasPhone !== phone) {
-    _rowHeightPx = ROW_HEIGHT;
+    /* Phone cards are taller than the 76px desktop row; seed a better estimate
+       before the first measured paint so spacers drift less on switch-in. */
+    _rowHeightPx = phone ? 96 : ROW_HEIGHT;
     _virtualWindow = { start: -1, end: -1 };
     _virtualWindowList = null;
     scheduleTableDensitySync((v) => applyColumnVisibility(v), state.activeView);
@@ -1054,7 +1056,21 @@ function refreshMeasuredRowHeight(tbody) {
   const row = tbody?.querySelector('tr[data-row-index]');
   if (!row) return;
   const h = row.getBoundingClientRect().height;
-  if (h > 0 && Math.abs(h - _rowHeightPx) >= 0.5) _rowHeightPx = h;
+  if (!(h > 0) || Math.abs(h - _rowHeightPx) < 0.5) return;
+  const prev = _rowHeightPx;
+  _rowHeightPx = h;
+  // Phone cards vary with meta wrap; update spacer heights in place so scroll
+  // math tracks the new estimate without a full slice rewrite.
+  const phone = document.getElementById('tableWrap')?.classList.contains('table-phone');
+  if (!phone || Math.abs(h - prev) < 2) return;
+  const start = _virtualWindow.start;
+  const end = _virtualWindow.end;
+  const listLen = _virtualList?.length ?? 0;
+  if (listLen <= 0 || end <= start) return;
+  const top = tbody.querySelector('tr.virtual-spacer-top td');
+  const bot = tbody.querySelector('tr.virtual-spacer-bottom td');
+  if (top) top.style.height = `${start * h}px`;
+  if (bot) bot.style.height = `${(listLen - end) * h}px`;
 }
 export const TABLE_COLSPAN = 14;
 const VIRTUAL_OVERSCAN = 20;

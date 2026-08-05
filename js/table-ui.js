@@ -967,7 +967,9 @@ export async function prewarmTableQueryForView(view) {
 
 let _renderTableGen = 0;
 
-const TABLE_PHONE_MQ = '(max-width: 639.98px)';
+/* Match modal/fetcher sheet MQ so phone landscape (e.g. 844×390) uses cards. */
+const TABLE_PHONE_MQ =
+  '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 
 export function isTablePhoneLayout() {
   const wrap = document.getElementById('tableWrap');

@@ -3953,7 +3953,7 @@ html[data-boot-loading] .view-tab {
     height: max(100%, 28px);
   }
 }
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
   #alphaNavWrap {
     right: 2px;
     top: auto;
@@ -13056,8 +13056,10 @@ html.header-nav-sheet .header-nav-sheet-extras .profile-menu-panel {
   }
 }
 
-/* --- Phone (<= 639.98px) --- */
-@media (max-width: 639.98px) {
+/* --- Phone / short landscape (sheet MQ) ---
+   Header compact + touch shell must match TABLE_PHONE_MQ / modal sheets so
+   844×390 does not keep desktop chrome beside phone library cards. */
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
   :root {
     --touch-min: 44px;
   }

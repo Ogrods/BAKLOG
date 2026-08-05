@@ -23,7 +23,7 @@ For local dev without hitting production, set `window.__BAKLOG_REPORT_ENDPOINT` 
 
 | Channel | Link | Best for |
 |---------|------|----------|
-| **Discord** | [discord.gg/baklog](https://discord.gg/baklog) | Beta chat, `#bug-reports`, `#feature-requests` |
+| **Discord** | [discord.gg/VFvxN5nCCB](https://discord.gg/VFvxN5nCCB) | Beta chat, `#bug-reports`, `#feature-requests` |
 | **GitHub** | [github.com/Ogrods/BAKLOG](https://github.com/Ogrods/BAKLOG) | Source code (MIT), reproducible bugs, feature requests |
 | **GitHub Issues** | [New issue](https://github.com/Ogrods/BAKLOG/issues/new) | Long-term bug and feature record |
 | **Email** | [dan@baklog.app](mailto:dan@baklog.app) | Invite or support questions |

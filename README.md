@@ -6,7 +6,7 @@
 
 **BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
 
-**Open source (MIT)** — [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**.
+**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**. Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
 
 **Reviewing the repo?** See [ARCHITECTURE.md](ARCHITECTURE.md) for an honest map (local vs network, monolith shape, Pro licensing, store ToS).
 
@@ -241,7 +241,7 @@ Then open http://localhost:8765 in your browser. Click any chip in the **Fetcher
 
 ### Reporting a bug, support, and personal data
 
-Bug reports, Discord, GitHub issues, email, and how personal edits are stored: **[guide/getting-help.md](guide/getting-help.md)** and **[guide/using-the-dashboard.md](guide/using-the-dashboard.md)**.
+Bug reports, Discord ([invite](https://discord.gg/VFvxN5nCCB)), GitHub issues, email, and how personal edits are stored: **[guide/getting-help.md](guide/getting-help.md)** and **[guide/using-the-dashboard.md](guide/using-the-dashboard.md)**.
 
 ## Auto-refresh on a schedule
 

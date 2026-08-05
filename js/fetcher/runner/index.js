@@ -410,6 +410,36 @@ export const fetcherRunner = (() => {
   }
 
   let fetcherPopoverRelease = null;
+  const FETCHER_SHEET_MQ =
+    '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
+  let fetcherSheetMqWired = false;
+
+  function isFetcherSheetViewport() {
+    return typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia(FETCHER_SHEET_MQ).matches;
+  }
+
+  /** Phone: fullscreen sheet class. Tablet/desktop keep anchored popover math-free CSS. */
+  function syncFetcherPopoverSheetClass(pop = fetcherPopoverEl()) {
+    if (!pop) return;
+    pop.classList.toggle('fetcher-popover--sheet', isFetcherSheetViewport());
+  }
+
+  function ensureFetcherSheetMq() {
+    if (fetcherSheetMqWired || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    fetcherSheetMqWired = true;
+    const mq = window.matchMedia(FETCHER_SHEET_MQ);
+    const onChange = () => {
+      const pop = fetcherPopoverEl();
+      if (!pop || pop.hidden) return;
+      syncFetcherPopoverSheetClass(pop);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+  }
 
   function hideFetcherPopover() {
     fetcherPopoverRelease?.();
@@ -418,7 +448,10 @@ export const fetcherRunner = (() => {
     const bd = document.getElementById('fetcherPopoverBackdrop');
     const pill = document.getElementById('fetcherGlobalStatus');
     if (bd) bd.hidden = true;
-    if (pop) pop.hidden = true;
+    if (pop) {
+      pop.hidden = true;
+      pop.classList.remove('fetcher-popover--sheet');
+    }
     if (pill) pill.setAttribute('aria-expanded', 'false');
     // Collapse the log console drawer so reopening the fetcher starts tidy.
     const panel = logPanel();
@@ -436,6 +469,8 @@ export const fetcherRunner = (() => {
     const pop = fetcherPopoverEl();
     const bd = document.getElementById('fetcherPopoverBackdrop');
     if (!pop || !bd) return false;
+    ensureFetcherSheetMq();
+    syncFetcherPopoverSheetClass(pop);
     bd.hidden = false;
     pop.hidden = false;
     const pill = document.getElementById('fetcherGlobalStatus');
@@ -639,7 +674,7 @@ export const fetcherRunner = (() => {
     else expandPanel({ manual });
   }
 
-  const LOG_DESKTOP_MQ = '(min-width: 768px)';
+  const LOG_DESKTOP_MQ = '(min-width: 1024px)';
   let logHeightCardObs = null;
   let logHeightResizeWired = false;
 
@@ -1973,6 +2008,8 @@ export const fetcherRunner = (() => {
     toggleFetcherPopover,
     openFetcherLog,
     isFetcherPopoverOpen,
+    isFetcherSheetViewport,
+    syncFetcherPopoverSheetClass,
     setBarSummary(text) {
       lastBarSummary = text;
     },

@@ -89,6 +89,12 @@ import {
   perfActiveRun,
 } from './table-perf.js';
 import { applyColumnVisibility } from './table-columns.js';
+import {
+  observeTableDensity,
+  scheduleTableDensitySync,
+  syncTableDensity,
+} from './table-density.js';
+import { notesAffordanceHtml } from './notes-dialog.js';
 
 // === Alpha nav + scroll ===
 export function initAlphaNav() {
@@ -446,21 +452,9 @@ export function updateHasNotesIndicatorInPlace(tr, g) {
   if (!tr) return;
   const meta = tr.querySelector(".row-meta");
   if (!meta) return;
-  const notes = String(getPersonal(g).notes || "").trim();
-  const dot = meta.querySelector(".has-notes-dot");
-  if (notes) {
-    const tooltip = `${notes.slice(0, 160)} - click to edit notes`;
-    if (dot) {
-      dot.title = tooltip;
-    } else {
-      meta.insertAdjacentHTML(
-        "beforeend",
-        `<span class="has-notes-dot" title="${escapeAttr(tooltip)}" aria-label="Has notes">&#9998; note</span>`,
-      );
-    }
-  } else if (dot) {
-    dot.remove();
-  }
+  const key = gameKey(g);
+  meta.querySelectorAll(".has-notes-dot, .notes-open-btn").forEach((n) => n.remove());
+  meta.insertAdjacentHTML("beforeend", notesAffordanceHtml(key, getPersonal(g).notes));
 }
 
 export function updateRowInPlace(tr, g) {
@@ -617,6 +611,11 @@ export function consumePendingScrollTarget(list = state._visibleList) {
   }
 
   if (t.kind === "row") {
+    // Cross-view drills: wait for picks/summary chrome like toolbar drills.
+    if (t.hideOverlay && !isToolbarScrollReady()) {
+      scheduleScrollAfterChromeSettled();
+      return false;
+    }
     const key = t.key;
     if (!key || !Array.isArray(list) || !list.length) {
       t.consumed = true;
@@ -637,7 +636,14 @@ export function consumePendingScrollTarget(list = state._visibleList) {
     setRowAdAnchor(idx);
 
     const row = ensureRowPaintedForScroll(list, idx, key);
-    if (usesVirtualScroll(list)) {
+    const phone = isTablePhoneLayout();
+    if (phone && row) {
+      // Variable-height card rows: live rect beats idx * rh spacer math.
+      markFocusedRow(key);
+      refreshMeasuredRowHeight(row.parentElement);
+      scrollRowToCenter(row, { smooth: !!t.smooth });
+      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
+    } else if (usesVirtualScroll(list)) {
       // Virtual lists: position by deterministic index math (top-spacer height +
       // measured row height) instead of the freshly-painted row's rect. The giant
       // top spacer isn't always laid out when we measure two rAF after paint, so a
@@ -652,7 +658,7 @@ export function consumePendingScrollTarget(list = state._visibleList) {
       if (_pendingFlashKeys.has(key)) applyRowFlash(key);
     }
 
-    _lastConsumeWasSmooth = !!t.smooth && !!row && !usesVirtualScroll(list);
+    _lastConsumeWasSmooth = !!t.smooth && !!row && (phone || !usesVirtualScroll(list));
     t.consumed = true;
     _pendingScrollTarget = null;
     completeDrillOverlayIfNeeded(t.hideOverlay);
@@ -672,10 +678,10 @@ export function scheduleScrollAfterLayoutSettled() {
   });
 }
 
-/** Category drill-ins: wait for summary/picks chrome to stop resizing before scrolling. */
+/** Category / cross-view drills: wait for summary/picks chrome before scrolling. */
 export function scheduleScrollAfterChromeSettled() {
   const t = _pendingScrollTarget;
-  if (!t || t.consumed || t.kind !== 'toolbar') {
+  if (!t || t.consumed || (t.kind !== 'toolbar' && t.kind !== 'row')) {
     scheduleScrollAfterLayoutSettled();
     return;
   }
@@ -963,11 +969,51 @@ let _renderTableGen = 0;
 
 const TABLE_PHONE_MQ = '(max-width: 639.98px)';
 
+export function isTablePhoneLayout() {
+  const wrap = document.getElementById('tableWrap');
+  return !!wrap?.classList.contains('table-phone');
+}
+
+function syncTablePhoneStickyChrome() {
+  const bar = document.getElementById('tablePhoneSticky');
+  if (!bar) return;
+  const phone = isTablePhoneLayout();
+  const tableView = state.activeView === 'library'
+    || state.activeView === 'wishlist'
+    || state.activeView === 'itch';
+  bar.hidden = !(phone && tableView);
+  if (!phone || !tableView) return;
+  const label = document.getElementById('tablePhoneStickyLabel');
+  const count = document.getElementById('tablePhoneStickyCount');
+  if (label) {
+    label.textContent = state.activeView === 'wishlist'
+      ? 'Wishlist'
+      : state.activeView === 'itch'
+        ? 'itch.io'
+        : 'Library';
+  }
+  if (count) {
+    const n = state._visibleList?.length ?? 0;
+    count.textContent = n ? `${n}` : '';
+  }
+}
+
 function syncTablePhoneLayout() {
   const wrap = document.getElementById('tableWrap');
   if (!wrap) return;
+  const wasPhone = wrap.classList.contains('table-phone');
   const phone = typeof matchMedia === 'function' && matchMedia(TABLE_PHONE_MQ).matches;
   wrap.classList.toggle('table-phone', phone);
+  syncTablePhoneStickyChrome();
+  if (wasPhone !== phone) {
+    _rowHeightPx = ROW_HEIGHT;
+    _virtualWindow = { start: -1, end: -1 };
+    _virtualWindowList = null;
+    scheduleTableDensitySync((v) => applyColumnVisibility(v), state.activeView);
+    if (_virtualList && usesVirtualScroll(_virtualList)) {
+      scheduleVirtualScrollUpdate();
+    }
+  }
 }
 
 /** Toggle card-style library rows on narrow viewports. */
@@ -978,6 +1024,14 @@ export function initTablePhoneLayout() {
   const onChange = () => syncTablePhoneLayout();
   if (mq.addEventListener) mq.addEventListener('change', onChange);
   else mq.addListener(onChange);
+}
+
+/** Wire density ResizeObserver (call once at boot). */
+export function initTableDensity() {
+  observeTableDensity(
+    (v) => applyColumnVisibility(v),
+    () => state.activeView,
+  );
 }
 let _paintGen = 0;
 const FIRST_CHUNK = 50;
@@ -1068,12 +1122,29 @@ function getRow0DocY() {
   const shell = document.getElementById("tableShell");
   const thead = document.querySelector(".games-table thead");
   if (!shell) return 0;
-  return shell.offsetTop + (thead?.offsetHeight ?? 48);
+  // Phone hides thead (display:none → offsetHeight 0); do not invent 48px.
+  const headH = thead && getComputedStyle(thead).display !== 'none'
+    ? (thead.offsetHeight || 0)
+    : 0;
+  const phoneBar = document.getElementById('tablePhoneSticky');
+  const barH = phoneBar && !phoneBar.hidden ? (phoneBar.offsetHeight || 0) : 0;
+  return shell.offsetTop + headH + barH;
+}
+
+/** Extra Y from a sponsored row inserted at slot when slot < idx. */
+function sponsoredExtraBeforeIndex(idx) {
+  if (!_virtualList?.length || idx <= 0) return 0;
+  const slot = resolveSponsoredTableSlot(_virtualList.length);
+  if (slot < 0 || slot >= idx) return 0;
+  const ad = document.querySelector('#tbody tr.sponsored-table-row');
+  const h = ad?.getBoundingClientRect().height;
+  return h > 0 ? h : rowHeightPx();
 }
 
 function scrollTopForRowCenter(idx) {
   const rh = rowHeightPx();
-  const rowCenterY = getRow0DocY() + idx * rh + rh / 2;
+  const extra = sponsoredExtraBeforeIndex(idx);
+  const rowCenterY = getRow0DocY() + extra + idx * rh + rh / 2;
   return Math.max(0, rowCenterY - window.innerHeight * 0.42);
 }
 
@@ -1336,6 +1407,8 @@ function tableRowHtml(g, idx, { isWish }) {
             <div class="flex items-center gap-1.5 min-w-0">
               ${storeLinkHtml(g, "text-sky-400 hover:underline font-medium game-name truncate min-w-0", escapeHtml(g.name))}
               ${ownedWish ? '<span class="text-amber-400 text-xs shrink-0" title="You already own this (matched by title)">owned</span>' : ""}
+              ${earlyAccessPillHtml(g)}
+              ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
             </div>
             <div class="row-meta mt-1 flex items-center gap-1.5 flex-wrap">
               ${state.activeView === "wishlist" ? wishlistBadgeHtml(g) : storeBadgeHtml(g)}
@@ -1344,13 +1417,9 @@ function tableRowHtml(g, idx, { isWish }) {
               ${coopPillsHtml(g)}
               ${state.activeView === "wishlist" ? "" : trophyProgressPillHtml(g)}
               ${state.activeView === "wishlist" ? "" : platinumBadgeHtml(g)}
-              ${String(p.notes || "").trim() ? `<span class="has-notes-dot" title="${escapeAttr(String(p.notes).slice(0, 160))} - click to edit notes" aria-label="Has notes">&#9998; note</span>` : ""}
+              ${notesAffordanceHtml(key, p.notes)}
             </div>
-            ${lowConf && g.hltb_name ? `<div class="text-xs text-amber-400" title="Uncertain HowLongToBeat match - Shift+click HLTB to override">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
-          </div>
-          <div class="flex items-center gap-1.5 shrink-0">
-            ${earlyAccessPillHtml(g)}
-            ${hiddenGem ? '<span class="text-purple-400 shrink-0" style="cursor: default" title="Hidden gem: 90%+ rated and unplayed">✦</span>' : ""}
+            ${lowConf && g.hltb_name ? `<div class="hltb-match-hint text-xs text-amber-400" title="Uncertain HowLongToBeat match - Shift+click HLTB to override">HLTB match: ${escapeHtml(g.hltb_name)}</div>` : ""}
           </div>
         </div>
       </td>
@@ -1434,7 +1503,14 @@ function paintTableBody(list, opts = {}) {
   const { start, end } = computeVirtualRange(list.length, anchorIdx >= 0 ? anchorIdx : null);
   paintVirtualSlice(start, end);
   if (anchorIdx >= 0 && !hasPendingScrollTarget()) {
-    scrollToVirtualRowIndex(anchorIdx, { behavior: "auto" });
+    if (isTablePhoneLayout()) {
+      const key = gameKey(list[anchorIdx]);
+      const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+      if (row) scrollRowToCenter(row, { smooth: false });
+      else scrollToVirtualRowIndex(anchorIdx, { behavior: "auto" });
+    } else {
+      scrollToVirtualRowIndex(anchorIdx, { behavior: "auto" });
+    }
   }
   if (run) {
     perfMeasure(run, 'paint:total', 'paint:start', {
@@ -1652,7 +1728,8 @@ export async function renderTable(opts) {
   perfMark(perfRun, 'chrome:start');
   const isWish = state.activeView === "wishlist";
   syncTablePhoneLayout();
-  applyColumnVisibility(state.activeView);
+  syncTableDensity((v) => applyColumnVisibility(v), state.activeView);
+  syncTablePhoneStickyChrome();
   const statusHdr = document.getElementById("statusHeader");
   if (statusHdr) {
     const label = isWish ? "Tracking" : "Status";

@@ -1313,7 +1313,10 @@ export function renderDashboardCharts(games, aggIn) {
       ],
     },
     options: dashChartOptions({
-      animation: { duration: 400, easing: "easeOutQuart" },
+      animation: {
+        duration: prefersReducedMotion() ? 0 : 400,
+        easing: "easeOutQuart",
+      },
       plugins: {
         legend: {
           display: true,

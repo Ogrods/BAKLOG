@@ -297,4 +297,43 @@ describe("virtual drill anchor scroll", () => {
     expect(maxTop).toBeGreaterThan(0);
     expect(document.querySelector('tr[data-row-key="steam:60"]')).toBeTruthy();
   });
+
+  it("phone layout row drill prefers painted-row scroll after focusGame", async () => {
+    const { state } = await import("../js/state.js");
+    const {
+      setPendingScrollTarget,
+      consumePendingScrollTarget,
+    } = await import("../js/table-ui.js");
+    state.activeView = "library";
+    state.prefs = state.prefs || {};
+    document.getElementById("tableWrap")?.classList.add("table-phone");
+
+    const list = Array.from({ length: 80 }, (_, i) => ({
+      store: "steam",
+      id: i,
+      name: `Game ${String(i).padStart(3, "0")}`,
+    }));
+    state._visibleList = list;
+
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = `<tr data-row-key="steam:40" data-row-index="40" style="height:90px"><td>Game 040</td></tr>`;
+    const row = tbody.querySelector("tr");
+    Object.defineProperty(row, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ top: 500, bottom: 590, height: 90, left: 0, right: 100, width: 100 }),
+    });
+    Object.defineProperty(win, "scrollY", { configurable: true, value: 0 });
+    Object.defineProperty(win, "innerHeight", { configurable: true, value: 700 });
+
+    scrollToSpy.mockClear();
+    setPendingScrollTarget({ kind: "row", key: "steam:40", smooth: false });
+    const ok = consumePendingScrollTarget(list);
+    expect(ok).toBe(true);
+    expect(scrollToSpy).toHaveBeenCalled();
+    const top = scrollToSpy.mock.calls[0][0]?.top;
+    expect(typeof top).toBe("number");
+    // Rect path: rowCenter ~545, target ~545 - 0.42*700 ≈ 251
+    expect(top).toBeGreaterThan(100);
+    expect(top).toBeLessThan(400);
+  });
 });

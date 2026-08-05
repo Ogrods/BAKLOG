@@ -105,6 +105,7 @@ review-handoff.md
 review-report.json
 scripts/_diag_personal.py
 scripts/perf-last-run.json
+scripts/responsive-overflow-last-run.json
 
 .vercel
 .env*

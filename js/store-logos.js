@@ -187,3 +187,66 @@ export function storeLogoStripHtml(stores, { size = 'md', max = 12 } = {}) {
   if (!keys.length) return '';
   return `<div class="store-logo-strip store-logo-strip--${size}" role="list" aria-label="Stores in your library">${keys.map(k => `<span role="listitem">${storeGlyphHtml(k, { size, title: storeDisplayName(k) })}</span>`).join('')}</div>`;
 }
+
+/**
+ * Column count that keeps wrapped rows balanced.
+ * e.g. 12 items with max 11/row → 6 (6+6), not 11+1.
+ */
+export function balancedWrapColumns(count, maxPerRow) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  const max = Math.max(0, Math.floor(Number(maxPerRow) || 0));
+  if (n <= 0) return 0;
+  if (max <= 0 || max >= n) return n;
+  const rows = Math.ceil(n / max);
+  return Math.ceil(n / rows);
+}
+
+/** Snap a rendered `.store-logo-strip` to balanced grid columns for its host width. */
+export function snapStoreLogoStrip(strip) {
+  if (!strip) return;
+  const items = strip.querySelectorAll(':scope > [role="listitem"]');
+  const n = items.length;
+  if (n <= 1) {
+    strip.classList.remove('is-balanced-wrap');
+    strip.style.removeProperty('--store-strip-cols');
+    return;
+  }
+  const host = strip.parentElement || strip;
+  const itemW = items[0].getBoundingClientRect().width;
+  if (!(itemW > 0)) {
+    strip.classList.remove('is-balanced-wrap');
+    strip.style.removeProperty('--store-strip-cols');
+    return;
+  }
+  const styles = getComputedStyle(strip);
+  const gap = parseFloat(styles.columnGap || styles.gap) || 0;
+  const avail = host.clientWidth || strip.clientWidth;
+  if (!(avail > 0)) return;
+  const maxPerRow = Math.max(1, Math.floor((avail + gap) / (itemW + gap)));
+  const cols = balancedWrapColumns(n, maxPerRow);
+  if (cols >= n) {
+    strip.classList.remove('is-balanced-wrap');
+    strip.style.removeProperty('--store-strip-cols');
+    return;
+  }
+  strip.style.setProperty('--store-strip-cols', String(cols));
+  strip.classList.add('is-balanced-wrap');
+}
+
+const _heroStoreStripObs = new WeakMap();
+
+/** Observe `.dash-hero-stores` and re-snap the logo strip on resize. */
+export function observeHeroStoreStrip(host) {
+  if (!host) return;
+  const run = () => snapStoreLogoStrip(host.querySelector('.store-logo-strip'));
+  if (typeof ResizeObserver === 'function' && !_heroStoreStripObs.has(host)) {
+    const ro = new ResizeObserver(() => run());
+    _heroStoreStripObs.set(host, ro);
+    ro.observe(host);
+  }
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(run);
+  } else {
+    run();
+  }
+}

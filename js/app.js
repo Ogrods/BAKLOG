@@ -229,6 +229,10 @@ async function bootstrap() {
   document.body.classList.toggle("row-hero-on", !!state.prefs.rowHeroBackdrop);
   syncCheckboxLabelTitles();
   applyColumnVisibility(state.activeView);
+  // Density observer is started from bind-events; sync once after prefs apply.
+  import("./table-density.js").then(({ scheduleTableDensitySync }) => {
+    scheduleTableDensitySync((v) => applyColumnVisibility(v), state.activeView);
+  });
   const genreModeEl = document.getElementById("genreMode");
   if (genreModeEl) genreModeEl.value = state.prefs.genreFilterMode;
   const quickWinMaxEl = document.getElementById("quickWinMax");

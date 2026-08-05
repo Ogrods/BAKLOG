@@ -28,6 +28,7 @@
     "check:dist-integrity": "node scripts/check-dist-integrity.mjs",
     "check:perf": "npm run test:perf",
     "perf:audit": "node scripts/perf-audit.mjs",
+    "test:responsive": "node scripts/responsive-overflow-audit.mjs",
     "perf:profile": "node scripts/generate-perf-profile.mjs",
     "audit:header": "node scripts/audit-header-rule.mjs",
     "audit:tab-curtain": "node scripts/audit-tab-curtain.mjs",

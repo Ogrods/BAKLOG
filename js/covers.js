@@ -122,11 +122,51 @@ function assignPortraitAnimClass(spot) {
   spot.classList.add(`portrait-anim-${1 + Math.floor(Math.random() * PORTRAIT_ANIM_COUNT)}`);
 }
 const LOWRES_FACTOR = 0.7;
+/* Match app.css stacked-spotlight ladder (max-width: 1023.98px). Inline
+   object-position from this helper beats stylesheet rules, so stacked cover
+   offset must be stamped here (portrait defaults to center; low-res to 100%). */
+const SPOTLIGHT_STACK_MQ = "(max-width: 1023.98px)";
+const SPOTLIGHT_STACK_ART_POS = "66% 40%";
+const SPOTLIGHT_LOWRES_DESKTOP_POS = "100% 40%";
+
+function spotlightStackedArtPos() {
+  try {
+    return window.matchMedia?.(SPOTLIGHT_STACK_MQ)?.matches
+      ? SPOTLIGHT_STACK_ART_POS
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+function reapplyAllSpotlightArtFits() {
+  document
+    .querySelectorAll(".dash-spotlight .dash-spotlight-art")
+    .forEach((img) => {
+      if (img.naturalWidth) window.applySpotlightArtFit(img);
+    });
+}
+
+let _spotlightStackMqWired = false;
+function wireSpotlightStackArtPos() {
+  if (_spotlightStackMqWired || typeof window.matchMedia !== "function") return;
+  _spotlightStackMqWired = true;
+  const mq = window.matchMedia(SPOTLIGHT_STACK_MQ);
+  const onChange = () => reapplyAllSpotlightArtFits();
+  if (typeof mq.addEventListener === "function") {
+    mq.addEventListener("change", onChange);
+  } else if (typeof mq.addListener === "function") {
+    mq.addListener(onChange);
+  }
+}
+
 window.applySpotlightArtFit = function (img) {
   if (!img?.naturalWidth) return;
+  wireSpotlightStackArtPos();
   const ratio = img.naturalWidth / img.naturalHeight;
   const crop = spotlightCropForAspect(ratio);
-  img.style.objectPosition = crop.pos;
+  const stackPos = spotlightStackedArtPos();
+  img.style.objectPosition = stackPos || crop.pos;
   const spot = img.closest(".dash-spotlight");
   if (!spot) return;
   const bg = spot.querySelector(".dash-spotlight-art-bg");
@@ -135,6 +175,7 @@ window.applySpotlightArtFit = function (img) {
 
   if (crop.portrait && bg) {
     img.style.objectFit = crop.fit;
+    img.style.objectPosition = stackPos || crop.pos;
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
     spot.classList.remove("is-lowres-art");
@@ -155,9 +196,9 @@ window.applySpotlightArtFit = function (img) {
 
     if (lowRes && bg) {
       img.style.objectFit = "contain";
-      // Contained low-res art is pillarboxed; pin its right edge to the
-      // container's right edge (inline wins over the stylesheet rule).
-      img.style.objectPosition = "100% 40%";
+      // Contained low-res art is pillarboxed; desktop pins right edge, stacked
+      // parks ~2/3 across (inline wins over the stylesheet rule).
+      img.style.objectPosition = stackPos || SPOTLIGHT_LOWRES_DESKTOP_POS;
       if (src && bg.src !== src) bg.src = src;
       spot.classList.add("is-lowres-art");
       bg.classList.add("is-loaded");

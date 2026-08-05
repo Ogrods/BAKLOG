@@ -457,7 +457,7 @@ export function showUpdateModal(parsed, handlers = {}) {
     modal = document.createElement("div");
     modal.id = UPDATE_MODAL_ID;
     modal.className =
-      "fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60";
+      "app-modal fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60";
     modal.tabIndex = -1;
     document.body.appendChild(modal);
   }
@@ -495,7 +495,7 @@ export function confirmInstallUpdate() {
       modal = document.createElement("div");
       modal.id = UPDATE_INSTALL_MODAL_ID;
       modal.className =
-        "fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/60";
+        "app-modal fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/60";
       modal.tabIndex = -1;
       document.body.appendChild(modal);
     }

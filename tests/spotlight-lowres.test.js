@@ -73,5 +73,27 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("has-portrait-art")).toBe(true);
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
+    expect(img.style.objectPosition).toBe("center");
+  });
+
+  it("parks portrait and low-res covers at ~2/3 when spotlight is stacked", () => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: String(query).includes("1023.98px"),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    }));
+
+    const portraitSpot = mountSpotlight();
+    const portraitImg = stubArtDimensions(portraitSpot, 300, 450);
+    expect(portraitSpot.classList.contains("has-portrait-art")).toBe(true);
+    expect(portraitImg.style.objectPosition).toBe("66% 40%");
+
+    const lowresSpot = mountSpotlight();
+    const lowresImg = stubArtDimensions(lowresSpot, 460, 215);
+    expect(lowresSpot.classList.contains("is-lowres-art")).toBe(true);
+    expect(lowresImg.style.objectPosition).toBe("66% 40%");
   });
 });

@@ -730,6 +730,11 @@ function handleLayoutClick(ev) {
     _selectedKey = railItem.dataset.provider;
 
     renderConnections();
+    queueMicrotask(() => {
+      document
+        .querySelector(".conn-rail-item.is-selected")
+        ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    });
   }
 }
 
@@ -781,6 +786,9 @@ function handleLayoutKeydown(ev) {
   document
     .querySelector(`.conn-rail-item[data-provider="${_selectedKey}"]`)
     ?.focus();
+  document
+    .querySelector(".conn-rail-item.is-selected")
+    ?.scrollIntoView({ inline: "nearest", block: "nearest" });
 }
 
 function wireGridEvents() {

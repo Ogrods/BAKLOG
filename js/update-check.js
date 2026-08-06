@@ -338,17 +338,17 @@ export function renderUpdateModalHtml(parsed) {
     : '<p class="text-sm text-slate-400 mt-3">See the release page for details.</p>';
   const canUpdateNow = parsed.applySupported && !updateMutationsBlocked(parsed);
   const updateBtn = canUpdateNow
-    ? '<button type="button" class="update-modal-apply bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Update now</button>'
+    ? '<button type="button" class="update-modal-apply bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm text-white">Update now</button>'
     : "";
   return (
-    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
+    `<div class="update-modal-panel app-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
     `<h2 id="updateModalTitle" class="text-lg font-semibold text-slate-100">Update available: v${escapeHtml(parsed.latest || "")}</h2>` +
     `<p class="text-sm text-slate-400 mt-1">You have v${escapeHtml(parsed.current)}.</p>` +
     renderApplyBlockedHint(parsed) +
     notes +
     `<div class="flex flex-wrap gap-2 justify-end mt-4">` +
     `<a href="${escapeHtml(href)}" class="update-modal-release text-sm text-sky-300 hover:underline px-3 py-2" target="_blank" rel="noopener noreferrer">Release page</a>` +
-    '<button type="button" class="update-modal-later text-sm px-3 py-2 rounded hover:bg-slate-700">Remind me later</button>' +
+    '<button type="button" class="update-modal-later text-sm px-3 py-2 rounded hover:bg-slate-700 text-slate-300">Remind me later</button>' +
     updateBtn +
     "</div></div>"
   );
@@ -356,13 +356,13 @@ export function renderUpdateModalHtml(parsed) {
 
 function renderInstallConfirmModalHtml(hints = _installHints) {
   return (
-    `<div class="update-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
+    `<div class="update-modal-panel app-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
     '<h2 id="updateInstallTitle" class="text-lg font-semibold text-slate-100">Install and restart?</h2>' +
     '<p class="text-sm text-slate-400 mt-2">The update is downloaded and verified. BAKLOG will restart to finish installing. Your library data stays where it is.</p>' +
     renderSetupArpFootnote(hints) +
     '<div class="flex flex-wrap gap-2 justify-end mt-4">' +
-    '<button type="button" class="update-install-decline text-sm px-3 py-2 rounded hover:bg-slate-700">Not yet</button>' +
-    '<button type="button" class="update-install-confirm bg-sky-700 hover:bg-sky-600 px-3 py-2 rounded text-sm">Install &amp; restart</button>' +
+    '<button type="button" class="update-install-decline text-sm px-3 py-2 rounded hover:bg-slate-700 text-slate-300">Not yet</button>' +
+    '<button type="button" class="update-install-confirm bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm text-white">Install &amp; restart</button>' +
     "</div></div>"
   );
 }
@@ -461,6 +461,8 @@ export function showUpdateModal(parsed, handlers = {}) {
     modal.tabIndex = -1;
     document.body.appendChild(modal);
   }
+  modal.className =
+    "app-modal fixed inset-0 z-50 flex items-center justify-center bg-black/60";
   modal.replaceChildren();
   modal.insertAdjacentHTML("beforeend", renderUpdateModalHtml(parsed));
   modal.classList.remove("hidden");
@@ -499,6 +501,8 @@ export function confirmInstallUpdate() {
       modal.tabIndex = -1;
       document.body.appendChild(modal);
     }
+    modal.className =
+      "app-modal fixed inset-0 z-[60] flex items-center justify-center bg-black/60";
     modal.replaceChildren();
     modal.insertAdjacentHTML("beforeend", renderInstallConfirmModalHtml());
     modal.classList.remove("hidden");

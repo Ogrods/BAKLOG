@@ -67,6 +67,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Header sheet chrome: fetcher control sits left of the hamburger, sheet-mode fetcher pill matches icon-button size, and the beta pill keeps its full border (no upward translate under brand `overflow: hidden`).
 - Phone/tablet usability: header brand/actions density, phone fullscreen fetcher sheet (reuse `#fetcherPopover`), connections stack on the tablet ladder (retire ad-hoc 720px), and dashboard strip containment so views stay usable without page-level horizontal scroll.
 - Windows release build fully stops stray servers on port 8765 before frozen smoke (was `--dedupe`, which keeps a live listener and can fail the installer publish).
+- In-app update modals (Install and restart / Update available) follow the active theme tokens instead of fixed slate/sky defaults; extend sky utility remaps (`bg-sky-500/700`, hover variants) to `--accent`.
 
 ### Changed
 

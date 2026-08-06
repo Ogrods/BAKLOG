@@ -1,34 +1,6 @@
 {
-  "generated_at": "2026-08-01T20:53:53.908375+00:00",
+  "generated_at": "2026-08-06T23:03:43.261835+00:00",
   "items": [
-    {
-      "id": "epic-otxo-396b8b",
-      "store": "epic",
-      "title": "OTXO",
-      "claim_url": "https://store.epicgames.com/en-US/p/otxo-396b8b",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1608640/header.jpg?t=1775071242",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-08-06T15:00:00Z",
-      "steam_appid": 1608640,
-      "review_percent": 93,
-      "source": "epic",
-      "first_seen": "2026-08-01T20:43:42Z"
-    },
-    {
-      "id": "epic-sol-cesto-e9b803",
-      "store": "epic",
-      "title": "Sol Cesto",
-      "claim_url": "https://store.epicgames.com/en-US/p/sol-cesto-e9b803",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2738490/d505392564204d87cd762d2cdfbd8dd30af8cfdc/header.jpg?t=1782554560",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-08-06T15:00:00Z",
-      "steam_appid": 2738490,
-      "review_percent": 91,
-      "source": "epic",
-      "first_seen": "2026-08-01T20:43:42Z"
-    },
     {
       "id": "gamerpower-2478",
       "store": "itch",

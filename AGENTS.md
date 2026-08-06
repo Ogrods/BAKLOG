@@ -55,7 +55,7 @@ Refresh bundle budget after intentional growth: `npm run build && node scripts/c
 
 ## Auth gating (layers)
 
-- **CSRF** — `X-BAKLOG-Local: 1` or valid localhost Origin/Referer for mutating requests.
+- **CSRF** — mutating requests require `X-BAKLOG-Local: 1` (the app and admin console send it). When Supabase auth is on, a valid bearer may also authorize mutations; Origin/Referer alone is not enough.
 - **Supabase JWT** — when `BAKLOG_SUPABASE_URL` + anon key set; all `/api/*` except `/api/config` require bearer token.
 - **BAKLOG_ADMIN** — exposes `/admin/` and `/api/internal/*` without Supabase.
 

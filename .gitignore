@@ -89,6 +89,9 @@ assets/milestones/
 assets/social/
 
 # Local scratch run output, audits, review artifacts (never commit)
+.connect-*.log
+connect-*.log
+/update-dismiss.json
 .build-windows.log
 EVENT_AUDIT.json
 EVENT_AUDIT.md
@@ -103,6 +106,7 @@ review-feed-rows.csv
 review-findings.yaml
 review-handoff.md
 review-report.json
+.audit/
 scripts/_diag_personal.py
 scripts/perf-last-run.json
 scripts/responsive-overflow-last-run.json

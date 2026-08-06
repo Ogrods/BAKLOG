@@ -329,4 +329,4 @@ pytest tests/test_cdp_browser.py -m integration
 
 On GitHub, use **Actions → CDP smoke (manual) → Run workflow** after a suspected Chrome/Edge regression.
 
-Phase 0 is **local-only** — no cloud accounts or billing. Supabase/Next.js (Phase 1) stays on the roadmap until you opt in.
+BAKLOG is **local-first**: your library JSON and store credentials stay on your machine. Optional invite Supabase sign-in and Polar Pro checkout exist when configured; catalogs are not hosted in a BAKLOG cloud by default.

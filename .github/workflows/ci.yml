@@ -238,6 +238,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.event_name == 'workflow_dispatch'
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 

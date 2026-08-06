@@ -230,7 +230,7 @@ Dashboard JavaScript errors can be reported via the sticky toast or **Report a b
 
 **Fix:**
 
-1. Confirm you are on **v0.8.47 or newer** (⋮ menu version, or `GET /api/diagnostics`).
+1. Confirm you are on **v0.9.00 or newer** (⋮ menu version, or `GET /api/diagnostics`).
 2. Run BAKLOG from a permanent folder, not a temp zip extract (`running_from_temp: true` in diagnostics blocks in-app updates and can break profile writes).
 3. Open your data folder (Settings or diagnostics `data_dir_path`) and check `connect-battlenet.log`, `connect-psn.log`, or `connect-cdp.log` after a failed attempt.
 4. If the first Connect needs a one-time browser download, wait for the **Downloading BAKLOG browser** progress message before the window opens.

@@ -89,6 +89,7 @@ import {
   authStatusLoaded,
 } from './connections.js';
 import { visibleItchGames } from './connections-status.js';
+import { isItadDealsAvailable } from './itad-deal-gate.js';
 import { collectActiveFilters } from './active-filters.js';
 
 export { collectActiveFilters } from './active-filters.js';
@@ -466,9 +467,12 @@ export function scheduleTableRerender() {
 
 export function updateWishlistDrawerVisibility(options = {}) {
   const deferRadar = !!options?.deferTableChrome;
+  const itadDeals = isItadDealsAvailable();
   const section = document.getElementById("wishlistDealsSection");
-  if (section) section.classList.toggle("hidden", state.activeView !== "wishlist");
-  const showWishlistDeals = state.activeView === "wishlist" && state.dashboardDataReady;
+  if (section) {
+    section.classList.toggle("hidden", state.activeView !== "wishlist" || !itadDeals);
+  }
+  const showWishlistDeals = state.activeView === "wishlist" && state.dashboardDataReady && itadDeals;
   const radar = document.getElementById("wishlistDealRadar");
   if (radar) {
     // Wait for the library/wishlist data to land before showing the radar so
@@ -508,6 +512,7 @@ export function updateViewChrome(options) {
   document.documentElement.setAttribute("data-init-view", state.activeView);
   applyItchTabVisibility();
   updateWishlistDrawerVisibility({ deferTableChrome: deferChrome });
+  void import('./itad-deal-gate.js').then((m) => m.syncItadDealSurfaces({ rerender: false }));
   updatePickTabsVisibility();
   // Picks chrome is synchronous here — async renderViewHouseSlot raced category
   // drill-ins and re-painted the house stripe after toolbar scroll (68px jump).
@@ -571,6 +576,9 @@ export function updatePickTabsVisibility() {
     if (customMatch) {
       const idx = Number(customMatch[1]);
       hidden = hidden || !shouldShowCustomListTab(lists[idx], idx);
+    }
+    if (btn.dataset.tab === 'wishlistDeals') {
+      hidden = hidden || !isItadDealsAvailable();
     }
     btn.classList.toggle("hidden", hidden);
   });
@@ -783,15 +791,24 @@ export function renderSummary() {
       if (s) sourceSet.add(s);
     }
     const sourcesList = [...sourceSet].map(s => s.toUpperCase()).sort().join(", ");
-    const onSale = wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; });
-    const lows = wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; });
-    const owned = wl.filter(g => isOwnedByTitle(g.name)).length;
+    const itadDeals = isItadDealsAvailable();
+    const onSale = itadDeals
+      ? wl.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; })
+      : [];
+    const lows = itadDeals
+      ? wl.filter(g => { const d = getDealInfo(g); return d && d.isHistoricalLow; })
+      : [];
+    const owned = itadDeals
+      ? wl.filter(g => isOwnedByTitle(g.name)).length
+      : 0;
     // 100%-off (free-to-claim) deals skew the averages (0 price, max discount),
     // so they're excluded from Avg discount / Avg price.
     const isFullyFree = g => effectiveDiscountPercent(g) >= 100;
-    const cuts = onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0 && c < 100);
+    const cuts = itadDeals ? onSale.map(g => effectiveDiscountPercent(g)).filter(c => c > 0 && c < 100) : [];
     const avgDisc = cuts.length ? Math.round(cuts.reduce((s, c) => s + c, 0) / cuts.length) : null;
-    const prices = wl.filter(g => !isFullyFree(g)).map(g => effectiveSortPrice(g)).filter(p => p != null);
+    const prices = itadDeals
+      ? wl.filter(g => !isFullyFree(g)).map(g => effectiveSortPrice(g)).filter(p => p != null)
+      : [];
     const avgPrice = prices.length ? (prices.reduce((s, p) => s + p, 0) / prices.length).toFixed(2) : null;
     const onSaleActive = !!state.prefs.dealOnSaleOnly;
     const lowOnlyActive = !!state.prefs.dealHistoricalLowOnly;
@@ -810,10 +827,14 @@ export function renderSummary() {
     const sourcesChip = sourceSet.size
       ? `<div class="summary-stat-chip" data-stat="sources" title="Wishlist sources: ${escapeAttr(sourcesList)}">Sources <span class="text-slate-100 font-semibold ml-1">${sourceSet.size}</span></div>`
       : "";
+    const itadCta = !itadDeals
+      ? `<div class="summary-stat-chip text-slate-400" data-stat="itad-cta" title="Connect ITAD in Connections for cross-store deal prices">Connect ITAD in Connections for deal prices</div>`
+      : "";
     el.innerHTML = `
       <div class="w-full flex flex-wrap gap-2">
         ${resetChip}
         ${sourcesChip}
+        ${itadCta}
         ${avgDisc != null ? `<div class="summary-stat-chip" data-stat="avg-discount" title="Average discount % across on-sale wishlist items">Avg discount <span class="text-slate-100 font-semibold ml-1">${avgDisc}%</span></div>` : ""}
         ${avgPrice != null ? `<div class="summary-stat-chip" data-stat="avg-price" title="Average current deal price (USD) on wishlist">Avg price <span class="text-slate-100 font-semibold ml-1">$${avgPrice}</span></div>` : ""}
         ${onSaleChip}

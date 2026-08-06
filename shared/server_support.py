@@ -344,5 +344,15 @@ def build_diagnostics_payload(
         "apply_started": apply_started,
         "applying_lock_age_sec": applying_lock_age_sec(work_root),
         "apply_log_tail": apply_log_tail(work_root),
+        "connect_log_tails": _connect_log_tails(data_root),
         **install_visibility_fields(version),
     }
+
+
+def _connect_log_tails(data_root: Path) -> dict[str, list[str]]:
+    from auth.connect_log import connect_log_tails
+
+    try:
+        return connect_log_tails(max_lines=40)
+    except Exception:  # noqa: BLE001
+        return {}

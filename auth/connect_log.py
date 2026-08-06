@@ -57,3 +57,22 @@ def reset_connect_log_for_tests() -> None:
     """Clear cached paths / dedupe state (unit tests only)."""
     _last_log_by_key.clear()
     _log_paths.clear()
+
+
+def connect_log_tails(*, max_lines: int = 40) -> dict[str, list[str]]:
+    """Return tails of ``connect-*.log`` files under the data dir."""
+    from shared.server_support import tail_text_file
+
+    try:
+        from shared.install_paths import data_root
+
+        root = data_root()
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict[str, list[str]] = {}
+    try:
+        for path in sorted(root.glob("connect-*.log")):
+            out[path.name] = tail_text_file(path, max_lines=max_lines)
+    except Exception:  # noqa: BLE001
+        pass
+    return out

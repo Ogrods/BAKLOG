@@ -5,9 +5,11 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { state } from '../js/state.js';
 import { buildWishlistStatsHtml } from '../js/dashboard-cards.js';
+import { setAuthStatusSnapshot } from '../js/connections-status.js';
 
 beforeEach(() => {
   state.wishlistGames = [];
+  setAuthStatusSnapshot([{ key: 'itad', status: 'connected' }]);
 });
 
 describe('buildWishlistStatsHtml empty wishlist', () => {
@@ -26,5 +28,10 @@ describe('buildWishlistStatsHtml empty wishlist', () => {
     const html = buildWishlistStatsHtml();
     expect(html).toContain('wishlist fetcher');
     expect(html).toContain('Connect a store');
+  });
+
+  it('returns empty html when ITAD is not connected', () => {
+    setAuthStatusSnapshot([]);
+    expect(buildWishlistStatsHtml()).toBe('');
   });
 });

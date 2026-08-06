@@ -20,6 +20,7 @@ import { storeLogoHtml, storeDisplayName } from "./store-logos.js";
 import { getPersonal, filterOutHidden } from "./personal-storage.js";
 import { spotlightRecentKeysStorageKey } from "./profiles.js";
 import { getDealInfo, cutBucketClass } from "./deals.js";
+import { isItadDealsAvailable } from "./itad-deal-gate.js";
 import {
   isBarrel,
   isLeveragePick,
@@ -614,7 +615,7 @@ export function gameSpotlightReason(g, recentKeys) {
   if (status === "next" && rating >= 70) {
     return { eyebrow: "Up next", score: rating + 10 };
   }
-  if (isLeveragePick(g)) {
+  if (isItadDealsAvailable() && isLeveragePick(g)) {
     return { eyebrow: "Clutch deal", score: rating + 12, isLeverage: true };
   }
   // "Supposedly perfect" — a flawless 100% score on a thin sample (<50 reviews),
@@ -722,36 +723,38 @@ export function pickSpotlightGames(games, snapIn) {
   // games you want but don't own yet. Mirrors the visible-wishlist filter used by
   // the deal radar (cross-store-hidden + user-hidden excluded).
   const wlHidden = state.wishlistCrossStoreHiddenKeys || new Set();
-  const wishlistOnSale = filterOutHidden(
-    (state.wishlistGames || []).filter((g) => !wlHidden.has(gameKey(g))),
-  )
-    .filter(hasArt)
-    .filter((g) => isOnSale(g) && ratingValue(g) >= 70)
-    .map((g) => {
-      const deal = getDealInfo(g);
-      const cut = deal?.cut || 0;
-      const rating = ratingValue(g);
-      const metaParts = [`<strong>${rating}%</strong> review`];
-      if (cut > 0) {
-        metaParts.push(
-          `<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`,
-        );
-      }
-      if (deal?.price != null) {
-        metaParts.push(
-          `<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`,
-        );
-      }
-      return {
-        g,
-        reason: {
-          eyebrow: "On sale now",
-          score: rating + 9,
-          isWishlistSale: true,
-          metaParts,
-        },
-      };
-    });
+  const wishlistOnSale = isItadDealsAvailable()
+    ? filterOutHidden(
+        (state.wishlistGames || []).filter((g) => !wlHidden.has(gameKey(g))),
+      )
+        .filter(hasArt)
+        .filter((g) => isOnSale(g) && ratingValue(g) >= 70)
+        .map((g) => {
+          const deal = getDealInfo(g);
+          const cut = deal?.cut || 0;
+          const rating = ratingValue(g);
+          const metaParts = [`<strong>${rating}%</strong> review`];
+          if (cut > 0) {
+            metaParts.push(
+              `<strong class="dash-spotlight-cut ${cutBucketClass(cut)}">-${cut}%</strong> off`,
+            );
+          }
+          if (deal?.price != null) {
+            metaParts.push(
+              `<strong class="dash-spotlight-price ${cutBucketClass(cut)}">${escapeHtml(formatDollar(deal.price))}</strong>`,
+            );
+          }
+          return {
+            g,
+            reason: {
+              eyebrow: "On sale now",
+              score: rating + 9,
+              isWishlistSale: true,
+              metaParts,
+            },
+          };
+        })
+    : [];
   tagged.push(...wishlistOnSale);
 
   const snap = snapIn || getLibrarySnapshot(games);

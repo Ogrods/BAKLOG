@@ -8,6 +8,7 @@ import re
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -610,34 +611,43 @@ def _fetch_npsso_background(page, context) -> tuple[str, str]:
 
 def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Wait for sign-in on the PlayStation Store, then capture a valid npsso."""
-    deadline = time.time() + SUCCESS_WAIT_SEC
-    last_ssocookie = 0.0
+    from auth.cdp_browser import abort_if_browser_closed
+    from auth.connect_log import connect_log
+    from auth.connect_loop import run_connect_poll
+
+    connect_log("psn", "connect poll start", key="enter")
+
     tried_cookie: set[str] = set()
-    last_msg = 0.0
-    while time.time() < deadline:
+    last_ssocookie = [0.0]
+    last_blocked_nav = [0.0]
+
+    def _check() -> dict[str, str] | None:
         abort_if_browser_closed(context)
         url = page.url or ""
-
-        # Always re-check by fetching from ssocookie endpoint first; that's
-        # the source of truth, not the stale cookie that may be in the jar.
         now = time.time()
-        if now - last_ssocookie >= PSN_SSOCOOKIE_INTERVAL_SEC:
-            last_ssocookie = now
-            fresh, _source = _fetch_npsso_background(page, context)
+        if now - last_ssocookie[0] >= PSN_SSOCOOKIE_INTERVAL_SEC:
+            last_ssocookie[0] = now
+            fresh, source = _fetch_npsso_background(page, context)
+            connect_log(
+                "psn",
+                f"ssocookie poll source={source or 'none'} has_token={'yes' if fresh else 'no'}",
+                key="ssocookie",
+            )
             if fresh and fresh not in tried_cookie:
                 result = _check_npsso(fresh)
+                connect_log("psn", f"npsso probe={result}", key=f"npsso-{result}")
                 if result == PSN_CHECK_VALID:
+                    connect_log("psn", "session ready", key="ready")
                     return {"PSN_NPSSO": fresh}
-                # Only blacklist a token PSN positively rejected — an
-                # "unreachable" result is a network blip, so keep retrying it.
                 if result == PSN_CHECK_INVALID:
                     tried_cookie.add(fresh)
 
-        # Also try the cookie directly (cheap)
         cookie_val = _psn_cookie(context)
         if cookie_val and cookie_val not in tried_cookie:
             result = _check_npsso(cookie_val)
+            connect_log("psn", f"cookie jar probe={result}", key=f"jar-{result}")
             if result == PSN_CHECK_VALID:
+                connect_log("psn", "session ready via cookie jar", key="ready-jar")
                 return {"PSN_NPSSO": cookie_val}
             if result == PSN_CHECK_INVALID:
                 tried_cookie.add(cookie_val)
@@ -648,38 +658,35 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
             body = ""
 
         if _psn_on_blocked_account_page(url, body):
-            if session and now - last_msg > 6:
-                last_msg = now
-                session.emit(
-                    "waiting_for_user",
-                    {"message": "Use Sign In on the PlayStation Store (top-right) to continue"},
-                )
-            try:
-                page.goto(PSN_STORE_URL, wait_until="domcontentloaded", timeout=20000)
-            except Exception:
-                pass
-            page.wait_for_timeout(1500)
-            continue
+            connect_log("psn", f"blocked account page url={(url or '')[:120]}", key="blocked")
+            if now - last_blocked_nav[0] > 6:
+                last_blocked_nav[0] = now
+                try:
+                    page.goto(PSN_STORE_URL, wait_until="domcontentloaded", timeout=20000)
+                except Exception:
+                    pass
+        return None
 
-        if session and now - last_msg > 6:
-            last_msg = now
-            session.emit(
-                "waiting_for_user",
-                {
-                    "message": (
-                        "Signed in to PlayStation? Click anything on the page so Sony "
-                        "issues a fresh session cookie."
-                    )
-                    if "store.playstation.com" in url.lower()
-                    else "Sign in on the PlayStation Store (Sign In, top-right)."
-                },
+    def _hint() -> str:
+        url = (page.url or "").lower()
+        if "store.playstation.com" in url:
+            return (
+                "Signed in to PlayStation? Click anything on the page so Sony "
+                "issues a fresh session cookie."
             )
+        return "Sign in on the PlayStation Store (Sign In, top-right)."
 
-        page.wait_for_timeout(int(POLL_SEC * 1000))
-
-    raise RuntimeError(
-        "Could not capture a PSN session — sign in on the PlayStation Store (Sign In, top-right) "
-        "and keep this window open until it closes."
+    return run_connect_poll(
+        context=context,
+        session=session,
+        deadline=time.time() + SUCCESS_WAIT_SEC,
+        poll_sec=POLL_SEC,
+        check=_check,
+        hint=_hint,
+        timeout_message=(
+            "Could not capture a PSN session — sign in on the PlayStation Store (Sign In, top-right) "
+            "and keep this window open until it closes."
+        ),
     )
 
 
@@ -1860,8 +1867,10 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
     session.emit("waiting_for_user", {"message": connect_hint})
 
     from auth.cdp_browser import release_chromium_profile_lock
+    from auth.connect_log import connect_log
 
     release_chromium_profile_lock(user_data)
+    connect_log(provider, f"launching browser profile={Path(user_data).name}", key="launch")
 
     with launch_persistent_profile(
         user_data,

@@ -4,7 +4,8 @@
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { state } from '../js/state.js';
-import { renderPicks } from '../js/picks-ui.js';
+import { renderPicks, effectivePicksTab } from '../js/picks-ui.js';
+import { setAuthStatusSnapshot } from '../js/connections-status.js';
 
 function setupPicksDom() {
   document.body.innerHTML = `
@@ -48,6 +49,7 @@ describe('renderPicks empty library', () => {
   });
 
   it('wishlist deals tab uses Fetcher health wording when wishlist is empty', () => {
+    setAuthStatusSnapshot([{ key: 'itad', status: 'connected' }]);
     state.activeView = 'wishlist';
     state.prefs.picksTab = 'wishlistDeals';
     renderPicks();
@@ -55,5 +57,15 @@ describe('renderPicks empty library', () => {
     expect(grid?.innerHTML).toContain('Fetcher health');
     expect(grid?.innerHTML).toContain('Connect a store');
     expect(grid?.innerHTML).not.toMatch(/fetch_.*\.py/);
+  });
+
+  it('falls back from wishlist deals tab when ITAD is disconnected', () => {
+    setAuthStatusSnapshot([]);
+    state.activeView = 'wishlist';
+    state.prefs.picksTab = 'wishlistDeals';
+    expect(effectivePicksTab()).toBe('topRated');
+    renderPicks();
+    const grid = document.getElementById('picksGrid');
+    expect(grid?.innerHTML).toContain('Connect ITAD in Connections');
   });
 });

@@ -198,6 +198,8 @@ describe("spotlight expanded categories", () => {
     state.libraryFirstSeenByKey = {};
     state.wishlistGames = [];
     state.wishlistCrossStoreHiddenKeys = new Set();
+    const { setAuthStatusSnapshot } = await import("../js/connections-status.js");
+    setAuthStatusSnapshot([{ key: "itad", status: "connected" }]);
     win._dataVersion = (win._dataVersion || 0) + 1;
     let setStinkerChanceForTest;
     let setScoreJitterForTest;

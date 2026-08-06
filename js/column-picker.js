@@ -4,6 +4,7 @@ import { bindEscapeClose, trapFocus } from './focus-trap.js';
 import { escapeHtml } from './dom-util.js';
 import {
   toggleableColumns,
+  columnsForPicker,
   isColumnVisible,
   setColumnVisible,
   resetColumns,
@@ -36,7 +37,7 @@ function render() {
   const list = el(LIST_ID);
   if (!list) return;
   const view = currentView();
-  const cols = toggleableColumns();
+  const cols = columnsForPicker(view);
   list.innerHTML = cols.map(c => rowHtml(c, view)).join('');
 }
 

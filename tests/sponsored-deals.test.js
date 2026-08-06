@@ -53,6 +53,7 @@ import * as authGate from '../js/auth-gate.js';
 import * as anonMetrics from '../js/anon-metrics.js';
 import * as apiClient from '../js/api-client.js';
 import { state } from '../js/state.js';
+import { setAuthStatusSnapshot } from '../js/connections-status.js';
 
 function sponsor(overrides = {}) {
   const { id, ...rest } = {
@@ -896,6 +897,7 @@ describe('buildWishlistStatsHtml ad slot variants', () => {
   });
 
   it('uses wish-deal-hero sponsor in the wishlist deal rail when assigned', () => {
+    setAuthStatusSnapshot([{ key: 'itad', status: 'connected' }]);
     state.wishlistGames = [];
     __setSponsorsForTest(v2Doc(
       { hero: sponsor({ id: 'hero', title: 'Hero Deal', kind: 'sponsor' }) },

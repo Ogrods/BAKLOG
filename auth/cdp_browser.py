@@ -1681,6 +1681,14 @@ def launch_persistent_profile(
     profile = Path(user_data_dir)
     profile.mkdir(parents=True, exist_ok=True)
     _ensure_persistent_session_prefs(profile)
+    launch_t0 = time.time()
+    from auth.connect_log import connect_log
+
+    connect_log(
+        "cdp",
+        f"launch start exe={Path(exe).name} profile={profile.name} port={port}",
+        key="launch",
+    )
 
     args = [
         str(exe),
@@ -1939,6 +1947,12 @@ def launch_persistent_profile(
                 page.goto(initial_url, wait_until="domcontentloaded", timeout=25_000)
             except Exception:
                 pass
+
+    connect_log(
+        "cdp",
+        f"attached ms={int((time.time() - launch_t0) * 1000)} pages={len(context.pages)}",
+        key="attached",
+    )
 
     return context
 

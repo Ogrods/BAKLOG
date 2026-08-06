@@ -745,6 +745,31 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
 
     def _worker() -> None:
         try:
+            # Prefetch managed Chrome for Testing before the Connect window opens so
+            # progress can stream over SSE (wishlist/headless paths still ensure in
+            # launch_persistent_profile).
+            from auth.cdp_browser import ensure_chromium_executable
+
+            last_emit = [0.0]
+
+            def _on_chromium_progress(done: int, total: int | None) -> None:
+                now = time.time()
+                if done and total and done < total and (now - last_emit[0]) < 0.4:
+                    return
+                last_emit[0] = now
+                if total and total > 0:
+                    pct = min(100, int(100 * done / total))
+                    msg = f"Downloading BAKLOG browser… {pct}% (~150 MB one-time)"
+                else:
+                    mb = max(1, done // (1024 * 1024)) if done else 0
+                    msg = f"Downloading BAKLOG browser… {mb} MB (~150 MB one-time)"
+                session.emit(
+                    "status",
+                    {"message": msg, "bytes": done, "total": total},
+                )
+
+            ensure_chromium_executable(on_progress=_on_chromium_progress)
+
             creds = run_browser_auth(provider, session)
             if not creds:
                 # Window closed without a completed sign-in. Reset to a clean,

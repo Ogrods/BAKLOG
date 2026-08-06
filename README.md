@@ -67,7 +67,7 @@ The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-a
 
 Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback — not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
 
-**Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium for the Connect sign-in flow (override with `BAKLOG_CHROME_PATH`), then `pip install -r requirements.txt` and `python server.py`. Developers/CI: `pip install -e ".[dev]"` (or `requirements-dev.txt`).
+**Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium preferred for Connect (override with `BAKLOG_CHROME_PATH`; if missing, first Connect downloads a one-time browser ~150 MB), then `pip install -r requirements.txt` and `python server.py`. Developers/CI: `pip install -e ".[dev]"` (or `requirements-dev.txt`).
 
 ### System tray (optional)
 
@@ -225,7 +225,7 @@ If you have not created a venv yet, run the [Setup](#setup) steps first (`python
 
 Windows shortcut: `.\scripts\start-server.ps1` (uses the project venv; run `pip install -e ".[dev]"` once if that script reports a missing venv).
 
-Requires **Google Chrome** or **Microsoft Edge** installed (Edge ships with Windows). Connections opens a headed browser window for cookie/OAuth sign-in. Override the browser path with `BAKLOG_CHROME_PATH` if needed.
+Requires **Google Chrome** or **Microsoft Edge** when available (Edge ships with Windows). If neither is installed, Connections downloads a one-time Chrome for Testing build (~150 MB) on first Connect. Override the browser path with `BAKLOG_CHROME_PATH` if needed.
 
 On Windows, always use the project venv (not the Microsoft Store `python.exe` stub). Fetcher subprocesses launched from the stub can hang `subprocess.Popen` and wedge the run queue. `server.py` auto-picks `.venv` when present.
 

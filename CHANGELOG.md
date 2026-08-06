@@ -30,6 +30,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- When Chrome/Edge is missing, Connections (and other CDP launches) download a pinned Chrome for Testing build once into the data-dir cache (`shared/chromium_runtime.py`, pin `shared/chromium_cft_pin.json`). System browsers and `BAKLOG_CHROME_PATH` still win; `BAKLOG_NO_CHROMIUM_DOWNLOAD=1` disables the fallback.
+
 ### Fixed
 
 - Responsive outside scan: `TABLE_PHONE_MQ` (+ phone chrome / A–Z dock) aligns with sheet landscape MQ so 844×390 uses library cards; `test:responsive` covers itch + outside overlays (notes/bug/update/kebab/profile/claimables/header nav/pro-compare) and `--auth-gate` mode.

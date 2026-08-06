@@ -102,6 +102,14 @@ def test_pyinstaller_datas_include_curated_feeds() -> None:
     ), "packaging/baklog.spec datas must bundle curated/ (free_claims.fallback.json offline)"
 
 
+def test_pyinstaller_datas_include_chromium_cft_pin() -> None:
+    text = SPEC.read_text(encoding="utf-8")
+    assert 'chromium_cft_pin.json' in text, (
+        "packaging/baklog.spec datas must bundle shared/chromium_cft_pin.json"
+    )
+    assert (ROOT / "shared" / "chromium_cft_pin.json").is_file()
+
+
 def test_inno_installer_branding_assets() -> None:
     """Inno Setup wizard/icon files must exist with expected dimensions."""
     packaging = ROOT / "packaging"

@@ -1,0 +1,23 @@
+{
+  "version": "151.0.7922.76",
+  "channel": "Stable",
+  "source": "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json",
+  "platforms": {
+    "win64": {
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.76/win64/chrome-win64.zip",
+      "sha256": "19e700a206718b59ad2d208a37112b7543aead4b2da34b9539a3d6950341a866"
+    },
+    "mac-arm64": {
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.76/mac-arm64/chrome-mac-arm64.zip",
+      "sha256": "4d727601939c51719d2b5ff7d2cd57c44fab6d2529f9f1d2e5769939b86590bf"
+    },
+    "mac-x64": {
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.76/mac-x64/chrome-mac-x64.zip",
+      "sha256": "856f41d1ce82dd618c9e9317d48608286ba85d67be0e3870d64d305fe058b121"
+    },
+    "linux64": {
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.76/linux64/chrome-linux64.zip",
+      "sha256": "d9e4c5916f77e737f22056cab47cd8abb7d39ebec559500ffc2d6f3e02106a7e"
+    }
+  }
+}

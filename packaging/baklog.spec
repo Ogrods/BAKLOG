@@ -26,6 +26,7 @@ datas = [
     (str(root / "vendor"), "vendor"),
     (str(root / "curated"), "curated"),
     (str(root / "fetchers" / "manifest.json"), "fetchers"),
+    (str(root / "shared" / "chromium_cft_pin.json"), "shared"),
     (str(root / "pyproject.toml"), "."),
 ]
 

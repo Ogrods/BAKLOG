@@ -1,7 +1,8 @@
-"""Launch the user's Chrome/Edge and drive it over Chrome DevTools Protocol (CDP).
+"""Launch Chrome/Edge (or a managed Chrome for Testing build) over CDP.
 
 Replaces Playwright for Connections sign-in and headless wishlist fetches.
-Requires Google Chrome or Microsoft Edge installed locally.
+Prefers a system Google Chrome or Microsoft Edge install; when none is found,
+``ensure_chromium_executable`` downloads a pinned Chrome for Testing build.
 """
 
 from __future__ import annotations
@@ -364,7 +365,7 @@ STEALTH_INIT_SCRIPT = r"""
 
 _BROWSER_LAUNCH_HINT = (
     "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH to the browser "
-    "executable, or try the other installed browser."
+    "executable, or let BAKLOG download a one-time browser (~150 MB) on Connect."
 )
 
 
@@ -487,7 +488,10 @@ def _chromium_executable_candidates() -> list[Path]:
 
 
 def find_chromium_executable() -> Path:
-    """Return path to Chrome or Edge, or raise with install instructions."""
+    """Return path to Chrome/Edge or a previously downloaded managed build.
+
+    Does not download. Soft probes (``/api/config``) use this so boot stays offline.
+    """
     override = os.getenv("BAKLOG_CHROME_PATH", "").strip()
     if override:
         p = Path(override)
@@ -506,10 +510,39 @@ def find_chromium_executable() -> Path:
             if p.is_file():
                 return p
 
+    try:
+        from shared.chromium_runtime import find_managed_chromium
+
+        managed = find_managed_chromium()
+        if managed is not None:
+            return managed
+    except Exception:
+        pass
+
     raise RuntimeError(
         "No Chrome or Edge browser found. Install Google Chrome or Microsoft Edge, "
-        "or set BAKLOG_CHROME_PATH to your browser executable."
+        "set BAKLOG_CHROME_PATH, or Connect once online so BAKLOG can download a browser."
     )
+
+
+def ensure_chromium_executable(
+    *,
+    on_progress: Callable[[int, int | None], None] | None = None,
+) -> Path:
+    """Like ``find_chromium_executable``, but download managed CfT when missing."""
+    try:
+        return find_chromium_executable()
+    except RuntimeError:
+        override = os.getenv("BAKLOG_CHROME_PATH", "").strip()
+        if override:
+            # Honor explicit override failures; never replace with a download.
+            raise
+        from shared.chromium_runtime import ChromiumRuntimeError, ensure_chromium
+
+        try:
+            return ensure_chromium(on_progress=on_progress)
+        except ChromiumRuntimeError as exc:
+            raise RuntimeError(f"{exc} {_BROWSER_LAUNCH_HINT}") from exc
 
 
 def _free_port() -> int:
@@ -1643,7 +1676,7 @@ def launch_persistent_profile(
     When ``initial_url`` is set, the first connect page navigates there after CDP attach
     (used by EA Connect to open the login page immediately).
     """
-    exe = find_chromium_executable()
+    exe = ensure_chromium_executable()
     port = _free_port()
     profile = Path(user_data_dir)
     profile.mkdir(parents=True, exist_ok=True)

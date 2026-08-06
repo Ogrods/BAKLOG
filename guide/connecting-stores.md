@@ -2,7 +2,7 @@
 
 Connect each store from the **Connections** tab in the dashboard, then run fetchers from the **Fetcher health** row or from the terminal.
 
-**Recommended flow:** run `python server.py`, open **Connections**, click **Connect** for each store. A headed Chrome/Edge window opens for cookie or OAuth sign-in. Credentials stay local in encrypted per-profile storage (`cache/auth/`). After connecting, click the matching chip in **Fetcher health** or run the script below.
+**Recommended flow:** run `python server.py`, open **Connections**, click **Connect** for each store. A headed Chrome/Edge window opens for cookie or OAuth sign-in (if neither is installed, BAKLOG downloads a one-time browser on first Connect). Credentials stay local in encrypted per-profile storage (`cache/auth/`). After connecting, click the matching chip in **Fetcher health** or run the script below.
 
 BAKLOG supports **19 store connections** across **12 libraries** and **8 wishlists** (27 fetcher jobs). Wishlist JSON files are optional per store - the **Fetcher health** row marks any file not yet fetched as *missing*; that is normal until you run the matching script.
 

@@ -41,7 +41,7 @@ Profile switch cancels in-flight fetchers, resets secrets cache, rebinds run pat
 
 1. **Old machine:** **Connections** → ⋮ → **Portable bundle…** → **Export bundle…**. Choose a passphrase and save the downloaded `baklog-secrets-*.bundle` somewhere safe (USB, cloud folder, etc.).
 
-2. **New machine:** Install BAKLOG (`pip install -r requirements.txt`, `python server.py`). Chrome or Edge must be installed for Connections sign-in.
+2. **New machine:** Install BAKLOG (`pip install -r requirements.txt`, `python server.py`). Chrome or Edge is preferred for Connections; if missing, first Connect downloads a one-time browser (~150 MB).
 
 3. **New machine:** **Connections** → ⋮ → **Portable bundle…** → **Import bundle…**, pick the file, enter the same passphrase. The page reloads with every provider restored - including browser cookie profiles.
 

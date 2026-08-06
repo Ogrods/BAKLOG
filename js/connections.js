@@ -1774,6 +1774,15 @@ async function startBrowserConnect(provider) {
         msg.message || "Complete sign-in in the browser window…";
   });
 
+  es.addEventListener("status", (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (log && msg.message) log.textContent = msg.message;
+    } catch {
+      /* ignore malformed status */
+    }
+  });
+
   es.addEventListener("signed_in", () => {
     if (log) log.textContent = "Signed in - extracting credentials…";
   });
@@ -1838,7 +1847,7 @@ function renderBrowserWarn() {
   el.hidden = false;
   el.innerHTML = `
     <div class="migration-banner-body">
-      <span class="text-amber-400">Google Chrome or Microsoft Edge is required for store sign-in. Install one, then click Connect.</span>
+      <span class="text-amber-400">No Chrome or Edge found. On first Connect, BAKLOG downloads a one-time browser (~150 MB), or install Google Chrome / Microsoft Edge.</span>
     </div>`;
 }
 

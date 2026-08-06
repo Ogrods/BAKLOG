@@ -64,12 +64,14 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 ## Chrome / Edge not found
 
-**Symptom:** Connections sign-in fails to open a browser.
+**Symptom:** Connections shows a browser warning, or sign-in fails to open a browser.
 
 **Fix:**
 
-1. Install Google Chrome or Microsoft Edge.
-2. Set `BAKLOG_CHROME_PATH` to the full path of your browser executable.
+1. Click **Connect** once while online - BAKLOG downloads a one-time browser (~150 MB) into its data folder when Chrome/Edge is missing.
+2. Or install Google Chrome or Microsoft Edge.
+3. Or set `BAKLOG_CHROME_PATH` to the full path of your browser executable.
+4. Offline / air-gapped: install Chrome or Edge (or set `BAKLOG_CHROME_PATH`). `BAKLOG_NO_CHROMIUM_DOWNLOAD=1` disables the auto-download.
 
 ## Battle.net cookie issues (Windows)
 

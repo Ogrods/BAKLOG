@@ -7,7 +7,7 @@ Install BAKLOG, run the local server, and open the dashboard in your browser.
 | Requirement | Notes |
 |-------------|-------|
 | **Python 3.11+** | Use a virtual environment (recommended) |
-| **Google Chrome or Chromium** | Required for the Connections sign-in flow. Microsoft Edge also works on Windows. Override with `BAKLOG_CHROME_PATH` if needed |
+| **Google Chrome or Chromium** | Preferred for Connections sign-in (Microsoft Edge also works). If none is installed, BAKLOG downloads a one-time browser (~150 MB) on first Connect. Override with `BAKLOG_CHROME_PATH` if needed |
 | **OS** | Windows 10/11 (primary), macOS, or Linux - see [FAQ](faq.md#supported-platforms) for store limits |
 
 On Windows, use the project `.venv` Python - not the Microsoft Store `python.exe` stub. Fetcher subprocesses launched from the stub can hang and wedge the run queue. `server.py` auto-picks `.venv` when present.

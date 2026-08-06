@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from auth.connect_loop import run_connect_poll
-from auth.runner import PSN_CHECK_VALID, _fetch_npsso_background
+from auth.runner import _fetch_npsso_background
 
 
 def test_ssocookie_api_used_when_cookie_jar_empty() -> None:

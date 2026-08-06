@@ -239,6 +239,8 @@ python fetch_itad.py                        # IsThereAnyDeal prices → itad_pri
 
 **Display currency / FX:** set `ITAD_COUNTRY` (e.g. `GB`) before `fetch_itad.py`. ITAD and wishlist rows use that region's currency. The script caches daily exchange rates from [Frankfurter](https://www.frankfurter.app/) and writes comparable `price_amount` fields on wishlist JSON while keeping `price_native` / `currency_native` for the store's real price. Re-run ITAD after wishlist fetches to refresh conversions.
 
+**Wishlist deal UI:** Cross-store deal prices on the Wishlist tab and Dashboard require **ITAD** connected in Connections (validated API key) plus a run of `fetch_itad.py` from Fetcher health.
+
 ---
 
 ## Platform availability

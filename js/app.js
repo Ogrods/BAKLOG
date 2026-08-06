@@ -106,6 +106,7 @@ import {
 } from "./dashboard-charts.js";
 import { prewarmTableQueryForView, tableFingerprint } from "./table-ui.js";
 import { applyColumnVisibility } from "./table-columns.js";
+import { isItadDealsAvailable, syncItadDealSurfaces } from "./itad-deal-gate.js";
 import { initBugReportDialog } from "./bug-report.js";
 import { refreshAdsForPlanChange } from "./sponsored-deals.js";
 import {
@@ -214,6 +215,9 @@ async function bootstrap() {
   syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
+  document.addEventListener("baklog:auth-status", () => {
+    syncItadDealSurfaces();
+  });
   wireProView();
   onPlanChange(() => {
     applyProTabVisibility();
@@ -257,6 +261,7 @@ async function bootstrap() {
   syncFilterDomFromState();
   updateCleanupBtnState();
   updateViewChrome();
+  syncItadDealSurfaces({ rerender: false });
   if (
     state.activeView === "library" &&
     state.prefs.picksTab === "wishlistDeals"
@@ -266,6 +271,7 @@ async function bootstrap() {
   }
   if (
     state.activeView === "wishlist" &&
+    isItadDealsAvailable() &&
     state.prefs.picksTab !== "wishlistDeals"
   ) {
     state.prefs.picksTab = "wishlistDeals";

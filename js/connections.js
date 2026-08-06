@@ -46,6 +46,7 @@ export {
   providerForFetcher,
   providerStatus,
 };
+export { isItadDealsAvailable } from "./itad-deal-gate.js";
 export {
   displayStatus,
   groupRepFor,
@@ -1805,7 +1806,7 @@ async function startBrowserConnect(provider) {
     // On frozen builds, the server console stderr may contain the actual
     // error details (e.g. a traceback from the connect callback).
     if (_serverFrozen && log) {
-      log.textContent += " Check the BAKLOG server console for error details.";
+      log.textContent += " Check connect-*.log in your BAKLOG data folder (see Settings > Data folder).";
     }
 
     connectUiFinished = true;

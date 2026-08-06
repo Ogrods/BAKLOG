@@ -5,6 +5,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { state } from '../js/state.js';
 import { renderPicks } from '../js/picks-ui.js';
+import { setAuthStatusSnapshot } from '../js/connections-status.js';
 import { dismissSponsoredDeal, __resetDismissedSponsorsForTest, __setSponsorsForTest } from '../js/sponsored-deals.js';
 import * as authGate from '../js/auth-gate.js';
 
@@ -34,6 +35,7 @@ function wishlistDeal(name, price = 9.99, cut = 50) {
 
 beforeEach(() => {
   __resetDismissedSponsorsForTest();
+  setAuthStatusSnapshot([{ key: 'itad', status: 'connected' }]);
   vi.spyOn(authGate, 'isPro').mockReturnValue(false);
   state.allGames = [];
   state.itchGames = [];

@@ -15,6 +15,7 @@ import {
 import { gameGenresCanonical } from "./genres.js";
 import { getPersonal } from "./personal-storage.js";
 import { getDealInfo, dealScore } from "./deals.js";
+import { isItadDealsAvailable } from "./itad-deal-gate.js";
 import { formatMoney, displayCurrency } from "./currency.js";
 import { hoardRate, oldestWishlist } from "./sabermetrics.js";
 
@@ -365,20 +366,22 @@ export function computeCreativeMetrics(games, snap) {
   }
 
   const wl = state.wishlistGames || [];
-  const atLow = wl.filter((g) => {
-    const d = getDealInfo(g);
-    return d && d.isHistoricalLow;
-  });
-  if (atLow.length) out.patiencePays = atLow.length;
+  if (isItadDealsAvailable()) {
+    const atLow = wl.filter((g) => {
+      const d = getDealInfo(g);
+      return d && d.isHistoricalLow;
+    });
+    if (atLow.length) out.patiencePays = atLow.length;
 
-  const onSaleWl = wl.filter((g) => {
-    const d = getDealInfo(g);
-    return d && (d.cut || 0) > 0;
-  });
-  if (onSaleWl.length) {
-    const top = [...onSaleWl].sort((a, b) => dealScore(b) - dealScore(a))[0];
-    const cut = getDealInfo(top)?.cut || 0;
-    out.gotAway = { name: top.name, cut };
+    const onSaleWl = wl.filter((g) => {
+      const d = getDealInfo(g);
+      return d && (d.cut || 0) > 0;
+    });
+    if (onSaleWl.length) {
+      const top = [...onSaleWl].sort((a, b) => dealScore(b) - dealScore(a))[0];
+      const cut = getDealInfo(top)?.cut || 0;
+      out.gotAway = { name: top.name, cut };
+    }
   }
 
   const wlOldest = oldestWishlist(wl);

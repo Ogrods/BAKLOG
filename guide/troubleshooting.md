@@ -224,6 +224,20 @@ We skip paid signing for now; future releases may add certificates. Verify SHA-2
 
 Dashboard JavaScript errors can be reported via the sticky toast or **Report a bug…** menu. Fetcher failures are separate - check **Fetcher health**, exit codes, and `profiles/<id>/cache/runs/*.jsonl`. See [Getting help](getting-help.md).
 
+## Connect window closes immediately
+
+**Symptom:** Battle.net, PSN, or another store Connect opens a browser window that closes within a few seconds.
+
+**Fix:**
+
+1. Confirm you are on **v0.8.47 or newer** (⋮ menu version, or `GET /api/diagnostics`).
+2. Run BAKLOG from a permanent folder, not a temp zip extract (`running_from_temp: true` in diagnostics blocks in-app updates and can break profile writes).
+3. Open your data folder (Settings or diagnostics `data_dir_path`) and check `connect-battlenet.log`, `connect-psn.log`, or `connect-cdp.log` after a failed attempt.
+4. If the first Connect needs a one-time browser download, wait for the **Downloading BAKLOG browser** progress message before the window opens.
+5. Use **Reconnect** and complete sign-in without closing the window early.
+
+Include the relevant `connect-*.log` tail when reporting a bug (**Report a bug…** copies diagnostics automatically on recent builds).
+
 ## Still stuck?
 
 - [FAQ](faq.md)

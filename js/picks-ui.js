@@ -20,6 +20,7 @@ import {
   dealDroppedBadgeHtml,
   isOwnedByTitle,
 } from './deals.js';
+import { isItadDealsAvailable } from './itad-deal-gate.js';
 import { getPersonal, filterOutHidden } from './personal-storage.js';
 import { getPicksLimitForView, setPicksLimitForView } from './prefs.js';
 import { syncCoverFits } from './covers.js';
@@ -143,7 +144,10 @@ export function applyPicksCollapsedState() {
 /** Picks tab for the active view — never show library tabs on wishlist. */
 export function effectivePicksTab() {
   const view = state.activeView;
-  if (view === "wishlist") return "wishlistDeals";
+  if (view === "wishlist") {
+    if (!isItadDealsAvailable()) return "topRated";
+    return "wishlistDeals";
+  }
   if (view === "itch") {
     const t = state.prefs.itchPicksTab || state.prefs.picksTab;
     if (t === "wishlistDeals" || isCustomListTab(t)) return state.prefs.itchPicksTab || "topRated";
@@ -203,6 +207,8 @@ export function renderPicks() {
     default:
       if (customIdx >= 0 && pickView === "library") {
         data = resolveCustomListGames(getCustomLists()[customIdx]);
+      } else if (pickView === "wishlist" && !isItadDealsAvailable()) {
+        data = [];
       } else {
         data = pickView === "wishlist" ? wishlistDeals : backlogRated;
       }
@@ -229,9 +235,13 @@ export function renderPicks() {
   const emptyMsg = isCustomTab
     ? 'Select games in the table, then use Add to list in the bulk bar.'
     : tab === "wishlistDeals"
-    ? (state.wishlistGames.length === 0
+    ? (!isItadDealsAvailable()
+      ? "Connect ITAD in Connections, then run the deal price fetcher to see wishlist deals here."
+      : state.wishlistGames.length === 0
       ? "No deals on your wishlist yet. Connect a store and run the wishlist and deal price fetchers from Fetcher health."
       : "No wishlist deals on sale right now. Refresh prices from Fetcher health, or check back after the next sale.")
+    : pickView === "wishlist" && !isItadDealsAvailable()
+    ? "Connect ITAD in Connections, then run the deal price fetcher to see wishlist deals here."
     : pickView === "itch"
       ? "No rated itch.io backlog games yet. Most indie titles won't have Steam review scores."
       : "No games match this tab yet.";

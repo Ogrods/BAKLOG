@@ -23,6 +23,7 @@ import {
   slimItadSnapshot,
   buildOwnedNormNames,
 } from "./deals.js";
+import { isItadDealsAvailable } from "./itad-deal-gate.js";
 import {
   loadManualGames,
   saveLibraryFirstSeen,
@@ -104,6 +105,12 @@ let _prevRowCountLibrary = null;
 let _prevRowCountWishlist = null;
 
 export async function loadItadPrices() {
+  if (!isItadDealsAvailable()) {
+    state.libraryMeta.itad = null;
+    state.itadByKey = {};
+    state.itadPriceDroppedKeys = new Set();
+    return;
+  }
   let prevByKey = {};
   try {
     const raw = localStorage.getItem(itadSnapshotStorageKey());
@@ -132,6 +139,7 @@ export async function loadItadPrices() {
 }
 
 export function showItadAlertBanner({ newSales, newHistoricalLows }) {
+  if (!isItadDealsAvailable()) return;
   const el = document.getElementById("itadAlertBanner");
   if (!el) return;
   const parts = [];

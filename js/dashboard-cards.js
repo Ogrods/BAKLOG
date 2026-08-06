@@ -9,6 +9,7 @@ import { freeItchCount, paidItchCount, itchSpendTotal } from './sabermetrics.js'
 import { gameGenresCanonical } from './genres.js';
 import { getPersonal } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, effectiveDiscountPercent, isStealDeal } from './deals.js';
+import { isItadDealsAvailable } from './itad-deal-gate.js';
 import {
   sponsoredDealCardHtml,
   getAdsForLocation,
@@ -379,6 +380,7 @@ export function renderDashboardHouseSlot() {
 }
 
 export function buildWishlistStatsHtml(slot = 'wishlist') {
+  if (!isItadDealsAvailable()) return '';
   const wl = state.wishlistGames;
   if (!wl.length) {
     const cards = [
@@ -450,6 +452,7 @@ export function buildWishlistStatsHtml(slot = 'wishlist') {
 }
 
 export function renderDashboardWishlistStats() {
+  if (!isItadDealsAvailable()) return;
   // Re-used by both the dashboard mega-grid and the standalone wishlist deal
   // radar shown above the table on the Wishlist view. The three organic deal
   // cards share one builder; only the 4th ad slot varies per target.

@@ -6,6 +6,7 @@ import {
   pinAllDensityColumns,
   setDensityPinned,
 } from './table-density.js';
+import { isWishlistPriceColumnAvailable } from './itad-deal-gate.js';
 
 export const TABLE_VIEWS = ['library', 'wishlist', 'itch'];
 
@@ -51,11 +52,24 @@ export function isColumnVisible(view, id) {
   const col = TABLE_COLUMNS.find(c => c.id === id);
   if (!col) return true;
   if (col.locked) return true;
+  if (viewKey(view) === 'wishlist' && id === 'price' && !isWishlistPriceColumnAvailable()) {
+    return false;
+  }
   ensureColumnsPrefs();
   const vk = viewKey(view);
   const stored = state.prefs.columns[vk];
   if (stored && typeof stored[id] === 'boolean') return stored[id];
   return defaultVisibleFor(col, vk);
+}
+
+/** Column picker: omit ITAD-gated columns for the active view. */
+export function columnsForPicker(view) {
+  return toggleableColumns().filter((col) => {
+    if (viewKey(view) === 'wishlist' && col.id === 'price' && !isWishlistPriceColumnAvailable()) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function setColumnVisible(view, id, on) {
@@ -102,6 +116,11 @@ export function applyColumnVisibility(view, opts = {}) {
     const userHide = !isColumnVisible(view, col.id);
     const densityHide = !opts.skipDensity && densityWouldHide(view, col.id, tier);
     wrap.classList.toggle(`table-hide-${col.id}`, userHide || densityHide);
+  }
+  const priceHeader = document.getElementById('priceHeader');
+  if (priceHeader) {
+    const hidePrice = viewKey(view) === 'wishlist' && !isWishlistPriceColumnAvailable();
+    priceHeader.classList.toggle('hidden', hidePrice);
   }
 }
 

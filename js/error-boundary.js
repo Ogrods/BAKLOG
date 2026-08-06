@@ -446,6 +446,7 @@ export async function fetchBugBundleServerContext() {
       apply_started: data.apply_started ?? null,
       applying_lock_age_sec: data.applying_lock_age_sec ?? null,
       apply_log_tail: data.apply_log_tail ?? null,
+      connect_log_tails: data.connect_log_tails ?? null,
       install_source: data.install_source ?? null,
       arp_version: data.arp_version ?? null,
     };

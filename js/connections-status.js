@@ -49,6 +49,11 @@ export function isProviderConnected(provider) {
   return authStatus.some(p => p.key === provider && p.status === 'connected');
 }
 
+/** ITAD deal/pricing UI is meaningful only after a validated API key is saved. */
+export function isItadDealsAvailable() {
+  return isProviderConnected('itad');
+}
+
 /** Number of auth providers with status === 'connected'. */
 export function connectedProviderCount() {
   return authStatus.filter(p => p.status === 'connected').length;

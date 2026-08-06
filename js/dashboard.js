@@ -24,6 +24,7 @@ import {
 } from './game-core.js';
 import { getPersonal } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
+import { isItadDealsAvailable } from './itad-deal-gate.js';
 import { ensureChartJs } from './chart-loader.js';
 import { animateCount, countUpDurationForDelta, dashboardLibraryGames, sortStoresByDisplayOrder } from './dashboard-shared.js';
 import { isSurfaceAnimating } from './library-count-animation.js';
@@ -168,6 +169,13 @@ function buildMegaArtifacts(games, snap) {
   };
   _megaArtifactsKey = key;
   return _megaArtifactsCache;
+}
+
+function megaHeroDealsTaglineHtml(stats) {
+  if (!isItadDealsAvailable()) {
+    return '<span title="Connect ITAD in Connections for wishlist deal tracking">Connect ITAD for deals</span>';
+  }
+  return `<span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
 }
 
 function computeMegaHeroStats(games, snap, agg) {
@@ -320,7 +328,7 @@ function updateDashboardMegaInPlace(games, stats, spotlight, spotlightPool, marq
         <span class="sep">·</span>
         <span id="dashHeroYearsClear" title="${escapeAttr(stats.yearsClearTitle)}"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
-        <span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>`;
+        ${megaHeroDealsTaglineHtml(stats)}`;
   }
   applyMegaHeroCounters(stats);
   const marqueeKey = marqueeItems.map(it => `${it.glyph}|${it.label}|${it.valueHtml}`).join("\n");
@@ -380,7 +388,7 @@ function renderDashboardMega(games, snap, agg) {
         <span class="sep">·</span>
         <span id="dashHeroYearsClear" title="${escapeAttr(stats.yearsClearTitle)}"><strong>${stats.years}</strong> yrs to clear at 2h/day</span>
         <span class="sep">·</span>
-        <span title="Wishlist items with an active discount right now"><strong>${escapeHtml(formatNum(stats.wlDeals))}</strong> deals live</span>
+        ${megaHeroDealsTaglineHtml(stats)}
       </div>
       <div class="dash-hero-pillars">
         <div class="dash-hero-pillar" title="Sum of playtime across all games, in hours">

@@ -23,6 +23,7 @@ import {
   isStealDeal,
   cutBucketClass,
 } from "./deals.js";
+import { isItadDealsAvailable } from "./itad-deal-gate.js";
 import { formatMoney, displayCurrency } from "./currency.js";
 import { registerPausable } from "./visibility.js";
 export {
@@ -418,10 +419,12 @@ export function buildInsightPool(games, snapIn, ctxIn) {
     );
   }
 
-  const deals = state.wishlistGames.filter((g) => {
-    const d = getDealInfo(g);
-    return d && (d.cut || 0) > 0;
-  });
+  const deals = isItadDealsAvailable()
+    ? state.wishlistGames.filter((g) => {
+        const d = getDealInfo(g);
+        return d && (d.cut || 0) > 0;
+      })
+    : [];
   if (deals.length) {
     const top = [...deals].sort((a, b) => dealScore(b) - dealScore(a))[0];
     const cut = getDealInfo(top)?.cut || 0;
@@ -471,7 +474,7 @@ export function buildInsightPool(games, snapIn, ctxIn) {
   ).length;
   if (hiddenGems) add(`Hidden gems: <strong>${formatNum(hiddenGems)}</strong>`);
 
-  const clutch = backlog.filter((g) => isLeveragePick(g));
+  const clutch = isItadDealsAvailable() ? backlog.filter((g) => isLeveragePick(g)) : [];
   if (clutch[0])
     add(`Clutch pick: <strong>${escapeHtml(clutch[0].name)}</strong>`);
 
@@ -1016,7 +1019,9 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     push("^", "is-rose", formatNum(cleanup), "cleanup candidates", null, {
       weight: W.friendly,
     });
-  const clutchCount = backlog.filter((g) => isLeveragePick(g)).length;
+  const clutchCount = isItadDealsAvailable()
+    ? backlog.filter((g) => isLeveragePick(g)).length
+    : 0;
   if (clutchCount)
     push("*", "is-violet", formatNum(clutchCount), "clutch picks", null, {
       weight: W.friendly,
@@ -1203,70 +1208,72 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     );
   }
 
-  const stealsCount = wl.filter(isStealDeal).length;
-  if (stealsCount)
-    push("+", "is-emerald", formatNum(stealsCount), "steal-tier deals");
-  if (onSale.length)
-    push("+", "is-emerald", formatNum(onSale.length), "on sale now");
-  if (onSale.length) {
-    const top = [...onSale].sort((a, b) => dealScore(b) - dealScore(a))[0];
-    const cut = getDealInfo(top)?.cut || 0;
-    push(
-      "+",
-      "is-emerald",
-      "",
-      "top deal",
-      `${escapeHtml(top.name)} ${coloredCutHtml(cut, { className: "dash-marquee-cut" })}`,
-    );
-    const cuts = onSale
-      .map((g) => getDealInfo(g)?.cut || 0)
-      .filter((x) => x > 0);
-    if (cuts.length) {
-      const avgCut = Math.round(
-        cuts.reduce((s, c2) => s + c2, 0) / cuts.length,
-      );
+  if (isItadDealsAvailable()) {
+    const stealsCount = wl.filter(isStealDeal).length;
+    if (stealsCount)
+      push("+", "is-emerald", formatNum(stealsCount), "steal-tier deals");
+    if (onSale.length)
+      push("+", "is-emerald", formatNum(onSale.length), "on sale now");
+    if (onSale.length) {
+      const top = [...onSale].sort((a, b) => dealScore(b) - dealScore(a))[0];
+      const cut = getDealInfo(top)?.cut || 0;
       push(
         "+",
         "is-emerald",
         "",
-        "avg discount",
-        coloredCutHtml(avgCut, {
-          signed: false,
-          className: "dash-marquee-cut",
-        }),
+        "top deal",
+        `${escapeHtml(top.name)} ${coloredCutHtml(cut, { className: "dash-marquee-cut" })}`,
       );
-      const steepest = Math.max(...cuts);
+      const cuts = onSale
+        .map((g) => getDealInfo(g)?.cut || 0)
+        .filter((x) => x > 0);
+      if (cuts.length) {
+        const avgCut = Math.round(
+          cuts.reduce((s, c2) => s + c2, 0) / cuts.length,
+        );
+        push(
+          "+",
+          "is-emerald",
+          "",
+          "avg discount",
+          coloredCutHtml(avgCut, {
+            signed: false,
+            className: "dash-marquee-cut",
+          }),
+        );
+        const steepest = Math.max(...cuts);
+        push(
+          "+",
+          "is-emerald",
+          "",
+          "steepest cut",
+          coloredCutHtml(steepest, { className: "dash-marquee-cut" }),
+        );
+      }
+    }
+
+    let wishlistValue = 0;
+    let wishlistSaleNow = 0;
+    for (const g of wl) {
+      const d = getDealInfo(g);
+      if (d?.regular != null) wishlistValue += d.regular;
+      if (d?.price != null) wishlistSaleNow += d.price;
+    }
+    if (wishlistValue > 0)
       push(
-        "+",
-        "is-emerald",
-        "",
-        "steepest cut",
-        coloredCutHtml(steepest, { className: "dash-marquee-cut" }),
+        "#",
+        "is-violet",
+        formatDollarMarquee(wishlistValue),
+        "wishlist value",
+      );
+    if (wishlistSaleNow > 0 && wishlistSaleNow < wishlistValue) {
+      push(
+        "#",
+        "is-violet",
+        formatDollarMarquee(wishlistValue - wishlistSaleNow),
+        "savings if bought now",
       );
     }
-  }
-
-  let wishlistValue = 0;
-  let wishlistSaleNow = 0;
-  for (const g of wl) {
-    const d = getDealInfo(g);
-    if (d?.regular != null) wishlistValue += d.regular;
-    if (d?.price != null) wishlistSaleNow += d.price;
-  }
-  if (wishlistValue > 0)
-    push(
-      "#",
-      "is-violet",
-      formatDollarMarquee(wishlistValue),
-      "wishlist value",
-    );
-  if (wishlistSaleNow > 0 && wishlistSaleNow < wishlistValue) {
-    push(
-      "#",
-      "is-violet",
-      formatDollarMarquee(wishlistValue - wishlistSaleNow),
-      "savings if bought now",
-    );
   }
 
   const parseReleaseYear = (d) => {

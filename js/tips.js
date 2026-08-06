@@ -146,7 +146,7 @@ export const SUPPORT_GROUPS = [
   ],
   [
     "BAKLOG Pro adds sync and bulk refresh - and nothing free today moves behind it.",
-    "Want fewer sponsored slots? BAKLOG Pro is the no-ads path.",
+    "Fewer sponsored slots? Pro supporters help fund BAKLOG.",
   ],
   [
     "Not in the beta yet? Request an invite at baklog.app - we onboard in small waves.",

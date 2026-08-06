@@ -507,7 +507,7 @@ function renderConnPrefs() {
       note.classList.add("conn-prefs-note--pro");
     } else {
       note.textContent =
-        "Auto-refresh runs while BAKLOG is open (even minimized). Pro adds background refresh while closed to the tray.";
+        "Auto-refresh runs while BAKLOG is open (even minimized). Pro supporters get background refresh while closed to the tray.";
       note.classList.remove("conn-prefs-note--pro");
     }
     note.hidden = false;

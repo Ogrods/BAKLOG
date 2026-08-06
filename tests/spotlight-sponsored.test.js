@@ -235,7 +235,7 @@ describe('spotlight sponsored slides', () => {
       _spotlightReason: {
         eyebrow: 'BAKLOG Pro',
         score: 50,
-        metaParts: ['Leveled up with bulk refresh, cloud sync, and no ads — $5/mo.'],
+        metaParts: ['Supporter perks: bulk refresh, cloud sync, fewer sponsored slots - Support BAKLOG.'],
         slogan: 'One honest backlog across every store.',
       },
       _spotlightAd: {
@@ -250,7 +250,7 @@ describe('spotlight sponsored slides', () => {
     const html = renderSpotlightHtml(slide);
     expect(html).toContain('dash-spotlight-slogan');
     expect(html).toContain('dash-spotlight-meta');
-    expect(html).toContain('Leveled up with bulk refresh');
+    expect(html).toContain('Supporter perks: bulk refresh');
   });
 
   it('does not emit a scheme class for non-logo sponsored slides', () => {

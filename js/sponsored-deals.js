@@ -293,8 +293,8 @@ const V1_PLACEMENT_MAP = {
 const HOUSE_DEFAULTS = {
   'house-support-baklog': {
     kind: 'house',
-    title: 'Upgrade to BAKLOG Pro',
-    tagline: 'Bulk refresh, cloud sync, and no sponsored cards.',
+    title: 'Support BAKLOG Pro',
+    tagline: 'Optional perks for supporters: bulk refresh, background sync, fewer sponsored cards.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -303,8 +303,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-pro-promo': {
     kind: 'house',
-    title: 'Refresh faster. See fewer ads.',
-    tagline: 'Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.',
+    title: 'Optional support for BAKLOG Pro',
+    tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and fewer sponsored slots - nothing free today moves behind it.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -322,8 +322,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-itch-privacy': {
     kind: 'house',
-    title: 'Upgrade to BAKLOG Pro',
-    tagline: 'Background refresh, cloud sync, and no sponsored cards.',
+    title: 'Support BAKLOG Pro',
+    tagline: 'Optional perks for supporters: background refresh, cloud sync, fewer sponsored cards.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -334,7 +334,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'BAKLOG Pro',
     slogan: 'One honest backlog across every store.',
-    tagline: 'Leveled up with bulk refresh, cloud sync, and no ads.',
+    tagline: 'Supporter perks: bulk refresh, cloud sync, fewer sponsored slots.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -357,7 +357,7 @@ const HOUSE_DEFAULTS = {
   'house-spotlight-pro-noads': {
     kind: 'house',
     title: 'Fewer distractions',
-    slogan: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
+    slogan: 'Pro supporters see fewer sponsored deal slots.',
     tagline: 'Nothing you use today moves behind paywall.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
@@ -370,7 +370,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Never miss a free game again',
     slogan: 'Alerts when giveaways and sales land.',
-    tagline: 'Deal & watchlist alerts - coming soon with Pro.',
+    tagline: 'Deal & watchlist alerts - coming soon for Pro supporters.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -777,13 +777,13 @@ const HOUSE_BANNER_FEATURES = [
 // Sync pair: PRO_PROMO ↔ landing/index.html paid tier + FAQ pricing answers.
 export const PRO_PROMO = {
   label: 'BAKLOG Pro',
-  title: 'Refresh faster. See fewer ads.',
+  title: 'Optional support for BAKLOG Pro',
   price: '',
-  tagline: 'Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.',
+  tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and fewer sponsored slots - nothing free today moves behind it.',
   cta: 'Support BAKLOG',
   ctaYearly: 'Support BAKLOG',
   url: PRO_CHECKOUT_MONTHLY,
-  founderNote: 'Back the roadmap while Pro is early.',
+  founderNote: 'Early support helps fund the roadmap.',
   features: [
     {
       title: 'Queued bulk refresh',
@@ -796,8 +796,8 @@ export const PRO_PROMO = {
       icon: '⏱',
     },
     {
-      title: 'No sponsored cards',
-      desc: 'Paid tier drops sponsored deal slots so your deal radar stays yours.',
+      title: 'Fewer sponsored cards',
+      desc: 'Pro supporters see fewer sponsored deal slots so your deal radar stays yours.',
       icon: '✦',
     },
     {
@@ -812,7 +812,7 @@ export const PRO_PROMO = {
     },
     {
       title: 'Bonus claimables feed',
-      desc: 'DLC, add-ons, and in-game bonuses filtered out of the free feed, surfaced for Pro.',
+      desc: 'DLC, add-ons, and in-game bonuses filtered out of the free feed, surfaced for Pro supporters.',
       icon: '🎁',
     },
     {
@@ -862,8 +862,8 @@ export function isProPromoSponsorId(id) {
 export const HOUSE_DEAL_ITEM = {
   id: 'house-support-baklog',
   kind: 'house',
-  title: 'Upgrade to BAKLOG Pro',
-  tagline: 'Bulk refresh, cloud sync, and no sponsored cards.',
+  title: 'Support BAKLOG Pro',
+  tagline: 'Optional perks for supporters: bulk refresh, background sync, fewer sponsored cards.',
   cta: 'Support BAKLOG',
   url: PRO_CHECKOUT_MONTHLY,
   dismissible: true,

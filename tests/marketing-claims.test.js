@@ -89,11 +89,29 @@ describe('marketing copy guardrails', () => {
     expect(table).toMatch(/Deal\/watchlist alerts[\s\S]*?<td>✕<\/td>[\s\S]*?<td>Coming<\/td>/i);
   });
 
-  it('landing tier table keeps queue-all refresh as coming on paid', () => {
+  it('landing tier table marks queue-all refresh as live on paid', () => {
     const text = readFileSync('landing/index.html', 'utf8');
     const start = text.indexOf('class="tier-compare"');
     const table = text.slice(start, text.indexOf('</table>', start));
-    expect(table).toMatch(/Manual store refresh[\s\S]*coming/i);
+    const rowMatch = table.match(
+      /<th scope="row">Manual store refresh<\/th>\s*<td>[^<]*<\/td>\s*<td>([^<]+)<\/td>/,
+    );
+    expect(rowMatch).toBeTruthy();
+    expect(rowMatch[1]).toMatch(/queue all stale/i);
+    expect(rowMatch[1]).not.toMatch(/coming/i);
+  });
+
+  it('avoids hard-sell Upgrade / See fewer ads headlines in public Pro copy', () => {
+    const landing = readFileSync('landing/index.html', 'utf8');
+    const promo = readFileSync('js/sponsored-deals.js', 'utf8');
+    for (const text of [landing, promo]) {
+      expect(text).not.toMatch(/Upgrade to BAKLOG Pro/);
+      expect(text).not.toMatch(/Refresh faster\. See fewer ads\./);
+      expect(text).not.toMatch(/no-ads path/i);
+      expect(text).not.toMatch(/Leveled up with bulk refresh/);
+    }
+    expect(promo).toMatch(/HOUSE_PRO_BANNERS_ENABLED = false/);
+    expect(promo).toMatch(/Optional support for BAKLOG Pro/);
   });
 
   const UNQUALIFIED_TELEMETRY = /\b(?:No|Zero) telemetry\b/gi;

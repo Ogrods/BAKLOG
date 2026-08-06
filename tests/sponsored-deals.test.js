@@ -88,8 +88,8 @@ function proPromoItem(overrides = {}) {
     id: 'house-pro-promo',
     kind: 'house',
     banner: 'pro',
-    title: 'Refresh faster. See fewer ads.',
-    tagline: 'Queue stale stores, sync across machines, and remove sponsored deal cards. Nothing you use today moves behind paywall.',
+    title: 'Optional support for BAKLOG Pro',
+    tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and fewer sponsored slots - nothing free today moves behind it.',
     cta: 'Get Pro — $5/mo',
     url: 'https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw',
     placements: 'dash-deal-rail',
@@ -830,7 +830,7 @@ describe('sponsoredDealSlotHtml', () => {
     wireWishHouse();
     const html = sponsoredDealSlotHtml();
     expect(html).toContain('sponsored-deal-house');
-    expect(html).toContain('Upgrade to BAKLOG Pro');
+    expect(html).toContain('Support BAKLOG Pro');
     expect(html).toContain('data-sponsor-house="1"');
     expect(html).not.toContain('sponsored-dismiss');
   });

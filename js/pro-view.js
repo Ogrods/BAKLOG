@@ -126,8 +126,8 @@ function proCompareHtml() {
     </tr>`)
     .join('');
   return `<div class="pro-view-compare-wrap">
-    <h3 class="pro-view-section-title">What stays free vs what Pro adds</h3>
-    <p class="pro-view-compare-lead">Import, browse, and pick what to play stay free. Pro adds bulk refresh, background sync, and no sponsored cards.</p>
+    <h3 class="pro-view-section-title">What stays free vs optional Pro support</h3>
+    <p class="pro-view-compare-lead">Import, browse, and pick what to play stay free. Pro supporters get bulk refresh, background sync, and fewer sponsored cards.</p>
     <table class="pro-view-compare" aria-label="Free vs Pro">${head}<tbody>${rows}</tbody></table>
   </div>`;
 }

@@ -7,11 +7,11 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-# Cancel earlier runs of the same branch/PR when a new commit lands —
-# saves minutes and stops stale red checks.
+# One group per commit so a delayed/stale push for an older SHA cannot
+# cancel the tip run (cancel-in-progress previously keyed only on ref).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   # Ubuntu carries comprehensive coverage, split into two parallel lanes so the

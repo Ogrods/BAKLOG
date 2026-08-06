@@ -5,6 +5,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 # Cancel earlier runs of the same branch/PR when a new commit lands —
 # saves minutes and stops stale red checks.

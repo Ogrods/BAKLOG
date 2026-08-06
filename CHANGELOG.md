@@ -30,6 +30,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.00] - 2026-08-06
+
 ### Added
 
 - When Chrome/Edge is missing, Connections (and other CDP launches) download a pinned Chrome for Testing build once into the data-dir cache (`shared/chromium_runtime.py`, pin `shared/chromium_cft_pin.json`). System browsers and `BAKLOG_CHROME_PATH` still win; `BAKLOG_NO_CHROMIUM_DOWNLOAD=1` disables the fallback.
@@ -38,6 +40,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - Wishlist and dashboard ITAD deal UI stays gated until ITAD is connected (validated API key); hide price column, deal radar, picks Deals tab, and related deal chips when disconnected.
 - Battle.net / PSN Connect quick-close diagnostics: PSN uses `run_connect_poll`, CDP launch logging (`connect-cdp.log` / `connect-psn.log`), tails in diagnostics and bug bundles, and troubleshooting for "Connect window closes immediately".
+- Pruned stale free-claims approved ids so `audit_free_surface_data.py --fail-on high` stays green; rebuilt hosted/fallback feeds.
+- `scripts/test-all.ps1` npm steps tolerate Vitest stderr deprecations under PowerShell `$ErrorActionPreference=Stop`.
+- README / PRIVACY / CSRF docs aligned with shipped invite auth, Connections metrics toggle, and strict `X-BAKLOG-Local` mutating API.
 - Responsive outside scan: `TABLE_PHONE_MQ` (+ phone chrome / A–Z dock) aligns with sheet landscape MQ so 844×390 uses library cards; `test:responsive` covers itch + outside overlays (notes/bug/update/kebab/profile/claimables/header nav/pro-compare) and `--auth-gate` mode.
 - Responsive re-litigation: sheet modals get `overflow-y: auto` + flex `min-height: 0` under the landscape sheet MQ (notes/update no longer clip); phone library cards gain touch targets, hide dual cover EA ribbon, priority-hide COUCH when ONLINE coop is present, full-width sponsored house strip, and phone virtual-row height remeasure; `#summary` h-scroll aligns with sheet MQ and chip `min-height` uses `--touch-min`; wishlist/dash radar Tailwind `sm:grid-cols-3` → `lg:grid-cols-3` to match the 1024 CSS ladder.
 - R5 responsive closeout: type tokens for ribbon/insight/score digits; tablet insight wrap; reduced-motion for error toast + pick/coop hover lifts; year-chart Chart.js duration gated; short-landscape chart/ribbon height trim; leftover app.css media (`640`/`760`/`767`/`768`/`520`/`420`) onto `1023.98`/`639.98`/`400`; fetcher `LOG_DESKTOP_MQ` `768`→`1024`.
@@ -78,6 +83,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Permanent Discord invite is `https://discord.gg/VFvxN5nCCB` (`shared/community.json`); linked from app kebab + footer socials, landing footer icons + Community column, README, and guide/getting-help.
 - Fetcher health on phone opens as a fullscreen overlay sheet with sticky titled head; tablet keeps the anchored popover (dvh-capped).
 - Main view tabs collapse to a hamburger sheet at tablet and below (replaces the phone horizontal scroll strip), and also when the inline header would wrap; sheet mode hides fullscreen and moves Report bug + profile into the overlay.
+- CI: `workflow_dispatch` on the CI workflow; concurrency keyed per commit SHA; optional Playwright perf job is `continue-on-error` so manual tip checks can go green without shipping installers.
 
 ## [0.8.47] - 2026-08-02
 

@@ -2,7 +2,7 @@
 
 BAKLOG is a **local-first** desktop tool. It does not ship telemetry or
 analytics **by default**. Optional anonymous aggregate metrics are **opt-in**
-(Connections / Settings: share anonymous stats). The "server" referenced in the
+(Connections: share anonymous stats). The "server" referenced in the
 README is a `http://127.0.0.1` Python process that serves files to your own
 browser tab. Game libraries, personal notes, and store credentials stay on your
 machine. On frozen Windows beta installs, the default data root is
@@ -30,7 +30,7 @@ These are optional and separate from the local dashboard:
 | Bug report (`/api/report`) | Whitelisted diagnostic bundle you paste/send | You click **Send report** in the app |
 | Free claims feed (`free-claims.json`) | Public curated giveaway metadata (no personal data) | App polls when you open Claimable Now |
 | Sponsored deals feed (`sponsors.json`) | Public house/paid ad metadata (no personal data) | App fetches when online (profile override → hosted → bundled) |
-| Metrics (`/api/metrics`) | Anonymous session/impression counts | **Opt-in only** (`shareAnonStats` in Settings; default off) |
+| Metrics (`/api/metrics`) | Anonymous session/impression counts | **Opt-in only** (`shareAnonStats` in Connections; default off) |
 
 The local app does **not** upload your library or credentials to these endpoints.
 
@@ -254,9 +254,9 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
 
 ## What does *not* happen
 
-- No telemetry or analytics **by default** — optional anonymous aggregate
+- No telemetry or analytics **by default** - optional anonymous aggregate
   metrics (`shareAnonStats`) send counts to `baklog.app` only when you enable
-  them in Settings.
+  them in Connections.
 - No silent crash uploads — the error log stays in your browser until *you*
   copy it or explicitly send it via **Send report** in the consent dialog.
 - No third-party ad/affiliate **scripts** — outbound links may carry an

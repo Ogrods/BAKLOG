@@ -1,98 +1,22 @@
 {
   "ids": [
-    "epic-echo-generation-midnight-edition-069026",
-    "epic-otxo-396b8b",
-    "epic-sol-cesto-e9b803",
     "gamerpower-2478",
     "gamerpower-3301",
     "gamerpower-3421",
-    "gamerpower-3498",
-    "gamerpower-3555",
     "gamerpower-3676",
     "gamerpower-3697",
-    "gamerpower-3709",
-    "gamerpower-3712",
-    "gamerpower-3717",
-    "gamerpower-3720",
-    "gamerpower-3724",
-    "gamerpower-3725",
-    "itad-0a93135bfee3",
-    "itad-0d4598c53ffe",
     "itad-1cfb7de15158",
     "itad-2c618502e94c",
     "itad-56b70d2f45d3",
-    "itad-59dc47dd81a3",
-    "itad-5b6611643316",
-    "itad-75d1019b80eb",
-    "itad-840d262ba7fa",
-    "itad-90df86960d93",
-    "itad-920c69f9fdf1",
-    "itad-98730029b14b",
-    "itad-bd4edc3ae553",
-    "itad-cb21d42d706e",
-    "itad-d85d5bb4128d",
-    "itad-dd5b5b16e035",
-    "itad-df07e9ed2270",
-    "itad-eb44ea1d719b"
+    "itad-59dc47dd81a3"
   ],
-  "store_overrides": {
-    "itad-98730029b14b": "indiegala",
-    "itad-dd5b5b16e035": "indiegala"
-  },
+  "store_overrides": {},
   "field_overrides": {
-    "gamerpower-3498": {
-      "title": "Primal Slideee Deluxe (Stove)"
-    },
-    "gamerpower-3555": {
-      "title": "Together After Dark"
-    },
     "gamerpower-3676": {
       "title": "Dire Echo"
     },
     "gamerpower-3697": {
       "title": "NIGHTBELL"
-    },
-    "gamerpower-3709": {
-      "title": "NoRush! - Tower Edition"
-    },
-    "gamerpower-3712": {
-      "title": "Catch Me!"
-    },
-    "itad-0a93135bfee3": {
-      "title": "Slime King"
-    },
-    "itad-0d4598c53ffe": {
-      "title": "Mr.Brocco & Co"
-    },
-    "itad-75d1019b80eb": {
-      "title": "Nova Lands"
-    },
-    "itad-840d262ba7fa": {
-      "title": "The Mound: Omen of Cthulhu: Lost Explorers Swords Pack"
-    },
-    "itad-90df86960d93": {
-      "title": "Tattoo Tycoon"
-    },
-    "itad-920c69f9fdf1": {
-      "title": "The Ouroboros King"
-    },
-    "itad-98730029b14b": {
-      "title": "Carlos the Taco"
-    },
-    "itad-bd4edc3ae553": {
-      "title": "NoRush!"
-    },
-    "itad-cb21d42d706e": {
-      "title": "Princess Farmer"
-    },
-    "itad-d85d5bb4128d": {
-      "title": "Madness Inside"
-    },
-    "itad-dd5b5b16e035": {
-      "title": "The Brave Little Cloud"
-    },
-    "itad-eb44ea1d719b": {
-      "title": "KeepUp Survival"
     }
   },
   "dismissed": [
@@ -108,8 +32,5 @@
     "itad-0c69ed1f1bd8",
     "itad-b07aac9ebd26"
   ],
-  "premium_only_ids": [
-    "gamerpower-3498",
-    "itad-840d262ba7fa"
-  ]
+  "premium_only_ids": []
 }

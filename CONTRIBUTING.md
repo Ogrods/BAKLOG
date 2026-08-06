@@ -92,9 +92,10 @@ Never move or re-point a published tag. Cut a new patch tag instead.
 
 ## Local API note
 
-Mutating requests to the local server require the `X-BAKLOG-Local: 1` header (or
-a valid localhost Origin/Referer). The app and admin console send this
-automatically.
+Mutating requests to the local server require the `X-BAKLOG-Local: 1` header.
+The app and admin console send this automatically. A localhost Origin/Referer
+alone is not enough. When Supabase auth is enabled, a valid bearer token may
+also authorize mutations.
 
 ## Reporting security issues
 

@@ -13,6 +13,27 @@ if (Test-Path $VenvPy) {
     $Python = "python"
 }
 
+# npm/Vitest may print deprecations on stderr; with $ErrorActionPreference=Stop,
+# PowerShell treats NativeCommandError as terminating even when exit code is 0.
+function Invoke-NpmStep {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+        [Parameter(Mandatory = $true)]
+        [string[]]$NpmArgs
+    )
+    Write-Host "==> $Label"
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & npm @NpmArgs
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+    if ($code -ne 0) { exit $code }
+}
+
 Write-Host "==> ruff"
 & $Python -m ruff check .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -21,13 +42,8 @@ Write-Host "==> pytest"
 & $Python -m pytest --force-sugar -m "not integration and not slow and not release_smoke" --durations=20
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "==> vitest"
-npm test
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "==> test:perf"
-npm run test:perf
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Invoke-NpmStep -Label "vitest" -NpmArgs @("test")
+Invoke-NpmStep -Label "test:perf" -NpmArgs @("run", "test:perf")
 
 if (-not $Full) {
     Write-Host ""
@@ -35,27 +51,23 @@ if (-not $Full) {
     exit 0
 }
 
-Write-Host "==> check:module-size"
-npm run check:module-size
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "==> lint"
-npm run lint
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Invoke-NpmStep -Label "check:module-size" -NpmArgs @("run", "check:module-size")
+Invoke-NpmStep -Label "lint" -NpmArgs @("run", "lint")
 
 Write-Host "==> vendor:supabase + build"
-npm run vendor:supabase
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run build
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    & npm run vendor:supabase
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & npm run build
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+} finally {
+    $ErrorActionPreference = $prev
+}
 
-Write-Host "==> check:bundle-size"
-npm run check:bundle-size
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "==> check:dist-integrity"
-npm run check:dist-integrity
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Invoke-NpmStep -Label "check:bundle-size" -NpmArgs @("run", "check:bundle-size")
+Invoke-NpmStep -Label "check:dist-integrity" -NpmArgs @("run", "check:dist-integrity")
 
 Write-Host "==> audit free surface"
 & $Python scripts/audit_free_surface_data.py --fail-on high --out .audit/report.json --baseline-out .audit/baseline.json --findings-out .audit/findings.yaml --handoff-out .audit/handoff.md --csv-out .audit/rows.csv

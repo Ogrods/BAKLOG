@@ -7,6 +7,9 @@ games_*.json
 games_wishlist_*.json
 itad_prices.json
 free_claims.json
+# Maintainer Claims admin selection + raw scrape (local/ops only - not public)
+curated/free_claims.approved.json
+curated/free_claims.auto.json
 broken_images.json
 still_missing_images.json
 cache/

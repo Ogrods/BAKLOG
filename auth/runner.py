@@ -668,8 +668,8 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
         return None
 
     def _hint() -> str:
-        url = (page.url or "").lower()
-        if "store.playstation.com" in url:
+        url = page.url or ""
+        if host_matches(url, "store.playstation.com"):
             return (
                 "Signed in to PlayStation? Click anything on the page so Sony "
                 "issues a fresh session cookie."

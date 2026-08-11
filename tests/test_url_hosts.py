@@ -27,6 +27,18 @@ def test_host_matches_rejects_epic_host_spoof() -> None:
     )
 
 
+def test_host_matches_psn_store() -> None:
+    assert host_matches("https://store.playstation.com/en-us/", "store.playstation.com") is True
+    assert (
+        host_matches("https://evilstore.playstation.com.attacker.tld/", "store.playstation.com")
+        is False
+    )
+    assert (
+        host_matches("https://example.com/?q=store.playstation.com", "store.playstation.com")
+        is False
+    )
+
+
 def test_cookie_domain_matches_battlenet() -> None:
     assert cookie_domain_matches(".battle.net", "battle.net") is True
     assert cookie_domain_matches("account.battle.net", "battle.net") is True

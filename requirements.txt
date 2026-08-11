@@ -7,7 +7,7 @@ howlongtobeatpy>=1.0.0
 psnawp>=3.0.0
 websocket-client>=1.6.0
 keyring>=25.0.0
-cryptography>=42.0.0
+cryptography>=50.0.0
 PyJWT>=2.8.0
 # Optional: system tray launcher (tray_app.py). Server runs fine without these.
 pystray>=0.19

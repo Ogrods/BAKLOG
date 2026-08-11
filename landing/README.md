@@ -212,17 +212,19 @@ From the repo root, set `PYTHONPATH` so `fetchers/` / `shared/` imports resolve:
 ```powershell
 $env:PYTHONPATH = (Get-Location).Path
 .\.venv\Scripts\python.exe fetchers/fetch_claim_sources.py
-# curate curated/free_claims.approved.json (ids to publish)
+# curate curated/free_claims.approved.json locally (ids to publish; gitignored)
 .\.venv\Scripts\python.exe fetchers/build_free_claims.py
 ```
 
 `build_free_claims.py` writes disk only:
 
-- `landing/free-claims.json` (hosted on Vercel)
-- `curated/free_claims.fallback.json` (bundled offline fallback)
+- `landing/free-claims.json` (hosted on Vercel - **commit this**)
+- `curated/free_claims.fallback.json` (bundled offline fallback - **commit this**)
 - active profile `free_claims.json` (local app; use `--no-profile` to skip)
 
-**Prod** still needs a commit/push of `landing/free-claims.json` (and usually the fallback) or a Vercel deploy hook — publish alone does not update baklog.app.
+`curated/free_claims.auto.json` (scrape) and `curated/free_claims.approved.json` (Publish/Hide/Block selection) are **gitignored** maintainer ops files. Keep them on disk locally; do not commit them to the public repo.
+
+**Prod** still needs a commit/push of `landing/free-claims.json` (and usually the fallback) or a Vercel deploy hook - publish alone does not update baklog.app.
 
 **Pre-deploy check** (fetch → dry-run build → audit → optional Vercel hook):
 

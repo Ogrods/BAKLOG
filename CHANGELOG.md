@@ -30,6 +30,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Changed
+
+- `curated/free_claims.approved.json` and `curated/free_claims.auto.json` are gitignored (maintainer Claims ops only). Publish still commits `landing/free-claims.json` + `curated/free_claims.fallback.json`.
+- Dropped stale machine-local editable `-e` path from `requirements-lock.txt`.
+
 ## [0.9.00] - 2026-08-06
 
 ### Added

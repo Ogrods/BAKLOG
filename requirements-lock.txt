@@ -54,8 +54,6 @@ setuptools==82.0.1
 shadowcopy==0.0.4
 six==1.17.0
 soupsieve==2.8.4
-# Editable install with no version control (steam-backlog==0.6.0)
--e c:\users\danog\documents\my docs\coding stuff\steam-backlog
 termcolor==3.3.0
 typing_extensions==4.15.0
 urllib3==2.7.0

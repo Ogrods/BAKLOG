@@ -5658,8 +5658,13 @@ html[data-theme="ember"] .brand-logo-pills {
 .migration-banner.hidden {
   display: none;
 }
-#migrationBanner {
-  margin-top: 0.75rem;
+/* Shell padding-top is 0 so the header supplies the inset. When a banner is
+   the first visible chrome above the header, match header.app-header. */
+.app-shell > .migration-banner:not(.hidden) {
+  margin-top: 1rem;
+}
+.app-shell > .migration-banner:not(.hidden) ~ .migration-banner:not(.hidden) {
+  margin-top: 0;
 }
 #authReconnectBanner:not(.hidden),
 #authSecretsBanner:not(.hidden) {

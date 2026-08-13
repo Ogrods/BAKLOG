@@ -30,6 +30,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Pre-header alert banners (ITAD price refresh and siblings) use the same 1rem top inset as the app header, so they no longer sit flush to the viewport.
+
 ### Changed
 
 - `curated/free_claims.approved.json` and `curated/free_claims.auto.json` are gitignored (maintainer Claims ops only). Publish still commits `landing/free-claims.json` + `curated/free_claims.fallback.json`.

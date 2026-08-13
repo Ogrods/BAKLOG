@@ -33,6 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Wishlist deal radar (Today's Top Deal / Steals), Picks deals, dashboard deal counts, and on-sale spotlight ignore user-hidden and cross-store-dupe wishlist rows - the same visible list the wishlist table already uses.
+- Pre-header alert banners (ITAD price refresh and siblings) use the same 1rem top inset as the app header, so they no longer sit flush to the viewport.
 
 ### Changed
 

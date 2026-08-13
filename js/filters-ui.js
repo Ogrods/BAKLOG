@@ -45,7 +45,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { gameGenresCanonical } from './genres.js';
-import { getPersonal, filterOutHidden, filterCounted, countHiddenLibraryNoiseGames } from './personal-storage.js';
+import { getPersonal, filterOutHidden, filterCounted, countHiddenLibraryNoiseGames, wishlistGamesBase } from './personal-storage.js';
 import {
   savePrefs,
   saveActiveView,
@@ -783,10 +783,10 @@ export function renderSummary() {
     return;
   }
   if (state.activeView === "wishlist") {
-    const wl = state.wishlistGames.filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)));
-    const hiddenCount = state.wishlistGames.length - wl.length;
+    const wl = wishlistGamesBase();
+    const hiddenCount = (state.wishlistGames || []).length - wl.length;
     const sourceSet = new Set();
-    for (const g of state.wishlistGames) {
+    for (const g of wl) {
       const s = (g.wishlist_store || g.store_target || (g.store === "wishlist" ? "steam" : g.store) || "").toLowerCase();
       if (s) sourceSet.add(s);
     }

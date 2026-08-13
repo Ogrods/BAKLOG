@@ -21,7 +21,7 @@ import {
   isOwnedByTitle,
 } from './deals.js';
 import { isItadDealsAvailable } from './itad-deal-gate.js';
-import { getPersonal, filterOutHidden } from './personal-storage.js';
+import { getPersonal, filterOutHidden, wishlistGamesBase } from './personal-storage.js';
 import { getPicksLimitForView, setPicksLimitForView } from './prefs.js';
 import { syncCoverFits } from './covers.js';
 import { sponsoredPickSlotHtml, sponsoredDealPickSlotHtml, pickLocationForView, houseLocationForView, renderHouseLocationSlot } from './sponsored-deals.js';
@@ -181,8 +181,7 @@ export function renderPicks() {
       if (lb !== la) return lb - la;
       return ratingValue(b) - ratingValue(a);
     });
-  const wishlistDeals = state.wishlistGames
-    .filter(g => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)))
+  const wishlistDeals = wishlistGamesBase()
     .filter(g => {
       const d = getDealInfo(g);
       if (!d) return false;

@@ -30,6 +30,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Wishlist deal radar (Today's Top Deal / Steals), Picks deals, dashboard deal counts, and on-sale spotlight ignore user-hidden and cross-store-dupe wishlist rows - the same visible list the wishlist table already uses.
+
 ### Changed
 
 - `curated/free_claims.approved.json` and `curated/free_claims.auto.json` are gitignored (maintainer Claims ops only). Publish still commits `landing/free-claims.json` + `curated/free_claims.fallback.json`.

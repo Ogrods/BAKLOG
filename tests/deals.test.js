@@ -5,6 +5,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { state } from '../js/state.js';
 import { AFFILIATE_CREDENTIALS } from '../js/affiliate.js';
+import { buildWishlistStatsHtml } from '../js/dashboard-cards.js';
+import { setAuthStatusSnapshot } from '../js/connections-status.js';
 import {
   parsePriceLike,
   getDealInfo,
@@ -38,7 +40,11 @@ function resetState() {
   state.itadPriceDroppedKeys = new Set();
   state.ownedNormNames = new Set();
   state.allGames = [];
+  state.wishlistGames = [];
+  state.personal = {};
   state.crossStoreHiddenKeys = new Set();
+  state.wishlistCrossStoreHiddenKeys = new Set();
+  if (typeof window !== 'undefined') window._dataVersion = (window._dataVersion || 0) + 1;
   state.prefs = {
     dealOnSaleOnly: false,
     dealHistoricalLowOnly: false,
@@ -289,6 +295,61 @@ describe('dealHeroCardHtml', () => {
     const html = dealHeroCardHtml({ ...baseGame, hltb_main_hours: 12 });
     expect(html).toContain('deal-hero-stat-dot-hltb');
     expect(html).toContain('12h');
+  });
+});
+
+const signalis = {
+  store: 'wishlist',
+  id: '1262350',
+  name: 'SIGNALIS',
+  steam_review_percent: 96,
+  steam_review_count: 20000,
+};
+const otherDeal = {
+  store: 'wishlist',
+  id: 'other',
+  name: 'Other Deal',
+  steam_review_percent: 82,
+};
+
+function seedWishlistRadarDeals() {
+  setAuthStatusSnapshot([{ key: 'itad', status: 'connected' }]);
+  state.wishlistGames = [signalis, otherDeal];
+  state.itadByKey = {
+    'wishlist:1262350': {
+      price: 4.99,
+      regular: 19.99,
+      cut: 75,
+      is_historical_low: true,
+      shop: 'Steam',
+    },
+    'wishlist:other': { price: 14.99, regular: 19.99, cut: 25, shop: 'Steam' },
+  };
+}
+
+describe('buildWishlistStatsHtml visible wishlist', () => {
+  it('does not feature a user-hidden wishlist game as Top Deal or Steal', () => {
+    seedWishlistRadarDeals();
+    state.personal = { 'wishlist:1262350': { hidden: true } };
+    const html = buildWishlistStatsHtml();
+    expect(html).not.toContain('SIGNALIS');
+    expect(html).toContain('Other Deal');
+  });
+
+  it('still features the same game when it is not hidden', () => {
+    seedWishlistRadarDeals();
+    const html = buildWishlistStatsHtml();
+    expect(html).toContain('SIGNALIS');
+    expect(html).toContain('Today&apos;s top deal');
+    expect(html).toContain('Steals waiting');
+  });
+
+  it('does not feature a cross-store-hidden wishlist game as Top Deal or Steal', () => {
+    seedWishlistRadarDeals();
+    state.wishlistCrossStoreHiddenKeys = new Set(['wishlist:1262350']);
+    const html = buildWishlistStatsHtml();
+    expect(html).not.toContain('SIGNALIS');
+    expect(html).toContain('Other Deal');
   });
 });
 

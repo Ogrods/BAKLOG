@@ -267,6 +267,38 @@ describe("spotlight expanded categories", () => {
     expect(sale?._spotlightReason?.eyebrow).toBe("On sale now");
   });
 
+  it("excludes user-hidden wishlist games from On sale now", () => {
+    state.itadByKey = { "wishlist:3": { cut: 40, price: 9.99 } };
+    state.personal = { "wishlist:3": { hidden: true } };
+    state.wishlistGames = [{
+      store: "wishlist",
+      id: 3,
+      name: "Wishlist 3",
+      steam_review_percent: 85,
+      steam_review_count: 1000,
+      library_image: "x.jpg",
+      header_image: "x.jpg",
+    }];
+    const pool = pickSpotlightGames([]);
+    expect(pool.find(g => g.store === "wishlist" && g.id === 3)).toBeUndefined();
+  });
+
+  it("excludes cross-store-hidden wishlist games from On sale now", () => {
+    state.itadByKey = { "wishlist:3": { cut: 40, price: 9.99 } };
+    state.wishlistCrossStoreHiddenKeys = new Set(["wishlist:3"]);
+    state.wishlistGames = [{
+      store: "wishlist",
+      id: 3,
+      name: "Wishlist 3",
+      steam_review_percent: 85,
+      steam_review_count: 1000,
+      library_image: "x.jpg",
+      header_image: "x.jpg",
+    }];
+    const pool = pickSpotlightGames([]);
+    expect(pool.find(g => g.store === "wishlist" && g.id === 3)).toBeUndefined();
+  });
+
   it("tags recent releases as New release", () => {
     state.personal = { "steam:4": { status: "backlog" } };
     const recent = new Date();

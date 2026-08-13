@@ -792,6 +792,15 @@ export function libraryGamesBase() {
   return filterOutHidden(out);
 }
 
+/** Visible wishlist: not user-hidden, not a cross-store dupe. Same universe as
+ *  the wishlist table (minus search / deal-filter chips). */
+export function wishlistGamesBase() {
+  const hidden = state.wishlistCrossStoreHiddenKeys || new Set();
+  return filterOutHidden(
+    (state.wishlistGames || []).filter(g => !hidden.has(gameKey(g))),
+  );
+}
+
 /** Visible, counted library size: drops cross-store dupes, user-hidden rows,
  *  and manual rows toggled out of the count. Single source of truth for the
  *  "of Y" denominators and headline totals. */

@@ -17,7 +17,7 @@ import {
   normalizeGame,
 } from "./game-core.js";
 import { storeLogoHtml, storeDisplayName } from "./store-logos.js";
-import { getPersonal, filterOutHidden } from "./personal-storage.js";
+import { getPersonal, wishlistGamesBase } from "./personal-storage.js";
 import { spotlightRecentKeysStorageKey } from "./profiles.js";
 import { getDealInfo, cutBucketClass } from "./deals.js";
 import { isItadDealsAvailable } from "./itad-deal-gate.js";
@@ -720,13 +720,10 @@ export function pickSpotlightGames(games, snapIn) {
   }
 
   // "On sale now" is sourced exclusively from the wishlist: surface discounts on
-  // games you want but don't own yet. Mirrors the visible-wishlist filter used by
-  // the deal radar (cross-store-hidden + user-hidden excluded).
-  const wlHidden = state.wishlistCrossStoreHiddenKeys || new Set();
+  // games you want but don't own yet. Same visible-wishlist universe as the
+  // deal radar (cross-store-hidden + user-hidden excluded).
   const wishlistOnSale = isItadDealsAvailable()
-    ? filterOutHidden(
-        (state.wishlistGames || []).filter((g) => !wlHidden.has(gameKey(g))),
-      )
+    ? wishlistGamesBase()
         .filter(hasArt)
         .filter((g) => isOnSale(g) && ratingValue(g) >= 70)
         .map((g) => {

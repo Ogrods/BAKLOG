@@ -7,7 +7,7 @@ import { gameKey, hltbMain, ratingValue, hasEnoughReviews, coverFallbackFor, lib
 import { affiliateUrl, hasLiveAffiliates } from './affiliate.js';
 import { freeItchCount, paidItchCount, itchSpendTotal } from './sabermetrics.js';
 import { gameGenresCanonical } from './genres.js';
-import { getPersonal } from './personal-storage.js';
+import { getPersonal, wishlistGamesBase } from './personal-storage.js';
 import { wishlistGamesWithDeals, dealHeroCardHtml, dealHeroEmptyHtml, dealSaleScoreboardCardHtml, dealStealsCardHtml, getDealInfo, dealScore, effectiveDiscountPercent, isStealDeal } from './deals.js';
 import { isItadDealsAvailable } from './itad-deal-gate.js';
 import {
@@ -381,8 +381,9 @@ export function renderDashboardHouseSlot() {
 
 export function buildWishlistStatsHtml(slot = 'wishlist') {
   if (!isItadDealsAvailable()) return '';
-  const wl = state.wishlistGames;
-  if (!wl.length) {
+  const raw = state.wishlistGames || [];
+  const wl = wishlistGamesBase();
+  if (!raw.length) {
     const cards = [
       dealHeroEmptyHtml({ noWishlist: true }),
       dealSaleScoreboardCardHtml({

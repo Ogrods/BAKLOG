@@ -22,7 +22,7 @@ import {
   hltbBacklogHoursTitle,
   hltbClearByYearsTitle,
 } from './game-core.js';
-import { getPersonal } from './personal-storage.js';
+import { getPersonal, wishlistGamesBase } from './personal-storage.js';
 import { getDealInfo } from './deals.js';
 import { isItadDealsAvailable } from './itad-deal-gate.js';
 import { ensureChartJs } from './chart-loader.js';
@@ -117,7 +117,7 @@ export function dashboardFingerprint() {
     }
   }
   let dealSig = 0;
-  for (const g of state.wishlistGames || []) {
+  for (const g of wishlistGamesBase()) {
     const d = getDealInfo(g);
     if (d) dealSig += (d.cut || 0) + (d.isHistoricalLow ? 1000 : 0);
   }
@@ -183,7 +183,7 @@ function computeMegaHeroStats(games, snap, agg) {
   const playedHrs = snap.playedHrs;
   const completion = snap.nonSkip ? Math.round(snap.completionRate * 100) : 0;
   const avgRating = agg?.avgRating != null ? agg.avgRating : " - ";
-  const wlDeals = state.wishlistGames.filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
+  const wlDeals = wishlistGamesBase().filter(g => { const d = getDealInfo(g); return d && (d.cut || 0) > 0; }).length;
   const storeCountMap = agg?.storeCounts ? { ...agg.storeCounts } : {};
   if (!agg?.storeCounts) {
     for (const g of games) {

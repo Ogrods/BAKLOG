@@ -40,7 +40,7 @@
     "@supabase/supabase-js": "^2.112.2",
     "@tailwindcss/cli": "^4.3.3",
     "axe-core": "^4.13.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.2",
     "eslint": "^10.8.0",
     "eslint-plugin-import-x": "^4.16.1",
     "globals": "^17.9.0",

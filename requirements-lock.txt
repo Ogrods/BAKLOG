@@ -40,7 +40,7 @@ Pygments==2.20.0
 pyinstaller==6.21.0
 pyinstaller-hooks-contrib==2026.6
 PyJWT==2.13.0
-pyrate-limiter==4.2.0
+pyrate-limiter==4.4.0
 pystray==0.19.5
 pytest==9.1.1
 pytest-sugar==1.1.1

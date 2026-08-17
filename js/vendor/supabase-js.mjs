@@ -4262,7 +4262,7 @@ Suggested solution: ${env.workaround}`;
 var websocket_factory_default = WebSocketFactory;
 
 // node_modules/@supabase/realtime-js/dist/module/lib/version.js
-var version = "2.112.2";
+var version = "2.112.3";
 
 // node_modules/@supabase/realtime-js/dist/module/lib/constants.js
 var DEFAULT_VERSION = `realtime-js/${version}`;
@@ -10200,7 +10200,7 @@ var StorageFileApi = class extends BaseApiClient {
     return query;
   }
 };
-var version2 = "2.112.2";
+var version2 = "2.112.3";
 var DEFAULT_HEADERS = { "X-Client-Info": `storage-js/${version2}` };
 var StorageBucketApi = class extends BaseApiClient {
   constructor(url, headers = {}, fetch$1, opts) {
@@ -11602,7 +11602,7 @@ var StorageClient = class extends StorageBucketApi {
 };
 
 // node_modules/@supabase/auth-js/dist/module/lib/version.js
-var version3 = "2.112.2";
+var version3 = "2.112.3";
 
 // node_modules/@supabase/auth-js/dist/module/lib/constants.js
 var AUTO_REFRESH_TICK_DURATION_MS = 30 * 1e3;
@@ -19699,7 +19699,7 @@ var AuthClient = GoTrueClient_default;
 var AuthClient_default = AuthClient;
 
 // node_modules/@supabase/supabase-js/dist/index.mjs
-var version4 = "2.112.2";
+var version4 = "2.112.3";
 var JS_ENV = "";
 var JS_RUNTIME_VERSION;
 if (typeof Deno !== "undefined") {
@@ -19886,6 +19886,7 @@ var fetchWithAuth = (supabaseKey, supabaseUrl, getAccessToken, customFetch, trac
   };
 };
 var warnedMissingTracingRuntime = false;
+var warnedNonW3CPropagator = false;
 function getTraceHeaders(input, targets, respectSampling) {
   const extractTraceContext = getTraceContextExtractor();
   if (!extractTraceContext) {
@@ -19897,10 +19898,18 @@ function getTraceHeaders(input, targets, respectSampling) {
   }
   if (!shouldPropagateToTarget(typeof input === "string" ? input : input instanceof URL ? input : input.url, targets)) return null;
   const traceContext = extractTraceContext();
-  if (!traceContext || !traceContext.traceparent) return null;
+  if (!traceContext || !traceContext.traceparent) {
+    var _traceContext$carrier;
+    if ((traceContext === null || traceContext === void 0 || (_traceContext$carrier = traceContext.carrierKeys) === null || _traceContext$carrier === void 0 ? void 0 : _traceContext$carrier.length) && !warnedNonW3CPropagator) {
+      warnedNonW3CPropagator = true;
+      const sentryHint = traceContext.carrierKeys.includes("sentry-trace") ? " Sentry detected: set `propagateTraceparent: true` in Sentry.init() to emit it." : " Configure your tracing SDK to emit W3C trace context on outgoing requests.";
+      console.warn(`@supabase/supabase-js: tracePropagation is enabled and a tracing SDK is active, but its propagator wrote [${traceContext.carrierKeys.join(", ")}] and no W3C traceparent header, so trace headers will not be attached.` + sentryHint);
+    }
+    return null;
+  }
   if (respectSampling) {
     const parsed = parseTraceParent(traceContext.traceparent);
-    if (parsed && !parsed.isSampled) return null;
+    if (parsed && !parsed.isSampled) return { traceparent: traceContext.traceparent };
   }
   return traceContext;
 }

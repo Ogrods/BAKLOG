@@ -36,6 +36,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Public pre-push no longer treats `baklog-internal` as the public work tree: the sync script clears inherited `GIT_DIR`, merge-copies rule dirs so internal-only files survive, and resets public HEAD if that leak is detected.
 - Cursor stop-hook tracker reminder honors `loop_count` and reminds at most once per conversation, so Docker/WSL completion pings no longer restart the follow-up loop.
 - Wishlist deal radar (Today's Top Deal / Steals), Picks deals, dashboard deal counts, and on-sale spotlight ignore user-hidden and cross-store-dupe wishlist rows - the same visible list the wishlist table already uses.
 - Pre-header alert banners (ITAD price refresh and siblings) use the same 1rem top inset as the app header, so they no longer sit flush to the viewport.

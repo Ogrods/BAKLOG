@@ -14,9 +14,7 @@ alwaysApply: false
 
 ## Key files
 
-- `landing/index.html` — hero, waitlist, `#demo` interactive section, inline JSON-LD `@graph`
-- `landing/llms.txt` — AI-crawler summary (no em dashes)
-- `landing/ga.js` — GA4 config for the marketing site (`G-88L32JZQDH`); CSP allowlist in `landing/vercel.json`
+- `landing/index.html` — hero, waitlist, `#demo` interactive section, inline JSON-LD `@graph`, inline GA4 gtag (`G-88L32JZQDH`; CSP hash in `landing/vercel.json`)
 - `landing/demo.js` — IIFE with dummy data (`STATS`, `SPOTLIGHT_GAMES`); mirrors app UX, no app imports
 - `landing/demo.css` — demo dashboard chrome
 - `landing/main.js` — waitlist POST to `/api/subscribe`

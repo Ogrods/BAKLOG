@@ -2,6 +2,7 @@
  * Landing SEO gate: JSON-LD parse + FAQ sync, required meta, no em dashes.
  * Used as seo-god.json build_cmd. Does not start a server.
  */
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +56,21 @@ function scanEmDash(filePath, errors) {
   }
 }
 
+function extractHeadGtagConfig(html) {
+  const headEnd = html.toLowerCase().indexOf("</head>");
+  if (headEnd < 0) return null;
+  const head = html.slice(0, headEnd);
+  const loader = 'src="https://www.googletagmanager.com/gtag/js?id=G-88L32JZQDH"';
+  if (!head.includes(loader)) return null;
+  const after = head.slice(head.indexOf(loader));
+  const start = after.indexOf("<script>");
+  const end = after.indexOf("</script>", start);
+  if (start < 0 || end < 0) return null;
+  const body = after.slice(start + "<script>".length, end);
+  if (!body.includes("G-88L32JZQDH") || !body.includes("gtag(")) return null;
+  return body;
+}
+
 export function checkLandingSeo() {
   const errors = [];
   const indexPath = path.join(landing, "index.html");
@@ -106,13 +122,19 @@ export function checkLandingSeo() {
     });
   }
 
-  if (!html.includes("G-88L32JZQDH") || !fs.existsSync(path.join(landing, "ga.js"))) {
-    errors.push("index.html / ga.js missing Google Analytics measurement id");
-  }
-
-  const vercel = fs.readFileSync(path.join(landing, "vercel.json"), "utf8");
-  if (!vercel.includes("https://www.googletagmanager.com")) {
-    errors.push("vercel.json CSP missing googletagmanager.com for GA");
+  const gtagBody = extractHeadGtagConfig(html);
+  if (!gtagBody) {
+    errors.push("index.html <head> missing inline gtag config for G-88L32JZQDH");
+  } else {
+    const sha = crypto.createHash("sha256").update(gtagBody, "utf8").digest("base64");
+    const token = `'sha256-${sha}'`;
+    const vercel = fs.readFileSync(path.join(landing, "vercel.json"), "utf8");
+    if (!vercel.includes(token)) {
+      errors.push(`vercel.json CSP missing ${token} for the inline gtag snippet`);
+    }
+    if (!vercel.includes("https://www.googletagmanager.com")) {
+      errors.push("vercel.json CSP missing googletagmanager.com for GA");
+    }
   }
 
   const sitemap = fs.readFileSync(path.join(landing, "sitemap.xml"), "utf8");

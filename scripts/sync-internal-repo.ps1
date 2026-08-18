@@ -52,9 +52,13 @@ function Invoke-GitAt {
         [Parameter(Mandatory = $true)][string[]]$GitArgs
     )
     Clear-InheritedGitEnv
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     $output = & git -C $Path @GitArgs 2>&1
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
     return [pscustomobject]@{
-        Code   = $LASTEXITCODE
+        Code   = $code
         Output = $output
         Text   = (($output | ForEach-Object { "$_" }) -join "`n").Trim()
     }

@@ -101,7 +101,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 @echo off
 cd /d "%~dp0"
 echo Starting BAKLOG (tray) on http://127.0.0.1:8765
-echo Connections sign-in requires Google Chrome or Microsoft Edge.
+echo Connections sign-in prefers Chrome or Edge. If neither is installed, BAKLOG downloads a one-time browser.
 start "" "%~dp0BAKLOG Tray.exe"
 "@ | Set-Content -Encoding ASCII (Join-Path $OutDir "Start BAKLOG.bat")
 
@@ -109,7 +109,7 @@ start "" "%~dp0BAKLOG Tray.exe"
 @echo off
 cd /d "%~dp0"
 echo Starting BAKLOG server (console) on http://127.0.0.1:8765
-echo Connections sign-in requires Google Chrome or Microsoft Edge.
+echo Connections sign-in prefers Chrome or Edge. If neither is installed, BAKLOG downloads a one-time browser.
 "%~dp0BAKLOG.exe"
 pause
 "@ | Set-Content -Encoding ASCII (Join-Path $OutDir "Start BAKLOG (server console).bat")

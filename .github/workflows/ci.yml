@@ -262,13 +262,18 @@ jobs:
           npx playwright install chromium
 
       - name: Generate perf profile + build + audit
+        env:
+          BAKLOG_AUTH_DISABLED: "1"
+          BAKLOG_SERVE_BUILT: "1"
         run: |
           node scripts/generate-perf-profile.mjs
           npm run vendor:supabase
           npm run build
+          ls dist/js/app-*.js
           mkdir -p profiles/perf
+          cp tests/fixtures/perf-profile/index.json profiles/index.json
           cp -r tests/fixtures/perf-profile/perf/* profiles/perf/
-          BAKLOG_PROFILE=perf BAKLOG_SERVE_BUILT=1 python server.py &
+          python server.py &
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:8765/api/config && break
             sleep 1

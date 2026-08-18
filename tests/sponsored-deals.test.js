@@ -89,7 +89,7 @@ function proPromoItem(overrides = {}) {
     kind: 'house',
     banner: 'pro',
     title: 'Optional support for BAKLOG Pro',
-    tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and fewer sponsored slots - nothing free today moves behind it.',
+    tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - nothing free today moves behind it.',
     cta: 'Get Pro — $5/mo',
     url: 'https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw',
     placements: 'dash-deal-rail',

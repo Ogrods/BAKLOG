@@ -34,6 +34,7 @@ from auth.cdp_browser import (
     find_chromium_executable,
     is_blank_browser_url,
     launch_persistent_profile,
+    linux_ci_no_sandbox_flags,
 )
 from auth.runner import _cookie_header
 
@@ -617,6 +618,23 @@ class TestFindBrowser:
         assert "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" in paths
         assert "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" in paths
         assert "/opt/google/chrome/chrome" in paths
+
+
+class TestLinuxCiNoSandbox:
+    def test_off_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("BAKLOG_CHROMIUM_NO_SANDBOX", raising=False)
+        monkeypatch.setattr(sys, "platform", "linux")
+        assert linux_ci_no_sandbox_flags() == []
+
+    def test_linux_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BAKLOG_CHROMIUM_NO_SANDBOX", "1")
+        monkeypatch.setattr(sys, "platform", "linux")
+        assert linux_ci_no_sandbox_flags() == ["--no-sandbox", "--disable-setuid-sandbox"]
+
+    def test_ignored_on_windows(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BAKLOG_CHROMIUM_NO_SANDBOX", "1")
+        monkeypatch.setattr(sys, "platform", "win32")
+        assert linux_ci_no_sandbox_flags() == []
 
 
 @pytest.mark.integration

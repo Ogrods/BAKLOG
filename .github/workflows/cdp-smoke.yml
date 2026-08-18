@@ -30,4 +30,5 @@ jobs:
       - name: Run CDP integration smoke test
         env:
           BAKLOG_CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          BAKLOG_CHROMIUM_NO_SANDBOX: "1"
         run: pytest tests/test_cdp_browser.py -m integration -v

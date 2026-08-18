@@ -29,7 +29,7 @@ HOUSE_DEFAULTS = {
     "house-support-baklog": {
         "kind": "house",
         "title": "Support BAKLOG Pro",
-        "tagline": "Optional perks for supporters: bulk refresh, background sync, fewer sponsored cards.",
+        "tagline": "Optional perks for supporters: bulk refresh, background sync, sponsored deal cards removed.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -40,7 +40,7 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "Optional support for BAKLOG Pro",
         "tagline": (
-            "Back the roadmap. Pro adds bulk refresh, background sync, and fewer sponsored slots - "
+            "Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - "
             "nothing free today moves behind it."
         ),
         "cta": "Support BAKLOG",
@@ -61,7 +61,7 @@ HOUSE_DEFAULTS = {
     "house-itch-privacy": {
         "kind": "house",
         "title": "Support BAKLOG Pro",
-        "tagline": "Optional perks for supporters: background refresh, cloud sync, fewer sponsored cards.",
+        "tagline": "Optional perks for supporters: background refresh, cloud sync, sponsored deal cards removed.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -72,7 +72,7 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "BAKLOG Pro",
         "slogan": "One honest backlog across every store.",
-        "tagline": "Supporter perks: bulk refresh, cloud sync, fewer sponsored slots.",
+        "tagline": "Supporter perks: bulk refresh, cloud sync, sponsored deal cards removed.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -98,7 +98,7 @@ HOUSE_DEFAULTS = {
     "house-spotlight-pro-noads": {
         "kind": "house",
         "title": "Fewer distractions",
-        "slogan": "Pro supporters see fewer sponsored deal slots.",
+        "slogan": "Pro supporters see sponsored deal cards removed.",
         "tagline": "Nothing you use today moves behind paywall.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",

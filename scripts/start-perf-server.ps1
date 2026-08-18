@@ -13,13 +13,15 @@ if (-not (Test-Path $py)) {
     Write-Error "Missing $py - create .venv first."
 }
 
-$fixturePerf = Join-Path $root 'tests\fixtures\perf-profile\perf'
-$destPerf = Join-Path $root 'profiles\perf'
-if (-not (Test-Path $fixturePerf)) {
-    node scripts/generate-perf-profile.mjs
-}
+Write-Host '==> generate + sync perf profile fixture (index active=perf)'
+node scripts/generate-perf-profile.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$fixtureRoot = Join-Path $root 'tests\fixtures\perf-profile'
+$profilesDir = Join-Path $root 'profiles'
+$destPerf = Join-Path $profilesDir 'perf'
 New-Item -ItemType Directory -Force -Path $destPerf | Out-Null
-Copy-Item -Recurse -Force (Join-Path $fixturePerf '*') $destPerf
+Copy-Item -Force (Join-Path $fixtureRoot 'index.json') (Join-Path $profilesDir 'index.json')
+Copy-Item -Recurse -Force (Join-Path $fixtureRoot 'perf\*') $destPerf
 
 if (-not $SkipBuild) {
     Write-Host '==> npm run build'
@@ -32,7 +34,7 @@ $env:BAKLOG_SERVE_BUILT = '1'
 $env:BAKLOG_ADMIN = '0'
 $env:BAKLOG_AUTH_DISABLED = '1'
 
-Write-Host '==> starting server (BAKLOG_PROFILE=perf, BAKLOG_SERVE_BUILT=1)'
+Write-Host '==> starting server (profiles/index.json active=perf, BAKLOG_SERVE_BUILT=1, AUTH_DISABLED)'
 $server = Start-Process -FilePath $py -ArgumentList 'server.py' -WorkingDirectory $root -PassThru -WindowStyle Hidden
 
 function Stop-Server {

@@ -57,6 +57,7 @@ hiddenimports = [
     "auth.cdp_browser",
     "auth.manager",
     "auth.secrets",
+    "shared.chromium_runtime",
     "shared.install_paths",
     "shared.data_dir_migration",
     "shared.bundled_auth_env",

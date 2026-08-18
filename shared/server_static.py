@@ -12,25 +12,38 @@ from shared.profile_paths import PROFILE_CACHE_JSON_FILES
 LIBRARY_JSON_RE = re.compile(r"^/games_[a-z0-9_]+\.json$", re.I)
 
 
-def normalize_static_path(path_only: str) -> str:
-    """Canonical URL path for static classification (decode + casefold segments)."""
+def _decoded_static_segments(path_only: str, *, casefold: bool) -> list[str]:
     clean = path_only.split("?", 1)[0]
-    if not clean.startswith("/"):
-        clean = "/" + clean.lstrip("/")
     try:
         decoded = unquote(clean, encoding="utf-8", errors="strict")
     except UnicodeDecodeError:
         decoded = clean
     segments: list[str] = []
-    for seg in decoded.split("/"):
+    for seg in decoded.replace("\\", "/").split("/"):
         if not seg or seg == ".":
             continue
         if seg == "..":
             if segments:
                 segments.pop()
             continue
-        segments.append(seg.casefold())
+        segments.append(seg.casefold() if casefold else seg)
+    return segments
+
+
+def normalize_static_path(path_only: str) -> str:
+    """Canonical URL path for static classification (decode + casefold segments)."""
+    segments = _decoded_static_segments(path_only, casefold=True)
     return "/" + "/".join(segments) if segments else "/"
+
+
+def static_relpath_preserve_case(path_only: str) -> str:
+    """Relative disk path for public static files. Strips . and ..; does not casefold.
+
+    Classification must keep using normalize_static_path so Windows cannot bypass
+    denylists with /Profiles. Hashed dist JS from esbuild keeps mixed-case names
+    (app-LEFEOLTR.js); casefolding that leaf 404s on Linux.
+    """
+    return "/".join(_decoded_static_segments(path_only, casefold=False))
 
 
 def static_class(path_only: str, *, admin_enabled: bool | None = None) -> str:

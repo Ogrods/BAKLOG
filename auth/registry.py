@@ -55,7 +55,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         success_url_pattern=r"steamcommunity\.com/dev/apikey",
         fetcher_keys=("steam", "wishlistSteam", "steamReviews"),
         tips=(
-            "We grab your Steam Web API key automatically once you sign in — nothing to copy.",
+            "We grab your Steam Web API key automatically once you sign in - nothing to copy.",
             "Your profile + game details must be set to Public for the library and wishlist to load.",
             "First sync of a big library can take a few minutes (Steam rate-limits); later runs use cache.",
         ),
@@ -72,9 +72,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("gog", "wishlistGog"),
         tips=(
             "One sign-in covers both your GOG library and wishlist.",
-            "Sessions last about two weeks — reconnect here if GOG games stop updating.",
+            "Sessions last about two weeks - reconnect here if GOG games stop updating.",
             "On Windows/macOS with GOG Galaxy installed, the local Galaxy source below "
-            "is preferred — no browser sign-in needed.",
+            "is preferred - no browser sign-in needed.",
         ),
         connect_strategy="cookie_probe",
     ),
@@ -87,10 +87,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("gog",),
         platforms=("win32", "darwin"),
         tips=(
-            "No sign-in window — we read Galaxy's local galaxy-2.0.db on this PC.",
+            "No sign-in window - we read Galaxy's local galaxy-2.0.db on this PC.",
             "Install GOG Galaxy, sign in, and sync your library once.",
             "Nothing leaves your machine for this source; it's a local file read only.",
-            "Windows and macOS only — Linux has no supported Galaxy DB path.",
+            "Windows and macOS only - Linux has no supported Galaxy DB path.",
         ),
     ),
     "psn": ProviderSpec(
@@ -107,7 +107,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Use the Sign In button at the top-right of the store page, then keep the window "
             "open until it closes on its own.",
             "Easiest sign-in: if you have a passkey, choose \u201cSign in with a passkey\u201d "
-            "and approve it on your phone \u2014 no password or 2FA codes to type.",
+            "and approve it on your phone - no password or 2FA codes to type.",
             "One sign-in covers your PSN library and PlayStation Store wishlist; sessions last ~30 days.",
         ),
     ),
@@ -117,7 +117,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         kind="browser",
         description=(
             "Your Epic Games library. Click Connect to sign in to Epic in a managed "
-            "window — we capture and exchange the authorizationCode for a 30-day "
+            "window - we capture and exchange the authorizationCode for a 30-day "
             "refresh token automatically. If auto-capture is ever blocked, you can "
             "still paste the code Epic shows on the page below."
         ),
@@ -140,7 +140,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("epic",),
         preserve_profile_on_reconnect=True,
         tips=(
-            "Click Connect and sign in — we grab the authorizationCode for you, no copy/paste.",
+            "Click Connect and sign in - we grab the authorizationCode for you, no copy/paste.",
             (
                 "Auto-capture blocked? Paste the authorizationCode shown on Epic's page "
                 "into the fallback field."
@@ -153,7 +153,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         label="Epic (wishlist)",
         kind="browser",
         description=(
-            "Your Epic Games Store wishlist. Separate sign-in on the storefront — "
+            "Your Epic Games Store wishlist. Separate sign-in on the storefront - "
             "Cloudflare may challenge once."
         ),
         env_keys=("EPIC_STORE_COOKIE",),
@@ -162,7 +162,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         expiry_days=7,
         fetcher_keys=("wishlistEpic",),
         tips=(
-            "Separate from the Epic library sign-in above \u2014 the storefront uses its own session.",
+            "Separate from the Epic library sign-in above - the storefront uses its own session.",
             "Cloudflare may show a quick checkbox; clear it, then let the wishlist fully load before closing.",
             "Storefront sessions are short (~7 days), so expect to reconnect this one more often.",
         ),
@@ -183,10 +183,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("amazon",),
         platforms=("win32",),
         tips=(
-            "No sign-in window \u2014 we read the Amazon Games launcher's local database on this PC.",
+            "No sign-in window - we read the Amazon Games launcher's local database on this PC.",
             "Just install the Amazon Games launcher and sign in there once; keep it installed.",
             "Nothing leaves your machine for this source; it's a local file read only.",
-            "Windows only \u2014 the launcher database uses Windows DPAPI. On macOS/Linux use "
+            "Windows only - the launcher database uses Windows DPAPI. On macOS/Linux use "
             "“Amazon (Prime Gaming, web)” below.",
         ),
     ),
@@ -204,8 +204,8 @@ PROVIDERS: dict[str, ProviderSpec] = {
         expiry_days=30,
         fetcher_keys=("amazon",),
         tips=(
-            "Sign in on the Amazon page — BAKLOG sends you to My Collection after login.",
-            "Imports Amazon-fulfilled Prime games only \u2014 external key drops (Epic, Steam, etc.) are skipped.",
+            "Sign in on the Amazon page - BAKLOG sends you to My Collection after login.",
+            "Imports Amazon-fulfilled Prime games only - external key drops (Epic, Steam, etc.) are skipped.",
             "Use this on macOS/Linux, or on Windows when you don't use the Amazon Games launcher.",
             "Sessions last about 30 days; reconnect if the Amazon fetcher reports auth failure.",
         ),
@@ -229,9 +229,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
         success_url_pattern=r"xbl\.io/(dashboard|app)",
         fetcher_keys=("xbox",),
         tips=(
-            "Sign in at xbl.io with your Microsoft account \u2014 we save the OpenXBL API key for you.",
+            "Sign in at xbl.io with your Microsoft account - we save the OpenXBL API key for you.",
             "Stuck on the Microsoft login? Click \u201cSign in another way\u201d and have it email you a "
-            "one-time code \u2014 no password or authenticator needed.",
+            "one-time code - no password or authenticator needed.",
             "Already have a key? Paste it in the field below instead of signing in.",
             "Pulls titles you've actually launched on Xbox network.",
         ),
@@ -242,7 +242,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         kind="browser",
         description=(
             "Your Xbox Store wishlist. Separate sign-in on xbox.com from the Xbox play "
-            "history above \u2014 wishlists aren't exposed by OpenXBL."
+            "history above - wishlists aren't exposed by OpenXBL."
         ),
         env_keys=("XBOX_WISHLIST_PROFILE", "XBOX_WISHLIST_TOKEN", "XBOX_WISHLIST_MARKET"),
         login_url="https://www.xbox.com/en-us/wishlist",
@@ -250,10 +250,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
         expiry_days=30,
         fetcher_keys=("wishlistXbox",),
         tips=(
-            "Separate xbox.com sign-in from Xbox play history above \u2014 wishlists aren't in OpenXBL.",
+            "Separate xbox.com sign-in from Xbox play history above - wishlists aren't in OpenXBL.",
             "Sign in with your Microsoft account and keep the window open until it closes.",
             "Easiest login: click \u201cSign in another way\u201d and have Microsoft email you a one-time "
-            "code \u2014 no password or authenticator needed.",
+            "code - no password or authenticator needed.",
         ),
         connect_strategy="xhr_sniffer",
         post_connect_probe="advisory",
@@ -264,7 +264,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         label="itch.io (API key)",
         kind="manual",
         description=(
-            "Your itch.io library via API key. Paste a key from your itch settings — "
+            "Your itch.io library via API key. Paste a key from your itch settings - "
             "automated sign-in is blocked."
         ),
         env_keys=("ITCH_API_KEY",),
@@ -272,7 +272,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         login_url="https://itch.io/user/settings/api-keys",
         fetcher_keys=("itch",),
         tips=(
-            "Open in browser goes straight to your itch API keys page \u2014 generate one and paste it below.",
+            "Open in browser goes straight to your itch API keys page - generate one and paste it below.",
             "itch blocks automated sign-in, so the API key is the supported web path.",
             "With the itch desktop app installed, the local source below is preferred.",
             "Bundle items you haven't claimed yet won't show up until you claim them on itch.io.",
@@ -286,7 +286,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         env_keys=("ITCH_BUTLER_DB",),
         fetcher_keys=("itch",),
         tips=(
-            "No API key needed — we read the itch app's butler.db on this PC.",
+            "No API key needed - we read the itch app's butler.db on this PC.",
             "Install the itch desktop app, sign in, and open your library once.",
             "Adds last-played / playtime when games are installed through the app.",
         ),
@@ -297,14 +297,14 @@ PROVIDERS: dict[str, ProviderSpec] = {
         kind="manual",
         description=(
             "Cross-store deal prices for your wishlist. Paste an API key from your ITAD "
-            "apps page — automated sign-in is blocked."
+            "apps page - automated sign-in is blocked."
         ),
         env_keys=("ITAD_API_KEY",),
         form_fields=(FormField("ITAD_API_KEY", "API key (UUID)", secret=True),),
         login_url="https://isthereanydeal.com/apps/my/",
         fetcher_keys=("itad",),
         tips=(
-            "Not a store login \u2014 this powers cross-store deal prices and historical lows on your wishlist.",
+            "Not a store login - this powers cross-store deal prices and historical lows on your wishlist.",
             "Create an app at isthereanydeal.com/apps/my/, then paste the API key (a UUID) below.",
             "Deals refresh on their own up to once an hour while the dashboard is open.",
         ),
@@ -321,7 +321,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
         fetcher_keys=("battlenet",),
         tips=(
             "Sign in at account.battle.net and open your Games list so the session is fully active.",
-            "Battle.net sessions are short (~7 days) \u2014 reconnect here when the library looks stale.",
+            "Battle.net sessions are short (~7 days) - reconnect here when the library looks stale.",
             "Covers Blizzard titles tied to your account (WoW, Diablo, Overwatch, etc.).",
         ),
         connect_strategy="cookie_api_probe",
@@ -385,7 +385,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "Sign in at humblebundle.com (email or Google). Complete any CAPTCHA in the browser window.",
             "After sign-in we'll open your library page to capture the session.",
             (
-                "Most Humble purchases are Steam keys \u2014 they appear as Humble-owned "
+                "Most Humble purchases are Steam keys - they appear as Humble-owned "
                 "titles and dedupe against Steam by name."
             ),
         ),
@@ -404,16 +404,16 @@ PROVIDERS: dict[str, ProviderSpec] = {
         tips=(
             "One sign-in covers both your Ubisoft Connect library and the Ubisoft Store wishlist.",
             "After signing in, browse to your games once so we can capture the session.",
-            "If 2FA/verify leaves a blank tab, close it and click Connect again \u2014 "
+            "If 2FA/verify leaves a blank tab, close it and click Connect again - "
             "the sign-in still completes in the main window.",
-            "Sessions are short (~7 days) \u2014 reconnect here when Ubisoft data goes stale.",
+            "Sessions are short (~7 days) - reconnect here when Ubisoft data goes stale.",
         ),
     ),
     "ea": ProviderSpec(
         key="ea",
         label="EA App",
         kind="browser",
-        description="Your EA App (PC) library — owned titles and EA Play vault games.",
+        description="Your EA App (PC) library - owned titles and EA Play vault games.",
         env_keys=("EA_PROFILE", "EA_BEARER_TOKEN"),
         login_url="https://www.ea.com/login",
         success_url_pattern=r"ea\.com",
@@ -424,7 +424,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "After sign-in we open the deals page briefly to confirm your session.",
             "If the chip shows Session expired, click Reconnect (not Connect) for a clean sign-in.",
             "Each sync replays your saved browser profile; reconnect if library fetches start failing.",
-            "Only PC titles sold on EA are listed \u2014 Steam/Epic copies stay on those store fetchers.",
+            "Only PC titles sold on EA are listed - Steam/Epic copies stay on those store fetchers.",
         ),
         connect_strategy="bearer_header",
         login_success_url="https://www.ea.com/",

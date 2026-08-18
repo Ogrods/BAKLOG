@@ -235,7 +235,7 @@ describe('spotlight sponsored slides', () => {
       _spotlightReason: {
         eyebrow: 'BAKLOG Pro',
         score: 50,
-        metaParts: ['Supporter perks: bulk refresh, cloud sync, fewer sponsored slots - Support BAKLOG.'],
+        metaParts: ['Supporter perks: bulk refresh, cloud sync, sponsored deal cards removed - Support BAKLOG.'],
         slogan: 'One honest backlog across every store.',
       },
       _spotlightAd: {

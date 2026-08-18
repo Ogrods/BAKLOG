@@ -62,3 +62,35 @@ export function syntheticWishlistGames(count) {
   }
   return games;
 }
+
+/**
+ * Minimal itch.io catalog rows so perf/responsive audits open the itch view
+ * (cached catalog makes isItchTabAvailable true without Connect).
+ * @param {number} count
+ */
+export function syntheticItchGames(count) {
+  const games = [];
+  for (let i = 0; i < count; i++) {
+    games.push({
+      store: 'itch',
+      id: 9000 + i,
+      itch_id: 9000 + i,
+      name: `Itch Jam ${i}`,
+      type: 'game',
+      playtime_minutes: 0,
+      publisher: 'Perf Fixture',
+    });
+  }
+  return games;
+}
+
+/**
+ * @param {number} count
+ */
+export function itchCatalogPayload(count) {
+  const games = syntheticItchGames(count);
+  return {
+    game_count: games.length,
+    games,
+  };
+}

@@ -1654,6 +1654,19 @@ def _ensure_persistent_session_prefs(profile: Path) -> None:
         pass
 
 
+def linux_ci_no_sandbox_flags() -> list[str]:
+    """Chrome flags for GitHub Linux runners (AppArmor blocks the sandbox).
+
+    Opt-in via BAKLOG_CHROMIUM_NO_SANDBOX=1. Never used on Windows Connect.
+    """
+    raw = os.environ.get("BAKLOG_CHROMIUM_NO_SANDBOX", "").strip().lower()
+    if raw not in ("1", "true", "yes"):
+        return []
+    if not sys.platform.startswith("linux"):
+        return []
+    return ["--no-sandbox", "--disable-setuid-sandbox"]
+
+
 def launch_persistent_profile(
     user_data_dir: str | Path,
     *,
@@ -1708,6 +1721,7 @@ def launch_persistent_profile(
         # persistent "unsupported command-line flag" infobar that blocks the login UI.
         "--disable-features=IsolateOrigins,site-per-process",
     ]
+    args.extend(linux_ci_no_sandbox_flags())
     if headless:
         mode = "new" if headless is True else str(headless).lower()
         if mode in ("legacy", "old"):

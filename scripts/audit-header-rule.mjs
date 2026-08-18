@@ -4,19 +4,16 @@
  * Usage: node scripts/audit-header-rule.mjs [baseUrl]
  */
 import { chromium } from 'playwright';
+import { clickViewTab, waitViewSettled } from './audit-view-click.mjs';
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8765';
 const VIEWS = ['dashboard', 'library', 'wishlist', 'itch', 'connections', 'pro'];
 
 async function clickView(page, view) {
-  await page.evaluate((v) => {
-    document.querySelector(`.view-tab[data-view="${v}"]`)?.click();
-  }, view);
-  await page.waitForFunction(
-    (v) => document.documentElement.getAttribute('data-init-view') === v,
-    view,
-    { timeout: 20000 },
-  );
+  const { jumped, hasTab } = await clickViewTab(page, view);
+  if (!hasTab) return 'absent';
+  if (jumped) return 'jump';
+  await waitViewSettled(page, view, 20000);
   await page.waitForFunction(
     () => {
       const v = document.documentElement.getAttribute('data-init-view');
@@ -28,10 +25,10 @@ async function clickView(page, view) {
     { timeout: 20000 },
   );
   await page.waitForTimeout(600);
+  return 'ok';
 }
 
-async function sampleView(page, view) {
-  await clickView(page, view);
+async function sampleView(page) {
   return page.evaluate(() => {
     const header = document.querySelector('header.app-header');
     const row = document.querySelector('.app-header-row');
@@ -78,7 +75,16 @@ async function main() {
         console.log(`SKIP ${view} (tab absent)`);
         continue;
       }
-      const snap = await sampleView(page, view);
+      const outcome = await clickView(page, view);
+      if (outcome === 'absent') {
+        console.log(`SKIP ${view} (tab absent)`);
+        continue;
+      }
+      if (outcome === 'jump') {
+        console.log(`SKIP ${view} (jump tab)`);
+        continue;
+      }
+      const snap = await sampleView(page);
       const ok = ruleOk(snap);
       if (!ok) {
         failed = true;

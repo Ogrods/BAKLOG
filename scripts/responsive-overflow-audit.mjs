@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { clickViewTab, waitViewSettled } from './audit-view-click.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2).filter((a) => a !== '--');
@@ -43,17 +44,6 @@ const VIEWS = ['dashboard', 'library', 'wishlist', 'connections', 'pro', 'itch']
 /** Allow 1px subpixel fudge (common on fractional DPR). */
 const SCROLL_FUDGE_PX = 1;
 
-async function clickViewTab(page, view) {
-  await page.evaluate((v) => {
-    const tab = document.querySelector(`.view-tab[data-view="${v}"]`);
-    if (tab) {
-      tab.click();
-      return;
-    }
-    document.querySelector(`#headerNavSheet .view-tab[data-view="${v}"]`)?.click();
-  }, view);
-}
-
 async function waitBootCurtainLift(page, { allowAuthGate = false } = {}, timeoutMs = 25000) {
   const authBlocking = await page.evaluate(() => {
     const gate = document.getElementById('authGateOverlay');
@@ -69,20 +59,6 @@ async function waitBootCurtainLift(page, { allowAuthGate = false } = {}, timeout
   await page.waitForFunction(
     () => !document.documentElement.hasAttribute('data-boot-loading'),
     null,
-    { timeout: timeoutMs },
-  );
-}
-
-async function waitViewSettled(page, view, timeoutMs = 12000) {
-  await page.waitForFunction(
-    (v) => {
-      const overlay = !!document
-        .getElementById('viewLoadingOverlay')
-        ?.classList.contains('show');
-      const active = document.documentElement.getAttribute('data-init-view');
-      return !overlay && active === v;
-    },
-    view,
     { timeout: timeoutMs },
   );
 }
@@ -318,7 +294,33 @@ async function runMainMatrix(browser, report) {
 
     for (const view of VIEWS) {
       try {
-        await clickViewTab(page, view);
+        const { jumped, hasTab } = await clickViewTab(page, view);
+        if (!hasTab) {
+          pushResult(report, {
+            viewport: vp.label,
+            width: vp.width,
+            view,
+            scrollWidth: 0,
+            clientWidth: vp.width,
+            overflowPx: 0,
+            ok: true,
+            skipped: 'tab-absent',
+          });
+          continue;
+        }
+        if (jumped) {
+          pushResult(report, {
+            viewport: vp.label,
+            width: vp.width,
+            view,
+            scrollWidth: 0,
+            clientWidth: vp.width,
+            overflowPx: 0,
+            ok: true,
+            skipped: 'itch-tab-jump',
+          });
+          continue;
+        }
         await waitViewSettled(page, view);
         await page.waitForTimeout(200);
         const m = await measureOverflow(page);

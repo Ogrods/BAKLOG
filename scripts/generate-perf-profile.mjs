@@ -6,7 +6,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { steamCatalogPayload, syntheticWishlistGames } from '../tests/fixtures/synthetic-games.js';
+import {
+  itchCatalogPayload,
+  steamCatalogPayload,
+  syntheticWishlistGames,
+} from '../tests/fixtures/synthetic-games.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureRoot = path.join(root, 'tests', 'fixtures', 'perf-profile');
@@ -48,10 +52,11 @@ writeJson('perf/games_wishlist.json', {
   game_count: 20,
   games: syntheticWishlistGames(20),
 });
+writeJson('perf/games_itch.json', itchCatalogPayload(12));
 
 // Empty stubs for other stores merge path expects.
 for (const store of [
-  'gog', 'psn', 'epic', 'amazon', 'nintendo', 'itch', 'xbox', 'battlenet', 'ubisoft', 'humble', 'ea',
+  'gog', 'psn', 'epic', 'amazon', 'nintendo', 'xbox', 'battlenet', 'ubisoft', 'humble', 'ea',
 ]) {
   writeJson(`perf/games_${store}.json`, { game_count: 0, games: [] });
 }

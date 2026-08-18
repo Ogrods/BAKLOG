@@ -254,6 +254,9 @@ from shared.server_static import (  # noqa: E402
 from shared.server_static import (  # noqa: E402
     static_class as _static_class_impl,
 )
+from shared.server_static import (  # noqa: E402
+    static_relpath_preserve_case as _static_relpath_preserve_case,
+)
 from shared.subprocess_guard import _max_run_seconds_from_env, popen_fetcher  # noqa: E402, F401 — re-exported for tests
 
 MAX_RUN_SECONDS = _max_run_seconds_from_env()
@@ -1147,7 +1150,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path: str) -> str:
         """Serve catalog and cache JSON from the active profile root (legacy or profiles/<id>/)."""
-        norm = _normalize_static_path(path.split("?", 1)[0])
+        raw = path.split("?", 1)[0]
+        norm = _normalize_static_path(raw)
         clean = norm.lstrip("/")
         if _static_class(norm) == "deny":
             return str(profile_root() / ".profile_static_blocked" / clean)
@@ -1187,8 +1191,9 @@ class Handler(SimpleHTTPRequestHandler):
         from shared.install_paths import static_root
         # For frozen builds, resolve from the static root (includes _internal)
         base = static_root() if is_frozen() else Path.cwd()
-        resolved_path = base / clean
-        if clean == "":
+        disk_rel = _static_relpath_preserve_case(raw)
+        resolved_path = base / disk_rel
+        if disk_rel == "":
             resolved_path = base / "index.html"
         if resolved_path.is_dir():
             for leaf in ("index.html", "index.htm"):

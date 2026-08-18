@@ -51,9 +51,23 @@ Connect on `http://localhost:3001`. Redirects: localhost and 127.0.0.1 `/api/gsc
 
 Query data arrives **automatically** after bind (often empty 2-3 days). No Site audit click. No DataForSEO.
 
+## OpenSEO Browse tabs
+
+Stay on **Browse**, not **Chat**. Switch project first (audio ≠ www).
+
+**Use**
+- **GSC Insights** (My site) - the one that matters. Clicks, impressions, queries, pages from Search Console. Free. Check this after 2-3 days.
+- **Dashboard** (Overview) - optional glance. Ignore empty research widgets.
+
+**Skip (need DataForSEO or OpenRouter; not worth it for these sites)**
+- Keyword Research, Domain Overview, Backlinks, Brand Lookup (Research)
+- Rank Tracking, Saved Keywords (My site)
+- Site Audit (My site) - generic anti-bot warning without a DataForSEO key
+- Prompt Explorer (Research), **AI & MCP** (Connect), **Chat** tab
+
 ## Site audit "couldn't fully crawl"
 
-OpenSEO **Site audit** needs `DATAFORSEO_API_KEY`. Without it, logs show the missing env var and the UI shows a generic anti-bot warning. Ignore Site audit. Use Search performance (GSC, free). Do not add DataForSEO for these sites.
+OpenSEO **Site audit** needs `DATAFORSEO_API_KEY`. Without it, logs show the missing env var and the UI shows a generic anti-bot warning. Ignore Site audit. Use **GSC Insights**. Do not add DataForSEO for these sites.
 
 ## Adding another site
 

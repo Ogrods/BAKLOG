@@ -1,5 +1,9 @@
 # Pre-push internal sync helper - runs from scripts/hooks/pre-push.
 # Syncs gitignored internal paths to baklog-internal when they changed since last sync.
+#
+# This runs inside a public-repo hook. Git sets GIT_DIR to the public .git;
+# sync-internal-repo.ps1 must clear that env before any git command in the
+# private clone. Set BAKLOG_SKIP_INTERNAL_SYNC=1 to skip.
 param(
     [string]$InternalRepo = ""
 )
@@ -13,8 +17,18 @@ if (-not $InternalRepo) {
     $InternalRepo = Join-Path (Split-Path $RepoRoot -Parent) "baklog-internal"
 }
 
+if ($env:BAKLOG_SKIP_INTERNAL_SYNC -eq "1") {
+    Write-Host "[pre-push] BAKLOG_SKIP_INTERNAL_SYNC=1 - skipping internal sync." -ForegroundColor DarkGray
+    exit 0
+}
+
 if (-not (Test-Path $manifestFile)) {
     Write-Host "[pre-push] No internal manifest - skipping internal sync." -ForegroundColor DarkGray
+    exit 0
+}
+
+if (-not (Test-Path -LiteralPath $InternalRepo)) {
+    Write-Host "[pre-push] Internal clone not found at $InternalRepo - skipping." -ForegroundColor DarkGray
     exit 0
 }
 
@@ -61,9 +75,11 @@ if (-not $needsSync) {
 }
 
 Write-Host "[pre-push] Internal docs changed - syncing to private repo..." -ForegroundColor Cyan
-& $syncScript -InternalRepo $InternalRepo -Push
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[pre-push] Internal sync failed. Push aborted." -ForegroundColor Red
+try {
+    & $syncScript -InternalRepo $InternalRepo -Push
+    if ($LASTEXITCODE -ne 0) { throw "sync-internal-repo.ps1 exited $LASTEXITCODE" }
+} catch {
+    Write-Host "[pre-push] Internal sync failed. Push aborted. $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 Write-Host "[pre-push] Internal sync complete." -ForegroundColor Green

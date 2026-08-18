@@ -52,6 +52,7 @@ if (-not $Full) {
 }
 
 Invoke-NpmStep -Label "check:module-size" -NpmArgs @("run", "check:module-size")
+Invoke-NpmStep -Label "check:landing-seo" -NpmArgs @("run", "check:landing-seo")
 Invoke-NpmStep -Label "lint" -NpmArgs @("run", "lint")
 
 Write-Host "==> vendor:supabase + build"

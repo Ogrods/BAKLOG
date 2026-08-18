@@ -18,6 +18,7 @@
     "watch:tailwind": "tailwindcss -i styles/tailwind-input.css -o tailwind.css --watch",
     "build": "node scripts/build-frontend.mjs",
     "landing": "python -m http.server 4000 --directory landing",
+    "check:landing-seo": "node scripts/check-landing-seo.mjs",
     "check:spotlight:baseline": "node scripts/spotlight-visual-check.mjs --mode=baseline",
     "check:spotlight": "node scripts/spotlight-visual-check.mjs --mode=after",
     "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --outfile=js/vendor/supabase-js.mjs && node -e \"import fs from 'node:fs'; fs.mkdirSync('landing/vendor',{recursive:true}); fs.copyFileSync('js/vendor/supabase-js.mjs','landing/vendor/supabase-js.mjs')\"",

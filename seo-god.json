@@ -2,10 +2,10 @@
   "version": 1,
   "site_url": "https://baklog.app",
   "openseo": {
-    "url": "http://127.0.0.1:3001",
+    "url": "http://localhost:3001",
     "status": "running"
   },
-  "gsc": { "connected": false },
+  "gsc": { "connected": true },
   "phases": {
     "setup": "done",
     "audit": "done",

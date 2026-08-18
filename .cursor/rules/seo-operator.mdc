@@ -1,0 +1,54 @@
+---
+description: OpenSEO, Search Console, GA4, and baklog.app landing SEO operator playbook. Use when adding sites, GSC, gtag, crawls, DataForSEO, or the site-audit warning.
+alwaysApply: false
+---
+
+# Landing SEO operator (attended)
+
+Local OpenSEO + GSC + marketing GA. Not a product feature. Do not vendor [AKCodez/seo-god](https://github.com/AKCodez/seo-god). Do not add a nightly `claude -p` job. `schedule.mode` in `seo-god.json` stays `none`.
+
+## What is already done (baklog.app, 2026-08-18)
+
+- Landing SEO gates: FAQ JSON-LD, `llms.txt`, robots `/auth/`, meta <=160, heading order. Gate: `npm run check:landing-seo`.
+- GA4 `G-88L32JZQDH` **inline** in `landing/index.html` `<head>` (not `ga.js`). CSP sha256 in `landing/vercel.json`. Auth pages have no gtag.
+- OpenSEO Docker gitignored at `.seo-god/`, loopback only (`127.0.0.1:3001`), `AUTH_MODE=local_noauth`.
+- GSC OAuth is in gitignored `.seo-god/secrets.env`. Property baklog.app is bound.
+- Desktop app still has no telemetry.
+
+## Start / URLs
+
+```powershell
+docker compose -p seo-god -f .seo-god/docker-compose.yml up -d
+```
+
+- Dashboard: `http://localhost:3001` (OAuth cookies). `127.0.0.1:3001` is the same bind; use **localhost** for Connect with Google.
+- Never publish port 3001 off loopback.
+- Recreate after secret edits: `docker compose -p seo-god -f .seo-god/docker-compose.yml up -d --force-recreate`
+
+## Google Analytics
+
+Google's installer looks at **page HTML**. Keep `gtag('config', 'G-88L32JZQDH')` inline in `<head>`. After editing the snippet, recompute the CSP hash (`npm run check:landing-seo` fails if `vercel.json` drifts). Verify in GA4 **Realtime** after loading baklog.app. Ignore iframe checkers (`X-Frame-Options: DENY`).
+
+## Search Console
+
+Same Google account can bind every property it owns. Connect on `http://localhost:3001`. Redirects already include localhost and 127.0.0.1 `/api/gsc/oauth/callback`. If the OAuth client lived in chat, rotate the client secret in GCP and `secrets.env`.
+
+GSC queries can stay empty 24-48h after bind. That is not a failed setup.
+
+## Site audit "couldn't fully crawl"
+
+OpenSEO **Site audit** calls DataForSEO. Without `DATAFORSEO_API_KEY`, logs show `Missing required environment variable: DATAFORSEO_API_KEY` and the UI shows a generic anti-bot warning. baklog.app is not blocking us: sitemap is only `https://baklog.app/`, homepage 200, host Lighthouse SEO 100. Ignore that audit, or use Search Performance (GSC, free). Do not add DataForSEO for this one-page invite site.
+
+## Adding another site
+
+OpenSEO is multi-project. Create a project with the **public https URL**, never `http://localhost:...` (the crawler runs inside Docker, so localhost is the container).
+
+If **New project** fails from localhost, it is usually the same DataForSEO gate, not a bind issue. You can still use GSC on an existing project. Do not reuse this GA id on other sites. Do not reuse the wedding-project OAuth client; the baklog GCP OAuth client is fine if that Gmail owns the other GSC properties.
+
+## Secrets (never commit)
+
+`.seo-god/`, `seo/`, `lighthouse/` are gitignored. `seo-god.json` has no secrets (`gsc.connected` is a flag only).
+
+## Internal sync
+
+Public pre-push may sync to `baklog-internal`. `scripts/sync-internal-repo.ps1` must clear inherited `GIT_DIR` and merge-copy `.cursor/rules/` (never wipe `internal-*.mdc`). Skip with `BAKLOG_SKIP_INTERNAL_SYNC=1`. Edit tracker in `..\baklog-internal\tracker.html` and `git push` there; do not use public sync to publish tracker edits.

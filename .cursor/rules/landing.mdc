@@ -22,6 +22,8 @@ alwaysApply: false
 
 FAQ JSON-LD must match the `#faq` details list: `npm run check:landing-seo`.
 
+Attended OpenSEO / GSC / GA playbook: `.cursor/rules/seo-operator.mdc`.
+
 ## Serverless
 
 - `landing/api/subscribe.js` — waitlist (Resend + optional Supabase)

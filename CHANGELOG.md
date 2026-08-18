@@ -32,7 +32,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Added
 
-- Landing FAQPage + WebSite JSON-LD (kept in sync with the `#faq` list), homepage apple-touch-icon, `llms.txt`, `robots.txt` `/auth/` disallow, `/auth-reset` `X-Robots-Tag`, homepage meta description under 160 characters, footer headings without a skipped level, Google Analytics on the marketing site (`G-88L32JZQDH` inline gtag in `<head>`), and `npm run check:landing-seo`.
+- Landing FAQPage + WebSite JSON-LD (kept in sync with the `#faq` list), homepage apple-touch-icon, `llms.txt`, `robots.txt` `/auth/` disallow, `/auth-reset` `X-Robots-Tag`, homepage meta description under 160 characters, footer headings without a skipped level, Google Analytics on the marketing site (`G-88L32JZQDH` inline gtag in `<head>`), `npm run check:landing-seo`, and the attended OpenSEO/GSC playbook in `.cursor/rules/seo-operator.mdc`.
 
 ### Fixed
 

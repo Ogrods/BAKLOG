@@ -6,7 +6,7 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 
 - `index.html` — page markup, inline base CSS, waitlist form shell, inline Google tag (`G-88L32JZQDH`) in `<head>`. No build step.
 - `llms.txt` - plain-text site summary for AI crawlers.
-- JSON-LD - inline `@graph` on `index.html` (`SoftwareApplication`, `WebSite`, `FAQPage`). Keep FAQPage in sync with the `#faq` details list via `npm run check:landing-seo`.
+FAQ JSON-LD must match the `#faq` details list via `npm run check:landing-seo`. Attended OpenSEO / GSC / GA: `.cursor/rules/seo-operator.mdc`.
 - `main.js` — footer year, non-blocking font load, waitlist submit handler.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).

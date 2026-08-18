@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "site_url": "https://baklog.app",
+  "openseo": {
+    "url": "http://127.0.0.1:3001",
+    "status": "running"
+  },
+  "gsc": { "connected": false },
+  "phases": {
+    "setup": "done",
+    "audit": "done",
+    "measure": "in_progress",
+    "ai_visibility": "pending",
+    "schedule": "pending"
+  },
+  "schedule": {
+    "mode": "none",
+    "time_local": "05:00",
+    "marker": ".seo-god/last-run.json"
+  },
+  "ai_prompts_locked": [],
+  "power_ups": {
+    "dataforseo": false,
+    "llm_keys": false,
+    "telegram": false
+  },
+  "build_cmd": "node scripts/check-landing-seo.mjs"
+}

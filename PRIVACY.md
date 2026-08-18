@@ -18,7 +18,7 @@ Nothing else leaves your machine except direct calls to storefronts and
 enrichment services (network hosts below), plus optional `baklog.app` endpoints
 in **Hosted surfaces** when you use those features.
 
-Last updated: 2026-06-09.
+Last updated: 2026-08-18.
 
 ## Hosted surfaces (baklog.app)
 
@@ -27,6 +27,7 @@ These are optional and separate from the local dashboard:
 | Surface | What it collects | When |
 |---------|------------------|------|
 | Waitlist (`/api/subscribe`) | Email you submit | You opt in on the landing page |
+| Google Analytics (GA4 `G-88L32JZQDH`) | Anonymous page views on the marketing site | Browser loads baklog.app (not the desktop app) |
 | Bug report (`/api/report`) | Whitelisted diagnostic bundle you paste/send | You click **Send report** in the app |
 | Free claims feed (`free-claims.json`) | Public curated giveaway metadata (no personal data) | App polls when you open Claimable Now |
 | Sponsored deals feed (`sponsors.json`) | Public house/paid ad metadata (no personal data) | App fetches when online (profile override → hosted → bundled) |
@@ -41,7 +42,7 @@ The local app does **not** upload your library or credentials to these endpoints
   provide. Each storefront sees its own normal API/scrape traffic from you.
 - The **local app** has no remote backend for your library: the authors never
   receive your catalog, notes, or credentials automatically.
-- The **baklog.app** marketing site is separate (waitlist email, optional bug
+- The **baklog.app** marketing site is separate (Google Analytics page views, waitlist email, optional bug
   reports you send, public free-claims feed) — see **Hosted surfaces** below.
 - Backups of your personal data and fetched libraries are written locally and
   not transmitted anywhere.

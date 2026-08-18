@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Google Analytics (marketing site only). Desktop app stays no telemetry by default. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-88L32JZQDH"></script>
+  <script src="ga.js"></script>
   <title>BAKLOG: One honest backlog across every store</title>
-  <meta name="description" content="One honest backlog across every store. Free forever to import · 12 libraries and 8 wishlists · runs on your machine, no telemetry by default. Watch 0 → 2,000+ games climb in ~90 seconds. MIT source on GitHub. Invite-only early access." />
+  <meta name="description" content="One honest backlog across every store. Free forever to import. 12 libraries and 8 wishlists on your machine, no telemetry by default. Invite-only." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="BAKLOG" />
@@ -13,6 +16,7 @@
   <meta name="impact-site-verification" value="dc7618b3-fd26-44a1-b6d1-df252ccab181" />
   <link rel="canonical" href="https://baklog.app/" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
   <!-- Open Graph / social -->
   <meta property="og:type" content="website" />
@@ -43,9 +47,10 @@
   <script src="pro-checkout-gate.js" defer></script>
   <script src="main.js" defer></script>
 
-  <!-- Structured data: inline. The src attribute is ignored on ld+json blocks,
-       and data blocks aren't executed so CSP script-src doesn't apply to them. -->
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","codeRepository":"https://github.com/Ogrods/BAKLOG","license":"https://opensource.org/licenses/MIT","description":"One honest backlog across every store. Free forever to import; 12 libraries and 8 wishlists; runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now helps you never miss a free game again. Open source (MIT). Optional paid tier to support BAKLOG. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Support BAKLOG","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}}</script>
+  <!-- Structured data: inline. data blocks aren't executed so CSP script-src
+       does not apply. Keep FAQPage in sync with the #faq details list
+       (npm run check:landing-seo). -->
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareApplication","name":"BAKLOG","applicationCategory":"GameApplication","operatingSystem":"Windows, macOS, Linux","url":"https://baklog.app/","codeRepository":"https://github.com/Ogrods/BAKLOG","license":"https://opensource.org/licenses/MIT","description":"One honest backlog across every store. Free forever to import; 12 libraries and 8 wishlists; runs on your machine. Watch 0 → 2,000+ games climb in ~90 seconds. Claimable Now helps you never miss a free game again. Open source (MIT). Optional paid tier to support BAKLOG. Invite-only early access.","offers":[{"@type":"Offer","name":"Free","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Support BAKLOG","price":"5","priceCurrency":"USD","billingDuration":"P1M"}],"publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}},{"@type":"WebSite","name":"BAKLOG","url":"https://baklog.app/","publisher":{"@type":"Organization","name":"BAKLOG","url":"https://baklog.app/"}},{"@type":"FAQPage","url":"https://baklog.app/#faq","mainEntity":[{"@type":"Question","name":"Is it safe?","acceptedAnswer":{"@type":"Answer","text":"Your credentials stay encrypted on your machine (AES-256-GCM, OS keychain). Store sign-in runs in your own local browser, not a container and not a shared cloud vault. Fetches go straight from your PC to each storefront, from your IP. There is no BAKLOG server holding your library. The full app is open source (MIT) with a published threat model that lists what we defend and what we do not (local malware, storefront ToS, and the rest). baklog.app never receives your catalog. The marketing site uses Google Analytics for anonymous page views. Waitlist email if you request an invite, and a bug report only if you click Send."}},{"@type":"Question","name":"Is it open source?","acceptedAnswer":{"@type":"Answer","text":"Yes. BAKLOG is released under the MIT license. The full app (server, fetchers, auth, and dashboard) lives in the public GitHub repo: clone it and run from source today. No hidden builds, no closed-source telemetry layer. The invite beta is packaged builds on top of the same tree. Optional paid features are conveniences on top of the same open codebase, not a fork of your data into our cloud."}},{"@type":"Question","name":"Is it free?","acceptedAnswer":{"@type":"Answer","text":"Yes. Importing your library across every store is free forever: auto-fetch on connect, full dashboard, ownership-aware deals (with sponsored slots in deal cards on the free tier), cached trophy summary % (no on-demand deep re-pull), and Claimable Now for full-game giveaways. Store refresh on the free tier is one store at a time, on demand; auto-refresh quietly updates one stale store every ~30 min while the app is open. An optional paid tier adds more - see Support BAKLOG. Nothing you use free today moves behind paywall."}},{"@type":"Question","name":"What's in the paid tier?","acceptedAnswer":{"@type":"Answer","text":"Optional Pro support adds a few conveniences today: fewer sponsored deal cards, scheduled stale-store refresh without keeping the app open, deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only), a bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed, and queued bulk refresh (queue every stale store from Fetcher health). Coming soon: cloud sync across machines and deal/watchlist alerts. Support BAKLOG or Support BAKLOG (yearly). The free tier keeps everything you need to import, browse, and decide what to play next."}},{"@type":"Question","name":"What's the difference between free and paid refresh?","acceptedAnswer":{"@type":"Answer","text":"On the free tier, you refresh one store at a time: click a fetcher chip, wait for it to finish, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open. Pro supporters get scheduled refresh that runs even when the app is closed (tray or OS scheduler). Queued bulk refresh (one action queues every stale store back-to-back from Fetcher health) is live on Pro. Your credentials and data still stay on your machine. Only the convenience layer changes."}},{"@type":"Question","name":"Does BAKLOG show me free games to claim?","acceptedAnswer":{"@type":"Answer","text":"Never miss a free game again. Claimable Now is a maintainer-curated free-game feed that aggregates active giveaways from Epic, GOG, Steam, Prime, and more, sourced via GamerPower, IsThereAnyDeal, and the Epic Store, right in your dashboard. A notification banner alerts you when new drops land. The feed is ownership-aware: it skips games you already own somewhere in your library. Included on the free tier. For Epic mobile claims and other free entry paths, see starting from zero."}},{"@type":"Question","name":"I don't really own games yet. Is BAKLOG still for me?","acceptedAnswer":{"@type":"Answer","text":"Yes. You don't need a paid library to start. See starting from zero for free entry paths: Epic, Prime, GOG, free-to-play hits, and more. BAKLOG tracks your collection from the first claim, and Claimable Now aggregates the week's free drops in your dashboard."}},{"@type":"Question","name":"Do I have to refresh it?","acceptedAnswer":{"@type":"Answer","text":"Not manually. When you connect a store, BAKLOG auto-fetches its library. While the app is open, auto-refresh for stores older than 24h is on by default (Connections). ITAD deal prices refresh on a schedule. On the free tier there's no background sync while closed. Pro supporters get scheduled refresh while closed; cloud sync between machines is a coming Pro perk."}},{"@type":"Question","name":"Why is my count different from what the store shows?","acceptedAnswer":{"@type":"Answer","text":"Stores pad your library with things that aren't games: DLC skins, soundtracks, wallpapers, betas, and store apps. BAKLOG filters those out automatically so the number you see is real games, not shelf clutter. That filter is built-in and you never have to manage it. Separately, you can hide any game you just don't want to see and restore it later from the Hidden games panel."}},{"@type":"Question","name":"Does it upload my library?","acceptedAnswer":{"@type":"Answer","text":"No. Your catalog and credentials stay in your local profile folder. Store fetches go straight from your PC to each storefront. baklog.app never receives your library JSON. The marketing site uses Google Analytics for anonymous page views. Waitlist email if you request an invite, a bug report only if you click Send, and a public free-games metadata feed."}},{"@type":"Question","name":"Can I run it without waiting for an invite?","acceptedAnswer":{"@type":"Answer","text":"Yes. Clone github.com/Ogrods/BAKLOG and run from source on Windows, macOS, or Linux. The invite beta is optional packaged builds and update delivery on top of the same MIT tree."}},{"@type":"Question","name":"How is this different from Playnite?","acceptedAnswer":{"@type":"Answer","text":"Playnite is a launcher: it opens games and unifies your library view. BAKLOG is a backlog dashboard: what to play next, cross-store dedupe, wishlist deal radar, and ownership-aware sale checks. Many people use both. BAKLOG is not trying to replace your launcher."}},{"@type":"Question","name":"Isn't scraping against the rules?","acceptedAnswer":{"@type":"Answer","text":"BAKLOG automates requests you could make yourself, in your own browser, with your own credentials, on your own machine. Each storefront sees normal traffic from your IP, as you."}},{"@type":"Question","name":"Why invite-only right now?","acceptedAnswer":{"@type":"Answer","text":"We are onboarding in small waves so we can fix what breaks on real setups before opening the doors. Request an invite and you are in line for the next wave."}},{"@type":"Question","name":"Do you sell my data?","acceptedAnswer":{"@type":"Answer","text":"No. BAKLOG has no business model built on your library. We do not collect, host, or sell catalog data. There is no server holding it to sell. Optional invite login (Supabase) stores your email only; games stay local."}}]}]}</script>
 
   <style>
     @font-face {
@@ -555,7 +560,7 @@
     .foot-social a:hover { color: #fff; border-color: var(--text-mute); background: rgba(255,255,255,0.06); }
     .foot-social svg { width: 18px; height: 18px; fill: currentColor; }
     .foot-links { display: grid; grid-template-columns: repeat(2, auto); gap: 2rem 3.5rem; }
-    .foot-col h4 { margin: 0 0 0.65rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); }
+    .foot-col h3 { margin: 0 0 0.65rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); }
     .foot-col a { display: block; font-size: 0.9rem; line-height: 1.45; font-weight: 600; padding: 0.15rem 0; }
     .foot-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem 1.5rem; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-mute); }
     .foot-legal, .foot-trademark, .foot-affiliate { margin: 0; }
@@ -848,7 +853,7 @@
             <li>Store sign-in opens your own installed Chrome or Edge on your machine. Session cookies stay in a local browser profile on disk. No container, no remote sandbox, nothing shipped to us.</li>
             <li>Credentials encrypted at rest (AES-256-GCM); keys in Windows Credential Manager, macOS Keychain, or Linux Secret Service</li>
             <li>No telemetry by default. <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> you can read before you trust us</li>
-            <li>baklog.app is separate from your library: waitlist email if you request an invite, a bug report only if you click Send, and a public free-games feed. Your catalog never uploads there.</li>
+            <li>baklog.app is separate from your library: Google Analytics for anonymous page views, waitlist email if you request an invite, a bug report only if you click Send, and a public free-games feed. Your catalog never uploads there.</li>
             <li>We do not sell data because we do not host it. Optional invite login stores email only; your games stay in your local profile folder.</li>
           </ul>
         </article>
@@ -1017,19 +1022,19 @@
       <h2>There is no BAKLOG server to breach.</h2>
       <p>Your library JSON and store credentials stay on your PC. Fetches go to each storefront from your IP, through your own browser session. We do not run a datacenter copy of anyone's catalog.</p>
       <p>Sign-in is not a remote container: your installed Chrome or Edge opens locally, cookies land in a browser profile on disk, and nothing is shipped to us. Local-first is that architecture, not a trick about binding to localhost.</p>
-      <p>Skeptical? Read the published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> and <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">privacy inventory</a> before you trust us. The <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full MIT tree</a> is public: server, fetchers, auth, dashboard. No telemetry by default on the desktop app; opt-in anonymous aggregate metrics only. baklog.app only touches waitlist email, opt-in bug reports you send, and a public free-games feed.</p>
+      <p>Skeptical? Read the published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> and <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">privacy inventory</a> before you trust us. The <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">full MIT tree</a> is public: server, fetchers, auth, dashboard. No telemetry by default on the desktop app; opt-in anonymous aggregate metrics only. baklog.app uses Google Analytics for anonymous page views on the marketing site, plus waitlist email, opt-in bug reports you send, and a public free-games feed. Your catalog never uploads there.</p>
     </div>
   </section>
 
   <!-- ============ FAQ ============ -->
-  <section class="band">
+  <section class="band" id="faq">
     <div class="wrap" style="text-align:center">
       <span class="eyebrow">Questions</span>
       <h2>Straight answers.</h2>
       <div class="faq" style="text-align:left">
         <details>
           <summary>Is it safe?</summary>
-          <p>Your credentials stay encrypted on your machine (AES-256-GCM, OS keychain). Store sign-in runs in your own local browser, not a container and not a shared cloud vault. Fetches go straight from your PC to each storefront, from your IP. There is no BAKLOG server holding your library. The full app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> that lists what we defend and what we do not (local malware, storefront ToS, and the rest). baklog.app only sees a waitlist email or an opt-in bug report you send; it never receives your catalog.</p>
+          <p>Your credentials stay encrypted on your machine (AES-256-GCM, OS keychain). Store sign-in runs in your own local browser, not a container and not a shared cloud vault. Fetches go straight from your PC to each storefront, from your IP. There is no BAKLOG server holding your library. The full app is <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">open source (MIT)</a> with a published <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">threat model</a> that lists what we defend and what we do not (local malware, storefront ToS, and the rest). baklog.app never receives your catalog. The marketing site uses Google Analytics for anonymous page views. Waitlist email if you request an invite, and a bug report only if you click Send.</p>
         </details>
         <details>
           <summary>Is it open source?</summary>
@@ -1065,7 +1070,7 @@
         </details>
         <details>
           <summary>Does it upload my library?</summary>
-          <p>No. Your catalog and credentials stay in your local profile folder. Store fetches go straight from your PC to each storefront. baklog.app never receives your library JSON. The only things that touch this site are a waitlist email if you request an invite, a bug report only if you click Send, and a public free-games metadata feed.</p>
+          <p>No. Your catalog and credentials stay in your local profile folder. Store fetches go straight from your PC to each storefront. baklog.app never receives your library JSON. The marketing site uses Google Analytics for anonymous page views. Waitlist email if you request an invite, a bug report only if you click Send, and a public free-games metadata feed.</p>
         </details>
         <details>
           <summary>Can I run it without waiting for an invite?</summary>
@@ -1149,7 +1154,7 @@
         </div>
         <nav class="foot-links" aria-label="Footer">
           <div class="foot-col">
-            <h4>Community</h4>
+            <h3>Community</h3>
             <!-- Discord + GitHub: keep in sync with shared/community.json -->
             <a href="#waitlist">Request an invite</a>
             <a href="https://discord.gg/VFvxN5nCCB" target="_blank" rel="noopener noreferrer">Discord</a>
@@ -1159,7 +1164,7 @@
             <a href="mailto:dan@baklog.app">dan@baklog.app</a>
           </div>
           <div class="foot-col">
-            <h4>Data sources</h4>
+            <h3>Data sources</h3>
             <a href="https://www.protondb.com/" target="_blank" rel="noopener noreferrer">ProtonDB</a>
             <a href="https://isthereanydeal.com/" target="_blank" rel="noopener noreferrer">IsThereAnyDeal</a>
             <a href="https://www.gamerpower.com/" target="_blank" rel="noopener noreferrer">GamerPower</a>

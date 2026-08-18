@@ -5,7 +5,9 @@ Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
 ## Files
 
 - `index.html` — page markup, inline base CSS, waitlist form shell. No build step.
-- `structured-data.json` — JSON-LD for crawlers (loaded externally for CSP compliance).
+- `llms.txt` - plain-text site summary for AI crawlers.
+- `ga.js` - Google Analytics (GA4) config for the marketing site. Desktop app telemetry is unchanged (opt-in only).
+- JSON-LD - inline `@graph` on `index.html` (`SoftwareApplication`, `WebSite`, `FAQPage`). Keep FAQPage in sync with the `#faq` details list via `npm run check:landing-seo`.
 - `main.js` — footer year, non-blocking font load, waitlist submit handler.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
@@ -372,3 +374,5 @@ Users can optionally enable **Share anonymous usage counts** in the app (Connect
 python tools/make_og_image.py          # run from the repo root; writes landing/assets/og.png
 python tools/make_apple_touch_icon.py  # writes landing/apple-touch-icon.png
 ```
+
+Gate after landing HTML/JSON-LD edits: `npm run check:landing-seo` from the repo root (does not start a server).

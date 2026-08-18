@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 
+Disallow: /auth/
 Disallow: /auth-confirmed
 Disallow: /auth-reset
 Disallow: /success

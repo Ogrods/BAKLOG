@@ -50,7 +50,7 @@ backend. These **do** reach the network from a normal install:
 |-------------|---------|---------------------|
 | Store APIs / sites | Fetch **your** libraries (as you) | Your session only |
 | `github.com` | Optional in-app update check + zip download | Version check only |
-| `baklog.app` | Public `free-claims.json`, `sponsors.json` feeds; optional waitlist/report/metrics APIs | Feeds: none. Metrics: **opt-in only** (`shareAnonStats`). Reports: **you** submit |
+| `baklog.app` | Public `free-claims.json`, `sponsors.json` feeds; optional waitlist/report/metrics APIs; marketing-site Google Analytics | Feeds: none. Metrics: **opt-in only** (`shareAnonStats`). Reports: **you** submit. GA: marketing pages only |
 | `*.supabase.co` | Optional login | Auth metadata if enabled |
 | Polar / checkout URLs | Optional Pro purchase | Payment on Polar |
 

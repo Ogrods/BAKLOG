@@ -3,9 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Google Analytics (marketing site only). Desktop app stays no telemetry by default. -->
+  <!-- Google tag (gtag.js) - marketing site only. Desktop app stays no telemetry by default. -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-88L32JZQDH"></script>
-  <script src="ga.js"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-88L32JZQDH');
+  </script>
   <title>BAKLOG: One honest backlog across every store</title>
   <meta name="description" content="One honest backlog across every store. Free forever to import. 12 libraries and 8 wishlists on your machine, no telemetry by default. Invite-only." />
   <meta name="theme-color" content="#0f172a" />

@@ -10,7 +10,7 @@
 | **Auth** | `auth/` | AES-GCM secrets + OS keyring; CDP browser sign-in (`cdp_browser.py`, `runner.py`) |
 | **Fetchers** | `fetch_*.py`, `fetchers/manifest.json` | Whitelisted subprocess scripts → profile-scoped `games_*.json` |
 | **Frontend** | `index.html`, `js/app.js` | Vanilla ESM modules; optional esbuild `dist/` build |
-| **Landing** | `landing/` | Static marketing site + Vercel serverless (`api/subscribe.js`, `api/report.js`) |
+| **Landing** | `landing/` | Static marketing site + Vercel serverless (`api/subscribe.js`, `api/report.js`). Attended SEO playbook: `.cursor/rules/seo-operator.mdc` |
 | **Profiles** | `profiles/<id>/` | Per-profile catalogs, `data/personal.json`, `cache/auth/` |
 
 Deep reference (maintainer clone only): `docs/ARCHITECTURE.md` in the private `baklog-internal` repo.

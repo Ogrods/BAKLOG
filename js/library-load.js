@@ -232,8 +232,11 @@ export async function loadProtondbCache() {
   await loadCacheMeta("cache/protondb_map.json", "protondb");
 }
 
-/** Snapshot library keys before a catalog rebuild so merge diff can stamp real first-seen times. */
+/** Snapshot library keys before a catalog rebuild so merge diff can stamp real first-seen times.
+ *  Keep the first snapshot in a reload burst so a later enrich reload cannot
+ *  hide the library merge diff. */
 export function captureLibraryKeysBeforeMerge() {
+  if (state._libraryKeysBeforeMerge instanceof Set) return;
   const itchGames = Array.isArray(state.itchGames) ? state.itchGames : [];
   state._libraryKeysBeforeMerge = new Set(
     [...state.allGames, ...itchGames].map(gameKey),
@@ -255,9 +258,11 @@ export function shouldBaselineImportBatch(newStampCount, priorKeyCount) {
   return false;
 }
 
-/** Collapse bulk-import batches already persisted (same second, many keys). */
+/** Collapse first-import batches already persisted (same second, many keys).
+ *  A genuine haul into an already-seeded library is left alone. */
 export function repairBulkFirstSeenStamps(map) {
   if (!map || typeof map !== "object") return false;
+  const totalKeys = Object.keys(map).length;
   const bySecond = new Map();
   for (const [key, val] of Object.entries(map)) {
     const n = Number(val);
@@ -269,6 +274,8 @@ export function repairBulkFirstSeenStamps(map) {
   let changed = false;
   for (const keys of bySecond.values()) {
     if (keys.length < BULK_FIRST_SEEN_THRESHOLD) continue;
+    const priorKeyCount = totalKeys - keys.length;
+    if (!shouldBaselineImportBatch(keys.length, priorKeyCount)) continue;
     for (const key of keys) {
       if (map[key] !== 0) {
         map[key] = 0;

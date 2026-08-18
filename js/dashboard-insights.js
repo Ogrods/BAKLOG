@@ -16,7 +16,7 @@ import {
   playSessionCount,
 } from "./game-core.js";
 import { gameGenresCanonical } from "./genres.js";
-import { getPersonal } from "./personal-storage.js";
+import { getPersonal, wishlistGamesBase } from "./personal-storage.js";
 import {
   getDealInfo,
   dealScore,
@@ -341,6 +341,15 @@ function gamesFromMegaCtx(ctx, bucket) {
   return ctx[bucket].map((r) => r.g);
 }
 
+function visibleWishlistGames() {
+  try {
+    if (typeof wishlistGamesBase === "function") return wishlistGamesBase();
+  } catch {
+    /* tests often mock personal-storage without this export */
+  }
+  return state.wishlistGames || [];
+}
+
 /** @returns {{ html: string, weight: number }[]} */
 export function buildInsightPool(games, snapIn, ctxIn) {
   const entries = [];
@@ -420,7 +429,7 @@ export function buildInsightPool(games, snapIn, ctxIn) {
   }
 
   const deals = isItadDealsAvailable()
-    ? state.wishlistGames.filter((g) => {
+    ? visibleWishlistGames().filter((g) => {
         const d = getDealInfo(g);
         return d && (d.cut || 0) > 0;
       })
@@ -669,7 +678,7 @@ export function buildMarqueeItems(games, snapIn, ctxIn) {
     ? gamesFromMegaCtx(ctxIn, "rated")
     : games.filter((g) => rating(g) > 0);
 
-  const wl = state.wishlistGames || [];
+  const wl = visibleWishlistGames();
   const onSale = wl.filter((g) => {
     const d = getDealInfo(g);
     return d && (d.cut || 0) > 0;

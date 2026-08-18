@@ -12,6 +12,6 @@ Upgrading or reinstalling keeps your data. Uninstall removes the app; choose whe
 
 After install, launch BAKLOG from the Start Menu. A tray icon appears in the notification area. Right-click it for Open, Restart, or Quit. You do not need to keep a console window open.
 
-Connections sign-in requires Google Chrome or Microsoft Edge.
+Connections sign-in prefers Google Chrome or Microsoft Edge. If neither is installed, BAKLOG downloads a one-time browser (~150 MB).
 
 Help and updates: baklog.app

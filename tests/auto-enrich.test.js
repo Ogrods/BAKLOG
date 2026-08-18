@@ -267,6 +267,24 @@ describe('recordLibraryFirstSeen', () => {
     expect(n).toBe(1);
     expect(state.libraryFirstSeenByKey['steam:999']).toBeGreaterThan(0);
   });
+
+  it('does not let a later capture hide a 10-game haul from enrich replay', async () => {
+    const { captureLibraryKeysBeforeMerge } = await import('../js/library-load.js');
+    state.allGames = [];
+    for (let i = 0; i < 20; i++) {
+      state.allGames.push({ store: 'steam', id: `old-${i}`, name: `Old ${i}` });
+    }
+    recordLibraryFirstSeen();
+    captureLibraryKeysBeforeMerge();
+    for (let i = 0; i < 10; i++) {
+      state.allGames.push({ store: 'steam', id: `haul-${i}`, name: `Haul ${i}` });
+    }
+    captureLibraryKeysBeforeMerge();
+    const n = recordLibraryFirstSeen();
+    expect(n).toBe(10);
+    expect(state.libraryFirstSeenByKey['steam:haul-0']).toBeGreaterThan(0);
+    expect(state.libraryFirstSeenByKey['steam:haul-9']).toBeGreaterThan(0);
+  });
 });
 
 describe('repairBulkFirstSeenStamps', () => {
@@ -289,5 +307,17 @@ describe('repairBulkFirstSeenStamps', () => {
     const map = { 'steam:400': ts, 'steam:620': ts + 1 };
     expect(repairBulkFirstSeenStamps(map)).toBe(false);
     expect(map['steam:400']).toBe(ts);
+  });
+
+  it('leaves a same-second haul on an already-seeded library', async () => {
+    const { repairBulkFirstSeenStamps } = await import('../js/library-load.js');
+    const ts = Date.now() - 3 * 60 * 60 * 1000;
+    const base = ts - (ts % 1000);
+    const map = {};
+    for (let i = 0; i < 2000; i++) map[`steam:old-${i}`] = 0;
+    for (let i = 0; i < 10; i++) map[`steam:haul-${i}`] = base + i;
+    expect(repairBulkFirstSeenStamps(map)).toBe(false);
+    expect(map['steam:haul-0']).toBe(base);
+    expect(map['steam:haul-9']).toBe(base + 9);
   });
 });

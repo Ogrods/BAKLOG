@@ -59,6 +59,7 @@ def _spec_resolved_hiddenimports() -> set[str]:
         "auth.manager",
         "auth.secrets",
         "shared.install_paths",
+        "shared.chromium_runtime",
         "shared.data_dir_migration",
         "shared.bundled_auth_env",
         "shared.built_frontend",
@@ -90,9 +91,11 @@ def test_pyinstaller_hiddenimports_include_tray_deps() -> None:
         assert mod in text, f"packaging/baklog.spec tray_hiddenimports missing {mod}"
 
 
-def test_pyinstaller_hiddenimports_include_data_dir_migration() -> None:
+def test_pyinstaller_hiddenimports_include_chromium_runtime() -> None:
+    text = SPEC.read_text(encoding="utf-8")
+    assert "shared.chromium_runtime" in text
     hidden = _spec_resolved_hiddenimports()
-    assert "shared.data_dir_migration" in hidden
+    assert "shared.chromium_runtime" in hidden
 
 
 def test_pyinstaller_datas_include_curated_feeds() -> None:

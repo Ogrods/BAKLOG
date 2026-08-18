@@ -614,7 +614,7 @@ function bindReadyBannerHandlers(status, handlers = {}) {
     .querySelector(".update-ready-banner-later")
     ?.addEventListener("click", () => {
       handlers.onNotice?.(
-        "Update ready — choose Install & restart when you want.",
+        "Update ready - choose Install and restart when you want.",
       );
     });
 }
@@ -803,7 +803,7 @@ export async function runApplyReadyUpdate(opts = {}) {
     if (status.ok && status.canApply) {
       showReadyToInstallBanner(status, opts);
     }
-    opts.onNotice?.("Update ready — choose Install & restart when you want.");
+    opts.onNotice?.("Update ready - choose Install and restart when you want.");
     return { ok: true, ready: true, applied: false };
   }
 
@@ -858,7 +858,7 @@ export async function runInAppUpdateFlow(opts = {}) {
       : await confirmInstallUpdate();
   if (!confirmed) {
     showReadyToInstallBanner(status, opts);
-    opts.onNotice?.("Update ready — choose Install & restart when you want.");
+    opts.onNotice?.("Update ready - choose Install and restart when you want.");
     return { ok: true, ready: true, applied: false };
   }
 

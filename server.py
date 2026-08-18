@@ -2713,7 +2713,7 @@ def main() -> None:
             )
         if not _chromium_available():
             print(
-                "NOTE: Google Chrome or Microsoft Edge is required for Connections sign-in.",
+                "NOTE: If Chrome or Edge is missing, Connections downloads a one-time BAKLOG browser on first Connect.",
                 flush=True,
             )
         _maybe_open_browser()

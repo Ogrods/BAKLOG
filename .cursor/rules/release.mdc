@@ -11,7 +11,7 @@ Before **tagging or publishing** any release (`vX.Y.Z`, `replace_release_tag.ps1
 
 1. **Working tree clean** on the release commit on `main` (`git status` shows nothing to commit).
 2. **CI green** on that `main` commit. Do not tag while required checks are red or still pending. Wait for GitHub Actions on the merge commit to pass, then tag.
-3. Version stamps match (`pyproject.toml`, `package.json`, `index.html` meta/`brandVersionBadge`) and CHANGELOG has `[X.Y.Z]` notes.
+3. Version stamps match (`pyproject.toml`, `package.json`, `index.html` meta/`brandVersionBadge`) and CHANGELOG has `[X.Y.Z]` notes (user-facing only; see `changelog.mdc`).
 4. Flow: commit → push → merge to `main` → confirm clean tree + CI green on that commit → `git tag -a vX.Y.Z` and `git push origin vX.Y.Z` so `release.yml` builds assets.
 
 Do **not** tag a dirty tree, an unmerged feature branch, or a commit whose CI failed/is pending.

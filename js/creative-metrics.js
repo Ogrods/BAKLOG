@@ -13,7 +13,7 @@ import {
   parseLastPlayedMs,
 } from "./game-core.js";
 import { gameGenresCanonical } from "./genres.js";
-import { getPersonal } from "./personal-storage.js";
+import { getPersonal, wishlistGamesBase } from "./personal-storage.js";
 import { getDealInfo, dealScore } from "./deals.js";
 import { isItadDealsAvailable } from "./itad-deal-gate.js";
 import { formatMoney, displayCurrency } from "./currency.js";
@@ -26,6 +26,15 @@ const WORK_WEEK_HRS = 40;
 
 function statusOf(g) {
   return getPersonal(g).status || "backlog";
+}
+
+function visibleWishlistGames() {
+  try {
+    if (typeof wishlistGamesBase === "function") return wishlistGamesBase();
+  } catch {
+    /* tests often mock personal-storage without this export */
+  }
+  return state.wishlistGames || [];
 }
 
 function untouched(g) {
@@ -365,7 +374,7 @@ export function computeCreativeMetrics(games, snap) {
     out.workWeeksPill = wks;
   }
 
-  const wl = state.wishlistGames || [];
+  const wl = visibleWishlistGames();
   if (isItadDealsAvailable()) {
     const atLow = wl.filter((g) => {
       const d = getDealInfo(g);

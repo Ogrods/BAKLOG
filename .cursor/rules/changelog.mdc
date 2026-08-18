@@ -1,0 +1,35 @@
+---
+description: Public CHANGELOG and release notes stay user-facing; maintainer diary stays private
+globs: CHANGELOG.md
+alwaysApply: true
+---
+
+# Public changelog voice
+
+`CHANGELOG.md` is public. GitHub Release bodies and go-live commit messages follow the same rule.
+
+Write **user/tester facts** only: what changed in the app, landing site, or installer. Keep bullets short.
+
+**Do not put in public notes** (those belong in private `tracker.html` / internal docs):
+
+- Maintainer ops (hooks, private clone, Claims JSON gitignore, lockfile hygiene, CI dispatch)
+- Tooling names that are not the product (Cursor, OpenSEO, agent/LLM)
+- Ads, funnel, house banners, flag names testers do not type
+- Competitor names or "vs X" positioning
+- Session diary (audit labels, CSS breakpoint lists, selector names)
+
+**Do put in public notes:** store names we connect, Chrome/Edge, Discord, phone/tablet behavior, env vars a tester must set (`BAKLOG_NO_CHROMIUM_DOWNLOAD`). High-level privacy facts are fine ("analytics on baklog.app only, not in the desktop app").
+
+**Never publish in CHANGELOG, commits, PRs, or GitHub Release bodies:** measurement ids, API keys, emails, Steam IDs, profile folder names, Discord webhook URLs, or other personal/machine paths. Keep those in private tracker notes if needed.
+
+Do not rewrite already-published `[0.8.x]` history to match this rule. Apply it from the next cut forward.
+
+```
+# Bad
+- Cursor stop-hook tracker reminder honors loop_count
+- HOUSE_PRO_BANNERS_ENABLED=false until the funnel review
+
+# Good
+- If Chrome or Edge is missing, Connect downloads a one-time browser
+- In-app updates are check-then-click only
+```

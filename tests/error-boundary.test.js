@@ -19,6 +19,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 import {
+  _persistStorageKeyForTests,
   _resetForTests,
   buildBugBundle,
   BUG_REPORT_ENDPOINT,
@@ -31,7 +32,7 @@ import {
   submitBugReport,
 } from "../js/error-boundary.js";
 
-function installWindow({ versionMeta = "9.9.9-test", localStorageRaw } = {}) {
+function installWindow({ versionMeta = "9.9.9-test", localStorageRaw, localStorageKey } = {}) {
   const win = new Window({ url: "http://127.0.0.1:8765/" });
   global.window = win;
   global.document = win.document;
@@ -44,7 +45,7 @@ function installWindow({ versionMeta = "9.9.9-test", localStorageRaw } = {}) {
     win.document.head.appendChild(meta);
   }
   if (localStorageRaw !== undefined) {
-    win.localStorage.setItem("baklog-error-log", localStorageRaw);
+    win.localStorage.setItem(localStorageKey || "baklog-error-log:dev", localStorageRaw);
   }
   return win;
 }
@@ -60,18 +61,22 @@ describe("error-boundary persistence", () => {
   beforeEach(() => {
     installWindow();
     _resetForTests();
+    noteServerRuntime({ frozen: false, runtime_label: "dev" });
   });
   afterEach(() => { teardownWindow(); });
 
-  it("record() persists each entry to localStorage ring", () => {
+  it("record() persists each entry to runtime-scoped localStorage ring", () => {
     reportError(new Error("boom one"));
     reportError(new Error("boom two"));
-    const raw = window.localStorage.getItem("baklog-error-log");
+    const key = _persistStorageKeyForTests();
+    expect(key).toBe("baklog-error-log:dev");
+    const raw = window.localStorage.getItem(key);
     const parsed = JSON.parse(raw);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.length).toBe(2);
     expect(parsed[0].message).toBe("boom one");
     expect(parsed[1].message).toBe("boom two");
+    expect(window.localStorage.getItem("baklog-error-log")).toBeNull();
   });
 
   it("persisted ring is capped at MAX_PERSISTED (200)", () => {
@@ -79,7 +84,7 @@ describe("error-boundary persistence", () => {
     for (let i = 0; i < 210; i += 1) {
       reportError(new Error(`unique-${i}`));
     }
-    const parsed = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    const parsed = JSON.parse(window.localStorage.getItem(_persistStorageKeyForTests()));
     expect(parsed.length).toBe(200);
     expect(parsed[0].message).toBe("unique-10");
     expect(parsed[199].message).toBe("unique-209");
@@ -92,7 +97,7 @@ describe("error-boundary persistence", () => {
     reportError(err);
     const session = getCapturedErrors();
     expect(session[0].stack.length).toBe(10_000);
-    const persisted = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    const persisted = JSON.parse(window.localStorage.getItem(_persistStorageKeyForTests()));
     expect(persisted[0].stack.length).toBeLessThanOrEqual(4096 + 30);
     expect(persisted[0].stack).toContain("(... truncated for storage)");
     expect(persisted[0].stack).not.toBe(longStack);
@@ -104,9 +109,20 @@ describe("error-boundary persistence", () => {
     reportError(err);
     expect(getCapturedErrors().length).toBe(1);
     expect(getCapturedErrors()[0].repeats).toBe(2);
-    const persisted = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    const persisted = JSON.parse(window.localStorage.getItem(_persistStorageKeyForTests()));
     expect(persisted.length).toBe(1);
     expect(persisted[0].repeats).toBe(2);
+  });
+
+  it("keeps separate rings for dev and installed runtimes", () => {
+    reportError(new Error("dev only"));
+    expect(JSON.parse(window.localStorage.getItem("baklog-error-log:dev")).length).toBe(1);
+
+    noteServerRuntime({ frozen: true, runtime_label: "installed" });
+    reportError(new Error("installed only"));
+    expect(JSON.parse(window.localStorage.getItem("baklog-error-log:dev"))[0].message).toBe("dev only");
+    expect(JSON.parse(window.localStorage.getItem("baklog-error-log:installed"))[0].message).toBe("installed only");
+    expect(_persistStorageKeyForTests()).toBe("baklog-error-log:installed");
   });
 });
 
@@ -117,36 +133,40 @@ describe("error-boundary rehydration", () => {
     installWindow();
     _resetForTests();
     installGlobalErrorHandler();
-    noteServerRuntime({ frozen: true });
+    noteServerRuntime({ frozen: true, runtime_label: "installed" });
     reportError(new Error("frozen session error"));
-    const parsed = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    const parsed = JSON.parse(window.localStorage.getItem("baklog-error-log:installed"));
     expect(parsed[0].server_frozen).toBe(true);
   });
 
-  it("warns when persisted errors mix dev and frozen sessions", () => {
+  it("warns when discarded legacy ring mixed dev and frozen sessions", () => {
     installWindow();
     _resetForTests();
     window.localStorage.setItem(
       "baklog-error-log",
       JSON.stringify([
         { kind: "error", time: 1, message: "dev", stack: "", server_frozen: false, repeats: 1 },
+        { kind: "error", time: 2, message: "frozen", stack: "", server_frozen: true, repeats: 1 },
       ]),
     );
     installGlobalErrorHandler();
+    noteServerRuntime({ frozen: true, runtime_label: "installed" });
+    expect(window.localStorage.getItem("baklog-error-log")).toBeNull();
     const bundle = buildBugBundle({ server: { frozen: true } });
     expect(bundle.warnings?.length).toBe(1);
     expect(bundle.warnings[0]).toMatch(/dev and frozen/);
   });
 
-  it("installGlobalErrorHandler rehydrates persisted ring from localStorage", () => {
+  it("noteServerRuntime rehydrates persisted ring from runtime-scoped key", () => {
     const seeded = JSON.stringify([
       { kind: "reported", time: 1, message: "from a prior session", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
     ]);
-    installWindow({ localStorageRaw: seeded });
+    installWindow({ localStorageRaw: seeded, localStorageKey: "baklog-error-log:dev" });
     _resetForTests();
     // Re-seed because _resetForTests clears storage.
-    window.localStorage.setItem("baklog-error-log", seeded);
+    window.localStorage.setItem("baklog-error-log:dev", seeded);
     installGlobalErrorHandler();
+    noteServerRuntime({ frozen: false, runtime_label: "dev" });
     const bundle = buildBugBundle();
     expect(bundle.errors.persisted.length).toBe(1);
     expect(bundle.errors.persisted[0].message).toBe("from a prior session");
@@ -155,27 +175,29 @@ describe("error-boundary rehydration", () => {
   it("corrupt localStorage raw payload is silently ignored", () => {
     installWindow();
     _resetForTests();
-    window.localStorage.setItem("baklog-error-log", "{not valid json");
+    window.localStorage.setItem("baklog-error-log:dev", "{not valid json");
     installGlobalErrorHandler();
+    noteServerRuntime({ frozen: false, runtime_label: "dev" });
     const bundle = buildBugBundle();
     expect(bundle.errors.persisted).toEqual([]);
   });
 
-  it("prunes stale and ignored entries from persisted ring on install", () => {
+  it("prunes stale and ignored entries from persisted ring on runtime note", () => {
     const seeded = JSON.stringify([
       { kind: "error", time: 1, message: "ResizeObserver loop completed with undelivered notifications.", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
       { kind: "unhandledrejection", time: 2, message: "authStatus is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
       { kind: "unhandledrejection", time: 4, message: "queue wait timeout", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
       { kind: "reported", time: 3, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
     ]);
-    installWindow({ localStorageRaw: seeded });
+    installWindow({ localStorageRaw: seeded, localStorageKey: "baklog-error-log:dev" });
     _resetForTests();
-    window.localStorage.setItem("baklog-error-log", seeded);
+    window.localStorage.setItem("baklog-error-log:dev", seeded);
     installGlobalErrorHandler();
+    noteServerRuntime({ frozen: false, runtime_label: "dev" });
     const bundle = buildBugBundle();
     expect(bundle.errors.persisted.length).toBe(1);
     expect(bundle.errors.persisted[0].message).toBe("still relevant");
-    const stored = JSON.parse(window.localStorage.getItem("baklog-error-log"));
+    const stored = JSON.parse(window.localStorage.getItem("baklog-error-log:dev"));
     expect(stored.length).toBe(1);
     expect(stored[0].message).toBe("still relevant");
   });
@@ -192,7 +214,7 @@ describe("error-boundary ignored noise", () => {
   it("does not capture ResizeObserver loop warnings", () => {
     reportError(new Error("ResizeObserver loop completed with undelivered notifications."));
     expect(getCapturedErrors().length).toBe(0);
-    expect(window.localStorage.getItem("baklog-error-log")).toBeNull();
+    expect(window.localStorage.getItem("baklog-error-log:dev")).toBeNull();
     const bundle = buildBugBundle();
     expect(bundle.errors.session.length).toBe(0);
     expect(bundle.errors.persisted.length).toBe(0);
@@ -204,6 +226,7 @@ describe("error-boundary stale-chunk recovery", () => {
     installWindow();
     _resetForTests();
     installGlobalErrorHandler();
+    noteServerRuntime({ frozen: false, runtime_label: "dev" });
   });
   afterEach(() => { teardownWindow(); });
 
@@ -214,7 +237,7 @@ describe("error-boundary stale-chunk recovery", () => {
     err.name = "TypeError";
     reportError(err);
     expect(getCapturedErrors().length).toBe(0);
-    expect(window.localStorage.getItem("baklog-error-log")).toBeNull();
+    expect(window.localStorage.getItem("baklog-error-log:dev")).toBeNull();
     // Reload guard timestamp is recorded so a second failure won't loop.
     expect(window.sessionStorage.getItem("baklog-stale-chunk-reload")).not.toBeNull();
   });
@@ -226,7 +249,7 @@ describe("error-boundary stale-chunk recovery", () => {
     expect(getCapturedErrors().length).toBe(1);
   });
 
-  it("prunes stale-chunk + now-fixed errors from the persisted ring on install", () => {
+  it("prunes stale-chunk + now-fixed errors from the persisted ring on runtime note", () => {
     const seeded = JSON.stringify([
       { kind: "unhandledrejection", time: 1, message: "Failed to fetch dynamically imported module: /dist/js/chunks/sponsored-deals-Y7ODCHBG.js", stack: "", source: "", lineno: 0, colno: 0, name: "TypeError" },
       { kind: "unhandledrejection", time: 2, message: "eff is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
@@ -237,10 +260,11 @@ describe("error-boundary stale-chunk recovery", () => {
       { kind: "network", time: 7, message: "Server unreachable: BAKLOG is not responding at /api/update/apply-result. Check that the server is running.", stack: "", source: "fetchWithAuthRetry", lineno: 0, colno: 0, name: "NetworkError" },
       { kind: "reported", time: 8, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
     ]);
-    installWindow({ localStorageRaw: seeded });
+    installWindow({ localStorageRaw: seeded, localStorageKey: "baklog-error-log:dev" });
     _resetForTests();
-    window.localStorage.setItem("baklog-error-log", seeded);
+    window.localStorage.setItem("baklog-error-log:dev", seeded);
     installGlobalErrorHandler();
+    noteServerRuntime({ frozen: false, runtime_label: "dev" });
     const bundle = buildBugBundle();
     expect(bundle.errors.persisted.length).toBe(1);
     expect(bundle.errors.persisted[0].message).toBe("still relevant");

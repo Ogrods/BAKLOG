@@ -27,11 +27,11 @@ export function syncRuntimeModeBanner(cfg = {}) {
     label = 'Dev server';
     detail =
       `python server.py is serving this tab.${pathTip} ` +
-      'Browser prefs are shared with the installed app when both use port 8765 - use PORT=8766 in .env for isolation (see User guide).';
-  } else if (hasPersistedMixedRuntimeErrors(true)) {
+      'Use PORT=8766 and BAKLOG_DATA_DIR=...\\BAKLOG-Dev so prefs stay off the installed app (see User guide).';
+  } else if (hasPersistedMixedRuntimeErrors(cfg.frozen === true)) {
     label = 'Mixed sessions';
     detail =
-      'Error log entries from both dev and installed runs share this browser profile. Clear site data for 127.0.0.1 or use a private window when switching.';
+      'An older shared error log still has entries from both dev and installed runs. Clear site data for 127.0.0.1, or use a private window when switching.';
   } else {
     slot.classList.add('hidden');
     slot.replaceChildren();
@@ -60,6 +60,6 @@ export function _resetRuntimeModeBannerForTests() {
 export function _runtimeBannerLabel(cfg) {
   const mode = cfg.runtime_label || (cfg.frozen === true ? 'installed' : 'dev');
   if (mode === 'dev') return 'Dev server';
-  if (hasPersistedMixedRuntimeErrors(true)) return 'Mixed sessions';
+  if (hasPersistedMixedRuntimeErrors(cfg.frozen === true)) return 'Mixed sessions';
   return '';
 }

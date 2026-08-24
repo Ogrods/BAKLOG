@@ -21,12 +21,15 @@ export function syntheticSteamGames(count, opts = {}) {
       appid: id,
       name: `${prefix} ${String.fromCharCode(65 + (i % 26))}${i}`,
       status: i % 7 === 0 ? 'completed' : i % 5 === 0 ? 'playing' : 'unplayed',
-      hltb_main: (i % 40) + 1,
+      // Match live Steam/HLTB fetcher field names used by table-query filters.
+      hltb_main_hours: (i % 40) + 1,
       steam_review_percent: 60 + (i % 40),
       release_date: `20${10 + (i % 15)}-${String((i % 12) + 1).padStart(2, '0')}-15`,
       genres: [GENRES[i % GENRES.length], GENRES[(i + 2) % GENRES.length]],
       tags: [TAGS[i % TAGS.length]],
       playtime_forever: i * 3,
+      coop_online: i % 4 === 0,
+      coop_local: i % 6 === 0,
     });
   }
   return games;
@@ -58,6 +61,9 @@ export function syntheticWishlistGames(count) {
       wishlist_store: 'steam',
       store_target: 'steam',
       tracking_status: 'active',
+      // Fallback deal fields when ITAD is absent (table-query getDealInfo).
+      discount_percent: 20 + (i % 50),
+      price_overview: { final: 999 + i, initial: 1999 + i, currency: 'USD' },
     });
   }
   return games;
@@ -77,8 +83,11 @@ export function syntheticItchGames(count) {
       itch_id: 9000 + i,
       name: `Itch Jam ${i}`,
       type: 'game',
+      classification: 'game',
       playtime_minutes: 0,
       publisher: 'Perf Fixture',
+      genres: [GENRES[i % GENRES.length]],
+      steam_review_percent: 70 + (i % 20),
     });
   }
   return games;

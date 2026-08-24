@@ -40,7 +40,8 @@ const MAX_PERSIST_STACK_LEN = 4096; // cap persisted stacks so the ring stays un
 const DEDUPE_WINDOW_MS = 2000;
 const MESSAGE_TRUNCATE = 240;
 const UA_TRUNCATE = 256; // avoid leaking absurd UA-spoofing strings into bundles
-const PERSIST_STORAGE_KEY = 'baklog-error-log';
+const PERSIST_STORAGE_KEY_LEGACY = 'baklog-error-log';
+const PERSIST_STORAGE_PREFIX = 'baklog-error-log:';
 const PERSIST_STACK_TRUNCATED = '\n(... truncated for storage)';
 
 let _installed = false;
@@ -50,8 +51,45 @@ let _dismissed = false;
 let _persistedRing = []; // larger than _errors so bundles can include history across reloads
 let _bundleCtx = null; // { getFingerprint, getActiveFilterCount } — injected by app.js
 let _serverFrozenHint = null; // true/false from last /api/config; tags persisted errors
+let _runtimeLabel = null; // 'dev' | 'installed' | 'portable' once /api/config lands
+let _stagingBeforeRuntime = []; // errors before runtime is known (memory only)
+let _legacyMixedPresent = false; // true if discarded legacy ring had both frozen flags
 const _errors = [];
 const _signatures = new Map(); // sig -> last seen timestamp
+
+function persistStorageKey(label) {
+  const safe = String(label || 'unknown').replace(/[^a-z0-9_-]/gi, '');
+  return `${PERSIST_STORAGE_PREFIX}${safe || 'unknown'}`;
+}
+
+function runtimeLabelFromHints({ frozen, runtime_label } = {}) {
+  if (typeof runtime_label === 'string' && runtime_label.trim()) {
+    return runtime_label.trim().toLowerCase();
+  }
+  if (typeof frozen === 'boolean') return frozen ? 'installed' : 'dev';
+  return null;
+}
+
+/** Discard the pre-0.9.01 shared ring so mixed entries cannot reappear. */
+function discardLegacyErrorLog() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage?.getItem(PERSIST_STORAGE_KEY_LEGACY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const tagged = parsed.filter((e) => typeof e?.server_frozen === 'boolean');
+        if (tagged.length) {
+          const hasTrue = tagged.some((e) => e.server_frozen === true);
+          const hasFalse = tagged.some((e) => e.server_frozen === false);
+          _legacyMixedPresent = hasTrue && hasFalse;
+        }
+      }
+    } catch (_) { /* corrupt — still remove */ }
+    window.localStorage.removeItem(PERSIST_STORAGE_KEY_LEGACY);
+  } catch (_) { /* best-effort */ }
+}
 
 function makeSignature(entry) {
   const firstStackLine = (entry.stack || '').split('\n').slice(0, 2).join('|');
@@ -161,8 +199,9 @@ function prunePersistedRing() {
   const before = _persistedRing.length;
   _persistedRing = _persistedRing.filter(e => !isStalePersistedError(e));
   if (_persistedRing.length === before || typeof window === 'undefined') return;
+  if (!_runtimeLabel) return;
   try {
-    window.localStorage?.setItem(PERSIST_STORAGE_KEY, JSON.stringify(_persistedRing));
+    window.localStorage?.setItem(persistStorageKey(_runtimeLabel), JSON.stringify(_persistedRing));
   } catch (_) { /* best-effort */ }
 }
 
@@ -185,17 +224,32 @@ function shouldDedupe(entry) {
   return last != null && now - last < DEDUPE_WINDOW_MS;
 }
 
-/** Record whether the active server is frozen (from /api/config). Tags new persisted errors. */
-export function noteServerRuntime({ frozen } = {}) {
+/**
+ * Record whether the active server is frozen / which runtime label to use.
+ * Reloads the runtime-scoped ring and flushes any pre-config staging buffer.
+ */
+export function noteServerRuntime({ frozen, runtime_label } = {}) {
+  const label = runtimeLabelFromHints({ frozen, runtime_label });
   if (typeof frozen === 'boolean') _serverFrozenHint = frozen;
+  if (!label) return;
+  const changed = _runtimeLabel !== label;
+  _runtimeLabel = label;
+  discardLegacyErrorLog();
+  if (changed) {
+    loadPersistedErrors();
+    flushStagingBeforeRuntime();
+  }
 }
 
-/** True when persisted error ring tags both dev and frozen sessions. */
+/** True when a discarded legacy ring (or rare mixed tag set) spanned runtimes. */
 export function hasPersistedMixedRuntimeErrors(currentFrozen) {
+  if (_legacyMixedPresent) return true;
   return persistedErrorsMixedRuntime(currentFrozen);
 }
 
 function persistedErrorsMixedRuntime(currentFrozen) {
+  // Partitioned rings do not mix. Only report mix if this ring somehow still
+  // contains both tags (should not happen after noteServerRuntime).
   if (typeof currentFrozen !== 'boolean' || !_persistedRing.length) return false;
   const tagged = _persistedRing.filter((e) => typeof e.server_frozen === 'boolean');
   if (!tagged.length) return false;
@@ -208,25 +262,55 @@ function publishToWindow() {
     count: _errors.length,
     items: _errors.slice(),
     persisted: _persistedRing.slice(),
-    help: 'Uncaught errors + unhandled rejections. Session items live in items[]; the persisted ring (last 200 across reloads) lives in persisted[].',
+    runtime: _runtimeLabel,
+    help: 'Uncaught errors + unhandled rejections. Session items live in items[]; the persisted ring (last 200 across reloads, scoped per runtime) lives in persisted[].',
   };
 }
 
 /**
- * Restore the persisted ring from localStorage. Best-effort — corrupt JSON or
- * disabled storage is silently ignored so the live capture path is never blocked.
+ * Restore the persisted ring from the runtime-scoped localStorage key.
+ * Best-effort — corrupt JSON or disabled storage is silently ignored.
  */
 function loadPersistedErrors() {
   if (typeof window === 'undefined') return;
+  if (!_runtimeLabel) {
+    _persistedRing = [];
+    return;
+  }
   try {
-    const raw = window.localStorage?.getItem(PERSIST_STORAGE_KEY);
-    if (!raw) return;
+    const raw = window.localStorage?.getItem(persistStorageKey(_runtimeLabel));
+    if (!raw) {
+      _persistedRing = [];
+      return;
+    }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       _persistedRing = parsed.slice(-MAX_PERSISTED);
       prunePersistedRing();
+    } else {
+      _persistedRing = [];
     }
-  } catch (_) { /* corrupt or disabled storage — start fresh */ }
+  } catch (_) {
+    _persistedRing = [];
+  }
+}
+
+function flushStagingBeforeRuntime() {
+  if (!_stagingBeforeRuntime.length || !_runtimeLabel) return;
+  const pending = _stagingBeforeRuntime.splice(0, _stagingBeforeRuntime.length);
+  for (const entry of pending) {
+    const stored = entryForStorage(entry);
+    _persistedRing.push(stored);
+  }
+  while (_persistedRing.length > MAX_PERSISTED) _persistedRing.shift();
+  writePersistedRing();
+}
+
+function writePersistedRing() {
+  if (typeof window === 'undefined' || !_runtimeLabel) return;
+  try {
+    window.localStorage?.setItem(persistStorageKey(_runtimeLabel), JSON.stringify(_persistedRing));
+  } catch (_) { /* quota / disabled / private mode */ }
 }
 
 /**
@@ -236,11 +320,14 @@ function loadPersistedErrors() {
  */
 function persistError(entry) {
   if (typeof window === 'undefined') return;
+  if (!_runtimeLabel) {
+    _stagingBeforeRuntime.push(entry);
+    while (_stagingBeforeRuntime.length > MAX_PERSISTED) _stagingBeforeRuntime.shift();
+    return;
+  }
   _persistedRing.push(entryForStorage(entry));
   while (_persistedRing.length > MAX_PERSISTED) _persistedRing.shift();
-  try {
-    window.localStorage?.setItem(PERSIST_STORAGE_KEY, JSON.stringify(_persistedRing));
-  } catch (_) { /* quota / disabled / private mode — bundle still works from in-memory _persistedRing */ }
+  writePersistedRing();
 }
 
 /** Clone an entry for the persisted ring — truncate stacks, default repeats. */
@@ -265,9 +352,13 @@ function bumpRepeatsForSignature(sig) {
     for (let j = _persistedRing.length - 1; j >= 0; j -= 1) {
       if (makeSignature(_persistedRing[j]) !== sig) continue;
       _persistedRing[j].repeats = (_persistedRing[j].repeats || 1) + 1;
-      try {
-        window.localStorage?.setItem(PERSIST_STORAGE_KEY, JSON.stringify(_persistedRing));
-      } catch (_) { /* best-effort */ }
+      writePersistedRing();
+      return;
+    }
+    // Pre-runtime staging: bump there if not yet flushed.
+    for (let k = _stagingBeforeRuntime.length - 1; k >= 0; k -= 1) {
+      if (makeSignature(_stagingBeforeRuntime[k]) !== sig) continue;
+      _stagingBeforeRuntime[k].repeats = (_stagingBeforeRuntime[k].repeats || 1) + 1;
       return;
     }
     return;
@@ -395,9 +486,9 @@ export function buildBugBundle(extra = {}) {
   const dashStats = win?.__baklogDash?.stats || null;
   const server = extra.server || null;
   const warnings = [];
-  if (server && typeof server.frozen === 'boolean' && persistedErrorsMixedRuntime(server.frozen)) {
+  if (server && (hasPersistedMixedRuntimeErrors(server.frozen) || _legacyMixedPresent)) {
     warnings.push(
-      'Persisted errors include entries from both dev and frozen sessions (shared localhost localStorage). Filter by server_frozen or clear site data for 127.0.0.1.',
+      'Persisted errors include entries from both dev and frozen sessions (legacy shared localhost localStorage). Clear site data for 127.0.0.1 if this warning persists after upgrading.',
     );
   }
   const base = {
@@ -649,7 +740,8 @@ function record(entry) {
 export function installGlobalErrorHandler() {
   if (_installed || typeof window === 'undefined') return;
   _installed = true;
-  loadPersistedErrors();
+  discardLegacyErrorLog();
+  // Ring load waits for noteServerRuntime so we do not read the wrong key.
   window.addEventListener('error', (e) => {
     try {
       record(captureFromErrorEvent(e));
@@ -695,10 +787,23 @@ export function _resetForTests() {
   _errors.length = 0;
   _signatures.clear();
   _persistedRing = [];
+  _stagingBeforeRuntime = [];
   _bundleCtx = null;
   _serverFrozenHint = null;
+  _runtimeLabel = null;
+  _legacyMixedPresent = false;
   _dismissed = false;
   hideToast();
-  try { window?.localStorage?.removeItem(PERSIST_STORAGE_KEY); } catch (_) { /* noop */ }
+  try {
+    window?.localStorage?.removeItem(PERSIST_STORAGE_KEY_LEGACY);
+    for (const label of ['dev', 'installed', 'portable', 'unknown']) {
+      window?.localStorage?.removeItem(persistStorageKey(label));
+    }
+  } catch (_) { /* noop */ }
   publishToWindow();
+}
+
+/** @internal Vitest helper — current runtime-scoped storage key, or null. */
+export function _persistStorageKeyForTests() {
+  return _runtimeLabel ? persistStorageKey(_runtimeLabel) : null;
 }

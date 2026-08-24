@@ -49,10 +49,26 @@ for (const { name, count } of SIZES) {
 // Default active catalog: 500 rows (balance for local + CI e2e).
 writeJson('perf/games_steam.json', steamCatalogPayload(500));
 writeJson('perf/games_wishlist.json', {
-  game_count: 20,
-  games: syntheticWishlistGames(20),
+  game_count: 80,
+  games: syntheticWishlistGames(80),
 });
-writeJson('perf/games_itch.json', itchCatalogPayload(12));
+writeJson('perf/games_itch.json', itchCatalogPayload(120));
+
+// Seed ITAD so wishlist on-sale / steals drills have scrollable deal rows.
+const itadByKey = {};
+for (let i = 0; i < 80; i++) {
+  itadByKey[`wishlist:wl-${i}`] = {
+    price: +(9.99 - (i % 7) * 0.5).toFixed(2),
+    cut: 20 + (i % 50),
+    shop: 'Steam',
+    is_historical_low: i % 5 === 0,
+    is_historical_low_year: i % 5 === 0,
+  };
+}
+writeJson('perf/itad_prices.json', {
+  updated_at: '2026-06-25T00:00:00.000Z',
+  by_key: itadByKey,
+});
 
 // Empty stubs for other stores merge path expects.
 for (const store of [

@@ -418,16 +418,16 @@ export async function refreshFilterUI(options) {
     return;
   }
   const drillIn = !!options?.drillIn || !!state._pendingFocusKey;
-  // Chart drill-ins: paint summary + picks before the table so toolbar scroll
-  // does not land while chrome above the table is still growing.
+  // Chart drill-ins: paint summary + picks + table before toolbar scroll so
+  // virtual-list height exists (scrolling before paint leaves maxScroll≈0).
   if (hasPendingToolbarScroll()) {
     renderSummary();
     if (!options?.skipPicks) renderPicks();
-    scheduleScrollAfterChromeSettled();
     if (!options?.skipTable) {
       if (options?.force) await renderTable({ force: true, drillIn: false });
       else await renderTable({ drillIn: false });
     }
+    scheduleScrollAfterChromeSettled();
     return;
   }
   if (!options?.skipTable) {

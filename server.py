@@ -55,6 +55,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from shared.admin_gate import resolve_admin_enabled
 from shared.built_frontend import (
     is_immutable_built_asset as _is_immutable_built_asset,
 )
@@ -131,7 +132,10 @@ except ImportError:
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
-ADMIN_ENABLED = os.environ.get("BAKLOG_ADMIN") == "1"
+_ADMIN_OK, _ADMIN_WARN = resolve_admin_enabled(ROOT)
+if _ADMIN_WARN:
+    print(_ADMIN_WARN, file=sys.stderr, flush=True)
+ADMIN_ENABLED = _ADMIN_OK
 FREE_CLAIMS_INPUT_PATH = Path(
     os.environ.get("BAKLOG_FREE_CLAIMS_INPUT", "free-claims.input.json")
 )

@@ -22,6 +22,8 @@ describe("drill-anchor pending scroll target", () => {
     };
     global.cancelAnimationFrame = () => {};
     global.setTimeout = (cb, ms) => {
+      // Keep chrome-settle / verify delays pending so consume can still defer.
+      if (typeof ms === "number" && ms >= 50) return 1;
       if (typeof cb === "function") cb();
       return 1;
     };
@@ -188,7 +190,7 @@ describe("drill-anchor pending scroll target", () => {
     scheduleScrollAfterLayoutSettled();
     expect(hasPendingScrollTarget()).toBe(false);
     expect(document.querySelector("tr.row-focused")).toBeTruthy();
-    expect(scrollToSpy).toHaveBeenCalledTimes(1);
+    expect(scrollToSpy).toHaveBeenCalled();
   });
 
   it("consumePendingScrollTarget scrolls virtual list by row index", async () => {
@@ -204,6 +206,37 @@ describe("drill-anchor pending scroll target", () => {
     expect(scrollToSpy).toHaveBeenCalled();
     const top = scrollToSpy.mock.calls[0][0].top;
     expect(top).toBeGreaterThan(0);
+  });
+
+  it("scheduleScrollAfterChromeSettled forces consume after settle timeout", async () => {
+    const timeouts = [];
+    global.setTimeout = (cb, ms) => {
+      const id = timeouts.length + 1;
+      timeouts.push({ cb, ms, id });
+      return id;
+    };
+    global.clearTimeout = (id) => {
+      const slot = timeouts.find((t) => t.id === id);
+      if (slot) slot.cleared = true;
+    };
+
+    const { state } = await import("../js/state.js");
+    const {
+      setPendingScrollTarget,
+      scheduleScrollAfterChromeSettled,
+      hasPendingScrollTarget,
+    } = await import("../js/table-ui.js");
+    state.activeView = "library";
+    document.getElementById("viewLoadingOverlay")?.classList.add("show");
+    setPendingScrollTarget({ kind: "toolbar" });
+    scheduleScrollAfterChromeSettled();
+    expect(hasPendingScrollTarget()).toBe(true);
+    const settle = timeouts.find((t) => t.ms === 700 && !t.cleared);
+    expect(settle).toBeTruthy();
+    document.getElementById("viewLoadingOverlay")?.classList.remove("show");
+    settle.cb();
+    expect(hasPendingScrollTarget()).toBe(false);
+    expect(scrollToSpy).toHaveBeenCalled();
   });
 });
 
@@ -332,8 +365,47 @@ describe("virtual drill anchor scroll", () => {
     expect(scrollToSpy).toHaveBeenCalled();
     const top = scrollToSpy.mock.calls[0][0]?.top;
     expect(typeof top).toBe("number");
-    // Rect path: rowCenter ~545, target ~545 - 0.42*700 ≈ 251
+    // Rect path: rowCenter ~545; aim = sticky + 0.35*(vh-sticky) ≈ 250 → top ≈ 295
     expect(top).toBeGreaterThan(100);
     expect(top).toBeLessThan(400);
+  });
+
+  it("verify-after-scroll re-scrolls when the keyed row is far from the aim line", async () => {
+    const pendingTimers = [];
+    global.setTimeout = (cb, ms) => {
+      const id = pendingTimers.length + 1;
+      pendingTimers.push({ cb, ms, id });
+      return id;
+    };
+    global.clearTimeout = (id) => {
+      const slot = pendingTimers.find((t) => t.id === id);
+      if (slot) slot.cleared = true;
+    };
+
+    const { state } = await import("../js/state.js");
+    const { setPendingScrollTarget, consumePendingScrollTarget } = await import("../js/table-ui.js");
+    state.activeView = "library";
+    const list = [{ store: "steam", id: "42", name: "Test Game" }];
+    state._visibleList = list;
+
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = `<tr data-row-key="steam:42" data-row-index="0" style="height:76px"><td>Game</td></tr>`;
+    const row = tbody.querySelector("tr");
+    let top = 900;
+    Object.defineProperty(row, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ top, bottom: top + 76, height: 76, left: 0, right: 100, width: 100 }),
+    });
+    Object.defineProperty(win, "scrollY", { configurable: true, value: 0 });
+    Object.defineProperty(win, "innerHeight", { configurable: true, value: 700 });
+
+    scrollToSpy.mockClear();
+    setPendingScrollTarget({ kind: "row", key: "steam:42", smooth: false });
+    expect(consumePendingScrollTarget(list)).toBe(true);
+    expect(scrollToSpy).toHaveBeenCalled();
+    const verify = pendingTimers.find((t) => !t.cleared && t.ms === 50);
+    expect(verify).toBeTruthy();
+    verify.cb();
+    expect(scrollToSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

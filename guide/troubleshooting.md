@@ -139,9 +139,9 @@ If you still have `BAKLOG-Data`, reinstall BAKLOG and launch normally - first bo
 
 ## Dev server vs frozen exe (same browser origin)
 
-**Symptom:** The frozen beta shows the wrong library, old errors in bug reports, or UI prefs that match your git checkout - but `BAKLOG.exe` is supposed to use `%LOCALAPPDATA%\BAKLOG-Data`.
+**Symptom:** The frozen beta shows the wrong library, old errors in bug reports, or UI prefs that match your git checkout - but `BAKLOG.exe` is supposed to use `%LOCALAPPDATA%\BAKLOG-Data`. A **Mixed sessions** chip means an older shared error log still has entries from both runtimes.
 
-**Cause:** Dev (`python server.py`) and frozen (`BAKLOG.exe`) both serve on `http://127.0.0.1:8765`. The browser treats them as one site, so **localStorage is shared** (status chips, filters, `baklog-error-log`, Supabase session keys). Server library files are **not** shared - they come from the active data directory.
+**Cause:** Dev (`python server.py`) and frozen (`BAKLOG.exe`) both serve on `http://127.0.0.1:8765`. The browser treats them as one site, so **UI prefs and auth tokens in localStorage are shared**. Server library files are **not** shared - they come from the active data directory. From 0.9.01 onward, the error history is stored per runtime (`baklog-error-log:dev` vs `:installed`) so bug bundles no longer mix the two. Older builds used a single `baklog-error-log` key.
 
 **How to tell which server is running:** Open `http://127.0.0.1:8765/api/diagnostics` (or use **Report a bug**). Check `frozen` and `data_dir_path`:
 
@@ -152,7 +152,11 @@ If you still have `BAKLOG-Data`, reinstall BAKLOG and launch normally - first bo
 
 **Fix (library):** With BAKLOG closed, copy `profiles/` from your dev checkout into `%LOCALAPPDATA%\BAKLOG-Data`, or connect stores and refresh in the frozen app. Missing store files return an empty catalog (HTTP 200, zero games) - not your dev repo.
 
-**Split dev from frozen (recommended on one PC):** Set `BAKLOG_DATA_DIR=%LOCALAPPDATA%\BAKLOG-Dev` in `.env` before running `python server.py`. Dev library files stay in `BAKLOG-Dev`; the installed app keeps using `BAKLOG-Data`. The header shows a **Dev server** chip when `python server.py` is active.
+**Split dev from frozen (recommended on one PC):** Set `BAKLOG_DATA_DIR=%LOCALAPPDATA%\BAKLOG-Dev` and `PORT=8766` in `.env` before running `python server.py`. Dev library files stay in `BAKLOG-Dev`; the installed app keeps using `BAKLOG-Data` on port 8765. The header shows a **Dev server** chip when `python server.py` is active.
+
+**Admin console vs installed library:** `BAKLOG_ADMIN=1` will not attach to the default installed data folder (`BAKLOG-Data`). Run admin against the repo (or `BAKLOG-Dev`). Only set `BAKLOG_ADMIN_ALLOW_INSTALLED=1` if you intentionally need admin on the installed library.
+
+**Full clean of the installed library (maintainer / clean SoT):** Quit the tray, `BAKLOG.exe`, and any `server.py` on port 8765. Delete the entire `%LOCALAPPDATA%\BAKLOG-Data` folder. In Edge or Chrome, clear site data for `127.0.0.1` (and `:8766` if you used it). Launch the installed app once, create a new profile, and reconnect only the stores you want as the real library. Keep testing data under `BAKLOG-Dev` or the git checkout - do not copy testing dumps back into `BAKLOG-Data` unless intentional.
 
 **Keyring caveat:** Connections encryption uses one OS keyring entry (`steam-backlog`) per Windows user. A full uninstall wipe removes it for both dev and frozen - you will need to sign in to stores again everywhere on that account.
 

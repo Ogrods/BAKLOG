@@ -108,7 +108,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for running locally.
 | `server.py` size | Improving | Run/RunManager moved to `shared/run_manager.py`; CI line budget ratcheted |
 | `connections.js` size | Improving | Rail/status in `js/connections-rail.js`; session flows remain in barrel |
 | `fetcher-health.js` | Done | Barrel + `js/fetcher/` split (#91) |
-| Dev vs frozen localStorage | Mitigated | Use `PORT=8766` + separate `BAKLOG_DATA_DIR` for dev (see `.env.example`) |
+| Dev vs frozen localStorage | Mitigated | Prefer `PORT=8766` + `BAKLOG_DATA_DIR` for dev; error log is partitioned per runtime (`baklog-error-log:dev` / `:installed`); admin refuses default installed data root unless `BAKLOG_ADMIN_ALLOW_INSTALLED=1` |
 | macOS frozen zip | Deferred | Notify-only until `BAKLOG-macos.zip` ships; checklist in `packaging/build_macos.sh` |
 | Windows ARP version drift | Visible | Diagnostics + update install footnote when Setup + zip apply diverge |
 | Code signing | Out of scope | Unsigned beta builds (Windows Inno + portable zip) |

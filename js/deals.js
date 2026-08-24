@@ -82,6 +82,11 @@ export function drillWishlistDealFilter({ onSaleOnly, minDiscount }) {
   savePrefs();
   if (state.activeView !== "wishlist") switchView("wishlist");
   else refreshFilterUI();
+  // Defer import to avoid deals ↔ table-ui cycle at module load.
+  import('./table-ui.js').then(({ setPendingScrollTarget, scheduleScrollAfterChromeSettled }) => {
+    setPendingScrollTarget({ kind: 'toolbar', smooth: false });
+    scheduleScrollAfterChromeSettled();
+  }).catch(() => { /* audit/dev only best-effort */ });
 }
 
 export function dealHeroCardHtml(g) {

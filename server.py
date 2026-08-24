@@ -90,6 +90,7 @@ from shared.install_paths import (
     serve_built_frontend,
     static_root,
 )
+from shared.admin_gate import resolve_admin_enabled
 
 if __name__ == "__main__":
     from baklog_fetcher_dispatch import exit_if_fetcher_child
@@ -131,7 +132,10 @@ except ImportError:
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8765"))
-ADMIN_ENABLED = os.environ.get("BAKLOG_ADMIN") == "1"
+_ADMIN_OK, _ADMIN_WARN = resolve_admin_enabled(ROOT)
+if _ADMIN_WARN:
+    print(_ADMIN_WARN, file=sys.stderr, flush=True)
+ADMIN_ENABLED = _ADMIN_OK
 FREE_CLAIMS_INPUT_PATH = Path(
     os.environ.get("BAKLOG_FREE_CLAIMS_INPUT", "free-claims.input.json")
 )

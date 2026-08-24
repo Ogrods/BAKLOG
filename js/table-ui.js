@@ -145,10 +145,80 @@ function scrollRowToCenter(row, { smooth = true } = {}) {
   // landing from a dashboard drill-in.
   const rect = row.getBoundingClientRect();
   const rowCenterY = rect.top + window.scrollY + rect.height / 2;
-  // Aim ~42% from the top of the viewport, accounting for the sticky table
-  // header so the focused row clears it.
-  const target = Math.max(0, rowCenterY - window.innerHeight * 0.42);
+  const target = Math.max(0, rowCenterY - rowAimFromViewportTop());
   window.scrollTo({ top: target, behavior: smooth ? "smooth" : "auto" });
+}
+
+/** Sticky thead or phone sticky bar height (plus a small pad). */
+function stickyOffsetPx() {
+  const phoneBar = document.getElementById("tablePhoneSticky");
+  if (phoneBar && !phoneBar.hidden && phoneBar.offsetHeight > 0) {
+    return phoneBar.offsetHeight + 8;
+  }
+  const thead = document.querySelector(".games-table thead");
+  if (thead && getComputedStyle(thead).display !== "none") {
+    const h = thead.offsetHeight || thead.getBoundingClientRect().height || 0;
+    if (h > 0) return h + 8;
+  }
+  return 8;
+}
+
+/** Document Y offset for aiming a row under sticky chrome (upper mid of free viewport). */
+function rowAimFromViewportTop() {
+  const sticky = stickyOffsetPx();
+  const free = Math.max(80, window.innerHeight - sticky);
+  return sticky + free * 0.35;
+}
+
+/**
+ * Measure how far a painted row is from the drill aim line (viewport Y).
+ * Used by Playwright geometry audits — same math as verify-after-scroll.
+ * @param {string} key
+ * @returns {{ ok: boolean, key: string, reason?: string, delta?: number, aim?: number, rowCenter?: number, sticky?: number, phone?: boolean, scrollY?: number }}
+ */
+export function measureDrillRowGeometry(key) {
+  if (!key) return { ok: false, key: '', reason: 'no-key' };
+  const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (!row) return { ok: false, key, reason: 'row-missing' };
+  const sticky = stickyOffsetPx();
+  const aim = rowAimFromViewportTop();
+  const rect = row.getBoundingClientRect();
+  const rowCenter = rect.top + rect.height / 2;
+  const delta = Math.abs(rowCenter - aim);
+  return {
+    ok: delta <= ROW_SCROLL_VERIFY_THRESHOLD_PX,
+    key,
+    delta: Math.round(delta * 10) / 10,
+    aim: Math.round(aim * 10) / 10,
+    rowCenter: Math.round(rowCenter * 10) / 10,
+    sticky: Math.round(sticky * 10) / 10,
+    phone: isTablePhoneLayout(),
+    scrollY: Math.round(window.scrollY),
+    threshold: ROW_SCROLL_VERIFY_THRESHOLD_PX,
+  };
+}
+
+/**
+ * Measure toolbar drill landing (category filters).
+ * @returns {{ ok: boolean, reason?: string, toolbarTop?: number, pad?: number, scrollY?: number }}
+ */
+export function measureDrillToolbarGeometry() {
+  const toolbar = document.getElementById('toolbarSection');
+  if (!toolbar || toolbar.classList.contains('hidden')) {
+    return { ok: false, reason: 'toolbar-missing' };
+  }
+  // Match scrollToToolbarAnchor: pad under sticky chrome.
+  const aim = stickyOffsetPx();
+  const top = toolbar.getBoundingClientRect().top;
+  const delta = Math.abs(top - aim);
+  return {
+    ok: delta <= 72,
+    delta: Math.round(delta * 10) / 10,
+    toolbarTop: Math.round(top * 10) / 10,
+    pad: Math.round(aim * 10) / 10,
+    scrollY: Math.round(window.scrollY),
+    threshold: 72,
+  };
 }
 
 function markFocusedRow(key) {
@@ -504,6 +574,15 @@ function hltbLabel(g) {
 let _pendingScrollTarget = null;
 let _lastConsumeWasSmooth = false;
 let _chromeScrollObs = null;
+let _chromeSettleTimer = null;
+let _verifyScrollTimer = null;
+let _lastRowScrollKey = null;
+const CHROME_SETTLE_TIMEOUT_MS = 700;
+const ROW_SCROLL_VERIFY_THRESHOLD_PX = 48;
+const ROW_SCROLL_VERIFY_MAX_ATTEMPTS = 3;
+
+/** Public threshold used by verify-after-scroll and Playwright geometry audits. */
+export const DRILL_ROW_VERIFY_THRESHOLD_PX = ROW_SCROLL_VERIFY_THRESHOLD_PX;
 
 const SPONSORED_TABLE_SLOT = 5;
 const ROW_AD_DRILL_OFFSET = 1;
@@ -536,6 +615,17 @@ function disconnectChromeScrollObs() {
     _chromeScrollObs.disconnect();
     _chromeScrollObs = null;
   }
+  if (_chromeSettleTimer) {
+    clearTimeout(_chromeSettleTimer);
+    _chromeSettleTimer = null;
+  }
+}
+
+function clearVerifyScrollTimer() {
+  if (_verifyScrollTimer) {
+    clearTimeout(_verifyScrollTimer);
+    _verifyScrollTimer = null;
+  }
 }
 
 export function setPendingScrollTarget(target) {
@@ -556,10 +646,74 @@ export function setPendingScrollTarget(target) {
 export function cancelPendingScrollTarget() {
   _pendingScrollTarget = null;
   disconnectChromeScrollObs();
+  clearVerifyScrollTimer();
 }
 
 export function hasPendingScrollTarget() {
   return !!(_pendingScrollTarget && !_pendingScrollTarget.consumed);
+}
+
+/**
+ * Wait until pending drill scroll + view overlay settle, then a short delay for
+ * verify-after-scroll. Used by Playwright geometry audits.
+ * @param {{ timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function waitForDrillIdle({ timeoutMs = 8000 } = {}) {
+  const start = Date.now();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const doubleRaf = () =>
+    new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  while (Date.now() - start < timeoutMs) {
+    const busy =
+      hasPendingScrollTarget() ||
+      isViewOverlayVisible() ||
+      !!state._drillHideOverlay ||
+      !!state._pendingFocusKey;
+    if (!busy) {
+      await doubleRaf();
+      await sleep(320);
+      if (
+        !hasPendingScrollTarget() &&
+        !isViewOverlayVisible() &&
+        !state._drillHideOverlay &&
+        !state._pendingFocusKey
+      ) {
+        return true;
+      }
+    } else if (hasPendingScrollTarget()) {
+      scheduleScrollAfterChromeSettled();
+    }
+    await sleep(40);
+  }
+  return false;
+}
+
+/** Expose drill geometry helpers for Playwright audits (window.__baklogDrillGeom). */
+export function installDrillGeomApi() {
+  if (typeof window === 'undefined') return;
+  window.__baklogDrillGeom = {
+    measureRow: measureDrillRowGeometry,
+    measureToolbar: measureDrillToolbarGeometry,
+    threshold: DRILL_ROW_VERIFY_THRESHOLD_PX,
+    waitForIdle: waitForDrillIdle,
+    focusGame,
+    flashGameRow,
+    scrollToRowIndex,
+    hasPendingScrollTarget,
+    scheduleScrollAfterChromeSettled,
+    consumePendingScrollTarget,
+    scrollToToolbar: () => scrollToToolbarAnchor({ smooth: false }),
+    setPendingToolbar: () => setPendingScrollTarget({ kind: 'toolbar', smooth: false }),
+    scrollRowIntoAim: (key) => {
+      const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+      if (row) scrollRowToCenter(row, { smooth: false });
+    },
+    visibleListKeys: () => (state._visibleList || []).map((g) => gameKey(g)),
+    activeView: () => state.activeView,
+    pickedKey: () => state.pickedKey || null,
+  };
 }
 
 function scrollToToolbarAnchor({ smooth = false } = {}) {
@@ -569,7 +723,8 @@ function scrollToToolbarAnchor({ smooth = false } = {}) {
     return;
   }
   const rect = toolbar.getBoundingClientRect();
-  const targetY = Math.max(0, rect.top + window.scrollY - 12);
+  const pad = stickyOffsetPx();
+  const targetY = Math.max(0, rect.top + window.scrollY - pad);
   window.scrollTo({ top: targetY, behavior: smooth ? "smooth" : "auto" });
 }
 
@@ -598,7 +753,7 @@ export function consumePendingScrollTarget(list = state._visibleList) {
   if (!t || t.consumed) return false;
 
   if (t.kind === "toolbar") {
-    if (!isToolbarScrollReady()) {
+    if (!t.forceChrome && !isToolbarScrollReady()) {
       scheduleScrollAfterChromeSettled();
       return false;
     }
@@ -607,12 +762,13 @@ export function consumePendingScrollTarget(list = state._visibleList) {
     t.consumed = true;
     _pendingScrollTarget = null;
     completeDrillOverlayIfNeeded(t.hideOverlay);
+    scheduleVerifyToolbarScroll(0, !!t.smooth);
     return true;
   }
 
   if (t.kind === "row") {
     // Cross-view drills: wait for picks/summary chrome like toolbar drills.
-    if (t.hideOverlay && !isToolbarScrollReady()) {
+    if (t.hideOverlay && !t.forceChrome && !isToolbarScrollReady()) {
       scheduleScrollAfterChromeSettled();
       return false;
     }
@@ -659,12 +815,79 @@ export function consumePendingScrollTarget(list = state._visibleList) {
     }
 
     _lastConsumeWasSmooth = !!t.smooth && !!row && (phone || !usesVirtualScroll(list));
+    _lastRowScrollKey = key;
     t.consumed = true;
     _pendingScrollTarget = null;
     completeDrillOverlayIfNeeded(t.hideOverlay);
+    scheduleVerifyRowScroll(key, list, 0, !!t.smooth);
     return true;
   }
   return false;
+}
+
+/**
+ * After a row drill scroll, confirm the keyed row is near the aim line.
+ * Re-paint + re-scroll up to ROW_SCROLL_VERIFY_MAX_ATTEMPTS when off.
+ */
+function scheduleVerifyRowScroll(key, list, attempt, _smooth) {
+  clearVerifyScrollTimer();
+  if (!key || attempt >= ROW_SCROLL_VERIFY_MAX_ATTEMPTS) return;
+  const delay = _smooth ? 220 : 50;
+  _verifyScrollTimer = setTimeout(() => {
+    _verifyScrollTimer = null;
+    verifyRowScrollLanding(key, list, attempt, _smooth);
+  }, delay);
+}
+
+function verifyRowScrollLanding(key, list, attempt, smooth) {
+  if (!key || !Array.isArray(list) || !list.length) return;
+  const idx = list.findIndex((g) => gameKey(g) === key);
+  if (idx < 0) return;
+  let row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
+  if (!row) {
+    row = ensureRowPaintedForScroll(list, idx, key);
+  }
+  if (!row) {
+    if (usesVirtualScroll(list)) {
+      scrollToVirtualRowIndex(idx, { behavior: "auto" });
+      ensureRowPaintedForScroll(list, idx, key);
+    }
+    scheduleVerifyRowScroll(key, list, attempt + 1, false);
+    return;
+  }
+  markFocusedRow(key);
+  const rect = row.getBoundingClientRect();
+  const rowCenter = rect.top + rect.height / 2;
+  const aim = rowAimFromViewportTop();
+  if (Math.abs(rowCenter - aim) <= ROW_SCROLL_VERIFY_THRESHOLD_PX) return;
+  // Off target — always correct with live rect (virtual index math can drift
+  // by ~1 row when measured height/spacer lag the painted table).
+  scrollRowToCenter(row, { smooth: false });
+  scheduleVerifyRowScroll(key, list, attempt + 1, false);
+}
+
+/**
+ * After a toolbar drill scroll, confirm toolbar top is near sticky pad.
+ * Re-anchor when chrome growth left the landing short.
+ */
+function scheduleVerifyToolbarScroll(attempt, _smooth) {
+  clearVerifyScrollTimer();
+  if (attempt >= ROW_SCROLL_VERIFY_MAX_ATTEMPTS) return;
+  const delay = _smooth ? 220 : 50;
+  _verifyScrollTimer = setTimeout(() => {
+    _verifyScrollTimer = null;
+    verifyToolbarScrollLanding(attempt, _smooth);
+  }, delay);
+}
+
+function verifyToolbarScrollLanding(attempt, smooth) {
+  const m = measureDrillToolbarGeometry();
+  if (m.ok || m.reason === 'toolbar-missing') return;
+  // Empty filtered lists cannot scroll the toolbar under sticky chrome.
+  const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+  if (maxScroll < 24) return;
+  scrollToToolbarAnchor({ smooth: false });
+  scheduleVerifyToolbarScroll(attempt + 1, false);
 }
 
 /** Two rAF ticks after layout, then consume the pending scroll target once. */
@@ -699,12 +922,22 @@ export function scheduleScrollAfterChromeSettled() {
     }
   };
 
+  const forceConsume = () => {
+    if (!_pendingScrollTarget || _pendingScrollTarget.consumed) return;
+    // Settle timeout expired — skip chrome readiness so overlay cannot stick.
+    _pendingScrollTarget.forceChrome = true;
+    disconnectChromeScrollObs();
+    scheduleScrollAfterLayoutSettled();
+  };
+
   const picks = document.getElementById('picksSection');
   const toolbar = document.getElementById('toolbarSection');
   const summary = document.getElementById('summary');
   const viewHouse = document.getElementById('viewHouseSlot');
   const wishRadar = document.getElementById('wishlistDealRadar');
   if (!picks || !toolbar || typeof ResizeObserver !== 'function') {
+    // No chrome observers available — do not wait forever.
+    if (_pendingScrollTarget) _pendingScrollTarget.forceChrome = true;
     const run = () => scheduleScrollAfterLayoutSettled();
     if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 800 });
     else setTimeout(run, 0);
@@ -720,6 +953,8 @@ export function scheduleScrollAfterChromeSettled() {
   if (viewHouse) _chromeScrollObs.observe(viewHouse);
   if (wishRadar) _chromeScrollObs.observe(wishRadar);
   requestAnimationFrame(() => requestAnimationFrame(tryConsume));
+  // Cap wait so house/radar growth cannot leave the drill overlay forever.
+  _chromeSettleTimer = setTimeout(forceConsume, CHROME_SETTLE_TIMEOUT_MS);
 }
 
 const CHROME_BAND_ABOVE_TOOLBAR = ['viewHouseSlot', 'wishlistDealRadar'];
@@ -752,11 +987,13 @@ function isToolbarScrollReady() {
   if (!toolbar || toolbar.classList.contains('hidden')) return false;
   const picks = document.getElementById('picksSection');
   if (!picks || picks.classList.contains('hidden')) return false;
-  if (picks.offsetHeight < 24) return false;
+  // Category drills collapse picks; allow short/collapsed chrome (was blocking forever).
+  const picksCollapsed = state.prefs?.picksCollapsed === true;
+  if (!picksCollapsed && picks.offsetHeight < 24) return false;
   const picksTop = picks.offsetTop;
   const toolbarTop = toolbar.offsetTop;
   if (picksTop > 0 && toolbarTop > 0) {
-    if (toolbarTop < picksTop + picks.offsetHeight - 4) return false;
+    if (!picksCollapsed && toolbarTop < picksTop + picks.offsetHeight - 4) return false;
     if (!isChromeBandAboveToolbarSettled(toolbarTop)) return false;
     const toolbarRectTop = toolbar.getBoundingClientRect().top;
     if (window.scrollY < 16 && toolbarRectTop < 80) return false;
@@ -1064,15 +1301,44 @@ function refreshMeasuredRowHeight(tbody) {
   // Phone cards vary with meta wrap; update spacer heights in place so scroll
   // math tracks the new estimate without a full slice rewrite.
   const phone = document.getElementById('tableWrap')?.classList.contains('table-phone');
-  if (!phone || Math.abs(h - prev) < 2) return;
+  if (!phone || Math.abs(h - prev) < 2) {
+    maybeReanchorAfterRowHeightChange(prev);
+    return;
+  }
   const start = _virtualWindow.start;
   const end = _virtualWindow.end;
   const listLen = _virtualList?.length ?? 0;
-  if (listLen <= 0 || end <= start) return;
+  if (listLen <= 0 || end <= start) {
+    maybeReanchorAfterRowHeightChange(prev);
+    return;
+  }
   const top = tbody.querySelector('tr.virtual-spacer-top td');
   const bot = tbody.querySelector('tr.virtual-spacer-bottom td');
   if (top) top.style.height = `${start * h}px`;
   if (bot) bot.style.height = `${(listLen - end) * h}px`;
+  maybeReanchorAfterRowHeightChange(prev);
+}
+
+/** If row height drifted after a drill, re-scroll the last keyed target. */
+function maybeReanchorAfterRowHeightChange(prevHeight) {
+  if (Math.abs(_rowHeightPx - prevHeight) < 1) return;
+  const pending = _pendingScrollTarget;
+  if (pending && pending.kind === 'row' && !pending.consumed && pending.key) {
+    return; // consume path will use the new height
+  }
+  const key = _lastRowScrollKey;
+  if (!key) return;
+  const list = state._visibleList;
+  if (!Array.isArray(list) || !list.length) return;
+  const idx = list.findIndex((g) => gameKey(g) === key);
+  if (idx < 0) return;
+  if (usesVirtualScroll(list) && !isTablePhoneLayout()) {
+    scrollToVirtualRowIndex(idx, { behavior: 'auto' });
+  } else {
+    const painted = ensureRowPaintedForScroll(list, idx, key);
+    if (painted) scrollRowToCenter(painted, { smooth: false });
+  }
+  scheduleVerifyRowScroll(key, list, 0, false);
 }
 export const TABLE_COLSPAN = 14;
 const VIRTUAL_OVERSCAN = 20;
@@ -1163,7 +1429,7 @@ function scrollTopForRowCenter(idx) {
   const rh = rowHeightPx();
   const extra = sponsoredExtraBeforeIndex(idx);
   const rowCenterY = getRow0DocY() + extra + idx * rh + rh / 2;
-  return Math.max(0, rowCenterY - window.innerHeight * 0.42);
+  return Math.max(0, rowCenterY - rowAimFromViewportTop());
 }
 
 /** Sync viewport to a virtual row index (drill anchor). Must run when painting an anchored slice. */

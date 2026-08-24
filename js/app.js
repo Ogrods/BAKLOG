@@ -104,9 +104,24 @@ import {
   suppressChartStaggerForBoot,
   resizeRibbonCharts,
 } from "./dashboard-charts.js";
-import { prewarmTableQueryForView, tableFingerprint } from "./table-ui.js";
+import { prewarmTableQueryForView, tableFingerprint, installDrillGeomApi } from "./table-ui.js";
+import {
+  dashDrillStore,
+  dashDrillStatus,
+  dashDrillStoreStatus,
+  dashDrillGenre,
+  dashDrillHltbBucket,
+  dashDrillMinRating,
+  dashDrillCoop,
+  dashDrillItchGenre,
+} from "./dashboard-drilldown.js";
+import { drillWishlistDealFilter } from "./deals.js";
 import { applyColumnVisibility } from "./table-columns.js";
 import { isItadDealsAvailable, syncItadDealSurfaces } from "./itad-deal-gate.js";
+import {
+  getAuthStatusSnapshot,
+  setAuthStatusSnapshot,
+} from "./connections-status.js";
 import { initBugReportDialog } from "./bug-report.js";
 import { refreshAdsForPlanChange } from "./sponsored-deals.js";
 import {
@@ -215,6 +230,28 @@ async function bootstrap() {
   syncViewTabAria(state.activeView);
   savePrefs();
   bindEvents();
+  installDrillGeomApi();
+  if (typeof window !== "undefined" && window.__baklogDrillGeom) {
+    Object.assign(window.__baklogDrillGeom, {
+      dashDrillStore,
+      dashDrillStatus,
+      dashDrillStoreStatus,
+      dashDrillGenre,
+      dashDrillHltbBucket,
+      dashDrillMinRating,
+      dashDrillCoop,
+      dashDrillItchGenre,
+      drillWishlistDealFilter,
+      /** Perf/geometry audits only: pretend ITAD is connected so deal drills run. */
+      stubItadConnected() {
+        const snap = getAuthStatusSnapshot().filter((p) => p.key !== "itad");
+        snap.push({ key: "itad", status: "connected" });
+        setAuthStatusSnapshot(snap);
+        syncItadDealSurfaces({ rerender: true });
+        return import("./library-load.js").then((m) => m.loadItadPrices());
+      },
+    });
+  }
   document.addEventListener("baklog:auth-status", () => {
     syncItadDealSurfaces();
   });
@@ -316,8 +353,8 @@ async function bootstrap() {
       const cfgRes = await fetch("/api/config");
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
-        if (typeof cfg.frozen === "boolean")
-          noteServerRuntime({ frozen: cfg.frozen });
+        if (typeof cfg.frozen === "boolean" || cfg.runtime_label)
+          noteServerRuntime({ frozen: cfg.frozen, runtime_label: cfg.runtime_label });
         syncRuntimeModeBanner(cfg);
         if (cfg.frozen === true) {
           const bootCheck = state.prefs?.checkUpdatesOnBoot !== false;

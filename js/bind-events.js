@@ -43,6 +43,8 @@ import {
   filteredGames,
   sortedGames,
   cancelPendingScrollTarget,
+  setPendingScrollTarget,
+  scheduleScrollAfterChromeSettled,
   clearRowAdAnchor,
   initTablePhoneLayout,
   initTableDensity,
@@ -208,10 +210,14 @@ export function bindEvents() {
     }
     if (action === "deal-on-sale") {
       drillWishlistDealFilter({ onSaleOnly: true });
+      setPendingScrollTarget({ kind: "toolbar", smooth: false });
+      scheduleScrollAfterChromeSettled();
       return;
     }
     if (action === "deal-steals") {
       drillWishlistDealFilter({ minDiscount: 50 });
+      setPendingScrollTarget({ kind: "toolbar", smooth: false });
+      scheduleScrollAfterChromeSettled();
     }
   };
   document.getElementById("dashboardWishlistStats")?.addEventListener("click", onWishlistStatsClick);

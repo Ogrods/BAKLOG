@@ -30,6 +30,15 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard and picks jumps to a library row re-check the target after scroll so the wrong game is not left under the sticky header on phone and mid-width layouts.
+- Dev and installed runs no longer share one browser error history when both use the same localhost origin; each runtime keeps its own log.
+
+### Changed
+
+- Maintainer admin console will not attach to the default installed library folder unless you explicitly allow it. Prefer a separate data folder for admin work.
+
 ## [0.9.00] - 2026-08-18
 
 ### Added

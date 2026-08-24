@@ -55,6 +55,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from shared.admin_gate import resolve_admin_enabled
 from shared.built_frontend import (
     is_immutable_built_asset as _is_immutable_built_asset,
 )
@@ -90,7 +91,6 @@ from shared.install_paths import (
     serve_built_frontend,
     static_root,
 )
-from shared.admin_gate import resolve_admin_enabled
 
 if __name__ == "__main__":
     from baklog_fetcher_dispatch import exit_if_fetcher_child

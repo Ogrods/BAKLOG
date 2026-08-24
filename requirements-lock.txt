@@ -17,7 +17,7 @@ fonttools==4.63.0
 frozenlist==1.8.0
 git-filter-repo==2.47.0
 howlongtobeatpy==1.0.21
-idna==3.18
+idna==3.19
 iniconfig==2.3.0
 jaraco.classes==3.4.0
 jaraco.context==6.1.2

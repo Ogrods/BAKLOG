@@ -27,7 +27,7 @@ lz4==4.4.5
 more-itertools==11.1.0
 multidict==6.7.1
 numpy==2.4.6
-packaging==26.2
+packaging==26.3
 pefile==2024.8.26
 pillow==12.2.0
 pluggy==1.6.0

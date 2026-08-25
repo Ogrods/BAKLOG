@@ -248,6 +248,8 @@ $env:PYTHONPATH = (Get-Location).Path
 
 Does **not** commit or unify gitignored `auto` / `approved` / `input` files. Manual approve + publish remains available via admin/CLI for adding new candidates.
 
+**Repo setting required for Phase 2 PRs:** Settings → Actions → General → Workflow permissions → enable **Allow GitHub Actions to create and approve pull requests** (and prefer read/write default token, or keep job-level `contents: write` + `pull-requests: write` as in the workflow). Without that, the refresh job can push `chore/claims-feed-refresh` but cannot open the sticky PR.
+
 ### Admin console (optional)
 
 `admin/` is synced from the private `baklog-internal` repo (`scripts/sync-internal-repo.ps1` / `scripts/internal-manifest.txt`) and is **gitignored** — it is for maintainers only and is not shipped to end users.

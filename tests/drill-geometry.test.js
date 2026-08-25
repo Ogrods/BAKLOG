@@ -9,7 +9,10 @@ describe('drill geometry measure API', () => {
     const win = new Window({ url: 'http://127.0.0.1:8765/' });
     global.window = win;
     global.document = win.document;
-    global.CSS = { escape: (s) => String(s).replace(/"/g, '\\"') };
+    // Escape backslashes before quotes so the mock matches CSS.escape intent.
+    global.CSS = {
+      escape: (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"'),
+    };
     document.body.innerHTML = `
       <div id="toolbarSection" style="height:40px">toolbar</div>
       <div id="tableShell">

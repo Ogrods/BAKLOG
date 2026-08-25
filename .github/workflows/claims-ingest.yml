@@ -91,6 +91,13 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: python fetchers/build_free_claims.py --no-profile
 
+      # Re-synth after build: expired published ids are pruned from landing, so the
+      # pre-build approved id list would otherwise flag high "orphans_not_in_built".
+      - name: Resync ephemeral approved.json to built landing
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python scripts/synth_claims_approved_from_landing.py
+
       - name: Audit free-surface data
         env:
           PYTHONPATH: ${{ github.workspace }}

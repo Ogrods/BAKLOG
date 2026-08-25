@@ -244,7 +244,7 @@ $env:PYTHONPATH = (Get-Location).Path
 **Scheduled ingest (Phase 1 + Phase 2)** - GitHub Actions workflow `Claims ingest` (`.github/workflows/claims-ingest.yml`): daily ~15:00 UTC + `workflow_dispatch`.
 
 - **Phase 1 (read-only job):** `fetch_claim_sources.py` → `scripts/claims_ingest_summary.py` (scrape vs committed `landing/free-claims.json`, soft-warn if live baklog.app feed is older than 7 days, landing-vs-live skew line). Job stays green on stale age. No landing writes, no artifacts, no secrets.
-- **Phase 2 (write job, after Phase 1):** synthesize ephemeral `approved.json` from landing ids (keeps `premium_only`), stub empty `free-claims.input.json`, `build_free_claims.py --no-profile`, audit, then open/update sticky PR `chore/claims-feed-refresh` **only** when a lean item fingerprint changes. Never `--allow-empty`. Never auto-approves new scrapes. Merge the PR to publish.
+- **Phase 2 (write job, after Phase 1):** synthesize ephemeral `approved.json` from landing ids (keeps `premium_only`), stub empty `free-claims.input.json`, `build_free_claims.py --no-profile`, re-synth approved from the built landing (so expired drops are not audited as orphans), audit, then open/update sticky PR `chore/claims-feed-refresh` **only** when a lean item fingerprint changes. Never `--allow-empty`. Never auto-approves new scrapes. Merge the PR to publish.
 
 Does **not** commit or unify gitignored `auto` / `approved` / `input` files. Manual approve + publish remains available via admin/CLI for adding new candidates.
 

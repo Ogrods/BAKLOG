@@ -988,7 +988,6 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
         "/api/update-check",
         "/api/update/status",
         "/api/update/apply-result",
-        "/api/diagnostics",
     ):
         return True
     # /api/proxy/* endpoints proxy public third-party APIs (Steam storesearch,
@@ -1220,7 +1219,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/config":
             self._handle_config_get()
             return
-        if path in ("/api/update-check", "/api/update/status", "/api/update/apply-result", "/api/diagnostics"):
+        if path in ("/api/update-check", "/api/update/status", "/api/update/apply-result"):
+            self._handle_support_get(path)
+            return
+        if path == "/api/diagnostics":
+            if not _require_api_auth(self):
+                return
             self._handle_support_get(path)
             return
         if path.startswith("/oauth/epic/callback"):

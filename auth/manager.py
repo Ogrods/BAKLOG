@@ -738,7 +738,7 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
         # stale storefront session left in the profile dir.
         if _provider_state(provider) == "disconnected":
             clear_browser_session(provider)
-    session_id = uuid.uuid4().hex[:12]
+    session_id = uuid.uuid4().hex
     session = AuthSession(session_id, provider, fresh_connect=fresh)
     with _sessions_lock:
         _active_sessions[session_id] = session
@@ -810,6 +810,8 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
             session.emit("error", {"message": str(exc)})
         finally:
             session.finish()
+            with _sessions_lock:
+                _active_sessions.pop(session_id, None)
 
     ctx = contextvars.copy_context()
     threading.Thread(

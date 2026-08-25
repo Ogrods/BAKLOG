@@ -522,7 +522,8 @@ export function buildBugBundle(extra = {}) {
 /** Fetch redacted server diagnostics for bug bundles (best-effort). */
 export async function fetchBugBundleServerContext() {
   try {
-    const res = await fetch('/api/diagnostics');
+    const { baklogFetch } = await import('./api-client.js');
+    const res = await baklogFetch('/api/diagnostics');
     if (!res.ok) return null;
     const data = await res.json();
     return {

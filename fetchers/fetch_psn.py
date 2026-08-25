@@ -155,6 +155,17 @@ def load_existing() -> dict[str, dict]:
     return {str(g["id"]): g for g in data.get("games", [])}
 
 
+def empty_library_is_fingerprint_skip(
+    *,
+    library_skipped: bool,
+    only_new: bool,
+    refresh: bool,
+    has_existing: bool,
+) -> bool:
+    """True when empty library means intentional fingerprint skip (exit 0), not API failure."""
+    return bool(library_skipped and only_new and not refresh and has_existing)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch PSN library into games_psn.json")
     parser.add_argument("--refresh", action="store_true", help="Refetch library metadata from PSN")
@@ -193,6 +204,9 @@ def main() -> int:
 
     print(f"Fetching PSN library for {online_id}...", flush=True)
     library: list | None = None
+    # True only when probe_library_fingerprint matched prior meta (intentional skip).
+    # Empty collect_library must NOT reuse the unchanged fast-path (exit 0).
+    library_skipped = False
     if (
         args.only_new
         and not args.refresh
@@ -211,10 +225,11 @@ def main() -> int:
             and probe_max == prev_meta.get("max_last_played")
         ):
             print(
-                "PSN library fingerprint unchanged — skipping full collect.",
+                "PSN library fingerprint unchanged - skipping full collect.",
                 flush=True,
             )
             library = []
+            library_skipped = True
 
     if library is None:
         try:
@@ -229,7 +244,12 @@ def main() -> int:
         if not library:
             stats.error(f"No PSN title found with id {args.psn_id!r}.")
             return stats.finish("fetch_psn", t0, exit_code=1)
-    elif not library and args.only_new and not args.refresh and existing:
+    elif empty_library_is_fingerprint_skip(
+        library_skipped=library_skipped,
+        only_new=args.only_new,
+        refresh=args.refresh,
+        has_existing=bool(existing),
+    ):
         games_out = sorted(existing.values(), key=lambda g: g["name"].lower())
         payload = {
             "fetched_at": datetime.now(UTC).isoformat(),

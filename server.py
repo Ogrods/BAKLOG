@@ -1354,6 +1354,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             server_internal_routes.handle_internal_free_claims_preview(self)
             return
+        if path == "/api/internal/discord-notify":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            server_internal_routes.handle_internal_discord_notify(self)
+            return
         if path == "/api/auth/stream-ticket":
             from shared.supabase_auth import auth_enabled, verify_bearer_user
 

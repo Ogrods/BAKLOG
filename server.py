@@ -988,7 +988,6 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
         "/api/update-check",
         "/api/update/status",
         "/api/update/apply-result",
-        "/api/diagnostics",
     ):
         return True
     # /api/proxy/* endpoints proxy public third-party APIs (Steam storesearch,
@@ -1220,7 +1219,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/config":
             self._handle_config_get()
             return
-        if path in ("/api/update-check", "/api/update/status", "/api/update/apply-result", "/api/diagnostics"):
+        if path in ("/api/update-check", "/api/update/status", "/api/update/apply-result"):
+            self._handle_support_get(path)
+            return
+        if path == "/api/diagnostics":
+            if not _require_api_auth(self):
+                return
             self._handle_support_get(path)
             return
         if path.startswith("/oauth/epic/callback"):
@@ -1353,6 +1357,12 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")
                 return
             server_internal_routes.handle_internal_free_claims_preview(self)
+            return
+        if path == "/api/internal/discord-notify":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            server_internal_routes.handle_internal_discord_notify(self)
             return
         if path == "/api/auth/stream-ticket":
             from shared.supabase_auth import auth_enabled, verify_bearer_user
@@ -2088,6 +2098,17 @@ class Handler(SimpleHTTPRequestHandler):
             run_id = str(raw_run).strip().split("/", 1)[0].split("?", 1)[0] or None
             run = MANAGER.get(run_id) if run_id else None
             if run is not None:
+                # When auth is on, refuse to rebind the ticket profile to a run
+                # the caller cannot access (cross-profile stream ticket mint).
+                from shared.supabase_auth import auth_enabled
+
+                if auth_enabled() and _run_accessible(run) is None:
+                    _send_json(
+                        self,
+                        HTTPStatus.NOT_FOUND,
+                        {"error": f"unknown run: {run_id}"},
+                    )
+                    return
                 profile_id = run.profile_id
         ticket = _mint_stream_ticket(profile_id, run_id=run_id)
         _send_json(self, HTTPStatus.OK, {"ticket": ticket})

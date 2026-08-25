@@ -10,6 +10,8 @@ import { bindEscapeClose, trapFocus } from './focus-trap.js';
 const MODAL_ID = 'notesDialogModal';
 let _release = null;
 let _activeKey = null;
+/** Textarea value when the dialog was opened (for discard confirm). */
+let _openedValue = '';
 
 function el(id) {
   return document.getElementById(id);
@@ -39,12 +41,13 @@ export function openNotesDialog(key) {
   const name = g.name || 'Game';
   if (title) title.textContent = `Notes - ${name}`;
   input.value = getPersonal(g).notes || '';
+  _openedValue = input.value;
   modal.classList.remove('hidden');
   modal.classList.add('flex');
   _release?.();
   const dialog = modal.querySelector('[role="dialog"]') || modal;
   const releaseTrap = trapFocus(dialog);
-  const releaseEsc = bindEscapeClose(dialog, closeNotesDialog);
+  const releaseEsc = bindEscapeClose(dialog, requestCloseNotesDialog);
   _release = () => {
     releaseTrap();
     releaseEsc();
@@ -54,6 +57,7 @@ export function openNotesDialog(key) {
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
+/** Close without prompting (used after save or when discard is confirmed). */
 export function closeNotesDialog() {
   _release?.();
   const modal = el(MODAL_ID);
@@ -62,6 +66,16 @@ export function closeNotesDialog() {
     modal.classList.remove('flex');
   }
   _activeKey = null;
+  _openedValue = '';
+}
+
+/** Cancel / Escape / backdrop: confirm if the textarea differs from the opened value. */
+export function requestCloseNotesDialog() {
+  const input = el('notesDialogInput');
+  if (input && input.value !== _openedValue) {
+    if (!window.confirm('Discard unsaved notes?')) return;
+  }
+  closeNotesDialog();
 }
 
 function saveAndClose() {
@@ -86,11 +100,11 @@ function saveAndClose() {
 }
 
 export function bindNotesDialog() {
-  el('notesDialogClose')?.addEventListener('click', closeNotesDialog);
-  el('notesDialogCancel')?.addEventListener('click', closeNotesDialog);
+  el('notesDialogClose')?.addEventListener('click', requestCloseNotesDialog);
+  el('notesDialogCancel')?.addEventListener('click', requestCloseNotesDialog);
   el('notesDialogSave')?.addEventListener('click', saveAndClose);
   el(MODAL_ID)?.addEventListener('click', (e) => {
-    if (e.target.id === MODAL_ID) closeNotesDialog();
+    if (e.target.id === MODAL_ID) requestCloseNotesDialog();
   });
   el('notesDialogInput')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

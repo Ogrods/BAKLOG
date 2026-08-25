@@ -468,6 +468,29 @@ def test_stream_ticket_not_consumed_on_unknown_run(auth_server) -> None:
     assert status_ok != 401
 
 
+def test_stream_ticket_refuses_cross_profile_run_rebind(auth_server) -> None:
+    """Auth-on mint must not rebind ticket profile from an inaccessible run."""
+    base, secret, _tmp = auth_server
+    uid_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    uid_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    account_profiles.ensure_profile_for_user(uid_a, "a@test.com")
+    account_profiles.ensure_profile_for_user(uid_b, "b@test.com")
+    key = next(iter(server.FETCHERS))
+    run = server.Run(key, profile_id=uid_a)
+    with server.MANAGER._lock:
+        server.MANAGER._runs_by_id[run.id] = run
+    status, raw = _request(
+        base,
+        "/api/auth/stream-ticket",
+        method="POST",
+        auth=_bearer(secret, sub=uid_b),
+        headers={"Content-Type": "application/json"},
+        body=json.dumps({"run_id": run.id}).encode("utf-8"),
+    )
+    assert status == 404
+    assert "unknown run" in json.loads(raw.decode("utf-8")).get("error", "")
+
+
 def test_epic_callback_without_bearer(auth_server) -> None:
     base, _secret, _tmp = auth_server
     sub = "550e8400-e29b-41d4-a716-446655440000"

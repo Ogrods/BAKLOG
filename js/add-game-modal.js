@@ -1,3 +1,4 @@
+import { baklogFetch } from './api-client.js';
 import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
 import { safeCoverAttrUrl } from './covers.js';
@@ -117,7 +118,7 @@ function runWithDuplicateCheck(title, proceed) {
 }
 
 async function steamSearch(term) {
-  const res = await fetch(`/api/proxy/steam-search?term=${encodeURIComponent(term)}`);
+  const res = await baklogFetch(`/api/proxy/steam-search?term=${encodeURIComponent(term)}`);
   if (!res.ok) throw new Error(`Steam search HTTP ${res.status}`);
   const data = await res.json();
   return (data.items || []).slice(0, 6);
@@ -125,7 +126,7 @@ async function steamSearch(term) {
 
 async function steamAppReviews(appid) {
   try {
-    const res = await fetch(`/api/proxy/steam-reviews?appid=${appid}`);
+    const res = await baklogFetch(`/api/proxy/steam-reviews?appid=${appid}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.success || !data.query_summary) return null;

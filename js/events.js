@@ -3,6 +3,7 @@
 // surface is broken up — see js/app.js for the ~50 helpers it touches today.
 
 import { state } from './state.js';
+import { isHeaderNavMenuOpen } from './header-nav-menu.js';
 
 /**
  * Build the global keydown handler with explicit deps so this module stays
@@ -37,6 +38,19 @@ export function createGlobalKeydownHandler(deps) {
     toggleSelection,
   } = deps;
 
+  function overlayOpenBlockingSelectionClear() {
+    const hidden = (id) => document.getElementById(id)?.classList.contains('hidden');
+    if (isHeaderNavMenuOpen()) return true;
+    if (!hidden('addGameModal')) return true;
+    if (!hidden('notesDialogModal')) return true;
+    if (!hidden('columnsModal')) return true;
+    if (!hidden('profileManageModal')) return true;
+    if (!hidden('profilePinModal')) return true;
+    if (!hidden('customListsDialog')) return true;
+    if (!hidden('bugReportModal')) return true;
+    return false;
+  }
+
   return function handleGlobalKeydown(e) {
     // Ctrl/Cmd+Z runs the undo stack — checked before the input-blocker below
     // so it still works while a search/notes input has focus (matches OS).
@@ -48,7 +62,8 @@ export function createGlobalKeydownHandler(deps) {
     }
     if (e.key === "Escape") {
       if (state.filtersDrawerOpen) { closeFiltersDrawer(); return; }
-      if (!document.getElementById("addGameModal").classList.contains("hidden")) return;
+      // Let modal/sheet Escape handlers win; do not clear table selection first.
+      if (overlayOpenBlockingSelectionClear()) return;
       state.selectedKeys.clear();
       updateBulkBar();
       renderTable();

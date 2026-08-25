@@ -1393,6 +1393,8 @@ function cancelPaintJobs() {
 }
 
 function usesVirtualScroll(list) {
+  // Phone card layout uses variable-height rows; fixed-height virtual math drifts.
+  if (isTablePhoneLayout()) return false;
   return list.length > FIRST_CHUNK;
 }
 

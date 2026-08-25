@@ -37,6 +37,7 @@ function showOverlay() {
   _visible = true;
   _shownAt = nowMs();
   shell.setAttribute('aria-busy', 'true');
+  shell.classList.add('is-table-querying');
   ov.setAttribute('aria-hidden', 'false');
   ov.classList.add('show');
 }
@@ -48,6 +49,7 @@ function hideOverlayNow() {
   _hidePending = false;
   ov?.classList.remove('show');
   ov?.setAttribute('aria-hidden', 'true');
+  shell?.classList.remove('is-table-querying');
   shell?.removeAttribute('aria-busy');
 }
 
@@ -86,6 +88,8 @@ export function beginRowLoader() {
   clearTimeout(_showTimer);
   clearTimeout(_hideTimer);
   clearTimeout(_minVisibleTimer);
+  // Block stale-row clicks immediately (overlay may wait SHOW_DELAY_MS).
+  tableShell()?.classList.add('is-table-querying');
   _showTimer = setTimeout(() => {
     if (_activeToken !== token) return;
     showOverlay();
@@ -99,6 +103,10 @@ export function endRowLoader(token) {
   clearTimeout(_showTimer);
   _showTimer = null;
   _activeToken = 0;
+  if (!_visible) {
+    // beginRowLoader may have set the class before the delayed overlay show.
+    tableShell()?.classList.remove('is-table-querying');
+  }
   hideOverlay();
 }
 

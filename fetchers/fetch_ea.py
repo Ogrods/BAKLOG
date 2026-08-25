@@ -391,6 +391,13 @@ def main() -> int:
                 "websocket",
                 "browser",
                 "debugging endpoint",
+                "timeout",
+                "timed out",
+                "parse",
+                "json",
+                "dom",
+                "selector",
+                "network",
             )
         )
         if is_transport:

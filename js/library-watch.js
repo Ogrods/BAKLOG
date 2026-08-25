@@ -7,7 +7,7 @@
 import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
 import { LS_LIBRARY_WATCH, profileScopedStorageKey } from './profiles.js';
-import { fetchLibraryJson } from './library-load.js';
+import { fetchLibraryJson, rebuildAllGamesFromMetas } from './library-load.js';
 import { applyPrefsChange, switchView } from './filters-ui.js';
 import { syncFilterDomFromState } from './prefs.js';
 import { invalidateTableCache, renderTable } from './table-ui.js';
@@ -192,6 +192,8 @@ async function pollSteamCatalog() {
     const steam = await fetchLibraryJson('games_steam.json');
     if (steam?.games) {
       state.libraryMeta.steam = steam;
+      // Keep in-memory allGames / merge state aligned after background catalog swap.
+      rebuildAllGamesFromMetas();
       checkLibraryWatches();
     }
   } catch {

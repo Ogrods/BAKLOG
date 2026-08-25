@@ -460,7 +460,16 @@ export async function finishEmptyLibraryLoad() {
   await refreshLibraryChromeAfterMerge();
 }
 
-export async function applyMergedLibrary(mergeKey = null) {
+let _mergeChain = Promise.resolve();
+
+/** Serialize catalog merges so concurrent reload/manual paths cannot tear state. */
+export function applyMergedLibrary(mergeKey = null) {
+  const run = _mergeChain.then(() => applyMergedLibraryUnlocked(mergeKey));
+  _mergeChain = run.catch(() => {});
+  return run;
+}
+
+async function applyMergedLibraryUnlocked(mergeKey = null) {
   noteLibraryMerge(mergeKey);
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
@@ -932,4 +941,9 @@ export function refreshAfterManualChange() {
     ...dedupeWithinStore(manualItch).map(applyCoopOverrides),
   ];
   void applyMergedLibrary();
+}
+
+/** @internal test helper — wait for queued merges to settle. */
+export function whenLibraryMergesIdle() {
+  return _mergeChain;
 }

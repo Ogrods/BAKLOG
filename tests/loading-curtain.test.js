@@ -81,3 +81,26 @@ describe('releaseViewOverlayWhenReady', () => {
     expect(document.querySelector('.view-tab').disabled).toBe(false);
   });
 });
+
+describe('view overlay aria-busy on #main', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <main id="main"></main>
+      <div id="viewLoadingOverlay" class="app-view-overlay" aria-hidden="true"></div>
+      <div id="viewLoadingLabel"></div>
+      <button class="view-tab" data-view="library">Library</button>`;
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('sets aria-busy on show and clears on hide', async () => {
+    const { showViewOverlay, hideViewOverlay } = await import('../js/loading-curtain.js');
+    const main = document.getElementById('main');
+    showViewOverlay('library');
+    expect(main.getAttribute('aria-busy')).toBe('true');
+    hideViewOverlay();
+    expect(main.hasAttribute('aria-busy')).toBe(false);
+  });
+});

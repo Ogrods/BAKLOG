@@ -115,13 +115,24 @@ function shouldSuppressNetworkErrors() {
  * Narrow catch: only intercepts TypeError with "Failed to fetch" (server unreachable).
  * All other errors propagate immediately so AbortError, timeout, etc. keep their
  * original semantics for callers that handle them.
+ * Forwards AbortSignal from merged.init (callers pass signal via baklogFetch init).
  */
 async function _fetchWithRetry(
   url,
   merged,
   { retries = 1, delayMs = 500 } = {},
 ) {
+  const signal = merged?.signal;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    if (signal?.aborted) {
+      const reason = signal.reason;
+      if (reason instanceof Error) throw reason;
+      const abortErr = new DOMException(
+        reason != null ? String(reason) : "The operation was aborted.",
+        "AbortError",
+      );
+      throw abortErr;
+    }
     try {
       return await fetch(url, merged);
     } catch (err) {
@@ -132,7 +143,29 @@ async function _fetchWithRetry(
       // Re-throw non-network errors immediately (e.g. AbortError from fetchWithTimeout)
       if (!isNetworkError) throw err;
       if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, delayMs));
+        await new Promise((r, reject) => {
+          if (signal?.aborted) {
+            reject(
+              signal.reason instanceof Error
+                ? signal.reason
+                : new DOMException("The operation was aborted.", "AbortError"),
+            );
+            return;
+          }
+          const t = setTimeout(r, delayMs);
+          signal?.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(t);
+              reject(
+                signal.reason instanceof Error
+                  ? signal.reason
+                  : new DOMException("The operation was aborted.", "AbortError"),
+              );
+            },
+            { once: true },
+          );
+        });
         continue;
       }
       // Last attempt exhausted — produce a descriptive error + surface via toast
@@ -180,7 +213,8 @@ export async function dataFetch(url, init = {}) {
   return fetchWithAuthRetry(url, init, method);
 }
 
-/** fetch() wrapper that adds X-BAKLOG-Local for POST/PUT/DELETE and Bearer for /api/*. */
+/** fetch() wrapper that adds X-BAKLOG-Local for POST/PUT/DELETE and Bearer for /api/*.
+ *  Pass AbortSignal via init.signal — it is forwarded through auth merge into fetch. */
 export async function baklogFetch(url, init = {}) {
   const method = (init.method || "GET").toUpperCase();
   return fetchWithAuthRetry(url, init, method);

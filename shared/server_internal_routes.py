@@ -639,3 +639,112 @@ def handle_internal_frozen_diag(handler: SimpleHTTPRequestHandler) -> None:
     }
 
     s._send_json(handler, HTTPStatus.OK, diag)
+
+
+def redact_discord_webhook_url(url: str) -> str:
+    """Keep channel id visible; strip the token path segment for logs."""
+    text = str(url or "").strip()
+    marker = "/api/webhooks/"
+    idx = text.find(marker)
+    if idx < 0:
+        return "(webhook)"
+    rest = text[idx + len(marker) :]
+    channel_id = rest.split("/", 1)[0].strip() or "?"
+    return f"discord-webhook:{channel_id}"
+
+
+def discord_webhook_urls_from_env() -> list[str]:
+    """Parse BAKLOG_DISCORD_WEBHOOK_URLS (comma-separated https webhook URLs)."""
+    import os
+
+    raw = str(os.environ.get("BAKLOG_DISCORD_WEBHOOK_URLS") or "").strip()
+    if not raw:
+        return []
+    out: list[str] = []
+    for part in raw.split(","):
+        url = part.strip()
+        if url.startswith("https://discord.com/api/webhooks/") or url.startswith(
+            "https://discordapp.com/api/webhooks/"
+        ):
+            out.append(url)
+    return out
+
+
+def handle_internal_discord_notify(handler: SimpleHTTPRequestHandler) -> None:
+    """POST /api/internal/discord-notify — post claim alerts via env webhooks.
+
+    Body: ``{"claims":[{"title":"...","claim_url":"...","store":"...","ends_at":"..."}]}``.
+    Webhook URLs come from ``BAKLOG_DISCORD_WEBHOOK_URLS`` (never from the client).
+    """
+    import urllib.error
+    import urllib.request
+
+    s = _srv()
+    payload, err = s._read_json_body(handler)
+    if err:
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": err})
+        return
+    assert payload is not None
+    claims = payload.get("claims")
+    if not isinstance(claims, list) or not claims:
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "claims must be a non-empty list"})
+        return
+    too_large = s._admin_list_too_large(claims, cap=20, label="claims")
+    if too_large:
+        s._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": too_large})
+        return
+
+    webhooks = discord_webhook_urls_from_env()
+    if not webhooks:
+        s._send_json(
+            handler,
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "error": "discord_webhooks_unconfigured",
+                "hint": "Set BAKLOG_DISCORD_WEBHOOK_URLS to comma-separated Discord webhook URLs",
+            },
+        )
+        return
+
+    sent = 0
+    failures: list[dict[str, str]] = []
+    for claim in claims:
+        if not isinstance(claim, dict):
+            failures.append({"error": "claim_not_object"})
+            continue
+        title = str(claim.get("title") or "").strip() or "Unknown"
+        url = str(claim.get("claim_url") or "").strip()
+        if url and not _is_safe_http_url(url):
+            failures.append({"title": title, "error": "invalid_claim_url"})
+            continue
+        msg = f"Free game - {title}, claim it here: {url}" if url else f"Free game - {title}"
+        body = json.dumps({"content": msg}).encode("utf-8")
+        for webhook in webhooks:
+            label = redact_discord_webhook_url(webhook)
+            try:
+                req = urllib.request.Request(
+                    webhook,
+                    data=body,
+                    headers={
+                        "Content-Type": "application/json",
+                        # Discord often 403s bare urllib without a UA.
+                        "User-Agent": "BAKLOG-DiscordNotify/1.0 (+https://baklog.app)",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    if 200 <= int(resp.status) < 300:
+                        sent += 1
+                    else:
+                        failures.append({"webhook": label, "error": f"http_{resp.status}"})
+            except urllib.error.HTTPError as exc:
+                failures.append({"webhook": label, "error": f"http_{exc.code}"})
+            except Exception as exc:
+                failures.append({"webhook": label, "error": type(exc).__name__})
+
+    s._send_json(
+        handler,
+        HTTPStatus.OK if sent else HTTPStatus.BAD_GATEWAY,
+        {"ok": sent > 0, "sent": sent, "failures": failures},
+    )
+

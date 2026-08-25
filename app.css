@@ -3667,7 +3667,12 @@ body.bulk-bar-open {
 }
 .row-loading-overlay.show {
   opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.04s ease;
+}
+#tableShell.is-table-querying #tbody {
+  pointer-events: none;
+  opacity: 0.55;
 }
 .row-loading-overlay::after {
   content: "Updating…";

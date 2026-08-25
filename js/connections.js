@@ -1745,6 +1745,7 @@ async function startBrowserConnect(provider) {
   );
   const es = new EventSource(streamUrl);
   let connectUiFinished = false;
+  let transportErrorStreak = 0;
 
   async function finishConnectUi() {
     if (connectUiFinished) return;
@@ -1754,6 +1755,7 @@ async function startBrowserConnect(provider) {
     reconnectProviders.delete(provider);
     renderReconnectBanner();
     try {
+      es.onerror = null;
       es.close();
     } catch (_) {
       /* noop */
@@ -1766,6 +1768,28 @@ async function startBrowserConnect(provider) {
       /* noop */
     }
   }
+
+  es.onerror = () => {
+    if (connectUiFinished) return;
+    // Browser retries while CONNECTING; only fail after a hard drop.
+    if (es.readyState === EventSource.CONNECTING) {
+      transportErrorStreak += 1;
+      if (transportErrorStreak < 3) return;
+    }
+    if (log) {
+      log.textContent =
+        "Sign-in stream dropped. Close the browser window and try Connect again.";
+    }
+    connectUiFinished = true;
+    hideConnectCancelControl(card);
+    stopPostConnectFastPoll();
+    try {
+      es.onerror = null;
+      es.close();
+    } catch (_) {
+      /* noop */
+    }
+  };
 
   es.addEventListener("waiting_for_user", (ev) => {
     const msg = JSON.parse(ev.data);

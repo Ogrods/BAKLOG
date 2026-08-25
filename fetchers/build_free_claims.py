@@ -91,14 +91,15 @@ def _throttle(last_call: list[float]) -> None:
 
 
 def _steam_app_details(appid: int, last_call: list[float]) -> dict | None:
+    from clients.steam_client import _get_with_retry
+
     _throttle(last_call)
     try:
-        resp = requests.get(
+        resp = _get_with_retry(
             "https://store.steampowered.com/api/appdetails",
-            params={"appids": appid, "l": "english"},
+            {"appids": appid, "l": "english"},
             timeout=30,
         )
-        resp.raise_for_status()
         entry = resp.json().get(str(appid), {})
         if not entry.get("success"):
             return None
@@ -108,14 +109,15 @@ def _steam_app_details(appid: int, last_call: list[float]) -> dict | None:
 
 
 def _steam_review_percent(appid: int, last_call: list[float]) -> int | None:
+    from clients.steam_client import _get_with_retry
+
     _throttle(last_call)
     try:
-        resp = requests.get(
+        resp = _get_with_retry(
             f"https://store.steampowered.com/appreviews/{appid}",
-            params={"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0},
+            {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0},
             timeout=30,
         )
-        resp.raise_for_status()
         summary = resp.json().get("query_summary") or {}
         total = summary.get("total_reviews") or 0
         pos = summary.get("total_positive") or 0
@@ -924,6 +926,8 @@ def _apply_field_overrides(
         if not overrides:
             continue
         for field, value in overrides.items():
+            if field not in FIELD_OVERRIDE_KEYS:
+                continue
             item[field] = value
 
 

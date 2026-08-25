@@ -944,3 +944,86 @@ def test_free_claims_preview_trailing_slash(
     )
     assert code == 200
     assert isinstance(data.get("items"), list)
+
+
+def test_redact_discord_webhook_url() -> None:
+    from shared.server_internal_routes import redact_discord_webhook_url
+
+    assert (
+        redact_discord_webhook_url(
+            "https://discord.com/api/webhooks/1234567890/super-secret-token"
+        )
+        == "discord-webhook:1234567890"
+    )
+    assert redact_discord_webhook_url("https://example.com/x") == "(webhook)"
+
+
+def test_discord_notify_unconfigured(admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BAKLOG_DISCORD_WEBHOOK_URLS", raising=False)
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/discord-notify",
+        body={"claims": [{"title": "Demo", "claim_url": "https://example.com/claim"}]},
+    )
+    assert code == 503
+    assert data.get("error") == "discord_webhooks_unconfigured"
+
+
+def test_discord_notify_posts_and_never_echoes_token(
+    admin_server: tuple[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = "super-secret-token-value"
+    webhook = f"https://discord.com/api/webhooks/999888777/{token}"
+    monkeypatch.setenv("BAKLOG_DISCORD_WEBHOOK_URLS", webhook)
+    posted: list[str] = []
+    user_agents: list[str] = []
+    real_urlopen = urllib.request.urlopen
+
+    class _Resp:
+        status = 204
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b""
+
+    def fake_urlopen(req, timeout=15, **kwargs):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        if "discord.com/api/webhooks/" in url:
+            posted.append(url)
+            user_agents.append(req.get_header("User-agent") or req.get_header("User-Agent") or "")
+            return _Resp()
+        return real_urlopen(req, timeout=timeout, **kwargs)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    base, _ = admin_server
+    code, data = _request(
+        base,
+        "POST",
+        "/api/internal/discord-notify",
+        body={"claims": [{"title": "Demo Game", "claim_url": "https://store.example/claim"}]},
+    )
+    assert code == 200
+    assert data.get("ok") is True
+    assert data.get("sent") == 1
+    assert posted == [webhook]
+    assert user_agents and "BAKLOG-DiscordNotify" in user_agents[0]
+    blob = json.dumps(data)
+    assert token not in blob
+
+
+def test_discord_notify_admin_off_404(admin_off_server: str) -> None:
+    code, _ = _request(
+        admin_off_server,
+        "POST",
+        "/api/internal/discord-notify",
+        body={"claims": [{"title": "x"}]},
+    )
+    assert code == 404

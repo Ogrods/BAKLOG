@@ -31,6 +31,8 @@ OUTPUT_PATH = Path("curated/free_claims.auto.json")
 USER_AGENT = "BAKLOG-fetch_claim_sources/1.0"
 REQUEST_TIMEOUT = 30
 DEBUG_CLAIMS = os.environ.get("BAKLOG_DEBUG_CLAIMS") == "1"
+_RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
+_RETRY_BACKOFF = (2, 5, 10)
 
 
 def _debug_claims(msg: str) -> None:
@@ -38,13 +40,39 @@ def _debug_claims(msg: str) -> None:
         print(f"  [claims-debug] {msg}", flush=True)
 
 
+def _request_get(url: str, *, headers: dict[str, str], timeout: int = REQUEST_TIMEOUT) -> requests.Response:
+    """GET with retries on 429/5xx and transient network errors."""
+    import time
+
+    last_exc: BaseException | None = None
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, headers=headers, timeout=timeout)
+            if resp.status_code in _RETRYABLE_HTTP:
+                last_exc = requests.HTTPError(
+                    f"{resp.status_code} from {url}", response=resp
+                )
+                if attempt < 2:
+                    time.sleep(_RETRY_BACKOFF[min(attempt, len(_RETRY_BACKOFF) - 1)])
+                    continue
+            resp.raise_for_status()
+            return resp
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(_RETRY_BACKOFF[min(attempt, len(_RETRY_BACKOFF) - 1)])
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("retry loop exited without response")
+
+
 def _fetch_json(url: str) -> dict | list:
-    resp = requests.get(
+    resp = _request_get(
         url,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-        timeout=REQUEST_TIMEOUT,
     )
-    resp.raise_for_status()
     data = resp.json()
     if not isinstance(data, (dict, list)):
         raise ValueError(f"unexpected JSON type from {url}")
@@ -52,12 +80,13 @@ def _fetch_json(url: str) -> dict | list:
 
 
 def _fetch_text(url: str) -> str:
-    resp = requests.get(
+    resp = _request_get(
         url,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml"},
-        timeout=REQUEST_TIMEOUT,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml, application/xml, text/xml",
+        },
     )
-    resp.raise_for_status()
     return resp.text
 
 

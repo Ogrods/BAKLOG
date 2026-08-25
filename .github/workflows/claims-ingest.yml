@@ -168,9 +168,19 @@ jobs:
             gh pr edit "$EXISTING" --body-file "$BODY_FILE"
             echo "Updated PR #$EXISTING"
           else
-            gh pr create \
+            set +e
+            CREATE_OUT=$(gh pr create \
               --base main \
               --head chore/claims-feed-refresh \
               --title "Refresh free-claims feed" \
-              --body-file "$BODY_FILE"
+              --body-file "$BODY_FILE" 2>&1)
+            CREATE_CODE=$?
+            set -e
+            if [ "$CREATE_CODE" -ne 0 ]; then
+              echo "$CREATE_OUT"
+              echo "::error::Could not create PR (branch was pushed). Enable Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests. Then re-run this workflow."
+              echo "Branch: https://github.com/${{ github.repository }}/tree/chore/claims-feed-refresh"
+              exit "$CREATE_CODE"
+            fi
+            echo "$CREATE_OUT"
           fi

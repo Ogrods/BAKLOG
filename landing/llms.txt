@@ -11,14 +11,14 @@
 
 ## What baklog.app is
 
-baklog.app is the marketing site, invite waitlist, hosted auth pages, and public feeds (`/free-claims.json`, `/sponsors.json`). It does not host user libraries. The marketing site uses Google Analytics for anonymous page views.
+baklog.app is the marketing site, open-beta signup, hosted auth pages, and public feeds (`/free-claims.json`, `/sponsors.json`). It does not host user libraries. The marketing site uses Google Analytics for anonymous page views.
 
 ## Product facts
 
 - Runs on Windows, macOS, and Linux on the user's PC.
 - Imports 12 store libraries and 8 wishlists.
 - Free forever to import. Optional paid Pro tier for conveniences.
-- Invite-only packaged beta; anyone can clone and run from source.
+- Open beta packaged builds; anyone can also clone and run from source.
 - No telemetry by default. Optional opt-in anonymous aggregate metrics.
 
 ## Contact

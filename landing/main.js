@@ -42,7 +42,7 @@
       form.querySelector(".form-reassure").remove();
       msg.className = "form-msg ok";
       msg.textContent =
-        "You're on the invite list. We send invites in small waves, so keep an eye on your inbox.";
+        "Check your inbox for the download link. The open beta is ready now.";
     } catch {
       btn.disabled = false;
       btn.textContent = original;

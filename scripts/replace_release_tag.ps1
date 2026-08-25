@@ -27,7 +27,22 @@ if ($pyVer -ne $bare) {
     throw "pyproject.toml version '$pyVer' does not match -Version '$bare'. Bump or fix version files first."
 }
 
-Write-Host "Replace release $tag from HEAD $(git rev-parse --short HEAD)"
+$branch = (git rev-parse --abbrev-ref HEAD).Trim()
+if ($branch -ne "main") {
+    throw "Refuse replace_release_tag: HEAD is '$branch' (must be on main)."
+}
+$status = git status --porcelain
+if ($status) {
+    throw "Refuse replace_release_tag: working tree is dirty. Commit or stash first."
+}
+git fetch origin main --quiet
+$head = (git rev-parse HEAD).Trim()
+$originMain = (git rev-parse origin/main).Trim()
+if ($head -ne $originMain) {
+    throw "Refuse replace_release_tag: HEAD ($head) is not origin/main ($originMain). Push/pull first."
+}
+
+Write-Host "Replace release $tag from HEAD $(git rev-parse --short HEAD) on main"
 Write-Host "This deletes remote tag + GitHub Release, then re-pushes $tag (release.yml re-builds assets)."
 
 if ($DryRun) {
@@ -44,6 +59,8 @@ if (-not $Force) {
     if ($confirm -ne "REPLACE $tag") {
         Write-Error "Aborted."
     }
+} else {
+    Write-Host "WARNING: -Force skips interactive confirm but still requires main + clean + origin/main tip."
 }
 
 $releaseExists = $false

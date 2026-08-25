@@ -100,10 +100,36 @@ function Get-FileSha256([string]$Path) {
 
 function Expand-ZipDotNet([string]$ZipPath, [string]$Destination) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    if (Test-Path -LiteralPath $Destination) {
+    if (-not (Test-Path -LiteralPath $Destination)) {
         [System.IO.Directory]::CreateDirectory($Destination) | Out-Null
     }
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($ZipPath, $Destination)
+    $destFull = [System.IO.Path]::GetFullPath($Destination).TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try {
+        foreach ($entry in $zip.Entries) {
+            $name = $entry.FullName
+            if ([string]::IsNullOrWhiteSpace($name)) { continue }
+            # Zip-slip: reject absolute / parent traversal members.
+            if ($name.StartsWith("/") -or $name.StartsWith("\") -or $name -match '^[A-Za-z]:' -or $name.Contains("..")) {
+                throw "Refusing zip entry with unsafe path: $name"
+            }
+            $target = [System.IO.Path]::GetFullPath((Join-Path $Destination $name))
+            if (-not $target.StartsWith($destFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing zip-slip entry: $name -> $target"
+            }
+            if ($name.EndsWith("/") -or $name.EndsWith("\")) {
+                [System.IO.Directory]::CreateDirectory($target) | Out-Null
+                continue
+            }
+            $parent = Split-Path -Parent $target
+            if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+                [System.IO.Directory]::CreateDirectory($parent) | Out-Null
+            }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
+        }
+    } finally {
+        $zip.Dispose()
+    }
 }
 
 function Restore-InstallFromBackup([string]$InstallDir, [string]$BackupDir) {

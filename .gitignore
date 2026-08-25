@@ -120,4 +120,7 @@ scripts/responsive-overflow-last-run.json
 seo/
 
 .vercel
-.env*
+.env
+.env.*
+!.env.example
+!.env*.example

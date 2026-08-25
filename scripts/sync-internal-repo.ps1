@@ -113,9 +113,40 @@ function Assert-SafeInternalDestination([string]$SourceRoot, [string]$DestRoot) 
 }
 
 function Copy-InternalPath([string]$RepoRoot, [string]$InternalRepo, [string]$rel) {
+    if ([string]::IsNullOrWhiteSpace($rel)) {
+        throw "Refusing empty internal-manifest path."
+    }
+    if ([System.IO.Path]::IsPathRooted($rel) -or $rel.Contains("..")) {
+        throw "Refusing unsafe internal-manifest path: $rel"
+    }
     $src = Join-Path $RepoRoot $rel
     if (-not (Test-Path -LiteralPath $src)) { return $false }
     $dest = Join-Path $InternalRepo $rel
+    $repoRootFull = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+    $internalFull = [System.IO.Path]::GetFullPath($InternalRepo).TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+    $srcFull = [System.IO.Path]::GetFullPath($src)
+    $destFull = [System.IO.Path]::GetFullPath($dest)
+    $srcOk = $srcFull.StartsWith($repoRootFull, [System.StringComparison]::OrdinalIgnoreCase) -or
+        ($srcFull.TrimEnd("\", "/") -ieq $repoRootFull.TrimEnd("\", "/"))
+    $destOk = $destFull.StartsWith($internalFull, [System.StringComparison]::OrdinalIgnoreCase) -or
+        ($destFull.TrimEnd("\", "/") -ieq $internalFull.TrimEnd("\", "/"))
+    if (-not $srcOk -or -not $destOk) {
+        throw "Refusing path escape in internal sync: rel=$rel src=$srcFull dest=$destFull"
+    }
+    # Block Discord webhook URLs from being re-synced into the private repo.
+    if ($srcItem = Get-Item -LiteralPath $src -ErrorAction SilentlyContinue) {
+        $scanRoots = @()
+        if ($srcItem.PSIsContainer) { $scanRoots = @(Get-ChildItem -LiteralPath $src -Recurse -File -Force -ErrorAction SilentlyContinue) }
+        else { $scanRoots = @($srcItem) }
+        foreach ($f in $scanRoots) {
+            if ($f.Extension -match '\.(js|ts|md|json|txt|html)$') {
+                $hit = Select-String -LiteralPath $f.FullName -Pattern "discord.com/api/webhooks/" -SimpleMatch -ErrorAction SilentlyContinue
+                if ($hit) {
+                    throw "Refusing sync: Discord webhook URL found in $($f.FullName). Move webhooks to BAKLOG_DISCORD_WEBHOOK_URLS env."
+                }
+            }
+        }
+    }
     $srcItem = Get-Item -LiteralPath $src
     if ($srcItem.PSIsContainer) {
         if (-not (Test-Path -LiteralPath $dest)) {

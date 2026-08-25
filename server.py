@@ -196,7 +196,6 @@ from shared.server_stream_tickets import (  # noqa: E402, I001
     STREAM_ATTACH_POLL_SEC as _STREAM_ATTACH_POLL_SEC,
     STREAM_ATTACH_SHORT_WAIT_SEC as _STREAM_ATTACH_SHORT_WAIT_SEC,
     commit_stream_ticket as _commit_stream_ticket,
-    consume_stream_ticket as _consume_stream_ticket,
     mint_stream_ticket as _mint_stream_ticket,
     peek_stream_ticket as _peek_stream_ticket,
     stream_ticket_from_handler as _stream_ticket_from_handler,

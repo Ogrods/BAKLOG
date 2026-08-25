@@ -520,7 +520,6 @@ def _extract_gog_inline(page, context, session: AuthSession | None = None) -> di
 
     def _on_signed_in(creds: dict[str, str]) -> None:
         if session:
-            host = urlparse(page.url or "https://www.gog.com/").hostname or ""
             session.emit("signed_in", _signed_in_payload(page.url or "https://www.gog.com/"))
 
     return run_connect_poll(

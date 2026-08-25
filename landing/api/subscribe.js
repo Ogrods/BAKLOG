@@ -170,14 +170,28 @@ export default {
       });
     }
 
-    const rawText = await request.text();
-    if (rawText.length > MAX_BODY_BYTES) {
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > MAX_BODY_BYTES) {
       return Response.json({ error: "Payload too large" }, { status: 413 });
+    }
+
+    let rawText = "";
+    if (typeof request.text === "function") {
+      rawText = await request.text();
+      if (rawText.length > MAX_BODY_BYTES) {
+        return Response.json({ error: "Payload too large" }, { status: 413 });
+      }
     }
 
     let body;
     try {
-      body = rawText ? JSON.parse(rawText) : {};
+      if (rawText) {
+        body = JSON.parse(rawText);
+      } else if (typeof request.json === "function") {
+        body = await request.json();
+      } else {
+        body = {};
+      }
     } catch {
       body = {};
     }

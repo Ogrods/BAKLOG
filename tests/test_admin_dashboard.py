@@ -979,6 +979,7 @@ def test_discord_notify_posts_and_never_echoes_token(
     webhook = f"https://discord.com/api/webhooks/999888777/{token}"
     monkeypatch.setenv("BAKLOG_DISCORD_WEBHOOK_URLS", webhook)
     posted: list[str] = []
+    user_agents: list[str] = []
     real_urlopen = urllib.request.urlopen
 
     class _Resp:
@@ -997,6 +998,7 @@ def test_discord_notify_posts_and_never_echoes_token(
         url = req.full_url if hasattr(req, "full_url") else str(req)
         if "discord.com/api/webhooks/" in url:
             posted.append(url)
+            user_agents.append(req.get_header("User-agent") or req.get_header("User-Agent") or "")
             return _Resp()
         return real_urlopen(req, timeout=timeout, **kwargs)
 
@@ -1012,6 +1014,7 @@ def test_discord_notify_posts_and_never_echoes_token(
     assert data.get("ok") is True
     assert data.get("sent") == 1
     assert posted == [webhook]
+    assert user_agents and "BAKLOG-DiscordNotify" in user_agents[0]
     blob = json.dumps(data)
     assert token not in blob
 

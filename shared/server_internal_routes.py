@@ -725,7 +725,11 @@ def handle_internal_discord_notify(handler: SimpleHTTPRequestHandler) -> None:
                 req = urllib.request.Request(
                     webhook,
                     data=body,
-                    headers={"Content-Type": "application/json"},
+                    headers={
+                        "Content-Type": "application/json",
+                        # Discord often 403s bare urllib without a UA.
+                        "User-Agent": "BAKLOG-DiscordNotify/1.0 (+https://baklog.app)",
+                    },
                     method="POST",
                 )
                 with urllib.request.urlopen(req, timeout=15) as resp:

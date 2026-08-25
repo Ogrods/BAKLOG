@@ -190,7 +190,11 @@ def test_apply_update_ps1_avoids_module_cmdlets() -> None:
     assert "taskkill" not in text.lower()
     assert "$PID" in text
     assert "apply-started.json" in text
-    assert "ExtractToDirectory" in text
+    # Prefer entry-by-entry extract (zip-slip checks) over ExtractToDirectory.
+    assert "Expand-ZipDotNet" in text
+    assert "zip-slip" in text
+    assert "ExtractToFile" in text
+    assert "ExtractToDirectory" not in text
 
 
 def test_apply_update_ps1_kill_helper_excludes_self() -> None:

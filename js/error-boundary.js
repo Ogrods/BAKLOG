@@ -590,8 +590,13 @@ function scrubErrorText(text) {
   if (typeof text !== 'string' || !text) return text;
   return text
     .replace(/Bearer\s+[A-Za-z0-9._\-]+/gi, 'Bearer [redacted]')
-    .replace(/(Cookie:\s*)([^\s;]+)/gi, '$1[redacted]')
-    .replace(/api[_-]?key["']?\s*[:=]\s*["']?[\w\-]+/gi, 'api_key=[redacted]');
+    .replace(/(Cookie:\s*)(.+)$/gim, '$1[redacted]')
+    .replace(/(set-cookie:\s*)(.+)$/gim, '$1[redacted]')
+    .replace(/api[_-]?key["']?\s*[:=]\s*["']?[\w\-]+/gi, 'api_key=[redacted]')
+    .replace(/(NPSSO[=:\s]+)[\w\-\.]+/gi, '$1[redacted]')
+    .replace(/(refresh_token[=:\s"']+)[\w\-\.]+/gi, '$1[redacted]')
+    .replace(/([?&]ticket=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/([?&#](?:code|access_token|authorizationCode)=)[^&\s#'"]+/gi, '$1[redacted]');
 }
 
 function safeCount() {

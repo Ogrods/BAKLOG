@@ -11,6 +11,19 @@ import { checkRateLimit } from "./_rate-limit.js";
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MAX_BODY_BYTES = 8 * 1024;
 
+function isAllowedSubscribeOrigin(origin) {
+  if (!origin || typeof origin !== "string") return false;
+  if (origin === "https://baklog.app") return true;
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== "http:") return false;
+    if (u.hostname !== "127.0.0.1" && u.hostname !== "localhost") return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function sanitizeEmail(raw) {
   if (typeof raw !== "string") return "";
   return raw.replace(/[\x00-\x1f\x7f]/g, "").trim();
@@ -137,6 +150,13 @@ export default {
       return Response.json({ error: "Method not allowed" }, { status: 405 });
     }
 
+    const origin = request.headers.get("Origin") || "";
+    // Browser posts must come from the landing origin (bots can still forge Origin;
+    // this blocks casual CSRF from other sites).
+    if (origin && !isAllowedSubscribeOrigin(origin)) {
+      return Response.json({ error: "Origin not allowed" }, { status: 403 });
+    }
+
     const ip = clientIp(request);
     const rate = await checkRateLimit(ip, { namespace: "subscribe" });
     if (rate.misconfigured) {
@@ -155,9 +175,23 @@ export default {
       return Response.json({ error: "Payload too large" }, { status: 413 });
     }
 
+    let rawText = "";
+    if (typeof request.text === "function") {
+      rawText = await request.text();
+      if (rawText.length > MAX_BODY_BYTES) {
+        return Response.json({ error: "Payload too large" }, { status: 413 });
+      }
+    }
+
     let body;
     try {
-      body = await request.json();
+      if (rawText) {
+        body = JSON.parse(rawText);
+      } else if (typeof request.json === "function") {
+        body = await request.json();
+      } else {
+        body = {};
+      }
     } catch {
       body = {};
     }

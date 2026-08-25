@@ -42,6 +42,7 @@ import atexit
 import json
 import os
 import queue
+import re
 import secrets
 import signal
 import subprocess
@@ -195,7 +196,6 @@ from shared.server_stream_tickets import (  # noqa: E402, I001
     STREAM_ATTACH_POLL_SEC as _STREAM_ATTACH_POLL_SEC,
     STREAM_ATTACH_SHORT_WAIT_SEC as _STREAM_ATTACH_SHORT_WAIT_SEC,
     commit_stream_ticket as _commit_stream_ticket,
-    consume_stream_ticket as _consume_stream_ticket,
     mint_stream_ticket as _mint_stream_ticket,
     peek_stream_ticket as _peek_stream_ticket,
     stream_ticket_from_handler as _stream_ticket_from_handler,
@@ -203,12 +203,26 @@ from shared.server_stream_tickets import (  # noqa: E402, I001
 
 
 def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
-    """EventSource cannot send Authorization — validate single-use ?ticket= instead."""
+    """Legacy helper: prefer peek+commit inside stream handlers (see auth stream)."""
     from shared.supabase_auth import auth_enabled
 
     if not auth_enabled():
         return True
-    profile_id = _consume_stream_ticket(_stream_ticket_from_handler(handler))
+    profile_id = _peek_stream_ticket(_stream_ticket_from_handler(handler))
+    if not profile_id:
+        _send_auth_required(handler)
+        return False
+    set_request_profile_id(profile_id)
+    return True
+
+
+def _commit_auth_stream_ticket(handler: SimpleHTTPRequestHandler) -> bool:
+    """Consume one ticket use only after the auth session is confirmed present."""
+    from shared.supabase_auth import auth_enabled
+
+    if not auth_enabled():
+        return True
+    profile_id = _commit_stream_ticket(_stream_ticket_from_handler(handler))
     if not profile_id:
         _send_auth_required(handler)
         return False
@@ -1234,8 +1248,6 @@ class Handler(SimpleHTTPRequestHandler):
             self._handle_stream(path[len("/api/stream/"):])
             return
         if path.startswith("/api/auth/") and path.endswith("/stream"):
-            if not _authorize_stream(self):
-                return
             rest = path[len("/api/auth/") : -len("/stream")].strip("/")
             self._handle_auth_stream(rest)
             return
@@ -1579,6 +1591,9 @@ class Handler(SimpleHTTPRequestHandler):
         appid = (qs.get("appid") or [""])[0].strip()
         if not appid:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "missing appid"})
+            return
+        if not re.fullmatch(r"\d{1,10}", appid):
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid appid"})
             return
         import urllib.request
 
@@ -2159,12 +2174,12 @@ class Handler(SimpleHTTPRequestHandler):
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_start_failed", exc)
 
     def _public_callback_url(self, path: str) -> str:
-        """Build an absolute URL to ``path`` from the request Host (tunnel-aware)."""
-        host = self.headers.get("Host") or f"{HOST}:{PORT}"
-        proto = (self.headers.get("X-Forwarded-Proto") or "http").strip().lower()
-        if proto not in ("http", "https"):
-            proto = "http"
-        return f"{proto}://{host}{path}"
+        """Build an absolute callback URL (loopback by default; tunnel via env)."""
+        base = (os.environ.get("BAKLOG_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+        if base.startswith("http://") or base.startswith("https://"):
+            return f"{base}{path}"
+        # Prefer fixed loopback over Host / X-Forwarded-* (spoofable via proxy).
+        return f"http://127.0.0.1:{PORT}{path}"
 
     def _handle_epic_oauth_url(self) -> None:
         """Mint a profile-bound OAuth state and return the Epic browser sign-in URL."""
@@ -2316,6 +2331,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_auth_stream(self, session_id: str) -> None:
         global _sse_connections
         session_id = session_id.strip("/").split("/", 1)[0]
+        if not _authorize_stream(self):
+            return
         try:
             from auth.manager import get_auth_session
         except ImportError as exc:
@@ -2324,6 +2341,8 @@ class Handler(SimpleHTTPRequestHandler):
         session = get_auth_session(session_id)
         if session is None:
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown auth session")
+            return
+        if not _commit_auth_stream_ticket(self):
             return
 
         with _sse_lock:

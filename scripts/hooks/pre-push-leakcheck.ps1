@@ -11,9 +11,17 @@ $patterns = @(
     "profiles/",
     "data/",
     ".env",
+    ".env.local",
+    ".env.production",
+    ".env.imported",
+    "packaging/bundle-auth.env",
     "secrets.bin",
     "tracker.html",
-    "cache/auth/"
+    "cache/auth/",
+    "admin/",
+    "marketing/",
+    "docs/",
+    "audit/"
 )
 
 $tracked = git -C $repoRoot ls-files 2>$null

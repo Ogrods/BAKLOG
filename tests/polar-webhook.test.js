@@ -29,6 +29,13 @@ async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {} } = {}) {
       return { ok: true, json: async () => '11111111-1111-4111-8111-111111111111' };
     }
     if (String(url).includes('/auth/v1/admin/users/')) {
+      const method = (init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ id: 'u1', app_metadata: { beta: true } }),
+        };
+      }
       return { ok: true, json: async () => ({}) };
     }
     throw new Error(`unexpected fetch ${url} ${init?.method || ''}`);
@@ -122,8 +129,13 @@ describe('polar-webhook', () => {
     expect(res.status).toBe(202);
     expect(json.plan).toBe('pro');
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/rpc/get_user_id_by_email'))).toBe(false);
-    const adminCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/auth/v1/admin/users/'));
-    expect(adminCall?.[1]?.body).toContain('"plan":"pro"');
+    const putCall = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes('/auth/v1/admin/users/') &&
+        String(init?.method || '').toUpperCase() === 'PUT',
+    );
+    expect(putCall?.[1]?.body).toContain('"plan":"pro"');
+    expect(putCall?.[1]?.body).toContain('"beta":true');
   });
 
   it('downgrades to free on subscription.revoked', async () => {
@@ -136,8 +148,13 @@ describe('polar-webhook', () => {
     });
     expect(res.status).toBe(202);
     expect(json.plan).toBe('free');
-    const adminCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/auth/v1/admin/users/'));
-    expect(adminCall?.[1]?.body).toContain('"plan":"free"');
+    const putCall = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes('/auth/v1/admin/users/') &&
+        String(init?.method || '').toUpperCase() === 'PUT',
+    );
+    expect(putCall?.[1]?.body).toContain('"plan":"free"');
+    expect(putCall?.[1]?.body).toContain('"beta":true');
   });
 
   it('acknowledges unmatched buyers without updating Supabase', async () => {

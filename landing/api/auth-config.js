@@ -42,6 +42,26 @@ export default {
     if (!supabaseUrl || !supabaseAnonKey) {
       return Response.json({ error: "Auth not configured" }, { status: 503 });
     }
+    // Footgun guard: never publish a service_role / secret key as "anon".
+    const keyLower = supabaseAnonKey.toLowerCase();
+    let jwtRoleService = false;
+    try {
+      const part = supabaseAnonKey.split(".")[1] || "";
+      const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+      const json = atob(pad);
+      jwtRoleService = /"role"\s*:\s*"service_role"/.test(json);
+    } catch {
+      jwtRoleService = false;
+    }
+    if (
+      keyLower.includes("service_role") ||
+      keyLower.startsWith("sb_secret_") ||
+      jwtRoleService
+    ) {
+      console.error("auth-config: refusing to return non-anon key");
+      return Response.json({ error: "Auth misconfigured" }, { status: 503 });
+    }
     return Response.json(
       { supabaseUrl, supabaseAnonKey },
       {

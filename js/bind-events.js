@@ -81,6 +81,7 @@ import { recordSponsoredClick } from './anon-metrics.js';
 import { dismissSponsoredDeal, isProPromoSponsorId, refreshSponsoredSurfaces } from './sponsored-deals.js';
 import { goToProView, isProActivationPending } from './pro-view.js';
 import { isPro } from './auth-gate.js';
+import { baklogFetch } from './api-client.js';
 import { openCoverGallery } from './cover-gallery.js';
 import { initTrophyPopover } from './trophy-popover.js';
 import {
@@ -937,7 +938,7 @@ export function bindEvents() {
   document.getElementById("copyDiagnostics")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
     try {
-      const res = await fetch('/api/diagnostics');
+      const res = await baklogFetch('/api/diagnostics');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Diagnostics request failed');
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));

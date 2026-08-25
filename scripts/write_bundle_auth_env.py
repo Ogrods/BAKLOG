@@ -15,10 +15,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Never ship BAKLOG_SUPABASE_JWT_SECRET in public release zips — that secret
+# can forge HS256 JWTs. Frozen builds verify via JWKS (anon key + URL only).
 BUNDLE_KEYS = (
     "BAKLOG_SUPABASE_URL",
     "BAKLOG_SUPABASE_ANON_KEY",
-    "BAKLOG_SUPABASE_JWT_SECRET",
     "BAKLOG_LOCAL_PROFILES",
 )
 REQUIRED_KEYS = ("BAKLOG_SUPABASE_URL", "BAKLOG_SUPABASE_ANON_KEY")

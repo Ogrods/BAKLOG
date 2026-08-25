@@ -652,6 +652,13 @@ def main() -> int:
                 playtime_applied += 1
         print(f"  applied playtime to {playtime_applied} games", flush=True)
 
+    empty_exit = refuse_empty_result(
+        catalog_game_count(games_out),
+        label="Epic playable library rows",
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_epic", t0, exit_code=empty_exit)
+
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "epic",

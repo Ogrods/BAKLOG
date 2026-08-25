@@ -12,11 +12,16 @@ run_ps1() {
   elif command -v powershell >/dev/null 2>&1; then
     powershell -NoProfile -ExecutionPolicy Bypass -File "$1"
   else
-    echo "[pre-push] PowerShell not found — skipping $1." >&2
-    return 0
+    echo "[pre-push] PowerShell not found — cannot run leakcheck. Install pwsh or powershell." >&2
+    return 1
   fi
 }
 
 run_ps1 "$LEAK_PS1" || exit $?
-run_ps1 "$SYNC_PS1"
-exit $?
+# Sync is best-effort on machines without PowerShell for the sync script only —
+# but leakcheck above already failed closed.
+if command -v pwsh >/dev/null 2>&1 || command -v powershell >/dev/null 2>&1; then
+  run_ps1 "$SYNC_PS1"
+  exit $?
+fi
+exit 0

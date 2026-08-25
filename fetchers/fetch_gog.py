@@ -766,6 +766,17 @@ def main() -> int:
     for row in games_out:
         maybe_tag_library_noise_row(row, "gog")
 
+    # Final same-source count after merge/filter/carry (pre-merge slice can
+    # under-count when carry-forward restores rows; over-count when filters drop).
+    drift_exit = refuse_gog_source_drift(
+        _count_rows_for_source(games_out, source),
+        source=source,
+        allow_drift=args.allow_drift,
+        output_path=GAMES_GOG_JSON,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_gog", t0, exit_code=drift_exit)
+
     playable = catalog_game_count(games_out)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

@@ -341,9 +341,27 @@ def main() -> int:
     try:
         title, html = run_with_heartbeat(_fetch_wishlist_html, "Ubisoft wishlist capture")
     except Exception as exc:
-        mark_invalid("ubisoft", error=f"wishlist page fetch failed: {exc}")
-        stats.error(str(exc))
-        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=EXIT_CODE_AUTH)
+        msg = str(exc)
+        lower = msg.lower()
+        authish = any(
+            tok in lower
+            for tok in (
+                "auth",
+                "login",
+                "sign in",
+                "session",
+                "cookie",
+                "unauthorized",
+                "401",
+                "403",
+            )
+        )
+        if authish:
+            mark_invalid("ubisoft", error=f"wishlist page fetch failed: {exc}")
+            stats.error(str(exc))
+            return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=EXIT_CODE_AUTH)
+        stats.error(f"Ubisoft wishlist capture failed: {exc}")
+        return stats.finish("fetch_ubisoft_wishlist", t0, exit_code=1)
 
     if "Sign in" in title or _EMPTY_PHRASE.search(html or "") and "<div" not in (html or ""):
         msg = (

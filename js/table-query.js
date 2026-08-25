@@ -24,7 +24,6 @@ const HLTB_BUCKETS_QUERY = [
 const WORKER_THRESHOLD = 500;
 let _worker = null;
 let _workerGen = 0;
-let _workerFailed = false;
 
 export function escapeAttr(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -448,10 +447,19 @@ export function queryGames(payload) {
     ctx.customListKeySet = new Set(ctx.customListFilterKeys);
   }
   const source = payload.source;
+  const wantIndices = !!payload.returnIndices;
   const filtered = [];
+  const indices = wantIndices ? [] : null;
   for (let i = 0; i < source.length; i++) {
     const g = source[i];
-    if (passesFilter(ctx, g)) filtered.push(g);
+    if (passesFilter(ctx, g)) {
+      filtered.push(g);
+      if (indices) indices.push(i);
+    }
+  }
+  if (indices) {
+    indices.sort((ia, ib) => sortCompare(ctx, source[ia], source[ib]));
+    return { list: indices.map((i) => source[i]), indices };
   }
   filtered.sort((a, b) => sortCompare(ctx, a, b));
   return filtered;
@@ -466,12 +474,17 @@ function tableQueryWorkerUrl() {
 }
 
 function invalidateWorker() {
+  if (_worker) {
+    try {
+      _worker.terminate();
+    } catch {
+      /* ignore */
+    }
+  }
   _worker = null;
-  _workerFailed = true;
 }
 
 function getWorker() {
-  if (_workerFailed) return null;
   if (_worker) return _worker;
   try {
     _worker = new Worker(tableQueryWorkerUrl(), { type: 'module' });
@@ -479,7 +492,8 @@ function getWorker() {
       invalidateWorker();
     }, { once: true });
   } catch {
-    invalidateWorker();
+    _worker = null;
+    return null;
   }
   return _worker;
 }
@@ -504,7 +518,7 @@ export function queryGamesAsync(state, params) {
       playedTitleNorms: [...state.playedTitleNorms],
     },
   };
-  if (source.length < WORKER_THRESHOLD || _workerFailed) {
+  if (source.length < WORKER_THRESHOLD) {
     return Promise.resolve(queryGames({
       source,
       ctx: {

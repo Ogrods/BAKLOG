@@ -8,7 +8,7 @@ self.onmessage = (ev) => {
   ctx.ownedNormNames = new Set(ctx.ownedNormNames || []);
   ctx.combinedPlaytime = new Map(ctx.combinedPlaytime || []);
   ctx.playedTitleNorms = new Set(ctx.playedTitleNorms || []);
-  const list = queryGames({ source, ctx });
-  const indices = list.map(g => source.indexOf(g));
-  self.postMessage({ id, indices });
+  // Prefer indices from the filter pass (O(n)) — avoid source.indexOf remap.
+  const result = queryGames({ source, ctx, returnIndices: true });
+  self.postMessage({ id, indices: result.indices });
 };

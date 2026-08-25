@@ -21,16 +21,12 @@
       (function () {
         try {
           var pid = localStorage.getItem("baklog-active-profile") || "default";
-          var prefsKey =
-            pid && pid !== "default"
-              ? "steam-backlog-ui-prefs:" + pid
-              : "steam-backlog-ui-prefs";
-          var raw = localStorage.getItem(prefsKey);
-          var view = "dashboard";
-          if (raw) {
-            var p = JSON.parse(raw);
-            if (p && typeof p.activeView === "string") view = p.activeView;
-          }
+          // Active view lives in sessionStorage (same key as js/profiles.js
+          // activeViewSessionKey) — prefs localStorage no longer stores it.
+          var viewKey =
+            "steam-backlog-ui-prefs:activeView" +
+            (pid && pid !== "default" ? ":" + pid : "");
+          var view = sessionStorage.getItem(viewKey) || "dashboard";
           var valid = {
             dashboard: 1,
             library: 1,
@@ -41,7 +37,6 @@
           };
           if (!valid[view]) view = "dashboard";
           document.documentElement.setAttribute("data-init-view", view);
-          var pid = localStorage.getItem("baklog-active-profile") || "default";
           var themeSuffix = pid && pid !== "default" ? ":" + pid : "";
           var theme =
             localStorage.getItem("baklog-color-theme" + themeSuffix) ||

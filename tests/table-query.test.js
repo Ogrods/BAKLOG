@@ -253,6 +253,21 @@ describe('queryGames — integration', () => {
     });
     expect(out).toHaveLength(0);
   });
+
+  it('returnIndices returns sorted source indices without indexOf remap', () => {
+    const source = [
+      { ...baseGame, id: 1, appid: 1, name: 'Zulu' },
+      { ...baseGame, id: 2, appid: 2, name: 'Alpha' },
+      { ...baseGame, id: 3, appid: 3, name: 'Mike' },
+    ];
+    const { list, indices } = queryGames({
+      source,
+      ctx: ctx({ sortKey: 'name', sortDir: 1 }),
+      returnIndices: true,
+    });
+    expect(indices).toEqual([1, 2, 0]);
+    expect(list.map((g) => g.name)).toEqual(['Alpha', 'Mike', 'Zulu']);
+  });
 });
 
 describe('collectTableParams', () => {

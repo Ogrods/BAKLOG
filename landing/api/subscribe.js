@@ -1,9 +1,10 @@
-// Vercel serverless function: logs each waitlist signup (optional Supabase),
-// emails the founder via Resend, then sends the signer a confirmation auto-reply.
+// Vercel serverless function: logs each open-beta signup (optional Supabase),
+// emails the founder via Resend, then sends the signer a confirmation with the
+// GitHub Releases download link.
 // Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
 // Production also requires KV_REST_API_* or UPSTASH_REDIS_REST_* (distributed rate limit).
 // Optional: WELCOME_FROM (defaults to NOTIFY_FROM), WELCOME_REPLY_TO (defaults to NOTIFY_TO),
-// SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (durable waitlist log).
+// SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (durable waitlist log; stamps invited_at on insert).
 
 import { checkRateLimit } from "./_rate-limit.js";
 
@@ -45,7 +46,13 @@ async function logToSupabase({ email, ip, time }) {
       "Content-Type": "application/json",
       Prefer: "resolution=ignore-duplicates,return=minimal",
     },
-    body: JSON.stringify({ email, ip, source: "landing", created_at: time }),
+    body: JSON.stringify({
+      email,
+      ip,
+      source: "landing",
+      created_at: time,
+      invited_at: time,
+    }),
   });
   if (r.ok || r.status === 409) {
     // 409 = duplicate email on unique constraint; already on the list.
@@ -71,19 +78,27 @@ async function sendEmail(apiKey, payload) {
   return r;
 }
 
-const CONFIRM_SUBJECT = "You're on the BAKLOG invite list";
+const RELEASE_URL = "https://github.com/Ogrods/BAKLOG/releases/latest";
 
-const CONFIRM_TEXT = `Thanks for requesting a BAKLOG invite.
+const CONFIRM_SUBJECT = "Your BAKLOG open beta download";
 
-You're on the list. BAKLOG is in invite-only beta and we're onboarding in small waves, so you'll get a follow-up here when your spot opens up.
+const CONFIRM_TEXT = `Thanks for signing up for BAKLOG.
 
-A quick refresher on what you signed up for:
+The open beta is available now. Download it here:
+${RELEASE_URL}
+
+Quick start:
+- Grab BAKLOG-Setup.exe (or the portable zip) from the release page.
+- If Windows SmartScreen warns about an unknown publisher, click More info, then Run anyway. The build is not code-signed yet.
+- Launch BAKLOG, open the Connections tab, and connect the stores you use.
+
+A quick refresher:
 - One honest backlog across every store - 12 libraries and 8 wishlists, all on your machine.
 - Local-first: no project-owned server for your catalog; credentials encrypt to disk with your OS keychain; store fetches run from your IP.
-- MIT source on GitHub if you want to verify before install; invite beta is packaged builds on the same tree.
+- MIT source on GitHub if you want to verify before install; the beta is packaged builds on the same tree.
 - Claimable Now surfaces free giveaways; importing your library stays free forever.
 
-No action needed right now - just keep an eye on your inbox.
+Hit a snag? Reply to this email or use Report a bug in the app menu.
 
 - The BAKLOG team
 https://baklog.app`;
@@ -92,16 +107,25 @@ const CONFIRM_HTML = `<!doctype html>
 <html>
   <body style="margin:0;background:#0f172a;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e2e8f0;">
     <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
-      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">You're on the BAKLOG invite list</h1>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for requesting a BAKLOG invite. BAKLOG is in invite-only beta and we're onboarding in small waves, so you'll get a follow-up here when your spot opens up.</p>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">A quick refresher on what you signed up for:</p>
+      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">Your BAKLOG open beta download</h1>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for signing up. The open beta is available now.</p>
+      <p style="margin:0 0 20px;">
+        <a href="${RELEASE_URL}" style="display:inline-block;background:#38bdf8;color:#0f172a;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Download the beta</a>
+      </p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">Quick start:</p>
+      <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
+        <li>Grab BAKLOG-Setup.exe (or the portable zip) from the release page.</li>
+        <li>If Windows SmartScreen warns about an unknown publisher, click More info, then Run anyway. The build is not code-signed yet.</li>
+        <li>Launch BAKLOG, open the Connections tab, and connect the stores you use.</li>
+      </ul>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">A quick refresher:</p>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
         <li>One honest backlog across every store - 12 libraries and 8 wishlists, all on your machine.</li>
         <li>Local-first: no project-owned server for your catalog; credentials encrypt to disk with your OS keychain; store fetches run from your IP.</li>
-        <li>MIT source on GitHub if you want to verify before install; invite beta is packaged builds on the same tree.</li>
+        <li>MIT source on GitHub if you want to verify before install; the beta is packaged builds on the same tree.</li>
         <li>Claimable Now surfaces free giveaways; importing your library stays free forever.</li>
       </ul>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">No action needed right now - just keep an eye on your inbox.</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Hit a snag? Reply to this email or use Report a bug in the app menu.</p>
       <p style="font-size:14px;line-height:1.6;margin:0;color:#94a3b8;">- The BAKLOG team<br /><a href="https://baklog.app" style="color:#38bdf8;">baklog.app</a></p>
     </div>
   </body>
@@ -179,7 +203,7 @@ export default {
         from,
         to,
         reply_to: email,
-        subject: `New BAKLOG invite request: ${email}`,
+        subject: `New BAKLOG open beta signup: ${email}`,
         text: `New signup: ${email}\nTime: ${signupTime}\nDurable log: ${durableLog}`,
       });
     } catch (err) {

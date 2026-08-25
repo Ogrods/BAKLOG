@@ -187,7 +187,9 @@ describe("landing/api/subscribe.js", () => {
     const [, welcomeOpts] = fetchMock.mock.calls[1];
     const welcomePayload = JSON.parse(welcomeOpts.body);
     expect(welcomePayload.to).toBe("tester@example.com");
-    expect(welcomePayload.subject).toContain("invite list");
+    expect(welcomePayload.subject).toContain("open beta download");
+    expect(welcomePayload.text).toContain("https://github.com/Ogrods/BAKLOG/releases/latest");
+    expect(welcomePayload.html).toContain("https://github.com/Ogrods/BAKLOG/releases/latest");
   });
 
   it("sends founder notification and confirmation for a valid signup", async () => {
@@ -203,11 +205,13 @@ describe("landing/api/subscribe.js", () => {
     const founderPayload = JSON.parse(founderOpts.body);
     expect(founderPayload.to).toBe("founder@example.com");
     expect(founderPayload.reply_to).toBe("tester@example.com");
+    expect(founderPayload.subject).toContain("open beta signup");
 
     const [, welcomeOpts] = fetchMock.mock.calls[1];
     const welcomePayload = JSON.parse(welcomeOpts.body);
     expect(welcomePayload.to).toBe("tester@example.com");
-    expect(welcomePayload.subject).toContain("invite list");
+    expect(welcomePayload.subject).toContain("open beta download");
+    expect(welcomePayload.text).toContain("https://github.com/Ogrods/BAKLOG/releases/latest");
   });
 
   it("reports durable log NOT saved when Supabase is unconfigured", async () => {
@@ -233,5 +237,10 @@ describe("landing/api/subscribe.js", () => {
     const [, founderOpts] = fetchMock.mock.calls[1];
     const founderPayload = JSON.parse(founderOpts.body);
     expect(founderPayload.text).toContain("Durable log: saved to Supabase");
+    const [supabaseUrl, supabaseOpts] = fetchMock.mock.calls[0];
+    expect(supabaseUrl).toContain("/rest/v1/waitlist");
+    const insertBody = JSON.parse(supabaseOpts.body);
+    expect(insertBody.invited_at).toBeTruthy();
+    expect(insertBody.created_at).toBe(insertBody.invited_at);
   });
 });

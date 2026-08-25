@@ -1,17 +1,17 @@
 # BAKLOG landing page
 
-Static blue-on-blue landing page with an email waitlist, deployed to Vercel.
+Static blue-on-blue landing page with an open-beta email signup, deployed to Vercel.
 
 ## Files
 
-- `index.html` — page markup, inline base CSS, waitlist form shell, inline Google tag (`G-88L32JZQDH`) in `<head>`. No build step.
+- `index.html` — page markup, inline base CSS, open-beta signup form shell, inline Google tag (`G-88L32JZQDH`) in `<head>`. No build step.
 - `llms.txt` - plain-text site summary for AI crawlers.
 FAQ JSON-LD must match the `#faq` details list via `npm run check:landing-seo`. Attended OpenSEO / GSC / GA: `.cursor/rules/seo-operator.mdc`.
-- `main.js` — footer year, non-blocking font load, waitlist submit handler.
+- `main.js` — footer year, non-blocking font load, open-beta signup submit handler.
 - `demo.css` — mega hero dashboard styles (spotlight, marquee, ribbon charts, funnel sections).
 - `demo.js` — interactive demo (dummy data, count-up, spotlight rotation, Chart.js donuts).
 - `assets/sample/*.{webp,png}` — fictional game covers for the spotlight carousel.
-- `api/subscribe.js` — Vercel serverless function; logs waitlist signups (optional Supabase), emails you via [Resend](https://resend.com), and sends the signer a confirmation auto-reply.
+- `api/subscribe.js` — Vercel serverless function; logs signups (optional Supabase, stamps `invited_at` on insert), emails you via [Resend](https://resend.com), and sends the signer a confirmation with the GitHub Releases download link.
 - `api/auth-signup-notify.js` — Vercel serverless function; receives Supabase Database Webhooks on `auth.users` INSERT and emails you when someone creates a BAKLOG account in the app.
 - `api/auth-config.js` — read-only public Supabase URL + anon key for hosted auth pages (`/auth-reset`).
 - `auth-confirmed.html` + `auth-confirmed.js` — email confirmation landing page (works from phone; no local server required).

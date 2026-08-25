@@ -208,7 +208,7 @@ export default {
     const view = bundle.runtime?.view || "unknown";
     const appVersion = bundle.app_version || "unknown";
 
-    console.log(`bug_report\t${reportTime}\t${appVersion}\t${view}\t${contact || "(no contact)"}`);
+    console.log(`bug_report\t${reportTime}\t${appVersion}\t${view}\t${contact ? "contact=yes" : "contact=no"}`);
 
     try {
       await logToSupabase({ bundle, contact, note, ip, time: reportTime });

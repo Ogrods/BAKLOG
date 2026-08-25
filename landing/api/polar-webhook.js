@@ -144,6 +144,19 @@ async function findSupabaseUserId({ url, key, externalId, email }) {
 }
 
 async function setUserPlan({ url, key, userId, plan }) {
+  const getR = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    },
+  });
+  if (!getR.ok) {
+    const detail = await getR.text().catch(() => "");
+    throw new Error(`Supabase admin GET ${getR.status}: ${detail}`);
+  }
+  const user = await getR.json().catch(() => ({}));
+  const meta = { ...(user?.app_metadata || {}) };
+  meta.plan = plan;
   const r = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
     method: "PUT",
     headers: {
@@ -151,7 +164,7 @@ async function setUserPlan({ url, key, userId, plan }) {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ app_metadata: { plan } }),
+    body: JSON.stringify({ app_metadata: meta }),
   });
   if (!r.ok) {
     const detail = await r.text().catch(() => "");
@@ -175,6 +188,9 @@ export default {
 
     // Raw body is required for signature verification — do not parse first.
     const body = await request.text();
+    if (body.length > 1024 * 1024) {
+      return Response.json({ error: "Payload too large" }, { status: 413 });
+    }
     const ok = await verifySignature({
       secret,
       id: request.headers.get("webhook-id"),

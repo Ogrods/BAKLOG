@@ -1,0 +1,45 @@
+# Phase 1 claims cron: fetch scrapes + summarize. No landing writes, no artifacts,
+# no secrets. Soft-warn when baklog.app free-claims is stale (job stays green).
+name: Claims ingest
+
+on:
+  schedule:
+    # Daily ~15:00 UTC
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claims-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Fetch + summarize
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Fetch claim sources
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python fetchers/fetch_claim_sources.py
+
+      - name: Summarize vs landing + live age
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python scripts/claims_ingest_summary.py

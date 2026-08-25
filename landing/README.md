@@ -241,6 +241,8 @@ $env:PYTHONPATH = (Get-Location).Path
 .\scripts\check_claims_feed_age.ps1 -Live   # fetch https://baklog.app/free-claims.json
 ```
 
+**Scheduled ingest (Phase 1)** - GitHub Actions workflow `Claims ingest` (`.github/workflows/claims-ingest.yml`): daily ~15:00 UTC + `workflow_dispatch`. It runs `fetch_claim_sources.py`, then `scripts/claims_ingest_summary.py` (compares scrape ids to committed `landing/free-claims.json`, soft-warns if live baklog.app feed is older than 7 days). Job stays green on stale age. No landing writes, no artifacts, no secrets, `contents: read` only. Does **not** commit or unify gitignored `auto` / `approved` / `input` files. You still approve and publish by hand. Phase 2 refresh-PR is not enabled yet.
+
 ### Admin console (optional)
 
 `admin/` is synced from the private `baklog-internal` repo (`scripts/sync-internal-repo.ps1` / `scripts/internal-manifest.txt`) and is **gitignored** — it is for maintainers only and is not shipped to end users.

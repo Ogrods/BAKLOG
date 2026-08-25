@@ -113,6 +113,7 @@ export function showViewOverlay(view) {
     ov.setAttribute("aria-hidden", "false");
     ov.classList.add("show");
   }
+  document.getElementById("main")?.setAttribute("aria-busy", "true");
   document.getElementById('viewHouseSlot')?.classList.add('hidden');
   document.querySelectorAll(".view-tab").forEach(b => { b.disabled = true; });
 }
@@ -123,6 +124,7 @@ export function hideViewOverlay() {
     ov.classList.remove("show");
     ov.setAttribute("aria-hidden", "true");
   }
+  document.getElementById("main")?.removeAttribute("aria-busy");
   document.querySelectorAll(".view-tab").forEach(b => { b.disabled = false; });
 }
 

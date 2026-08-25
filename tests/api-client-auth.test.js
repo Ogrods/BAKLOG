@@ -121,4 +121,17 @@ describe('api-client auth boot guard', () => {
     expect(authGate.whenAuthReady).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalled();
   });
+
+  it('forwards AbortSignal from init into fetch', async () => {
+    authGate.settleAuthReady();
+    const ac = new AbortController();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { baklogFetch } = await import('../js/api-client.js');
+    await baklogFetch('/api/personal', { signal: ac.signal });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(ac.signal);
+  });
 });

@@ -192,6 +192,31 @@ describe('dedupe + sort (getVisibleClaims internals)', () => {
     expect(out[0].source).toBe('epic');
   });
 
+  it('on equal source rank prefers newer first_seen, else lower id', () => {
+    const older = {
+      id: 'b-older',
+      store: 'steam',
+      title: 'Same',
+      claim_url: 'https://s/a',
+      source: 'gamerpower',
+      first_seen: '2026-01-01T00:00:00Z',
+    };
+    const newer = {
+      id: 'a-newer',
+      store: 'steam',
+      title: 'Same',
+      claim_url: 'https://s/b',
+      source: 'gamerpower',
+      first_seen: '2026-06-01T00:00:00Z',
+    };
+    expect(dedupeClaims([older, newer])[0].id).toBe('a-newer');
+    expect(dedupeClaims([newer, older])[0].id).toBe('a-newer');
+
+    const tieA = { ...older, id: 'aaa', first_seen: '2026-03-01T00:00:00Z' };
+    const tieB = { ...older, id: 'zzz', first_seen: '2026-03-01T00:00:00Z' };
+    expect(dedupeClaims([tieB, tieA])[0].id).toBe('aaa');
+  });
+
   it('dedupes by steam_appid across differing titles', () => {
     const items = [
       { id: 'a', store: 'steam', title: 'Game (Steam) Giveaway', claim_url: 'https://s/a', steam_appid: 42, source: 'gamerpower' },

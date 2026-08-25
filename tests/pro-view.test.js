@@ -107,6 +107,18 @@ describe('renderProView', () => {
     renderProView();
     expect(document.getElementById('proViewRoot').textContent).toContain("You're on Pro");
   });
+
+  it('shows waiting-for-activation when checkout pending but not yet Pro', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isPro.mockReturnValue(false);
+    const { markCheckoutSuccessPending, renderProView } = await import('../js/pro-view.js');
+    markCheckoutSuccessPending();
+    renderProView({ showSuccess: true });
+    const root = document.getElementById('proViewRoot');
+    expect(root.textContent).toContain('Waiting for activation');
+    expect(root.textContent).not.toContain('Payment received');
+    expect(root.querySelector('.pro-view-success--pending')).toBeTruthy();
+  });
 });
 
 describe('post-checkout return', () => {

@@ -78,10 +78,11 @@ function setProStatus(message, ok) {
   el.classList.toggle('pro-view-status--err', !ok);
 }
 
-function successBannerHtml() {
-  return `<div class="pro-view-success" role="status">
-    <p class="pro-view-success-title">Payment received</p>
-    <p class="pro-view-success-lead">Finish activation below - hosted accounts refresh automatically; local installs paste the license key from your Polar receipt.</p>
+/** Shown while checkoutSuccessPending is set but isPro() is still false. */
+function waitingActivationBannerHtml() {
+  return `<div class="pro-view-success pro-view-success--pending" role="status">
+    <p class="pro-view-success-title">Waiting for activation</p>
+    <p class="pro-view-success-lead">Payment is processing - hosted accounts refresh automatically; local installs paste the license key from your Polar receipt.</p>
   </div>`;
 }
 
@@ -218,9 +219,9 @@ function proActiveHtml() {
   </div>`;
 }
 
-function proPitchHtml({ showSuccess = false } = {}) {
+function proPitchHtml({ showPending = false } = {}) {
   const planClass = selectedProPlan === 'yearly' ? 'pro-view-funnel--yearly' : 'pro-view-funnel--monthly';
-  return `${showSuccess ? successBannerHtml() : ''}
+  return `${showPending ? waitingActivationBannerHtml() : ''}
     <div class="pro-view-funnel ${planClass}" role="region" aria-label="BAKLOG Pro">
       <header class="pro-view-hero">
         ${proHeroBannerHtml(selectedProPlan)}
@@ -269,11 +270,14 @@ function applyProPlanToggle(root, plan) {
 export function renderProView({ showSuccess = false } = {}) {
   const el = document.getElementById('proViewRoot');
   if (!el) return;
+  // Confirmed Pro: active card only (never treat URL/pending as success alone).
   if (isPro()) {
     el.innerHTML = proActiveHtml();
     return;
   }
-  el.innerHTML = proPitchHtml({ showSuccess: showSuccess || checkoutSuccessPending });
+  // Keep checkoutSuccessPending, but show waiting-for-activation until isPro().
+  const pending = showSuccess || checkoutSuccessPending;
+  el.innerHTML = proPitchHtml({ showPending: pending });
   applyProPlanToggle(el, selectedProPlan);
 }
 

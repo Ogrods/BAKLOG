@@ -92,7 +92,20 @@ export function dedupeClaims(list) {
     if (!cur) { best.set(key, c); continue; }
     const rank = CLAIM_SOURCE_RANK[String(c.source || '').toLowerCase()] ?? 99;
     const curRank = CLAIM_SOURCE_RANK[String(cur.source || '').toLowerCase()] ?? 99;
-    if (rank < curRank) best.set(key, c);
+    if (rank < curRank) {
+      best.set(key, c);
+      continue;
+    }
+    if (rank > curRank) continue;
+    // Equal source rank: prefer newer first_seen, else lower id as stable tiebreak.
+    const seen = Date.parse(c.first_seen || '') || 0;
+    const curSeen = Date.parse(cur.first_seen || '') || 0;
+    if (seen > curSeen) {
+      best.set(key, c);
+      continue;
+    }
+    if (seen < curSeen) continue;
+    if (String(c.id || '') < String(cur.id || '')) best.set(key, c);
   }
   return [...best.values()];
 }

@@ -2098,6 +2098,17 @@ class Handler(SimpleHTTPRequestHandler):
             run_id = str(raw_run).strip().split("/", 1)[0].split("?", 1)[0] or None
             run = MANAGER.get(run_id) if run_id else None
             if run is not None:
+                # When auth is on, refuse to rebind the ticket profile to a run
+                # the caller cannot access (cross-profile stream ticket mint).
+                from shared.supabase_auth import auth_enabled
+
+                if auth_enabled() and _run_accessible(run) is None:
+                    _send_json(
+                        self,
+                        HTTPStatus.NOT_FOUND,
+                        {"error": f"unknown run: {run_id}"},
+                    )
+                    return
                 profile_id = run.profile_id
         ticket = _mint_stream_ticket(profile_id, run_id=run_id)
         _send_json(self, HTTPStatus.OK, {"ticket": ticket})

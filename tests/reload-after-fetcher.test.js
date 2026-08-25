@@ -86,10 +86,15 @@ describe("reloadAfterFetcher source routing", () => {
     // Regression: un-hide / dedup / wishlist->library bumps libNow by 1 without
     // a real acquisition; the celebratory burst must not fire (nothing lands in
     // "Recently added"). Flash requires _lastNewlyAddedCount > 0.
-    const fn = LIBRARY_LOAD_SRC.match(
-      /export async function applyMergedLibrary\([\s\S]*?\n\}/,
+    // Merge work lives in applyMergedLibraryUnlocked; applyMergedLibrary only
+    // serializes concurrent callers onto that chain.
+    expect(LIBRARY_LOAD_SRC).toMatch(
+      /export function applyMergedLibrary\([\s\S]*?_mergeChain/,
     );
-    expect(fn, "applyMergedLibrary").toBeTruthy();
+    const fn = LIBRARY_LOAD_SRC.match(
+      /async function applyMergedLibraryUnlocked\([\s\S]*?\n\}/,
+    );
+    expect(fn, "applyMergedLibraryUnlocked").toBeTruthy();
     const body = fn[0];
     expect(body).toMatch(
       /libNow > libPrev && newlyAdded > 0[\s\S]*fireLibraryCountFlash\(["']library["']/,

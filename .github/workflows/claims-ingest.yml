@@ -141,7 +141,7 @@ jobs:
           # Never stage maintainer-private or scrape scratch files
           rm -f curated/free_claims.approved.json curated/free_claims.auto.json free-claims.input.json
 
-          # Fetch remote sticky branch so --force-with-lease has a baseline (not stale/missing).
+          # Bot-owned sticky branch: plain --force after fetch (lease races on shallow checkout).
           git fetch origin chore/claims-feed-refresh:refs/remotes/origin/chore/claims-feed-refresh || true
           git checkout -B chore/claims-feed-refresh
           git add -- landing/free-claims.json curated/free_claims.fallback.json
@@ -151,7 +151,7 @@ jobs:
           fi
           git commit -m "Refresh free-claims feed (published ids only)"
 
-          git push -u origin chore/claims-feed-refresh --force-with-lease
+          git push -u origin HEAD:chore/claims-feed-refresh --force
 
           BODY_FILE=$(mktemp)
           {

@@ -36,6 +36,23 @@ POLL_SEC = 0.5
 PSN_STORE_URL = "https://store.playstation.com/en-us/"
 
 
+def _safe_connect_log_url(url: str) -> str:
+    """Host + path only — strip query/fragment (OAuth codes)."""
+    try:
+        parts = urlparse(str(url or ""))
+        if not parts.scheme and not parts.netloc:
+            return "(url)"
+        path = parts.path or "/"
+        return f"{parts.scheme}://{parts.netloc}{path}"
+    except Exception:  # noqa: BLE001
+        return "(url)"
+
+
+def _signed_in_payload(url: str) -> dict[str, Any]:
+    host = urlparse(url or "").hostname or ""
+    return {"ok": True, "host": host}
+
+
 def _connect_pages(page, context) -> list:
     """Live tabs for a connect session: primary page first, then others."""
     out: list = []
@@ -204,7 +221,7 @@ def _extract_battlenet_inline(page, context, session: AuthSession | None = None)
     def _on_signed_in(_creds: dict[str, str]) -> None:
         if session:
             live = _battlenet_live_page(page, context)
-            session.emit("signed_in", {"url": getattr(live, "url", None) or BATTLENET_GAMES_URL})
+            session.emit("signed_in", _signed_in_payload(getattr(live, "url", None) or BATTLENET_GAMES_URL))
 
     return run_connect_poll(
         context=context,
@@ -503,7 +520,8 @@ def _extract_gog_inline(page, context, session: AuthSession | None = None) -> di
 
     def _on_signed_in(creds: dict[str, str]) -> None:
         if session:
-            session.emit("signed_in", {"url": page.url or "https://www.gog.com/"})
+            host = urlparse(page.url or "https://www.gog.com/").hostname or ""
+            session.emit("signed_in", _signed_in_payload(page.url or "https://www.gog.com/"))
 
     return run_connect_poll(
         context=context,
@@ -658,7 +676,7 @@ def _extract_psn(page, context, session: AuthSession | None = None) -> dict[str,
             body = ""
 
         if _psn_on_blocked_account_page(url, body):
-            connect_log("psn", f"blocked account page url={(url or '')[:120]}", key="blocked")
+            connect_log("psn", f"blocked account page url={_safe_connect_log_url(url)[:120]}", key="blocked")
             if now - last_blocked_nav[0] > 6:
                 last_blocked_nav[0] = now
                 try:
@@ -1135,7 +1153,7 @@ def _extract_xbox_wishlist_inline(page, context, session) -> dict[str, str]:
         msa_ready = _xbox_has_msa_session(context)
         connect_log(
             "xbox_wishlist",
-            f"poll url={url!r} login={on_login} wishlist={on_wishlist} "
+            f"poll url={_safe_connect_log_url(url)!r} login={on_login} wishlist={on_wishlist} "
             f"handoff={on_handoff} mid={mid_exchange} done={handoff_done} "
             f"dom_signed_in={dom_signed_in_any} msa={msa_ready} token={token_ready}",
             key="poll",
@@ -1322,7 +1340,7 @@ def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
         ready = _nintendo_wishlist_session_ready(html, url, api_payloads)
         connect_log(
             "nintendo_wishlist",
-            f"poll url={url!r} signed_out={signed_out} graphql_ok={graphql_ok} "
+            f"poll url={_safe_connect_log_url(url)!r} signed_out={signed_out} graphql_ok={graphql_ok} "
             f"customer_ok={customer_ok} ready={ready}",
             key="poll",
         )
@@ -1465,7 +1483,7 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
         if on_success and not seen_success:
             seen_success = True
             if session:
-                session.emit("signed_in", {"url": UBISOFT_SUCCESS_URL})
+                session.emit("signed_in", _signed_in_payload(UBISOFT_SUCCESS_URL))
 
         if (on_success or seen_success) and nudged < len(UBISOFT_LIBRARY_URLS):
             try:
@@ -1678,7 +1696,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             else:
                 nudged = True
                 if session:
-                    session.emit("signed_in", {"url": page.url or EA_LOGIN_URL})
+                    session.emit("signed_in", _signed_in_payload(page.url or EA_LOGIN_URL))
                 try:
                     page.bring_to_front()
                 except Exception:

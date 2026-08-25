@@ -447,6 +447,9 @@ def _atomic_write_secrets(data: bytes) -> None:
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp, path)
+        _restrict_file_permissions(path)
+        if bak.exists():
+            _restrict_file_permissions(bak)
     except Exception:
         try:
             if tmp.exists():

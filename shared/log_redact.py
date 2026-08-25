@@ -26,7 +26,12 @@ LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(XBL_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(UBISOFT_SESSION_ID[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(STEAM_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(ITAD_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(ITCH_API_KEY[\"']?\s*[=:]\s*)[\"']?[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Authorization:\s*)(?!Bearer\s)([^\s,]+)", re.I), r"\1[redacted]"),
+    # OAuth / Connect URL fragments that may land in connect-*.log.
+    (re.compile(r"([?&#](?:code|access_token|authorizationCode)=)[^&\s#'\"]+", re.I), r"\1[redacted]"),
+    (re.compile(r"(#code=)[^&\s#'\"]+", re.I), r"\1[redacted]"),
 ]
 
 
@@ -37,12 +42,24 @@ def redact_log_line(text: str) -> str:
     return out
 
 
+def _redact_tail_field(value: Any) -> Any:
+    """Redact a log-tail field that may be a string or list[str]."""
+    if isinstance(value, str) and value:
+        return "\n".join(redact_log_line(line) for line in value.splitlines())
+    if isinstance(value, list):
+        return [redact_log_line(str(line)) for line in value]
+    return value
+
+
 def redact_diagnostics_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Redact sensitive tokens from diagnostics fields before serving over HTTP."""
-    tail = payload.get("refresh_log_tail")
-    if isinstance(tail, str) and tail:
-        payload = dict(payload)
-        payload["refresh_log_tail"] = "\n".join(
-            redact_log_line(line) for line in tail.splitlines()
-        )
-    return payload
+    out = dict(payload)
+    for key in ("refresh_log_tail", "apply_log_tail"):
+        if key in out:
+            out[key] = _redact_tail_field(out.get(key))
+    tails = out.get("connect_log_tails")
+    if isinstance(tails, dict) and tails:
+        out["connect_log_tails"] = {
+            str(name): _redact_tail_field(lines) for name, lines in tails.items()
+        }
+    return out

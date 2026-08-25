@@ -185,8 +185,15 @@ def profile_credentials_env(profile_id: str) -> dict[str, str]:
     return out
 
 
-def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
-    """Minimal subprocess environment: system paths + profile-scoped credentials only."""
+def subprocess_env_for_profile(
+    profile_id: str, *, fetcher_key: str | None = None
+) -> dict[str, str]:
+    """Minimal subprocess environment: system paths + profile-scoped credentials.
+
+    When ``fetcher_key`` is set, only credential env keys for providers that
+    satisfy that fetcher are injected (least privilege). Omit ``fetcher_key``
+    to pass all profile credentials (CLI / connection probes).
+    """
     env: dict[str, str] = {
         "PYTHONUNBUFFERED": "1",
         "PYTHONIOENCODING": "utf-8",
@@ -208,7 +215,12 @@ def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
         v = os.environ.get(k)
         if v:
             env[k] = v
-    env.update(profile_credentials_env(profile_id))
+    creds = profile_credentials_env(profile_id)
+    if fetcher_key:
+        allow = _credential_env_keys_for_fetcher(fetcher_key)
+        if allow is not None:
+            creds = {k: v for k, v in creds.items() if k in allow}
+    env.update(creds)
     from shared.install_paths import bundle_root, data_root
 
     env["BAKLOG_DATA_DIR"] = str(data_root().resolve())
@@ -216,6 +228,50 @@ def subprocess_env_for_profile(profile_id: str) -> dict[str, str]:
     existing = env.get("PYTHONPATH", "").strip()
     env["PYTHONPATH"] = root if not existing else f"{root}{os.pathsep}{existing}"
     return env
+
+
+def _credential_env_keys_for_fetcher(fetcher_key: str) -> set[str] | None:
+    """Allowed secret env keys for a fetcher run, or None to pass all credentials.
+
+    Returns an empty set for known no-credential jobs (claims builders, HLTB).
+    Returns None only when the key is unrecognized so we do not break custom/admin jobs.
+    """
+    from auth.registry import PROVIDERS
+    from fetchers.registry import AUTH_PROVIDER_BY_KEY, ENRICH_FETCHER_KEYS
+
+    key = (fetcher_key or "").strip()
+    if not key:
+        return None
+
+    # Enrich / claims jobs that do not need store secrets.
+    if key in ("hltb", "freeClaims", "claimSources", "buildFreeClaims"):
+        return set()
+
+    providers: list[str] = []
+    primary = AUTH_PROVIDER_BY_KEY.get(key)
+    if primary:
+        providers.append(primary)
+    for pid, spec in PROVIDERS.items():
+        if key in (spec.fetcher_keys or ()) and pid not in providers:
+            providers.append(pid)
+
+    # Steam enrich scripts share the Steam Web API key.
+    if key in ENRICH_FETCHER_KEYS and key.startswith("steam"):
+        if "steam" not in providers:
+            providers.append("steam")
+    if key == "protondb" and "steam" not in providers:
+        providers.append("steam")
+
+    if not providers:
+        # Unknown key: keep prior behavior (all creds) rather than break a run.
+        return None
+
+    allowed: set[str] = set()
+    for pid in providers:
+        spec = PROVIDERS.get(pid)
+        if spec:
+            allowed.update(spec.env_keys)
+    return allowed
 
 
 def _local_data_present(provider: str, blob: dict[str, Any]) -> bool:

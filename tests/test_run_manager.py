@@ -960,7 +960,7 @@ def test_execute_runs_from_repo_root_for_nondefault_profile(
     monkeypatch.setattr(
         auth.manager,
         "subprocess_env_for_profile",
-        lambda pid: {"BAKLOG_PROFILE": pid, "PYTHONUNBUFFERED": "1"},
+        lambda pid, fetcher_key=None: {"BAKLOG_PROFILE": pid, "PYTHONUNBUFFERED": "1"},
     )
 
     captured: dict[str, object] = {}

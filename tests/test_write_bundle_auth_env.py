@@ -22,12 +22,15 @@ def test_main_writes_env_file(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(bundle_env, "ROOT", tmp_path)
     monkeypatch.setenv("BAKLOG_SUPABASE_URL", "https://demo.supabase.co")
     monkeypatch.setenv("BAKLOG_SUPABASE_ANON_KEY", "anon-key")
+    monkeypatch.setenv("BAKLOG_SUPABASE_JWT_SECRET", "must-not-ship")
     rc = bundle_env.main([str(tmp_path / "bundle")])
     assert rc == 0
     text = (tmp_path / "bundle" / ".env").read_text(encoding="utf-8")
     assert "BAKLOG_SUPABASE_URL=https://demo.supabase.co" in text
     assert "BAKLOG_SUPABASE_ANON_KEY=anon-key" in text
     assert "SERVICE_ROLE" not in text
+    assert "BAKLOG_SUPABASE_JWT_SECRET" not in text
+    assert "must-not-ship" not in text
 
 
 def test_main_fails_without_required_keys(tmp_path: Path, monkeypatch) -> None:

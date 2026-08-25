@@ -161,3 +161,35 @@ def test_subprocess_env_omits_unset_provider_keys(
     assert "STEAM_API_KEY" not in env
     assert env.get("ITAD_COUNTRY") is None  # non-credential settings not injected
     assert env.get("BAKLOG_PROFILE") == "work"
+
+
+def test_subprocess_env_scopes_credentials_to_fetcher(
+    isolated_profiles: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_profile("Work")
+    set_active_profile("work")
+    monkeypatch.setenv("BAKLOG_PROFILE", "work")
+    set_provider_blob("steam", {"STEAM_API_KEY": "steam-key", "STEAM_ID": "1", "status": "connected"})
+    set_provider_blob("itad", {"ITAD_API_KEY": "itad-key", "status": "connected"})
+    set_provider_blob("psn", {"PSN_NPSSO": "npsso-secret", "status": "connected"})
+
+    steam_env = subprocess_env_for_profile("work", fetcher_key="steam")
+    assert steam_env.get("STEAM_API_KEY") == "steam-key"
+    assert "ITAD_API_KEY" not in steam_env
+    assert "PSN_NPSSO" not in steam_env
+
+    itad_env = subprocess_env_for_profile("work", fetcher_key="itad")
+    assert itad_env.get("ITAD_API_KEY") == "itad-key"
+    assert "STEAM_API_KEY" not in itad_env
+
+    hltb_env = subprocess_env_for_profile("work", fetcher_key="hltb")
+    assert "STEAM_API_KEY" not in hltb_env
+    assert "ITAD_API_KEY" not in hltb_env
+    assert "PSN_NPSSO" not in hltb_env
+
+    # No fetcher_key keeps prior all-creds behavior for probes/CLI.
+    all_env = subprocess_env_for_profile("work")
+    assert all_env.get("STEAM_API_KEY") == "steam-key"
+    assert all_env.get("ITAD_API_KEY") == "itad-key"
+    assert all_env.get("PSN_NPSSO") == "npsso-secret"

@@ -64,7 +64,7 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     }
     Write-Host "    BAKLOG_SUPABASE_URL + BAKLOG_SUPABASE_ANON_KEY present"
     if ($secrets -contains "BAKLOG_SUPABASE_JWT_SECRET") {
-        Write-Host "    BAKLOG_SUPABASE_JWT_SECRET present (optional but recommended)"
+        Write-Host "    BAKLOG_SUPABASE_JWT_SECRET present in GitHub (dev/HS256 only - never bundled into release zips)"
     }
 }
 

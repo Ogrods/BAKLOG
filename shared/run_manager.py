@@ -1469,7 +1469,7 @@ class RunManager:
         try:
             from auth.manager import subprocess_env_for_profile
 
-            env = subprocess_env_for_profile(run.profile_id)
+            env = subprocess_env_for_profile(run.profile_id, fetcher_key=run.key)
         except Exception as exc:
             run.status = "failed"
             run.exit_code = -1

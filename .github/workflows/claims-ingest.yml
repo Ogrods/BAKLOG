@@ -141,6 +141,8 @@ jobs:
           # Never stage maintainer-private or scrape scratch files
           rm -f curated/free_claims.approved.json curated/free_claims.auto.json free-claims.input.json
 
+          # Fetch remote sticky branch so --force-with-lease has a baseline (not stale/missing).
+          git fetch origin chore/claims-feed-refresh:refs/remotes/origin/chore/claims-feed-refresh || true
           git checkout -B chore/claims-feed-refresh
           git add -- landing/free-claims.json curated/free_claims.fallback.json
           if git diff --cached --quiet; then

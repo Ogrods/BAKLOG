@@ -11,6 +11,40 @@ const root = path.resolve(import.meta.dirname, "..");
 const landing = path.join(root, "landing");
 const EM_DASH = "\u2014";
 
+/** Strip HTML tags until stable, then drop leftover `<` (FAQ text only). */
+export function stripHtmlToText(s) {
+  let out = String(s);
+  let prev;
+  do {
+    prev = out;
+    out = out.replace(/<\/?[a-zA-Z][^>]*>/g, "");
+  } while (out !== prev);
+  return out.replace(/</g, "");
+}
+
+/** True when CSP lists an https:// source whose hostname equals `hostname`. */
+export function cspAllowsHttpsHostname(csp, hostname) {
+  for (const token of String(csp).split(/[\s;]+/)) {
+    if (!/^https:\/\//i.test(token)) continue;
+    try {
+      if (new URL(token).hostname === hostname) return true;
+    } catch {
+      // Wildcard hosts like https://*.example.com are not exact matches.
+    }
+  }
+  return false;
+}
+
+function vercelRootCsp(vercelJson) {
+  for (const block of vercelJson.headers || []) {
+    if (block.source !== "/(.*)") continue;
+    for (const h of block.headers || []) {
+      if (h.key === "Content-Security-Policy") return String(h.value || "");
+    }
+  }
+  return "";
+}
+
 export function extractFaqFromHtml(html) {
   const start = html.indexOf('class="faq"');
   if (start < 0) return [];
@@ -21,8 +55,8 @@ export function extractFaqFromHtml(html) {
   let m;
   while ((m = re.exec(block))) {
     items.push({
-      q: m[1].replace(/<[^>]+>/g, "").trim(),
-      a: m[2].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim(),
+      q: stripHtmlToText(m[1]).trim(),
+      a: stripHtmlToText(m[2]).replace(/\s+/g, " ").trim(),
     });
   }
   return items;
@@ -128,12 +162,21 @@ export function checkLandingSeo() {
   } else {
     const sha = crypto.createHash("sha256").update(gtagBody, "utf8").digest("base64");
     const token = `'sha256-${sha}'`;
-    const vercel = fs.readFileSync(path.join(landing, "vercel.json"), "utf8");
-    if (!vercel.includes(token)) {
-      errors.push(`vercel.json CSP missing ${token} for the inline gtag snippet`);
+    let vercelCfg;
+    try {
+      vercelCfg = JSON.parse(fs.readFileSync(path.join(landing, "vercel.json"), "utf8"));
+    } catch (err) {
+      errors.push(`vercel.json parse failed: ${err.message}`);
+      vercelCfg = null;
     }
-    if (!vercel.includes("https://www.googletagmanager.com")) {
-      errors.push("vercel.json CSP missing googletagmanager.com for GA");
+    if (vercelCfg) {
+      const csp = vercelRootCsp(vercelCfg);
+      if (!csp.includes(token)) {
+        errors.push(`vercel.json CSP missing ${token} for the inline gtag snippet`);
+      }
+      if (!cspAllowsHttpsHostname(csp, "www.googletagmanager.com")) {
+        errors.push("vercel.json CSP missing googletagmanager.com for GA");
+      }
     }
   }
 

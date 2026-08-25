@@ -6,6 +6,7 @@ live baklog.app feed age. Soft-warns on stale live feed (exit 0). Hard-fails onl
 when required local files are unreadable after a successful fetch.
 
 Public-safe output only: ids, titles, stores, ages. No secrets, no approved.json.
+No public ::notice::/::warning:: annotations (summary text only).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,15 +27,28 @@ LANDING_PATH = ROOT / "landing" / "free-claims.json"
 LIVE_URL = "https://baklog.app/free-claims.json"
 USER_AGENT = "BAKLOG-claims-ingest-summary/1.0"
 DEFAULT_MAX_AGE_DAYS = 7
+DEFAULT_SKEW_DAYS = 1.0
 SAMPLE_LIMIT = 25
+_WS_RE = re.compile(r"\s+")
 
 
-def _load_items(path: Path) -> list[dict]:
+def sanitize_title(raw: object) -> str:
+    """Collapse whitespace and strip backticks so markdown samples stay readable."""
+    text = _WS_RE.sub(" ", str(raw or "").replace("`", "'")).strip()
+    return text or "(no title)"
+
+
+def _load_doc(path: Path) -> dict:
     if not path.is_file():
         raise FileNotFoundError(f"missing feed: {path}")
     doc = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(doc, dict):
         raise ValueError(f"feed must be an object: {path}")
+    return doc
+
+
+def _load_items(path: Path) -> list[dict]:
+    doc = _load_doc(path)
     items = doc.get("items") or []
     if not isinstance(items, list):
         raise ValueError(f"items must be a list: {path}")
@@ -61,7 +76,7 @@ def _sample_lines(ids: set[str], by_id: dict[str, dict], *, limit: int = SAMPLE_
     lines: list[str] = []
     for item_id in sorted(ids)[:limit]:
         row = by_id.get(item_id) or {}
-        title = str(row.get("title") or "").strip() or "(no title)"
+        title = sanitize_title(row.get("title"))
         store = str(row.get("store") or row.get("source") or "").strip()
         suffix = f" [{store}]" if store else ""
         lines.append(f"- `{item_id}`{suffix}: {title}")
@@ -86,31 +101,64 @@ def _parse_generated_at(raw: object) -> datetime | None:
     return dt.astimezone(UTC)
 
 
-def check_live_age(url: str, *, max_age_days: float) -> tuple[str, bool]:
-    """Return (summary line, stale). Network errors are warnings, not failures."""
+def _fmt_ts(dt: datetime) -> str:
+    return dt.isoformat().replace("+00:00", "Z")
+
+
+def fetch_live_doc(url: str) -> tuple[dict | None, str | None]:
+    """Return (payload, error_message)."""
     req = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     try:
         with urlopen(req, timeout=30) as resp:  # noqa: S310 — fixed HTTPS URL
             payload = json.loads(resp.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-        return (f"WARN: could not fetch live feed ({exc})", False)
-
+        return None, f"could not fetch live feed ({exc})"
     if not isinstance(payload, dict):
-        return ("WARN: live feed is not a JSON object", False)
+        return None, "live feed is not a JSON object"
+    return payload, None
+
+
+def check_live_age(url: str, *, max_age_days: float) -> tuple[str, bool, datetime | None]:
+    """Return (summary line, stale, live_generated_at)."""
+    payload, err = fetch_live_doc(url)
+    if err or payload is None:
+        return (f"WARN: {err}", False, None)
 
     generated = _parse_generated_at(payload.get("generated_at"))
     if generated is None:
-        return ("WARN: live feed has no parseable generated_at", False)
+        return ("WARN: live feed has no parseable generated_at", False, None)
 
     age_days = (datetime.now(UTC) - generated).total_seconds() / 86400.0
     item_count = len(payload.get("items") or []) if isinstance(payload.get("items"), list) else "?"
     line = (
-        f"live generated_at={generated.isoformat().replace('+00:00', 'Z')} "
+        f"live generated_at={_fmt_ts(generated)} "
         f"age={age_days:.2f}d (limit={max_age_days:g}d) items={item_count}"
     )
     if age_days > max_age_days:
-        return (f"WARN: {line} - refresh and republish", True)
-    return (f"OK: {line}", False)
+        return (f"WARN: {line} - refresh and republish", True, generated)
+    return (f"OK: {line}", False, generated)
+
+
+def landing_vs_live_skew_line(
+    landing_generated: datetime | None,
+    live_generated: datetime | None,
+    *,
+    skew_days: float = DEFAULT_SKEW_DAYS,
+) -> str | None:
+    """Return a summary line when committed landing and live clocks diverge."""
+    if landing_generated is None or live_generated is None:
+        return None
+    delta_days = abs((landing_generated - live_generated).total_seconds()) / 86400.0
+    if delta_days <= skew_days:
+        return (
+            f"OK: landing vs live skew={delta_days:.2f}d "
+            f"(landing={_fmt_ts(landing_generated)}, live={_fmt_ts(live_generated)})"
+        )
+    return (
+        f"WARN: landing vs live skew={delta_days:.2f}d "
+        f"(limit={skew_days:g}d; landing={_fmt_ts(landing_generated)}, "
+        f"live={_fmt_ts(live_generated)}) - committed feed and baklog.app differ"
+    )
 
 
 def build_markdown(
@@ -119,6 +167,7 @@ def build_markdown(
     landing_items: list[dict],
     live_line: str,
     live_stale: bool,
+    skew_line: str | None = None,
 ) -> str:
     auto_by_id = _id_map(auto_items)
     land_by_id = _id_map(landing_items)
@@ -151,6 +200,9 @@ def build_markdown(
     if live_stale:
         lines.append("_Soft warn only - job stays green. Publish when ready._")
         lines.append("")
+
+    if skew_line:
+        lines.extend(["### Landing vs live skew", "", skew_line, ""])
 
     lines.extend(["### New scrape candidates (sample)", ""])
     if new_ids:
@@ -193,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--landing", type=Path, default=LANDING_PATH)
     parser.add_argument("--live-url", default=LIVE_URL)
     parser.add_argument("--max-age-days", type=float, default=DEFAULT_MAX_AGE_DAYS)
+    parser.add_argument("--skew-days", type=float, default=DEFAULT_SKEW_DAYS)
     parser.add_argument(
         "--skip-live",
         action="store_true",
@@ -201,22 +254,38 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        landing_doc = _load_doc(args.landing)
+        landing_items = [
+            row for row in (landing_doc.get("items") or []) if isinstance(row, dict)
+        ]
+        if not isinstance(landing_doc.get("items") or [], list):
+            raise ValueError(f"items must be a list: {args.landing}")
         auto_items = _load_items(args.auto)
-        landing_items = _load_items(args.landing)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
+    landing_generated = _parse_generated_at(landing_doc.get("generated_at"))
+
     if args.skip_live:
-        live_line, live_stale = ("SKIP: live age check disabled", False)
+        live_line, live_stale, live_generated = ("SKIP: live age check disabled", False, None)
+        skew_line = None
     else:
-        live_line, live_stale = check_live_age(args.live_url, max_age_days=args.max_age_days)
+        live_line, live_stale, live_generated = check_live_age(
+            args.live_url, max_age_days=args.max_age_days
+        )
+        skew_line = landing_vs_live_skew_line(
+            landing_generated,
+            live_generated,
+            skew_days=args.skew_days,
+        )
 
     md = build_markdown(
         auto_items=auto_items,
         landing_items=landing_items,
         live_line=live_line,
         live_stale=live_stale,
+        skew_line=skew_line,
     )
     _write_summary(md)
     return 0

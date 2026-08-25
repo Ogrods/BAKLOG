@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import scripts.claims_ingest_summary as cis
 
 
-def test_build_markdown_classifies_new_and_gone(tmp_path: Path) -> None:
+def test_sanitize_title_strips_backticks_and_newlines() -> None:
+    assert cis.sanitize_title("Foo\n`bar`  baz") == "Foo 'bar' baz"
+    assert cis.sanitize_title("   ") == "(no title)"
+
+
+def test_build_markdown_classifies_new_and_gone() -> None:
     auto = [
         {"id": "epic-new", "title": "New Game", "store": "epic", "source": "epic"},
         {"id": "epic-keep", "title": "Keep", "store": "epic", "source": "epic"},
@@ -22,12 +28,25 @@ def test_build_markdown_classifies_new_and_gone(tmp_path: Path) -> None:
         landing_items=landing,
         live_line="OK: age=1.0d",
         live_stale=False,
+        skew_line="WARN: landing vs live skew=10.00d",
     )
     assert "New scrape candidates (not in landing): **1**" in md
     assert "Landing ids missing from scrape: **1**" in md
     assert "`epic-new`" in md
     assert "`epic-gone`" in md
     assert "Phase 1: notify only" in md
+    assert "Landing vs live skew" in md
+
+
+def test_landing_vs_live_skew_line() -> None:
+    land = datetime(2026, 8, 24, tzinfo=UTC)
+    live = datetime(2026, 8, 7, tzinfo=UTC)
+    line = cis.landing_vs_live_skew_line(land, live, skew_days=1.0)
+    assert line is not None
+    assert line.startswith("WARN:")
+    ok = cis.landing_vs_live_skew_line(land, land + timedelta(hours=12), skew_days=1.0)
+    assert ok is not None
+    assert ok.startswith("OK:")
 
 
 def test_main_skip_live_writes_summary(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -38,7 +57,12 @@ def test_main_skip_live_writes_summary(tmp_path: Path, monkeypatch, capsys) -> N
         encoding="utf-8",
     )
     landing_path.write_text(
-        json.dumps({"items": [{"id": "a1", "title": "A", "store": "epic"}]}),
+        json.dumps(
+            {
+                "generated_at": "2026-08-24T00:00:00Z",
+                "items": [{"id": "a1", "title": "A", "store": "epic"}],
+            }
+        ),
         encoding="utf-8",
     )
     summary = tmp_path / "summary.md"

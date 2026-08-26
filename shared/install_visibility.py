@@ -54,6 +54,32 @@ def read_arp_display_version() -> str | None:
     return None
 
 
+def write_arp_display_version(version: str) -> bool:
+    """Update Inno DisplayVersion when the uninstall registry entry exists.
+
+    In-app zip updates replace files under ``%LOCALAPPDATA%\\BAKLOG`` but do not
+    re-run Setup; without this, Settings → Apps keeps showing the version from
+    the last ``BAKLOG-Setup.exe`` run.
+    """
+    text = str(version or "").strip()
+    if sys.platform != "win32" or not text:
+        return False
+    try:
+        import winreg
+    except ImportError:
+        return False
+
+    subkey = rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{INNO_UNINSTALL_REG_SUFFIX}"
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            with winreg.OpenKey(hive, subkey, 0, winreg.KEY_SET_VALUE) as key:
+                winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, text)
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def arp_version_mismatch(current_version: str, arp_version: str | None) -> bool:
     """True when ARP lists a different version than the running build."""
     from shared.server_support import normalize_version_tag
@@ -71,7 +97,7 @@ def install_trust_fields() -> dict[str, Any]:
     if sys.platform == "win32":
         fields["trust_note"] = (
             "Unsigned beta: SmartScreen may warn on first launch — More info, then Run anyway. "
-            "In-app zip updates do not refresh Add/Remove Programs; re-run Setup when you want ARP to match."
+            "Setup installs sync Add/Remove Programs after in-app zip updates."
         )
     elif sys.platform == "darwin":
         fields["trust_note"] = (

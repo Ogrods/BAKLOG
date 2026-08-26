@@ -182,6 +182,42 @@ def test_apply_update_ps1_missing_tray_in_bundle_restores(
     assert (install / "BAKLOG.exe").read_bytes() == b"old-server"
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows apply script only")
+def test_apply_update_ps1_syncs_arp_display_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import winreg
+
+    from shared.install_visibility import INNO_UNINSTALL_REG_SUFFIX
+
+    subkey = rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{INNO_UNINSTALL_REG_SUFFIX}"
+    monkeypatch.setenv("TEMP", str(tmp_path))
+    monkeypatch.setenv("TMP", str(tmp_path))
+
+    winreg.CreateKey(winreg.HKEY_CURRENT_USER, subkey)
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, "0.8.38")
+
+        install = tmp_path / "install" / "BAKLOG"
+        install.mkdir(parents=True)
+        (install / "BAKLOG.exe").write_bytes(b"old-server")
+        (install / "BAKLOG Tray.exe").write_bytes(b"old-tray")
+        (install / "unins000.exe").write_bytes(b"inno-uninstall-stub")
+
+        zip_path, sha256 = _make_bundle_zip(tmp_path)
+        proc = _run_apply(tmp_path, install=install, zip_path=zip_path, sha256=sha256, version="0.9.01")
+        assert proc.returncode == 0, proc.stderr
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as key:
+            display_version, _ = winreg.QueryValueEx(key, "DisplayVersion")
+        assert display_version == "0.9.01"
+        assert "updated ARP DisplayVersion" in (tmp_path / "BAKLOG-update" / "apply.log").read_text(encoding="utf-8")
+    finally:
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, subkey)
+        except OSError:
+            pass
+
+
 def test_apply_update_ps1_avoids_module_cmdlets() -> None:
     text = APPLY_PS1.read_text(encoding="utf-8")
     assert "Expand-Archive" not in text
@@ -195,6 +231,7 @@ def test_apply_update_ps1_avoids_module_cmdlets() -> None:
     assert "zip-slip" in text
     assert "ExtractToFile" in text
     assert "ExtractToDirectory" not in text
+    assert "Sync-ArpDisplayVersion" in text
 
 
 def test_apply_update_ps1_kill_helper_excludes_self() -> None:

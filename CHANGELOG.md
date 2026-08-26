@@ -45,6 +45,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- In-app updates on Windows refresh the version shown in Settings → Apps for Setup installs.
 - Dashboard and picks jumps to a library row re-check the target after scroll so the wrong game is not left under the sticky header on phone and mid-width layouts.
 - Dev and installed runs no longer share one browser error history when both use the same localhost origin; each runtime keeps its own log.
 

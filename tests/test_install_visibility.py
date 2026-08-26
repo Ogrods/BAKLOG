@@ -1,14 +1,19 @@
 """Tests for install source + ARP visibility helpers."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from shared.install_visibility import (
+    INNO_UNINSTALL_REG_SUFFIX,
     arp_version_mismatch,
     detect_install_source,
     install_visibility_fields,
     read_arp_display_version,
+    write_arp_display_version,
 )
 
 
@@ -52,6 +57,30 @@ def test_arp_version_mismatch() -> None:
 def test_read_arp_display_version_non_windows() -> None:
     with patch("shared.install_visibility.sys.platform", "linux"):
         assert read_arp_display_version() is None
+
+
+def test_write_arp_display_version_non_windows() -> None:
+    with patch("shared.install_visibility.sys.platform", "linux"):
+        assert write_arp_display_version("0.9.01") is False
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows registry only")
+def test_write_arp_display_version_updates_registry() -> None:
+    import winreg
+
+    subkey = rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{INNO_UNINSTALL_REG_SUFFIX}"
+    with patch("shared.install_visibility.sys.platform", "win32"):
+        winreg.CreateKey(winreg.HKEY_CURRENT_USER, subkey)
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey, 0, winreg.KEY_SET_VALUE) as key:
+                winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, "0.8.38")
+            assert write_arp_display_version("0.9.01") is True
+            assert read_arp_display_version() == "0.9.01"
+        finally:
+            try:
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, subkey)
+            except OSError:
+                pass
 
 
 def test_install_visibility_fields_includes_keys() -> None:

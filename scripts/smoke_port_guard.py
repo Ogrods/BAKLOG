@@ -80,6 +80,30 @@ def wait_for_owned_server(
     return False, f"server did not respond within {timeout_sec}s"
 
 
+def wait_for_http_server(
+    proc: subprocess.Popen,
+    base: str,
+    *,
+    timeout_sec: float = 30.0,
+) -> tuple[bool, str | None]:
+    """Wait until /api/config responds after a fresh spawn (port already cleared)."""
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        exit_code = proc.poll()
+        if exit_code is not None and exit_code != 0:
+            return False, f"server exited early with code {exit_code}"
+        try:
+            with urllib.request.urlopen(f"{base}/api/config", timeout=2) as resp:
+                if resp.status == 200:
+                    return True, None
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+        time.sleep(0.4)
+    exit_code = proc.poll()
+    suffix = f" (proc exit {exit_code})" if exit_code is not None else ""
+    return False, f"server did not respond within {timeout_sec}s{suffix}"
+
+
 def ensure_dev_port_free(
     *,
     host: str = DEFAULT_HOST,

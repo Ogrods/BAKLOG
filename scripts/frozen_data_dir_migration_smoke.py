@@ -95,6 +95,9 @@ def run_smoke(bundle_dir):
     finally:
         if proc is not None and proc.poll() is None:
             terminate_pid_tree(proc.pid)
+        holder = port_listener_pid()
+        if holder is not None:
+            terminate_pid_tree(holder)
         ensure_dev_port_free(timeout_sec=5.0)
         smoke_games = bundle_dir / "games_steam_smoke.json"
         if smoke_games.is_file():

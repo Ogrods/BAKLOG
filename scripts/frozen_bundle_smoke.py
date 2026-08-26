@@ -29,9 +29,9 @@ def _read_expected_version():
 
 
 def _wait_for_server(base, proc, *, timeout_sec=30.0):
-    from scripts.smoke_port_guard import wait_for_owned_server
+    from scripts.smoke_port_guard import wait_for_http_server
 
-    return wait_for_owned_server(proc, base, timeout_sec=timeout_sec)
+    return wait_for_http_server(proc, base, timeout_sec=timeout_sec)
 
 
 def _manifest_fetcher_count(bundle_dir):
@@ -190,6 +190,11 @@ def run_smoke(bundle_dir, *, expected_version=None):
             from shared.subprocess_guard import terminate_pid_tree
 
             terminate_pid_tree(proc.pid)
+        holder = port_listener_pid()
+        if holder is not None:
+            from shared.subprocess_guard import terminate_pid_tree
+
+            terminate_pid_tree(holder)
     if not isinstance(config, dict):
         report["error"] = "invalid /api/config response"
         return report

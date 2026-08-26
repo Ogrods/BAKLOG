@@ -91,6 +91,29 @@ def test_server_reports_blocked_port(monkeypatch, stub_exe: Path) -> None:
         assert server.proc is None
 
 
+def test_relative_exe_is_resolved_before_spawn(monkeypatch, stub_exe: Path) -> None:
+    """Callers pass repo-relative paths, but we spawn with cwd inside the bundle."""
+    spawned: list[tuple[Path, Path]] = []
+    monkeypatch.setattr(smoke_server, "ensure_port_free", lambda **kw: (True, None))
+    monkeypatch.setattr(smoke_server, "port_listener_pid", lambda host, port: None)
+    monkeypatch.setattr(smoke_server, "wait_for_port_free", lambda **kw: None)
+    monkeypatch.setattr(smoke_server, "terminate_pid_tree", lambda pid: None)
+    monkeypatch.setattr(smoke_server, "_probe_config", lambda base, **kw: True)
+    monkeypatch.setattr(
+        smoke_server,
+        "_spawn",
+        lambda exe, cwd, env: spawned.append((exe, cwd)) or _FakeProc(),
+    )
+    monkeypatch.chdir(stub_exe.parent.parent)
+    relative = Path(stub_exe.parent.name) / stub_exe.name
+
+    with smoke_server.FrozenSmokeServer(relative, port=8799) as server:
+        assert server.ok is True
+    exe, cwd = spawned[0]
+    assert exe.is_absolute() and exe.is_file()
+    assert cwd == stub_exe.parent.resolve()
+
+
 def test_server_missing_exe(tmp_path: Path) -> None:
     with smoke_server.FrozenSmokeServer(tmp_path / "nope", port=8799) as server:
         assert server.ok is False

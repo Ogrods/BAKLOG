@@ -78,8 +78,10 @@ class FrozenSmokeServer:
         host: str = DEFAULT_HOST,
         start_timeout_sec: float = DEFAULT_START_TIMEOUT_SEC,
     ) -> None:
-        self.exe = Path(exe)
-        self.cwd = Path(cwd) if cwd is not None else self.exe.parent
+        # Resolve up front: callers pass paths relative to the repo root, but we
+        # spawn with cwd inside the bundle.
+        self.exe = Path(exe).resolve()
+        self.cwd = Path(cwd).resolve() if cwd is not None else self.exe.parent
         self.port = port
         self.host = host
         self.start_timeout_sec = start_timeout_sec

@@ -97,6 +97,18 @@ Write-Host "Restoring bundled account-auth .env after migration smoke..."
 & $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "Smoke: frozen import chain (PyInstaller hidden imports)..."
+& $Python scripts/frozen_import_smoke.py --exe $ServerExe
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "frozen_import_smoke failed (exit $LASTEXITCODE)"
+}
+
+Write-Host "Smoke: frozen connect-flow (/api/config + auth endpoints)..."
+& $Python scripts/frozen_connect_smoke.py --exe $ServerExe
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "frozen_connect_smoke failed (exit $LASTEXITCODE)"
+}
+
 @"
 @echo off
 cd /d "%~dp0"

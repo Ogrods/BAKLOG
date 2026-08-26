@@ -7,6 +7,9 @@ BAKLOG.exe with -c "import X; print('ok')" for each module.
 
 Usage:
     python scripts/frozen_import_smoke.py --exe release/BAKLOG/BAKLOG.exe
+
+The frozen exe is invoked as ``BAKLOG.exe --import-check <module>`` (not
+``python -c``), which server.py handles and exits before binding the HTTP port.
 """
 
 import argparse
@@ -63,10 +66,9 @@ CRITICAL_IMPORTS = [
 
 def run_import_test(exe: Path, module_name: str) -> dict:
     """Run a single import test in the frozen exe subprocess."""
-    code = f"import {module_name}; print('ok')"
     try:
         proc = subprocess.run(
-            [str(exe), "-E", "-c", code],
+            [str(exe), "--import-check", module_name],
             capture_output=True,
             text=True,
             timeout=60,
@@ -88,7 +90,7 @@ def run_import_test(exe: Path, module_name: str) -> dict:
         error_lines = [
             line
             for line in stderr.splitlines()
-            if "Error" in line or "error" in line or "Traceback" in line
+            if "Error" in line or "error" in line or "Traceback" in line or "FAIL" in line
         ]
         error = error_lines[-1] if error_lines else stderr[-200:] if stderr else f"exit {proc.returncode}"
         return {"module": module_name, "ok": False, "error": error}

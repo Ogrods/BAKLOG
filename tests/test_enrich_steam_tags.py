@@ -235,8 +235,16 @@ def test_enricher_dry_run_does_not_write(
 def test_enricher_bails_without_mapping(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from shared.profile_paths import DEFAULT_PROFILE_ID
+
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("shared.profile_paths.profile_root", lambda profile_id=None: tmp_path)
+    monkeypatch.setattr(
+        "shared.profile_paths.get_active_profile_id",
+        lambda: DEFAULT_PROFILE_ID,
+    )
+    # auth.manager imports get_active_profile_id at module load — patch both bindings.
+    monkeypatch.setattr("auth.manager.get_active_profile_id", lambda: DEFAULT_PROFILE_ID)
     monkeypatch.setenv("STEAM_API_KEY", "test_key")
     monkeypatch.setenv("STEAM_ID", "76561197960287930")
     for mod in ("enrichers.enrich_steam_tags",):

@@ -23,7 +23,11 @@ if (Get-Command ISCC.exe -ErrorAction SilentlyContinue) {
     }
 }
 if (-not $Iscc) {
-    Write-Error "ISCC.exe not found. Install Inno Setup 6 or run on a Windows runner with choco install innosetup."
+    if ($env:BAKLOG_REQUIRE_INSTALLER -eq "1") {
+        Write-Error "ISCC.exe not found and BAKLOG_REQUIRE_INSTALLER=1. Install Inno Setup 6 or run on a Windows runner with choco install innosetup."
+    }
+    Write-Warning "ISCC.exe not found - skipping Inno stub compile (install Inno Setup 6 for local Setup.exe smoke). CI python-windows still installs Inno and runs this gate."
+    exit 0
 }
 
 $Python = Join-Path $Root ".venv\Scripts\python.exe"

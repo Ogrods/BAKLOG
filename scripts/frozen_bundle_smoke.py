@@ -66,6 +66,9 @@ def run_smoke(bundle_dir, *, expected_version=None, port=BUNDLE_SMOKE_PORT):
     tray_exe = frozen_tray_path(bundle_dir)
     fallback = bundle_dir / "_internal" / "curated" / "free_claims.fallback.json"
     env_path = bundle_dir / ".env"
+    # bundle_root() is the exe directory, so the version source has to sit beside
+    # the binary, not in the PyInstaller _internal/ copy.
+    pyproject = bundle_dir / "pyproject.toml"
     tray_required = tray_exe is not None
     tray_ok = (not tray_required) or tray_exe.is_file()
     static_ok = server_exe.is_file() and tray_ok and fallback.is_file()
@@ -78,9 +81,16 @@ def run_smoke(bundle_dir, *, expected_version=None, port=BUNDLE_SMOKE_PORT):
         "curated_fallback": fallback.is_file(),
         "fetcher_manifest_count": fetcher_count,
         "bundled_env": env_ok,
+        "bundle_pyproject": pyproject.is_file(),
     }
     if not static_ok:
         report["error"] = "missing required bundle files"
+        return report
+    if not pyproject.is_file():
+        report["error"] = (
+            f"pyproject.toml missing at bundle root ({pyproject}); "
+            "the frozen server reads its version from there"
+        )
         return report
     if fetcher_count < 1:
         report["error"] = "fetchers/manifest.json missing or empty in bundle"

@@ -57,6 +57,9 @@ if [[ ! -f "${FALLBACK_JSON}" ]]; then
   exit 1
 fi
 
+# pyproject.toml must be at bundle root for frozen version detection: bundle_root()
+# is the exe directory, while PyInstaller puts the packaged copy under _internal/.
+cp -f "${ROOT}/pyproject.toml" "${OUT_DIR}/pyproject.toml"
 cp -f "${ROOT}/packaging/BETA-README.txt" "${OUT_DIR}/BETA-README.txt"
 cp -f "${ROOT}/packaging/apply_update.sh" "${OUT_DIR}/apply_update.sh"
 chmod +x "${OUT_DIR}/apply_update.sh" "${SERVER_BIN}"

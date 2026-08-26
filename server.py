@@ -98,6 +98,18 @@ if __name__ == "__main__":
 
     exit_if_fetcher_child()
 
+    # Frozen import smoke: BAKLOG.exe --import-check <module>
+    # (PyInstaller does not honor python -c; this exits before the HTTP server.)
+    if len(sys.argv) >= 3 and sys.argv[1] == "--import-check":
+        module_name = sys.argv[2]
+        try:
+            __import__(module_name)
+        except Exception as exc:
+            print(f"import-check FAIL {module_name}: {exc}", file=sys.stderr, flush=True)
+            raise SystemExit(1) from exc
+        print("ok", flush=True)
+        raise SystemExit(0)
+
     # Apply BAKLOG_DEV_FROZEN_PARITY=1 patches before any path resolution.
     # Must come after the fetcher-child exit guard but before ROOT = data_root().
     from shared.dev_frozen_parity import apply_frozen_parity_patches

@@ -82,6 +82,28 @@ def _hit_endpoint(path: str) -> dict:
     return json.loads(data)
 
 
+def _hit_endpoint_allow_auth_gate(path: str, *, auth_required: bool) -> dict:
+    """GET path; when auth is on, a 401 proves the gate (no crash)."""
+    req = urllib.request.Request(
+        f"{BASE_URL}{path}",
+        headers={"Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = resp.read().decode("utf-8")
+        payload = json.loads(data)
+        if auth_required:
+            raise AssertionError(
+                f"{path} returned {getattr(resp, 'status', 200)} while authRequired; "
+                "expected 401 without a bearer"
+            )
+        return payload if isinstance(payload, dict) else {"ok": True}
+    except urllib.error.HTTPError as exc:
+        if auth_required and exc.code == 401:
+            return {"ok": True, "auth_gated": True, "status": 401}
+        raise
+
+
 def _shutdown_server(proc: subprocess.Popen) -> None:
     """Send graceful shutdown via API, then force-kill."""
     try:
@@ -152,7 +174,10 @@ def run_smoke(exe: Path) -> dict:
             config = _hit_endpoint("/api/config")
             assert isinstance(config, dict), "config is not a dict"
             assert config.get("frozen") is True, "config.frozen is not True"
-            report["steps"].append({"step": "api_config", "ok": True})
+            auth_required = bool(config.get("authRequired"))
+            report["steps"].append(
+                {"step": "api_config", "ok": True, "authRequired": auth_required}
+            )
         except Exception as exc:
             report["steps"].append({"step": "api_config", "ok": False, "error": str(exc)})
             report["error"] = f"api/config failed: {exc}"
@@ -160,7 +185,9 @@ def run_smoke(exe: Path) -> dict:
 
         # Step 3: /api/auth/status (connect endpoints)
         try:
-            status = _hit_endpoint("/api/auth/status")
+            status = _hit_endpoint_allow_auth_gate(
+                "/api/auth/status", auth_required=auth_required
+            )
             assert isinstance(status, dict), "auth status not a dict"
             report["steps"].append({"step": "api_auth_status", "ok": True})
         except Exception as exc:
@@ -170,7 +197,9 @@ def run_smoke(exe: Path) -> dict:
 
         # Step 4: /api/fetchers (used by connections view)
         try:
-            fetchers = _hit_endpoint("/api/fetchers")
+            fetchers = _hit_endpoint_allow_auth_gate(
+                "/api/fetchers", auth_required=auth_required
+            )
             assert isinstance(fetchers, dict), "fetchers not a dict"
             report["steps"].append({"step": "api_fetchers", "ok": True})
         except Exception as exc:

@@ -19,9 +19,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
    `git push origin vX.Y.Z`. The tag is the install-reproducibility contract;
    without it, "which version do you have?" is unanswerable for a second
    contributor.
-4. **Before tagging:** run `.\scripts\release_preflight.ps1 -TagVersion vX.Y.Z`
-   on Windows (includes pytest, Inno ISCC compile, optional full
-   `build_windows.ps1`). CI `python-windows` must also compile `baklog.iss`.
+4. **Before tagging (Windows):** run `.\scripts\release_preflight.ps1 -TagVersion vX.Y.Z`
+   (pytest, Inno ISCC compile, full `build_windows.ps1` with bundle/import/connect
+   smokes). Launch `release\BAKLOG\BAKLOG Tray.exe` for a quick manual smoke
+   (version badge, sign-in, one Connect if relevant). CI `python-windows` must
+   also compile `baklog.iss`. Tag push rebuilds on GitHub Actions; local
+   artifacts are for testing only.
 5. **Gates (tagging only):** working tree must be clean and GitHub CI must be green on the release commit on `main` before tagging, not before merge. Never tag WIP or a red/pending CI commit.
 6. **Broken public installer:** do not bump version for a bad build alone. Fix
    on `main`, keep `pyproject.toml` on the same version, run
@@ -34,6 +37,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - baklog.app is open beta: signup email still collected, confirmation includes the GitHub Releases download link.
 - Maintainer admin console will not attach to the default installed library folder unless you explicitly allow it. Prefer a separate data folder for admin work.
+- Free claims feed rebuilt from current approved auto rows (stale approved-only ids dropped).
 
 ### Fixed
 

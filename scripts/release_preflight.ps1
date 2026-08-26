@@ -2,8 +2,7 @@
 # Mirrors release.yml checks plus CI frontend-build budgets so PyInstaller is not wasted.
 param(
     [string]$TagVersion = "",
-    [switch]$SkipBuild,
-    [switch]$SkipFrozenSmoke
+    [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -105,7 +104,16 @@ Write-Host "==> packaging/build_windows.ps1"
 powershell -ExecutionPolicy Bypass -File (Join-Path $Root "packaging\build_windows.ps1")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+$BundleDir = Join-Path $Root "release\BAKLOG"
 Write-Host ""
-Write-Host "Preflight OK for v$pyVer. Safe to tag:"
+Write-Host "Preflight OK for v$pyVer. Manual smoke checklist (before tagging):"
+Write-Host "  1. Launch: $BundleDir\BAKLOG Tray.exe"
+Write-Host "  2. Confirm version badge shows v$pyVer"
+Write-Host "  3. Sign-in gate loads (Supabase auth)"
+Write-Host "  4. One Connect flow if this release touched store auth"
+Write-Host ""
+Write-Host "When manual smoke passes and main is clean with CI green:"
 Write-Host "  git tag -a v$pyVer -m ""BAKLOG v$pyVer"""
 Write-Host "  git push origin v$pyVer"
+Write-Host ""
+Write-Host "Tag push rebuilds on GitHub Actions; do not upload the local zip/Setup."

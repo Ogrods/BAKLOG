@@ -212,6 +212,30 @@ function Wait-ProcessGone([int]$ProcessId, [int]$TimeoutSec) {
     }
 }
 
+function Sync-ArpDisplayVersion {
+    param(
+        [string]$InstallDir,
+        [string]$Version
+    )
+    if (-not $Version) { return }
+    $unins = Get-ChildItem -LiteralPath $InstallDir -Filter "unins*.exe" -File -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $unins) {
+        Write-ApplyLog "skip ARP sync (no Inno uninstaller in install dir)"
+        return
+    }
+    $subkey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\{A7B3C9D1-E4F2-4A8B-9C0D-1E2F3A4B5C6D}_is1"
+    foreach ($root in @("HKCU:\", "HKLM:\")) {
+        $path = "$root$subkey"
+        if (Test-Path -LiteralPath $path) {
+            Set-ItemProperty -LiteralPath $path -Name DisplayVersion -Value $Version -ErrorAction Stop
+            Write-ApplyLog "updated ARP DisplayVersion to $Version ($path)"
+            return
+        }
+    }
+    Write-ApplyLog "skip ARP sync (Inno uninstall registry key not found)"
+}
+
 function Start-TrayIfPresent {
     if (-not $script:InstallDir) { return }
     $trayExePath = Join-Path $script:InstallDir "BAKLOG Tray.exe"
@@ -344,6 +368,7 @@ try {
         }
 
         Remove-OldBackups -InstallParent $installParent -KeepBackup $script:BackupDir
+        Sync-ArpDisplayVersion -InstallDir $installDir -Version $script:Version
         Write-ApplyResult -Ok $true -Version $script:Version -Restored $false
         # Drop ready package so the relaunched app does not rehydrate Install & restart.
         $versionDir = Join-Path $script:UpdateRoot $script:Version

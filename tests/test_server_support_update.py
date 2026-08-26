@@ -23,7 +23,8 @@ def test_update_available_compares_semver_tuple() -> None:
     assert update_available("0.9.0", "0.8.99") is False
 
 
-def test_build_update_check_payload_ok() -> None:
+def test_build_update_check_payload_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
     release = {
         "tag_name": "v1.2.3",
         "html_url": "https://github.com/Ogrods/BAKLOG/releases/tag/v1.2.3",
@@ -55,6 +56,7 @@ def test_build_update_check_payload_ok() -> None:
     assert payload["latest"] == "1.2.3"
     assert payload["release_notes"] == "## Notes\n- fix bug"
     assert payload["published_at"] == "2026-06-26T00:00:00Z"
+    assert payload["download_url"] is not None
     assert payload["download_url"].endswith("BAKLOG-win64.zip")
     assert payload["apply_supported"] is True
     assert payload["apply_blocked_reason"] is None

@@ -5,13 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import scripts.frozen_bundle_smoke as smoke
+from shared.update_platform import server_binary_name, tray_binary_name
 
 
 def _stub_bundle(tmp_path: Path, *, with_env: bool = True) -> Path:
     bundle = tmp_path / "BAKLOG"
     bundle.mkdir()
-    (bundle / "BAKLOG.exe").write_text("", encoding="utf-8")
-    (bundle / "BAKLOG Tray.exe").write_text("", encoding="utf-8")
+    (bundle / server_binary_name()).write_text("", encoding="utf-8")
+    tray = tray_binary_name()
+    if tray:
+        (bundle / tray).write_text("", encoding="utf-8")
     internal = bundle / "_internal" / "curated"
     internal.mkdir(parents=True)
     (internal / "free_claims.fallback.json").write_text("{}", encoding="utf-8")

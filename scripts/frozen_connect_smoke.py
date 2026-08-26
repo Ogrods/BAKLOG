@@ -235,7 +235,7 @@ def main() -> int:
     )
     ap.add_argument(
         "--exe", type=Path, required=True,
-        help="Path to frozen BAKLOG.exe",
+        help="Path to frozen BAKLOG server binary",
     )
     ap.add_argument(
         "--json-out", type=Path, default=None,

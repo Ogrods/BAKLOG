@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -13,6 +12,12 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parents[1]
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
+
+from scripts.frozen_smoke_paths import (  # noqa: E402
+    frozen_server_path,
+    frozen_tray_path,
+    smoke_home_env,
+)
 
 
 def _read_expected_version():
@@ -59,16 +64,19 @@ def run_smoke(bundle_dir, *, expected_version=None):
     bundle_dir = bundle_dir.resolve()
     version = expected_version or _read_expected_version()
     report = {"ok": False, "bundle_dir": str(bundle_dir), "checks": {}}
-    server_exe = bundle_dir / "BAKLOG.exe"
-    tray_exe = bundle_dir / "BAKLOG Tray.exe"
+    server_exe = frozen_server_path(bundle_dir)
+    tray_exe = frozen_tray_path(bundle_dir)
     fallback = bundle_dir / "_internal" / "curated" / "free_claims.fallback.json"
     env_path = bundle_dir / ".env"
-    static_ok = server_exe.is_file() and tray_exe.is_file() and fallback.is_file()
+    tray_required = tray_exe is not None
+    tray_ok = (not tray_required) or tray_exe.is_file()
+    static_ok = server_exe.is_file() and tray_ok and fallback.is_file()
     fetcher_count = _manifest_fetcher_count(bundle_dir)
     env_ok, env_missing = _env_has_auth_keys(env_path)
     report["checks"]["static"] = {
         "server_exe": server_exe.is_file(),
-        "tray_exe": tray_exe.is_file(),
+        "tray_exe": tray_exe.is_file() if tray_exe is not None else None,
+        "tray_required": tray_required,
         "curated_fallback": fallback.is_file(),
         "fetcher_manifest_count": fetcher_count,
         "bundled_env": env_ok,
@@ -99,10 +107,7 @@ def run_smoke(bundle_dir, *, expected_version=None):
         return report
     try:
         with tempfile.TemporaryDirectory(prefix="baklog-bundle-smoke-") as td:
-            localappdata = Path(td)
-            env = {**os.environ, "LOCALAPPDATA": str(localappdata), "BAKLOG_NO_BROWSER": "1"}
-            env.pop("BAKLOG_DATA_DIR", None)
-            env.pop("BAKLOG_PORTABLE", None)
+            env, _data_dir = smoke_home_env(Path(td))
             proc = subprocess.Popen(
                 [str(server_exe)],
                 cwd=str(bundle_dir),

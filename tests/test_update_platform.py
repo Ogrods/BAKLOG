@@ -21,24 +21,49 @@ from shared.update_release import is_allowed_download_url
 
 
 @pytest.mark.parametrize(
-    ("platform", "zip_name", "sha_name", "server", "tray", "script"),
+    ("platform", "zip_name", "sha_name", "server", "tray", "script", "bundle"),
     [
-        ("win32", "BAKLOG-win64.zip", "BAKLOG-win64.sha256", "BAKLOG.exe", "BAKLOG Tray.exe", "apply_update.ps1"),
-        ("darwin", "BAKLOG-macos.zip", "BAKLOG-macos.sha256", "BAKLOG", "BAKLOG Tray", "apply_update.sh"),
+        (
+            "win32",
+            "BAKLOG-win64.zip",
+            "BAKLOG-win64.sha256",
+            "BAKLOG.exe",
+            "BAKLOG Tray.exe",
+            "apply_update.ps1",
+            ("BAKLOG.exe", "BAKLOG Tray.exe"),
+        ),
+        (
+            "darwin",
+            "BAKLOG-macos.zip",
+            "BAKLOG-macos.sha256",
+            "BAKLOG",
+            "BAKLOG Tray",
+            "apply_update.sh",
+            ("BAKLOG", "BAKLOG Tray"),
+        ),
+        (
+            "linux",
+            "BAKLOG-linux64.zip",
+            "BAKLOG-linux64.sha256",
+            "BAKLOG",
+            "",
+            "apply_update.sh",
+            ("BAKLOG",),
+        ),
     ],
 )
-def test_platform_constants(platform, zip_name, sha_name, server, tray, script) -> None:
+def test_platform_constants(platform, zip_name, sha_name, server, tray, script, bundle) -> None:
     assert stable_zip_name(platform) == zip_name
     assert stable_sha256_name(platform) == sha_name
     assert server_binary_name(platform) == server
     assert tray_binary_name(platform) == tray
     assert apply_script_name(platform) == script
-    assert required_bundle_files(platform) == (server, tray)
+    assert required_bundle_files(platform) == bundle
 
 
 @pytest.mark.parametrize(
     "platform",
-    ["win32", "darwin"],
+    ["win32", "darwin", "linux"],
 )
 def test_is_in_app_apply_platform(platform, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.platform", platform)
@@ -50,9 +75,43 @@ def test_allowed_download_urls_for_macos_asset() -> None:
     assert is_allowed_download_url(url) is True
 
 
+def test_allowed_download_urls_for_linux_asset() -> None:
+    url = "https://github.com/Ogrods/BAKLOG/releases/download/v0.9.00/BAKLOG-linux64.zip"
+    assert is_allowed_download_url(url) is True
+
+
 @pytest.mark.no_leak_check
 def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr("shared.update_platform.sys.platform", "darwin")
+    script = tmp_path / "apply_update.sh"
+    script.write_text("#!/bin/bash\n", encoding="utf-8")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("{}", encoding="utf-8")
+    install = tmp_path / "install"
+    install.mkdir()
+    calls: list[dict] = []
+
+    class FakePopen:
+        def __init__(self, cmd, **kwargs):
+            calls.append({"cmd": cmd, "kwargs": kwargs})
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr("shared.update_platform.subprocess.Popen", FakePopen)
+    launch_apply_subprocess(script=script, manifest_path=manifest, install_dir=install)
+    assert calls
+    assert calls[0]["cmd"][0] == "/bin/bash"
+    assert str(script) in calls[0]["cmd"]
+    assert calls[0]["kwargs"].get("start_new_session") is True
+
+
+@pytest.mark.no_leak_check
+def test_launch_apply_subprocess_linux(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("shared.update_platform.sys.platform", "linux")
     script = tmp_path / "apply_update.sh"
     script.write_text("#!/bin/bash\n", encoding="utf-8")
     manifest = tmp_path / "manifest.json"

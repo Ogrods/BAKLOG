@@ -41,6 +41,23 @@ Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.b
 3. If macOS blocks the app ("cannot be opened"), right-click **BAKLOG Tray** → **Open** once, or run `xattr -cr /path/to/BAKLOG` in Terminal. See [Unsigned beta builds](troubleshooting.md#unsigned-beta-builds-no-code-signing).
 4. Library data lives in `~/Library/Application Support/BAKLOG-Data` (or beside the app when `portable.txt` is present). In-app updates use `apply_update.sh` once a mac zip is on the release.
 
+## Beta (Linux)
+
+Experimental packaged zip (no tray icon yet). Prefer a desktop session or GUI VM - Connect needs a headed browser.
+
+1. Download **BAKLOG-linux64.zip** from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest) when published, or from a CI preview artifact while it is still experimental.
+2. Unzip to a normal folder, then run:
+
+   ```bash
+   chmod +x "BAKLOG/Start BAKLOG.sh" BAKLOG/BAKLOG
+   ./BAKLOG/Start\ BAKLOG.sh
+   ```
+
+3. Your browser should open **http://127.0.0.1:8765**. Closing the terminal stops the server (there is no tray menu on Linux yet).
+4. Library data lives in `~/.local/share/baklog` (or `$XDG_DATA_HOME/baklog`). Optional login autostart uses `~/.config/autostart/BAKLOG.desktop` when enabled from the app.
+5. Install Google Chrome or Chromium for Connections, or set `BAKLOG_CHROME_PATH`. If neither is installed, first Connect can download a one-time browser (~150 MB) when online.
+6. Use **GOG (web)** and **Amazon (Prime Gaming, web)** - Galaxy local and Amazon launcher DB are not available on Linux.
+
 ## Install (from source)
 
 1. Clone or download the repo from [GitHub](https://github.com/Ogrods/BAKLOG).

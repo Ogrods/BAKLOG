@@ -1,4 +1,8 @@
-"""Windows uninstall helpers: login autostart registry, keyring, and data dir."""
+"""Uninstall helpers: login autostart, keyring, and data dir (all platforms).
+
+``cleanup_autostart`` delegates to ``shared.startup.disable_startup`` which already
+covers Windows registry, macOS LaunchAgent, and Linux XDG autostart.
+"""
 
 from __future__ import annotations
 
@@ -43,7 +47,7 @@ def _request_graceful_shutdown() -> bool:
 
 
 def cleanup_autostart() -> None:
-    """Remove HKCU Run\\BAKLOG login autostart (safe when the app is uninstalled)."""
+    """Remove login autostart registration (Windows / macOS / Linux)."""
     disable_startup()
 
 

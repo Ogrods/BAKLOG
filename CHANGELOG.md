@@ -33,6 +33,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Experimental Linux zip build (`BAKLOG-linux64.zip`) for testers who prefer a packaged app to running from source (server + Start script; no tray yet).
+
 ### Changed
 
 - baklog.app is open beta: signup email still collected, confirmation includes the GitHub Releases download link.

@@ -87,8 +87,14 @@ def _live_ok(row):
 
 
 def main():
+    from shared.update_platform import server_binary_name
+
     ap = argparse.ArgumentParser(description="Frozen fetcher fleet smoke test")
-    ap.add_argument("--exe", type=Path, default=_REPO / "release" / "BAKLOG" / "BAKLOG.exe")
+    ap.add_argument(
+        "--exe",
+        type=Path,
+        default=_REPO / "release" / "BAKLOG" / server_binary_name(),
+    )
     ap.add_argument("--data-dir", type=Path, default=_REPO)
     ap.add_argument("--profile", default=os.environ.get("BAKLOG_PROFILE", "").strip() or None)
     ap.add_argument("--dispatch-only", action="store_true", help="Only run --help dispatch checks")
@@ -96,7 +102,7 @@ def main():
     args = ap.parse_args()
     exe = args.exe.resolve()
     if not exe.is_file():
-        print(f"BAKLOG.exe not found: {exe}", file=sys.stderr)
+        print(f"BAKLOG server binary not found: {exe}", file=sys.stderr)
         return 2
     data_dir = args.data_dir.resolve()
     env = os.environ.copy()

@@ -290,7 +290,7 @@ def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
 
 def locate_bundle_root(extracted_dir: Path, platform: str | None = None) -> Path:
     """Find the directory containing required frozen executables."""
-    plats = (platform,) if platform is not None else ("win32", "darwin")
+    plats = (platform,) if platform is not None else ("win32", "darwin", "linux")
     for plat in plats:
         server_name = server_binary_name(plat)
         required = required_bundle_files(plat)

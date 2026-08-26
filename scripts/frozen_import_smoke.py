@@ -7,8 +7,9 @@ BAKLOG.exe with -c "import X; print('ok')" for each module.
 
 Usage:
     python scripts/frozen_import_smoke.py --exe release/BAKLOG/BAKLOG.exe
+    python scripts/frozen_import_smoke.py --exe release/BAKLOG/BAKLOG
 
-The frozen exe is invoked as ``BAKLOG.exe --import-check <module>`` (not
+The frozen exe is invoked as ``BAKLOG --import-check <module>`` (not
 ``python -c``), which server.py handles and exits before binding the HTTP port.
 """
 
@@ -127,7 +128,7 @@ def run_smoke(exe: Path) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(description="Frozen bundle import-chain smoke test")
-    ap.add_argument("--exe", type=Path, required=True, help="Path to frozen BAKLOG.exe")
+    ap.add_argument("--exe", type=Path, required=True, help="Path to frozen BAKLOG server binary")
     ap.add_argument("--json-out", type=Path, default=None, help="Write JSON report to file")
     args = ap.parse_args()
 

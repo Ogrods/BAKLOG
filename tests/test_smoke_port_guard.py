@@ -66,7 +66,8 @@ def test_ensure_dev_port_free_when_idle(monkeypatch) -> None:
 
 def test_wait_for_http_server_ok(monkeypatch) -> None:
     proc = _FakeProc(1000)
-    monkeypatch.setattr(guard.urllib.request, "urlopen", MagicMock(return_value=MagicMock(status=200, __enter__=lambda s: s, __exit__=lambda *a: None)))
+    resp = MagicMock(status=200, __enter__=lambda s: s, __exit__=lambda *a: None)
+    monkeypatch.setattr(guard.urllib.request, "urlopen", MagicMock(return_value=resp))
     ok, err = guard.wait_for_http_server(proc, "http://127.0.0.1:8765", timeout_sec=0.01)
     assert ok is True
     assert err is None

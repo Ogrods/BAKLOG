@@ -91,7 +91,7 @@ def run_smoke(bundle_dir, *, expected_version=None):
         report["error"] = f"bundled .env missing keys: {', '.join(env_missing)}"
         return report
     from scripts.frozen_data_dir_migration_smoke import run_smoke as migrate_smoke
-    from scripts.smoke_port_guard import port_collision_message, port_listener_pid, ensure_dev_port_free
+    from scripts.smoke_port_guard import ensure_dev_port_free, port_collision_message, port_listener_pid
 
     migrate = migrate_smoke(bundle_dir)
     report["checks"]["migration"] = migrate

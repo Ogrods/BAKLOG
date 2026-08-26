@@ -19,8 +19,8 @@ from scripts.smoke_port_guard import (  # noqa: E402
     port_listener_pid,
     wait_for_owned_server,
 )
-from shared.subprocess_guard import terminate_pid_tree  # noqa: E402
 from shared.bundled_auth_env import parse_env_file  # noqa: E402
+from shared.subprocess_guard import terminate_pid_tree  # noqa: E402
 
 
 def _wait_for_server(base, proc, *, timeout_sec=25.0):

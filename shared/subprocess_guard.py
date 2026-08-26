@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from typing import Any
 
 
@@ -167,11 +168,23 @@ def terminate_pid_tree(pid: int) -> None:
             check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    else:
-        import signal
+        return
+    import signal
 
+    targets = sorted(related_pids(pid), reverse=True)
+    for target in targets:
         try:
-            os.kill(pid, signal.SIGTERM)
+            os.kill(target, signal.SIGTERM)
+        except OSError:
+            pass
+    time.sleep(0.35)
+    for target in targets:
+        try:
+            os.kill(target, 0)
+        except OSError:
+            continue
+        try:
+            os.kill(target, signal.SIGKILL)
         except OSError:
             pass
 

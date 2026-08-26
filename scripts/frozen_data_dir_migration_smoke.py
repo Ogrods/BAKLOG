@@ -14,10 +14,12 @@ from scripts.frozen_smoke_paths import (  # noqa: E402
     smoke_home_env,
 )
 from scripts.smoke_port_guard import (  # noqa: E402
+    ensure_dev_port_free,
     port_collision_message,
     port_listener_pid,
     wait_for_owned_server,
 )
+from shared.subprocess_guard import terminate_pid_tree  # noqa: E402
 from shared.bundled_auth_env import parse_env_file  # noqa: E402
 
 
@@ -61,6 +63,7 @@ def run_smoke(bundle_dir):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+                start_new_session=sys.platform != "win32",
             )
             ok, wait_err = _wait_for_server("http://127.0.0.1:8765", proc)
             if not ok:
@@ -91,10 +94,8 @@ def run_smoke(bundle_dir):
             return report
     finally:
         if proc is not None and proc.poll() is None:
-            if sys.platform == "win32":
-                subprocess.run(["taskkill", "/F", "/PID", str(proc.pid), "/T"], capture_output=True, check=False)
-            else:
-                proc.terminate()
+            terminate_pid_tree(proc.pid)
+        ensure_dev_port_free(timeout_sec=5.0)
         smoke_games = bundle_dir / "games_steam_smoke.json"
         if smoke_games.is_file():
             smoke_games.unlink()

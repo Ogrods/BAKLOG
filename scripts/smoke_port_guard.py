@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 
 from shared.dev_server_pids import DEFAULT_HOST, DEFAULT_PORT, pid_listening_on_port
-from shared.subprocess_guard import related_pids
+from shared.subprocess_guard import related_pids, terminate_pid_tree
 
 
 def port_listener_pid(
@@ -78,6 +78,28 @@ def wait_for_owned_server(
             f"(pid {proc.pid}); run scripts/stop_baklog.py",
         )
     return False, f"server did not respond within {timeout_sec}s"
+
+
+def ensure_dev_port_free(
+    *,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    timeout_sec: float = 15.0,
+) -> tuple[bool, str | None]:
+    """Terminate any listener on the dev port and wait until it is free."""
+    holder = port_listener_pid(host, port)
+    if holder is None:
+        return True, None
+    terminate_pid_tree(holder)
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if port_listener_pid(host, port) is None:
+            return True, None
+        time.sleep(0.25)
+    holder = port_listener_pid(host, port)
+    if holder is None:
+        return True, None
+    return False, port_collision_message(holder, host=host, port=port)
 
 
 def port_collision_message(

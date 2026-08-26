@@ -91,12 +91,16 @@ def run_smoke(bundle_dir, *, expected_version=None):
         report["error"] = f"bundled .env missing keys: {', '.join(env_missing)}"
         return report
     from scripts.frozen_data_dir_migration_smoke import run_smoke as migrate_smoke
-    from scripts.smoke_port_guard import port_collision_message, port_listener_pid
+    from scripts.smoke_port_guard import port_collision_message, port_listener_pid, ensure_dev_port_free
 
     migrate = migrate_smoke(bundle_dir)
     report["checks"]["migration"] = migrate
     if not migrate.get("ok"):
         report["error"] = "frozen_data_dir_migration_smoke failed"
+        return report
+    port_ok, port_err = ensure_dev_port_free()
+    if not port_ok:
+        report["error"] = port_err
         return report
     proc = None
     config = None
@@ -115,11 +119,19 @@ def run_smoke(bundle_dir, *, expected_version=None):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+                start_new_session=sys.platform != "win32",
             )
             ok, wait_err = _wait_for_server("http://127.0.0.1:8765", proc)
             if not ok:
                 err = (proc.stderr.read() if proc.stderr else b"").decode("utf-8", errors="replace")
-                report["error"] = wait_err or f"server did not respond; stderr tail: {err[-400:]}"
+                holder = port_listener_pid()
+                exit_code = proc.poll()
+                detail = wait_err or f"server did not respond; stderr tail: {err[-400:]}"
+                if holder is not None and exit_code is not None:
+                    detail = (
+                        f"{detail}; port held by pid {holder} after smoke proc exited ({exit_code})"
+                    )
+                report["error"] = detail
                 return report
             with urllib.request.urlopen("http://127.0.0.1:8765/api/config", timeout=5) as resp:
                 config = json.loads(resp.read().decode("utf-8"))
@@ -175,10 +187,9 @@ def run_smoke(bundle_dir, *, expected_version=None):
                 return report
     finally:
         if proc is not None and proc.poll() is None:
-            if sys.platform == "win32":
-                subprocess.run(["taskkill", "/F", "/PID", str(proc.pid), "/T"], capture_output=True, check=False)
-            else:
-                proc.terminate()
+            from shared.subprocess_guard import terminate_pid_tree
+
+            terminate_pid_tree(proc.pid)
     if not isinstance(config, dict):
         report["error"] = "invalid /api/config response"
         return report

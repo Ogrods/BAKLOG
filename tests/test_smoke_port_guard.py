@@ -54,3 +54,10 @@ def test_port_collision_message() -> None:
     msg = guard.port_collision_message(99)
     assert "99" in msg
     assert "stop_baklog" in msg
+
+
+def test_ensure_dev_port_free_when_idle(monkeypatch) -> None:
+    monkeypatch.setattr(guard, "port_listener_pid", lambda host, port: None)
+    ok, err = guard.ensure_dev_port_free(timeout_sec=0.01)
+    assert ok is True
+    assert err is None

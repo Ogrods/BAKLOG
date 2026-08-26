@@ -11,11 +11,12 @@ from pathlib import Path
 MIGRATION_MARKER = ".legacy_migration_done"
 
 # Root-level catalog / config files (not directories).
+# Omit `.env` — bundled auth stays beside the exe; sync_bundled_auth_env_to_data_dir
+# copies auth keys into the data dir without removing the install copy.
 _ROOT_FILES = (
     "itad_prices.json",
     "free_claims.json",
     "sponsors.json",
-    ".env",
     "license.json",
     "refresh.log",
 )

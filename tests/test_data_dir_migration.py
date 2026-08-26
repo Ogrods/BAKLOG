@@ -97,3 +97,21 @@ def test_migrate_skips_when_legacy_empty(tmp_path: Path) -> None:
     legacy.mkdir()
     assert migrate_legacy_colocated_data(legacy, target) == []
     assert not migration_marker_path(target).exists()
+
+
+def test_migrate_leaves_bundled_env_in_install_dir(tmp_path: Path) -> None:
+    legacy = tmp_path / "install"
+    target = tmp_path / "userdata"
+    legacy.mkdir()
+    (legacy / "profiles").mkdir()
+    (legacy / "profiles" / "index.json").write_text('{"active":"default"}', encoding="utf-8")
+    env_text = (
+        "BAKLOG_SUPABASE_URL=https://proj.supabase.co\n"
+        "BAKLOG_SUPABASE_ANON_KEY=anon-key\n"
+    )
+    (legacy / ".env").write_text(env_text, encoding="utf-8")
+
+    migrate_legacy_colocated_data(legacy, target)
+
+    assert (legacy / ".env").read_text(encoding="utf-8") == env_text
+    assert not (target / ".env").exists()

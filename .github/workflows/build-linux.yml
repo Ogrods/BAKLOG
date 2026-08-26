@@ -61,6 +61,17 @@ jobs:
           BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
         run: bash packaging/build_linux.sh
 
+      - name: Verify bundled auth .env after build
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.frozen_bundle_smoke import _env_has_auth_keys
+          env_path = Path("release/BAKLOG/.env")
+          ok, missing = _env_has_auth_keys(env_path)
+          assert ok, f"bundled .env invalid after build: missing {missing}"
+          print(f"bundled auth ok: {env_path}")
+          PY
+
       - name: Isolate smoke home (XDG)
         run: |
           mkdir -p "$RUNNER_TEMP/baklog-home/.local/share"

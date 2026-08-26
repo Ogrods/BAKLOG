@@ -37,6 +37,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - baklog.app is open beta: signup email still collected, confirmation includes the GitHub Releases download link.
 - Maintainer admin console will not attach to the default installed library folder unless you explicitly allow it. Prefer a separate data folder for admin work.
+- Free claims feed rebuilt from current approved auto rows (stale approved-only ids dropped).
 
 ### Fixed
 

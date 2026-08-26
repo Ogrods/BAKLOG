@@ -8,10 +8,14 @@ import scripts.frozen_bundle_smoke as smoke
 from shared.update_platform import server_binary_name, tray_binary_name
 
 
-def _stub_bundle(tmp_path: Path, *, with_env: bool = True) -> Path:
+def _stub_bundle(tmp_path: Path, *, with_env: bool = True, with_pyproject: bool = True) -> Path:
     bundle = tmp_path / "BAKLOG"
     bundle.mkdir()
     (bundle / server_binary_name()).write_text("", encoding="utf-8")
+    if with_pyproject:
+        (bundle / "pyproject.toml").write_text(
+            '[project]\nversion = "0.8.20"\n', encoding="utf-8"
+        )
     tray = tray_binary_name()
     if tray:
         (bundle / tray).write_text("", encoding="utf-8")
@@ -61,6 +65,23 @@ def test_run_smoke_does_not_nest_migration_smoke(tmp_path: Path, monkeypatch) ->
     report = smoke.run_smoke(bundle, expected_version="0.8.20")
     assert "migration" not in report["checks"]
     assert report["port"] == smoke.BUNDLE_SMOKE_PORT
+
+
+def test_run_smoke_requires_pyproject_at_bundle_root(tmp_path: Path, monkeypatch) -> None:
+    """Frozen version detection reads bundle_root()/pyproject.toml, not _internal/."""
+    bundle = _stub_bundle(tmp_path, with_pyproject=False)
+    monkeypatch.setattr(smoke, "_read_expected_version", lambda: "0.8.20")
+    report = smoke.run_smoke(bundle, expected_version="0.8.20")
+    assert not report["ok"]
+    assert report["checks"]["static"]["bundle_pyproject"] is False
+    assert "pyproject.toml missing at bundle root" in (report.get("error") or "")
+
+
+def test_unix_build_scripts_stage_pyproject_at_bundle_root() -> None:
+    root = Path(__file__).resolve().parents[1]
+    for script in ("build_linux.sh", "build_macos.sh"):
+        text = (root / "packaging" / script).read_text(encoding="utf-8")
+        assert '"${ROOT}/pyproject.toml" "${OUT_DIR}/pyproject.toml"' in text, script
 
 
 def test_smoke_ports_are_distinct() -> None:

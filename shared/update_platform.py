@@ -9,25 +9,29 @@ from pathlib import Path
 _PLATFORM_ARTIFACTS: dict[str, tuple[str, str]] = {
     "win32": ("BAKLOG-win64.zip", "BAKLOG-win64.sha256"),
     "darwin": ("BAKLOG-macos.zip", "BAKLOG-macos.sha256"),
+    "linux": ("BAKLOG-linux64.zip", "BAKLOG-linux64.sha256"),
 }
 
+# Tray is optional on Linux MVP (server + Start BAKLOG.sh only).
 _PLATFORM_BUNDLE_FILES: dict[str, tuple[str, ...]] = {
     "win32": ("BAKLOG.exe", "BAKLOG Tray.exe"),
     "darwin": ("BAKLOG", "BAKLOG Tray"),
+    "linux": ("BAKLOG",),
 }
 
 _PLATFORM_APPLY_SCRIPT: dict[str, str] = {
     "win32": "apply_update.ps1",
     "darwin": "apply_update.sh",
+    "linux": "apply_update.sh",
 }
 
-_SUPPORTED_APPLY_PLATFORMS = frozenset({"win32", "darwin"})
+_SUPPORTED_APPLY_PLATFORMS = frozenset({"win32", "darwin", "linux"})
 
 
 def release_platform(platform: str | None = None) -> str:
-    """Platform key for GitHub release zip/sha256 names (win32 or darwin).
+    """Platform key for GitHub release zip/sha256 names (win32, darwin, or linux).
 
-    Linux dev/CI has no release bundle; callers fall back to win32 artifact names.
+    Unknown platforms fall back to win32 artifact names (legacy CI callers).
     """
     plat = platform or sys.platform
     if plat in _PLATFORM_ARTIFACTS:
@@ -85,7 +89,9 @@ def server_binary_name(platform: str | None = None) -> str:
 
 
 def tray_binary_name(platform: str | None = None) -> str:
-    return required_bundle_files(platform)[1]
+    """Tray launcher basename, or empty string when the platform ships without a tray (Linux MVP)."""
+    files = required_bundle_files(platform)
+    return files[1] if len(files) > 1 else ""
 
 
 def apply_log_path() -> Path:
@@ -132,7 +138,7 @@ def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: P
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
             )
-        if platform == "darwin":
+        if platform in ("darwin", "linux"):
             cmd = [
                 "/bin/bash",
                 str(script),

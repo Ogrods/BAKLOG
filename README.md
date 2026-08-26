@@ -61,7 +61,7 @@ See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: library and cre
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
 | **macOS** | Supported with limits — **Amazon Games (launcher)** and **GOG Galaxy (local)** are Windows/macOS-only local sources |
-| **Linux** | Supported with limits — **Amazon Games (launcher)** and **GOG Galaxy (local)** are unavailable; use web Connect instead |
+| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Experimental frozen zip (`BAKLOG-linux64.zip`) available via CI preview; source-run still recommended |
 
 The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local source:** **Amazon Games (launcher)** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent) — on macOS/Linux use **Amazon (Prime Gaming, web)** Connect instead; the Amazon fetcher still runs and auto-picks the web session. **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) — there is no supported Linux path, so Linux users use **GOG (web)** instead. Platform-restricted local providers show as **Unavailable** on unsupported OSes; their fetcher chips stay enabled when a web fallback exists.
 

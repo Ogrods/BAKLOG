@@ -58,7 +58,7 @@ We are onboarding in small waves so we can fix what breaks on real setups before
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
 | **macOS** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) are Windows/macOS-only local sources |
-| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) are unavailable; use web Connect instead |
+| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Experimental `BAKLOG-linux64.zip` packaged build in preview |
 
 The app itself (dashboard, server, secret storage, browser sign-in) is OS-agnostic. Platform-restricted local providers show as **Unavailable** on unsupported OSes; web fallbacks remain available.
 

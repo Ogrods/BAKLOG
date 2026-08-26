@@ -1,18 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for BAKLOG (Windows onedir). Run via packaging/build_windows.ps1.
-# Dual entry: BAKLOG.exe (server + fetcher dispatch) and BAKLOG Tray.exe (primary launcher).
+# PyInstaller spec for BAKLOG. Run via packaging/build_windows.ps1,
+# packaging/build_macos.sh, or packaging/build_linux.sh.
+# Dual entry on Windows/macOS: BAKLOG (+ .exe) and BAKLOG Tray.
+# Linux MVP: server binary only (no tray; Start BAKLOG.sh launches BAKLOG).
 
 import sys
 from pathlib import Path
 
 root = Path(SPEC).resolve().parent.parent
 app_icon = str(root / "packaging" / "BAKLOG.ico")
+_build_tray = sys.platform in ("win32", "darwin")
 
-_keyring_backends = (
-    ["keyring.backends.Windows"]
-    if sys.platform == "win32"
-    else ["keyring.backends.macOS"]
-)
+if sys.platform == "win32":
+    _keyring_backends = ["keyring.backends.Windows"]
+elif sys.platform == "darwin":
+    _keyring_backends = ["keyring.backends.macOS"]
+else:
+    # Linux SecretService + transitive deps PyInstaller often misses.
+    _keyring_backends = [
+        "keyring.backends.SecretService",
+        "secretstorage",
+        "jeepney",
+        "jeepney.io.blocking",
+    ]
 
 block_cipher = None
 
@@ -100,26 +110,7 @@ a = Analysis(
     noarchive=False,
 )
 
-a_tray = Analysis(
-    [str(root / "tray_app.py")],
-    pathex=[str(root)],
-    binaries=[],
-    datas=[],
-    hiddenimports=tray_hiddenimports,
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=["tests", "landing", "marketing", "node_modules"],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-MERGE((a, "BAKLOG", "BAKLOG"), (a_tray, "BAKLOG", "BAKLOG Tray"))
-
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-pyz_tray = PYZ(a_tray.pure, a_tray.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -140,38 +131,67 @@ exe = EXE(
     icon=app_icon,
 )
 
-exe_tray = EXE(
-    pyz_tray,
-    a_tray.scripts,
-    [],
-    exclude_binaries=True,
-    name="BAKLOG Tray",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=app_icon,
-)
-
-coll = COLLECT(
-    exe,
-    exe_tray,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    # MERGE assigns tray-only deps (pystray, Pillow's _imaging.pyd) to a_tray;
-    # COLLECT must aggregate them too or the tray exe falls back to headless.
-    a_tray.binaries,
-    a_tray.zipfiles,
-    a_tray.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="BAKLOG",
-)
+if _build_tray:
+    a_tray = Analysis(
+        [str(root / "tray_app.py")],
+        pathex=[str(root)],
+        binaries=[],
+        datas=[],
+        hiddenimports=tray_hiddenimports,
+        hookspath=[],
+        hooksconfig={},
+        runtime_hooks=[],
+        excludes=["tests", "landing", "marketing", "node_modules"],
+        win_no_prefer_redirects=False,
+        win_private_assemblies=False,
+        cipher=block_cipher,
+        noarchive=False,
+    )
+    MERGE((a, "BAKLOG", "BAKLOG"), (a_tray, "BAKLOG", "BAKLOG Tray"))
+    pyz_tray = PYZ(a_tray.pure, a_tray.zipped_data, cipher=block_cipher)
+    exe_tray = EXE(
+        pyz_tray,
+        a_tray.scripts,
+        [],
+        exclude_binaries=True,
+        name="BAKLOG Tray",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=app_icon,
+    )
+    coll = COLLECT(
+        exe,
+        exe_tray,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        # MERGE assigns tray-only deps (pystray, Pillow's _imaging.pyd) to a_tray;
+        # COLLECT must aggregate them too or the tray exe falls back to headless.
+        a_tray.binaries,
+        a_tray.zipfiles,
+        a_tray.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name="BAKLOG",
+    )
+else:
+    # Linux MVP: server binary only.
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name="BAKLOG",
+    )

@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -15,6 +14,10 @@ from scripts.smoke_port_guard import (  # noqa: E402
     port_listener_pid,
     wait_for_owned_server,
 )
+from scripts.frozen_smoke_paths import (  # noqa: E402
+    frozen_server_path,
+    smoke_home_env,
+)
 from shared.bundled_auth_env import parse_env_file  # noqa: E402
 
 
@@ -24,7 +27,7 @@ def _wait_for_server(base, proc, *, timeout_sec=25.0):
 
 def run_smoke(bundle_dir):
     bundle_dir = bundle_dir.resolve()
-    exe = bundle_dir / "BAKLOG.exe"
+    exe = frozen_server_path(bundle_dir)
     if not exe.is_file():
         raise FileNotFoundError(f"missing frozen server: {exe}")
     legacy_profiles = bundle_dir / "profiles"
@@ -46,15 +49,11 @@ def run_smoke(bundle_dir):
     proc = None
     try:
         with tempfile.TemporaryDirectory(prefix="baklog-migrate-smoke-") as td:
-            localappdata = Path(td)
-            data_dir = localappdata / "BAKLOG-Data"
+            env, data_dir = smoke_home_env(Path(td))
             data_dir.mkdir(parents=True, exist_ok=True)
             (data_dir / ".env").write_text(
                 "BAKLOG_SUPABASE_URL=https://stale.supabase.co\nBAKLOG_SUPABASE_ANON_KEY=stale-anon\n", encoding="utf-8"
             )
-            env = {**os.environ, "LOCALAPPDATA": str(localappdata), "BAKLOG_NO_BROWSER": "1"}
-            env.pop("BAKLOG_DATA_DIR", None)
-            env.pop("BAKLOG_PORTABLE", None)
             proc = subprocess.Popen(
                 [str(exe)],
                 cwd=str(bundle_dir),
@@ -113,7 +112,7 @@ def main():
         "--bundle-dir",
         type=Path,
         default=_REPO / "release" / "BAKLOG",
-        help="PyInstaller onedir output (contains BAKLOG.exe)",
+        help="PyInstaller onedir output (contains BAKLOG server binary)",
     )
     parser.add_argument("--json-out", type=Path, default=None, help="Write JSON report to this path")
     args = parser.parse_args()

@@ -1,0 +1,148 @@
+# Experimental Linux frozen build (workflow_dispatch preview).
+# Builds BAKLOG-linux64.zip on ubuntu-22.04 (glibc 2.35 baseline), runs frozen
+# smokes headlessly, then uploads zip + sha256 + SBOM as workflow artifacts.
+# Promote into release.yml on v* tags only after 2-3 clean dispatch runs.
+name: Build Linux (preview)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: build-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    name: Build and smoke Linux zip
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      BAKLOG_NO_BROWSER: "1"
+      BAKLOG_NO_CHROMIUM_DOWNLOAD: "1"
+      BAKLOG_IDLE_SHUTDOWN_MINUTES: "0"
+      BAKLOG_PROFILE: smoke
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install zip utility
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Verify release auth secrets (fail fast)
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$BAKLOG_SUPABASE_URL" ] || [ -z "$BAKLOG_SUPABASE_ANON_KEY" ]; then
+            echo "::error::GitHub repo secrets BAKLOG_SUPABASE_URL and BAKLOG_SUPABASE_ANON_KEY must be set."
+            exit 1
+          fi
+          echo "Release auth secrets present (values not printed)."
+
+      - name: Build Linux bundle
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: bash packaging/build_linux.sh
+
+      - name: Isolate smoke home (XDG)
+        run: |
+          mkdir -p "$RUNNER_TEMP/baklog-home/.local/share"
+          echo "HOME=$RUNNER_TEMP/baklog-home" >> "$GITHUB_ENV"
+          echo "XDG_DATA_HOME=$RUNNER_TEMP/baklog-home/.local/share" >> "$GITHUB_ENV"
+
+      - name: Chromium pin smoke (linux64)
+        run: |
+          python - <<'PY'
+          from shared.chromium_runtime import is_allowed_cft_url, load_pin, platform_key
+          assert platform_key() == "linux64", platform_key()
+          pin = load_pin()
+          entry = (pin.get("platforms") or {}).get("linux64")
+          assert isinstance(entry, dict), entry
+          url = str(entry.get("url") or "")
+          sha = str(entry.get("sha256") or "")
+          assert is_allowed_cft_url(url), url
+          assert len(sha) == 64, sha
+          print("chromium pin linux64 ok")
+          PY
+
+      - name: XDG data-dir smoke
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from shared.install_paths import default_frozen_data_dir
+          home = Path(os.environ["HOME"]).resolve()
+          xdg = Path(os.environ["XDG_DATA_HOME"]).resolve()
+          got = default_frozen_data_dir()
+          expect = (xdg / "baklog").resolve()
+          assert got == expect, (got, expect, home)
+          print(f"default_frozen_data_dir ok: {got}")
+          PY
+
+      - name: Frozen import smoke
+        run: python scripts/frozen_import_smoke.py --exe release/BAKLOG/BAKLOG
+
+      - name: Frozen bundle smoke
+        run: python scripts/frozen_bundle_smoke.py release/BAKLOG
+
+      - name: Frozen connect smoke
+        run: python scripts/frozen_connect_smoke.py --exe release/BAKLOG/BAKLOG
+
+      - name: Verify Linux artifacts exist
+        run: |
+          test -f release/BAKLOG-linux64.zip
+          test -f release/BAKLOG-linux64.sha256
+          test -x release/BAKLOG/BAKLOG
+          test -x "release/BAKLOG/Start BAKLOG.sh"
+          test ! -e "release/BAKLOG/BAKLOG Tray"
+          (
+            cd release
+            sha256sum -c BAKLOG-linux64.sha256
+          )
+          ls -lh release/BAKLOG-linux64.zip release/BAKLOG-linux64.sha256
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: release/BAKLOG
+          format: spdx-json
+          output-file: release/BAKLOG-linux64.sbom.spdx.json
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: release/BAKLOG-linux64.zip
+
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: release/BAKLOG-linux64.zip
+          sbom-path: release/BAKLOG-linux64.sbom.spdx.json
+
+      - name: Upload preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BAKLOG-linux64-preview
+          path: |
+            release/BAKLOG-linux64.zip
+            release/BAKLOG-linux64.sha256
+            release/BAKLOG-linux64.sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 14

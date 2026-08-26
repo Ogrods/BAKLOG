@@ -119,7 +119,11 @@ remove_old_backups() {
   done
 }
 
-start_tray_if_present() {
+is_linux() {
+  [[ "$(uname -s 2>/dev/null || true)" == "Linux" ]]
+}
+
+start_app_if_present() {
   if [[ -z "$INSTALL_DIR" ]]; then
     return 0
   fi
@@ -129,9 +133,25 @@ start_tray_if_present() {
       cd "$INSTALL_DIR"
       exec "./BAKLOG Tray" >/dev/null 2>&1 &
     )
+  elif is_linux && [[ -x "$INSTALL_DIR/BAKLOG" ]]; then
+    # Linux MVP ships without a tray; relaunch the server in a new session.
+    write_apply_log "relaunching server (linux MVP, no tray)"
+    (
+      cd "$INSTALL_DIR"
+      if command -v setsid >/dev/null 2>&1; then
+        setsid ./BAKLOG >/dev/null 2>&1 &
+      else
+        ./BAKLOG >/dev/null 2>&1 &
+      fi
+    )
   else
-    write_apply_log "tray binary missing; cannot relaunch"
+    write_apply_log "tray/server binary missing; cannot relaunch"
   fi
+}
+
+# Back-compat alias for fail()/early-exit paths that still call the old name.
+start_tray_if_present() {
+  start_app_if_present
 }
 
 wait_pid_gone() {
@@ -238,7 +258,8 @@ touch_applying_lock
 BUNDLE_ROOT=""
 while IFS= read -r -d '' candidate; do
   parent="$(dirname "$candidate")"
-  if [[ -f "$parent/BAKLOG Tray" ]]; then
+  # macOS/Windows bundles include BAKLOG Tray; Linux MVP is server-only.
+  if [[ -f "$parent/BAKLOG Tray" ]] || { is_linux && [[ -f "$parent/BAKLOG" ]]; }; then
     BUNDLE_ROOT="$parent"
     break
   fi
@@ -271,17 +292,32 @@ if ! (
   exit 1
 fi
 
-if [[ ! -f "$INSTALL_DIR/BAKLOG Tray" ]]; then
+if [[ ! -f "$INSTALL_DIR/BAKLOG" ]]; then
   restored=false
   if restore_install_from_backup "$INSTALL_DIR" "$BACKUP_DIR"; then
     restored=true
   fi
-  write_apply_result false "Updated bundle missing tray launcher" "$VERSION" "$restored"
-  start_tray_if_present
+  write_apply_result false "Updated bundle missing BAKLOG server" "$VERSION" "$restored"
+  start_app_if_present
   exit 1
 fi
 
-chmod +x "$INSTALL_DIR/BAKLOG" "$INSTALL_DIR/BAKLOG Tray" 2>/dev/null || true
+if [[ ! -f "$INSTALL_DIR/BAKLOG Tray" ]]; then
+  if is_linux; then
+    write_apply_log "no tray binary in bundle (linux MVP)"
+  else
+    restored=false
+    if restore_install_from_backup "$INSTALL_DIR" "$BACKUP_DIR"; then
+      restored=true
+    fi
+    write_apply_result false "Updated bundle missing tray launcher" "$VERSION" "$restored"
+    start_app_if_present
+    exit 1
+  fi
+fi
+
+chmod +x "$INSTALL_DIR/BAKLOG" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/BAKLOG Tray" 2>/dev/null || true
 remove_old_backups "$INSTALL_PARENT" "$BACKUP_DIR"
 write_apply_result true "" "$VERSION" false
 # Drop ready package so the relaunched app does not rehydrate Install & restart.
@@ -291,8 +327,7 @@ if [[ -d "$VERSION_DIR" ]]; then
   rmdir "$VERSION_DIR" 2>/dev/null || true
 fi
 
-write_apply_log "starting tray"
-cd "$INSTALL_DIR"
-exec "./BAKLOG Tray" >/dev/null 2>&1 &
+write_apply_log "starting app after apply"
+start_app_if_present
 
 exit 0

@@ -9,14 +9,14 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parents[1]
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
+from scripts.frozen_smoke_paths import (  # noqa: E402
+    frozen_server_path,
+    smoke_home_env,
+)
 from scripts.smoke_port_guard import (  # noqa: E402
     port_collision_message,
     port_listener_pid,
     wait_for_owned_server,
-)
-from scripts.frozen_smoke_paths import (  # noqa: E402
-    frozen_server_path,
-    smoke_home_env,
 )
 from shared.bundled_auth_env import parse_env_file  # noqa: E402
 

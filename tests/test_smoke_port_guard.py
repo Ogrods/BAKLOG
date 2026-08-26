@@ -71,7 +71,6 @@ def test_ensure_port_free_kills_holder(monkeypatch) -> None:
     killed: list[int] = []
     monkeypatch.setattr(guard, "port_listener_pid", lambda host, port: next(listeners, None))
     monkeypatch.setattr(guard, "terminate_pid_tree", killed.append)
-    monkeypatch.setattr(guard.time, "sleep", lambda _: None)
 
     ok, err = guard.ensure_port_free(timeout_sec=1.0)
     assert ok is True
@@ -82,10 +81,7 @@ def test_ensure_port_free_kills_holder(monkeypatch) -> None:
 def test_ensure_port_free_reports_stubborn_holder(monkeypatch) -> None:
     monkeypatch.setattr(guard, "port_listener_pid", lambda host, port: 777)
     monkeypatch.setattr(guard, "terminate_pid_tree", lambda pid: None)
-    monkeypatch.setattr(guard.time, "sleep", lambda _: None)
-    ticks = iter([0.0, 0.0, 5.0, 5.0])
-    monkeypatch.setattr(guard.time, "monotonic", lambda: next(ticks))
 
-    ok, err = guard.ensure_port_free(timeout_sec=0.01)
+    ok, err = guard.ensure_port_free(timeout_sec=0.0)
     assert ok is False
     assert "777" in (err or "")

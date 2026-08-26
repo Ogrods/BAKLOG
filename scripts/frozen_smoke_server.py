@@ -38,6 +38,28 @@ CONNECT_SMOKE_PORT = 8767
 DEFAULT_START_TIMEOUT_SEC = 30.0
 
 
+def _spawn(exe: Path, cwd: Path, env: dict[str, str]) -> subprocess.Popen:
+    """Spawn the frozen server detached enough to be tree-killed on exit."""
+    return subprocess.Popen(
+        [str(exe)],
+        cwd=str(cwd),
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
+        start_new_session=sys.platform != "win32",
+    )
+
+
+def _probe_config(base: str, *, timeout: float = 2.0) -> bool:
+    """True when /api/config answers 200."""
+    try:
+        with urllib.request.urlopen(f"{base}/api/config", timeout=timeout) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
 class FrozenSmokeServer:
     """Context manager that owns one frozen-server run for a smoke script.
 
@@ -78,15 +100,7 @@ class FrozenSmokeServer:
         if not free:
             self.error = free_err
             return self
-        self.proc = subprocess.Popen(
-            [str(self.exe)],
-            cwd=str(self.cwd),
-            env=self.env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
-            start_new_session=sys.platform != "win32",
-        )
+        self.proc = _spawn(self.exe, self.cwd, self.env)
         self.ok, self.error = self._wait_for_http()
         return self
 
@@ -105,12 +119,8 @@ class FrozenSmokeServer:
             exit_code = self.proc.poll()
             if exit_code is not None and exit_code != 0:
                 return False, f"server exited with code {exit_code}{self._stderr_suffix()}"
-            try:
-                with urllib.request.urlopen(f"{self.base}/api/config", timeout=2) as resp:
-                    if resp.status == 200:
-                        return True, None
-            except (urllib.error.URLError, TimeoutError, OSError):
-                pass
+            if _probe_config(self.base):
+                return True, None
             time.sleep(0.4)
         return False, (
             f"server did not respond on {self.base} within "

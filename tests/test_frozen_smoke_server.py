@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -20,15 +19,6 @@ class _FakeProc:
         return self._returncode
 
 
-@contextmanager
-def _ok_response(status: int = 200):
-    class _Resp:
-        def __init__(self) -> None:
-            self.status = status
-
-    yield _Resp()
-
-
 @pytest.fixture
 def stub_exe(tmp_path: Path) -> Path:
     exe = tmp_path / "BAKLOG"
@@ -36,20 +26,28 @@ def stub_exe(tmp_path: Path) -> Path:
     return exe
 
 
-def _patch_lifecycle(monkeypatch, *, proc, port_free=(True, None), listener=None):
+def _patch_lifecycle(
+    monkeypatch,
+    *,
+    proc,
+    port_free=(True, None),
+    listener=None,
+    reachable=True,
+):
+    """Stub the spawn/probe/kill seams so no real process or socket is used."""
     killed: list[int] = []
     monkeypatch.setattr(smoke_server, "ensure_port_free", lambda **kw: port_free)
     monkeypatch.setattr(smoke_server, "port_listener_pid", lambda host, port: listener)
     monkeypatch.setattr(smoke_server, "wait_for_port_free", lambda **kw: None)
     monkeypatch.setattr(smoke_server, "terminate_pid_tree", killed.append)
-    monkeypatch.setattr(smoke_server.subprocess, "Popen", lambda *a, **kw: proc)
+    monkeypatch.setattr(smoke_server, "_spawn", lambda exe, cwd, env: proc)
+    monkeypatch.setattr(smoke_server, "_probe_config", lambda base, **kw: reachable)
     return killed
 
 
 def test_server_ready_when_config_responds(monkeypatch, stub_exe: Path) -> None:
     proc = _FakeProc()
     killed = _patch_lifecycle(monkeypatch, proc=proc)
-    monkeypatch.setattr(smoke_server.urllib.request, "urlopen", lambda *a, **kw: _ok_response())
 
     with smoke_server.FrozenSmokeServer(stub_exe, port=8799) as server:
         assert server.ok is True
@@ -59,9 +57,7 @@ def test_server_ready_when_config_responds(monkeypatch, stub_exe: Path) -> None:
 
 
 def test_server_injects_port_into_env(monkeypatch, stub_exe: Path) -> None:
-    proc = _FakeProc()
-    _patch_lifecycle(monkeypatch, proc=proc)
-    monkeypatch.setattr(smoke_server.urllib.request, "urlopen", lambda *a, **kw: _ok_response())
+    _patch_lifecycle(monkeypatch, proc=_FakeProc())
 
     with smoke_server.FrozenSmokeServer(stub_exe, env={"A": "b"}, port=8766) as server:
         assert server.env["PORT"] == "8766"
@@ -69,17 +65,25 @@ def test_server_injects_port_into_env(monkeypatch, stub_exe: Path) -> None:
 
 
 def test_server_reports_early_exit(monkeypatch, stub_exe: Path) -> None:
-    proc = _FakeProc(returncode=3)
-    _patch_lifecycle(monkeypatch, proc=proc)
+    _patch_lifecycle(monkeypatch, proc=_FakeProc(returncode=3), reachable=False)
 
     with smoke_server.FrozenSmokeServer(stub_exe, port=8799) as server:
         assert server.ok is False
         assert "exited with code 3" in (server.error or "")
 
 
+def test_server_reports_timeout(monkeypatch, stub_exe: Path) -> None:
+    _patch_lifecycle(monkeypatch, proc=_FakeProc(), reachable=False)
+    monkeypatch.setattr(smoke_server.time, "sleep", lambda _: None)
+
+    server = smoke_server.FrozenSmokeServer(stub_exe, port=8799, start_timeout_sec=0.01)
+    with server:
+        assert server.ok is False
+        assert "did not respond" in (server.error or "")
+
+
 def test_server_reports_blocked_port(monkeypatch, stub_exe: Path) -> None:
-    proc = _FakeProc()
-    _patch_lifecycle(monkeypatch, proc=proc, port_free=(False, "port busy"))
+    _patch_lifecycle(monkeypatch, proc=_FakeProc(), port_free=(False, "port busy"))
 
     with smoke_server.FrozenSmokeServer(stub_exe, port=8799) as server:
         assert server.ok is False
@@ -96,7 +100,6 @@ def test_server_missing_exe(tmp_path: Path) -> None:
 def test_exit_kills_leftover_port_holder(monkeypatch, stub_exe: Path) -> None:
     proc = _FakeProc(pid=111, returncode=0)
     killed = _patch_lifecycle(monkeypatch, proc=proc, listener=222)
-    monkeypatch.setattr(smoke_server.urllib.request, "urlopen", lambda *a, **kw: _ok_response())
 
     with smoke_server.FrozenSmokeServer(stub_exe, port=8799) as server:
         assert server.ok is True

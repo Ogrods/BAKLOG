@@ -107,14 +107,30 @@ jobs:
           print(f"default_frozen_data_dir ok: {got}")
           PY
 
+      # One server session per step, each on its own port, so a slow teardown
+      # in one smoke cannot stall the next one.
       - name: Frozen import smoke
         run: python scripts/frozen_import_smoke.py --exe release/BAKLOG/BAKLOG
 
+      - name: Frozen data-dir migration smoke
+        run: python scripts/frozen_data_dir_migration_smoke.py --bundle-dir release/BAKLOG --port 8766
+
       - name: Frozen bundle smoke
-        run: python scripts/frozen_bundle_smoke.py release/BAKLOG
+        run: python scripts/frozen_bundle_smoke.py release/BAKLOG --port 8765
 
       - name: Frozen connect smoke
-        run: python scripts/frozen_connect_smoke.py --exe release/BAKLOG/BAKLOG
+        run: python scripts/frozen_connect_smoke.py --exe release/BAKLOG/BAKLOG --port 8767
+
+      - name: Verify bundled auth .env survived smokes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.frozen_bundle_smoke import _env_has_auth_keys
+          env_path = Path("release/BAKLOG/.env")
+          ok, missing = _env_has_auth_keys(env_path)
+          assert ok, f"bundled .env lost during smokes: missing {missing}"
+          print(f"bundled auth intact: {env_path}")
+          PY
 
       - name: Verify Linux artifacts exist
         run: |

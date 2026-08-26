@@ -6,7 +6,7 @@ endpoints without crashing. Run as a post-build gate after
 packaging/build_windows.ps1.
 
 Usage:
-    python scripts/frozen_connect_smoke.py --exd release/BAKLOG
+    python scripts/frozen_connect_smoke.py --exe release/BAKLOG/BAKLOG
 
 This test:
     1. Starts the frozen server (with BAKLOG_NO_BROWSER=1)
@@ -21,60 +21,25 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
-import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-BASE_URL = "http://127.0.0.1:8765"
-SMOKE_PORT = 8765  # Must match default server port
-START_TIMEOUT_SEC = 15
-POLL_INTERVAL_SEC = 0.5
+_REPO = Path(__file__).resolve().parents[1]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
+
+from scripts.frozen_smoke_server import (  # noqa: E402
+    CONNECT_SMOKE_PORT,
+    FrozenSmokeServer,
+)
 
 
-def _start_server(exe: Path, env: dict[str, str]) -> subprocess.Popen:
-    """Start the frozen server as a subprocess."""
-    print(f"Starting server: {exe}", file=sys.stderr)
-    merged_env = os.environ.copy()
-    merged_env.update(env)
-    proc = subprocess.Popen(
-        [str(exe)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env=merged_env,
-        creationflags=(
-            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-        )
-        if sys.platform == "win32"
-        else 0,
-    )
-    return proc
-
-
-def _wait_for_server(timeout: float = START_TIMEOUT_SEC) -> bool:
-    """Poll /api/config until the server responds or timeout."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            req = urllib.request.Request(
-                f"{BASE_URL}/api/config",
-                headers={"Accept": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    return True
-        except (urllib.error.URLError, TimeoutError, OSError):
-            pass
-        time.sleep(POLL_INTERVAL_SEC)
-    return False
-
-
-def _hit_endpoint(path: str) -> dict:
+def _hit_endpoint(base_url: str, path: str) -> dict:
     """GET an endpoint and return parsed JSON."""
     req = urllib.request.Request(
-        f"{BASE_URL}{path}",
+        f"{base_url}{path}",
         headers={"Accept": "application/json"},
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
@@ -82,10 +47,10 @@ def _hit_endpoint(path: str) -> dict:
     return json.loads(data)
 
 
-def _hit_endpoint_allow_auth_gate(path: str, *, auth_required: bool) -> dict:
+def _hit_endpoint_allow_auth_gate(base_url: str, path: str, *, auth_required: bool) -> dict:
     """GET path; when auth is on, a 401 proves the gate (no crash)."""
     req = urllib.request.Request(
-        f"{BASE_URL}{path}",
+        f"{base_url}{path}",
         headers={"Accept": "application/json"},
     )
     try:
@@ -104,47 +69,12 @@ def _hit_endpoint_allow_auth_gate(path: str, *, auth_required: bool) -> dict:
         raise
 
 
-def _shutdown_server(proc: subprocess.Popen) -> None:
-    """Send graceful shutdown via API, then force-kill."""
-    try:
-        req = urllib.request.Request(
-            f"{BASE_URL}/api/shutdown",
-            method="POST",
-            headers={"X-BAKLOG-Local": "1"},
-        )
-        urllib.request.urlopen(req, timeout=5)
-        proc.wait(timeout=10)
-    except (urllib.error.URLError, TimeoutError, OSError):
-        pass
-
-    if proc.poll() is None:
-        if sys.platform == "win32":
-            proc.send_signal(subprocess.signal.CTRL_BREAK_EVENT)
-        else:
-            proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=5)
-
-
-def _collect_stderr(proc: subprocess.Popen) -> str:
-    """Read remaining stderr from the process (non-blocking best-effort)."""
-    try:
-        out, _ = proc.communicate(timeout=3)
-        return (out or b"").decode("utf-8", errors="replace")
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        out, _ = proc.communicate(timeout=3)
-        return (out or b"").decode("utf-8", errors="replace")
-
-
-def run_smoke(exe: Path) -> dict:
+def run_smoke(exe: Path, *, port: int = CONNECT_SMOKE_PORT) -> dict:
     """Run the connect-flow smoke test and return a report."""
     report: dict = {
         "ok": False,
         "exe": str(exe),
+        "port": port,
         "steps": [],
         "error": None,
     }
@@ -154,24 +84,24 @@ def run_smoke(exe: Path) -> dict:
         return report
 
     env = {
+        **os.environ,
         "BAKLOG_NO_BROWSER": "1",
         "BAKLOG_PROFILE": "smoke",
         "BAKLOG_IDLE_SHUTDOWN_MINUTES": "0",
     }
 
-    proc = _start_server(exe, env)
-
-    try:
+    print(f"Starting server: {exe} (port {port})", file=sys.stderr)
+    with FrozenSmokeServer(exe, env=env, port=port) as server:
         # Step 1: Wait for server
-        if not _wait_for_server():
-            report["error"] = "server did not start within timeout"
-            report["stderr"] = _collect_stderr(proc)
+        if not server.ok:
+            report["error"] = server.error
             return report
         report["steps"].append({"step": "wait_for_server", "ok": True})
+        base_url = server.base
 
         # Step 2: /api/config
         try:
-            config = _hit_endpoint("/api/config")
+            config = _hit_endpoint(base_url, "/api/config")
             assert isinstance(config, dict), "config is not a dict"
             assert config.get("frozen") is True, "config.frozen is not True"
             auth_required = bool(config.get("authRequired"))
@@ -186,7 +116,7 @@ def run_smoke(exe: Path) -> dict:
         # Step 3: /api/auth/status (connect endpoints)
         try:
             status = _hit_endpoint_allow_auth_gate(
-                "/api/auth/status", auth_required=auth_required
+                base_url, "/api/auth/status", auth_required=auth_required
             )
             assert isinstance(status, dict), "auth status not a dict"
             report["steps"].append({"step": "api_auth_status", "ok": True})
@@ -198,7 +128,7 @@ def run_smoke(exe: Path) -> dict:
         # Step 4: /api/fetchers (used by connections view)
         try:
             fetchers = _hit_endpoint_allow_auth_gate(
-                "/api/fetchers", auth_required=auth_required
+                base_url, "/api/fetchers", auth_required=auth_required
             )
             assert isinstance(fetchers, dict), "fetchers not a dict"
             report["steps"].append({"step": "api_fetchers", "ok": True})
@@ -209,7 +139,7 @@ def run_smoke(exe: Path) -> dict:
 
         # Step 5: Verify server is still alive after all the hits
         try:
-            alive = _hit_endpoint("/api/config")
+            alive = _hit_endpoint(base_url, "/api/config")
             assert alive.get("frozen") is True, "server not alive after connect endpoint hits"
             report["steps"].append({"step": "post_connect_alive", "ok": True})
         except Exception as exc:
@@ -219,13 +149,6 @@ def run_smoke(exe: Path) -> dict:
 
         report["ok"] = True
 
-    finally:
-        _shutdown_server(proc)
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait(timeout=5)
-
-    report["stderr"] = _collect_stderr(proc)
     return report
 
 
@@ -241,9 +164,13 @@ def main() -> int:
         "--json-out", type=Path, default=None,
         help="Write JSON report to file",
     )
+    ap.add_argument(
+        "--port", type=int, default=CONNECT_SMOKE_PORT,
+        help=f"Port for the smoke server (default {CONNECT_SMOKE_PORT})",
+    )
     args = ap.parse_args()
 
-    report = run_smoke(args.exe)
+    report = run_smoke(args.exe, port=args.port)
     text = json.dumps(report, indent=2)
     print(text)
 

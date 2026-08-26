@@ -87,26 +87,36 @@ Write-Host "Stopping stray BAKLOG servers on port 8765..."
 & $Python scripts/stop_baklog.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "Smoke: frozen bundle (migration + /api/config + fetcher dispatch)..."
-& $Python scripts/frozen_bundle_smoke.py $OutDir
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
-}
-# Migration smoke moves co-located .env into %LOCALAPPDATA%\BAKLOG-Data; restore bundled auth for the zip.
-Write-Host "Restoring bundled account-auth .env after migration smoke..."
-& $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
+# One server session per smoke, each on its own port (8766 / 8765 / 8767).
 Write-Host "Smoke: frozen import chain (PyInstaller hidden imports)..."
 & $Python scripts/frozen_import_smoke.py --exe $ServerExe
 if ($LASTEXITCODE -ne 0) {
     Write-Error "frozen_import_smoke failed (exit $LASTEXITCODE)"
 }
 
+Write-Host "Smoke: frozen data-dir migration (legacy co-located data)..."
+& $Python scripts/frozen_data_dir_migration_smoke.py --bundle-dir $OutDir --port 8766
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "frozen_data_dir_migration_smoke failed (exit $LASTEXITCODE)"
+}
+
+Write-Host "Smoke: frozen bundle (/api/config + mirror gate + fetcher dispatch)..."
+& $Python scripts/frozen_bundle_smoke.py $OutDir --port 8765
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
+}
+
 Write-Host "Smoke: frozen connect-flow (/api/config + auth endpoints)..."
-& $Python scripts/frozen_connect_smoke.py --exe $ServerExe
+& $Python scripts/frozen_connect_smoke.py --exe $ServerExe --port 8767
 if ($LASTEXITCODE -ne 0) {
     Write-Error "frozen_connect_smoke failed (exit $LASTEXITCODE)"
+}
+
+# Belt and braces: the bundled .env must survive every smoke before zipping.
+Write-Host "Verifying bundled account-auth .env after smokes..."
+& $Python -c "import sys; sys.path.insert(0, r'$Root'); from pathlib import Path; from scripts.frozen_bundle_smoke import _env_has_auth_keys; ok, missing = _env_has_auth_keys(Path(r'$OutDir') / '.env'); sys.exit(0 if ok else f'bundled .env missing keys: {missing}')"
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "bundled .env verification failed (exit $LASTEXITCODE)"
 }
 
 @"

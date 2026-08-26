@@ -167,13 +167,43 @@ def terminate_pid_tree(pid: int) -> None:
             check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    else:
-        import signal
+        return
 
+    import signal
+    import time
+
+    # Descendants first: a PyInstaller launcher can respawn/hand off to a child
+    # that keeps the listening socket after the parent is gone.
+    targets = sorted(related_pids(pid) - _ancestors_of(pid), reverse=True)
+    for target in targets:
         try:
-            os.kill(pid, signal.SIGTERM)
+            os.kill(target, signal.SIGTERM)
         except OSError:
             pass
+    time.sleep(0.35)
+    for target in targets:
+        try:
+            os.kill(target, 0)
+        except OSError:
+            continue
+        try:
+            os.kill(target, signal.SIGKILL)
+        except OSError:
+            pass
+
+
+def _ancestors_of(pid: int) -> set[int]:
+    """Ancestors of ``pid`` (never kill the shell/CI runner that launched us)."""
+    table = _proc_parent_map()
+    ancestors: set[int] = set()
+    cur = pid
+    while cur in table:
+        parent = table[cur]
+        if parent <= 0 or parent in ancestors:
+            break
+        ancestors.add(parent)
+        cur = parent
+    return ancestors
 
 
 class _WindowsJobPopen(subprocess.Popen[str]):

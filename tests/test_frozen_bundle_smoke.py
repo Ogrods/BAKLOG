@@ -52,3 +52,24 @@ def test_run_smoke_fails_without_env(tmp_path: Path, monkeypatch) -> None:
     report = smoke.run_smoke(bundle, expected_version="0.8.20")
     assert not report["ok"]
     assert "bundled .env" in (report.get("error") or "")
+
+
+def test_run_smoke_does_not_nest_migration_smoke(tmp_path: Path, monkeypatch) -> None:
+    """Migration runs as its own workflow step, on its own port."""
+    bundle = _stub_bundle(tmp_path, with_env=False)
+    monkeypatch.setattr(smoke, "_read_expected_version", lambda: "0.8.20")
+    report = smoke.run_smoke(bundle, expected_version="0.8.20")
+    assert "migration" not in report["checks"]
+    assert report["port"] == smoke.BUNDLE_SMOKE_PORT
+
+
+def test_smoke_ports_are_distinct() -> None:
+    from scripts.frozen_smoke_server import (
+        BUNDLE_SMOKE_PORT,
+        CONNECT_SMOKE_PORT,
+        MIGRATION_SMOKE_PORT,
+    )
+
+    ports = {BUNDLE_SMOKE_PORT, MIGRATION_SMOKE_PORT, CONNECT_SMOKE_PORT}
+    assert len(ports) == 3
+    assert BUNDLE_SMOKE_PORT == 8765

@@ -18,6 +18,10 @@ from scripts.frozen_smoke_paths import (  # noqa: E402
     frozen_tray_path,
     smoke_home_env,
 )
+from scripts.frozen_smoke_server import (  # noqa: E402
+    BUNDLE_SMOKE_PORT,
+    FrozenSmokeServer,
+)
 
 
 def _read_expected_version():
@@ -26,12 +30,6 @@ def _read_expected_version():
     if not m:
         raise RuntimeError("could not read version from pyproject.toml")
     return m.group(1)
-
-
-def _wait_for_server(base, proc, *, timeout_sec=30.0):
-    from scripts.smoke_port_guard import wait_for_owned_server
-
-    return wait_for_owned_server(proc, base, timeout_sec=timeout_sec)
 
 
 def _manifest_fetcher_count(bundle_dir):
@@ -60,10 +58,10 @@ def _env_has_auth_keys(env_path):
     return (not missing, missing)
 
 
-def run_smoke(bundle_dir, *, expected_version=None):
+def run_smoke(bundle_dir, *, expected_version=None, port=BUNDLE_SMOKE_PORT):
     bundle_dir = bundle_dir.resolve()
     version = expected_version or _read_expected_version()
-    report = {"ok": False, "bundle_dir": str(bundle_dir), "checks": {}}
+    report = {"ok": False, "bundle_dir": str(bundle_dir), "port": port, "checks": {}}
     server_exe = frozen_server_path(bundle_dir)
     tray_exe = frozen_tray_path(bundle_dir)
     fallback = bundle_dir / "_internal" / "curated" / "free_claims.fallback.json"
@@ -90,42 +88,18 @@ def run_smoke(bundle_dir, *, expected_version=None):
     if not env_ok:
         report["error"] = f"bundled .env missing keys: {', '.join(env_missing)}"
         return report
-    from scripts.frozen_data_dir_migration_smoke import run_smoke as migrate_smoke
-    from scripts.smoke_port_guard import port_collision_message, port_listener_pid
-
-    migrate = migrate_smoke(bundle_dir)
-    report["checks"]["migration"] = migrate
-    if not migrate.get("ok"):
-        report["error"] = "frozen_data_dir_migration_smoke failed"
-        return report
-    proc = None
     config = None
-    holder = port_listener_pid()
-    if holder is not None:
-        report["error"] = port_collision_message(holder)
-        report["port_collision_before_start"] = holder
-        return report
-    try:
-        with tempfile.TemporaryDirectory(prefix="baklog-bundle-smoke-") as td:
-            env, _data_dir = smoke_home_env(Path(td))
-            proc = subprocess.Popen(
-                [str(server_exe)],
-                cwd=str(bundle_dir),
-                env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
-            )
-            ok, wait_err = _wait_for_server("http://127.0.0.1:8765", proc)
-            if not ok:
-                err = (proc.stderr.read() if proc.stderr else b"").decode("utf-8", errors="replace")
-                report["error"] = wait_err or f"server did not respond; stderr tail: {err[-400:]}"
+    with tempfile.TemporaryDirectory(prefix="baklog-bundle-smoke-") as td:
+        env, _data_dir = smoke_home_env(Path(td))
+        with FrozenSmokeServer(server_exe, cwd=bundle_dir, env=env, port=port) as server:
+            if not server.ok:
+                report["error"] = server.error
                 return report
-            with urllib.request.urlopen("http://127.0.0.1:8765/api/config", timeout=5) as resp:
-                config = json.loads(resp.read().decode("utf-8"))
+            base = server.base
+            config = server.get_json("/api/config")
             mirror_status = None
             # Verify root path serves HTML (the app), not a directory listing
-            with urllib.request.urlopen("http://127.0.0.1:8765/", timeout=5) as root_resp:
+            with urllib.request.urlopen(f"{base}/", timeout=5) as root_resp:
                 root_body = root_resp.read().decode("utf-8")
             root_ctype = root_resp.headers.get("Content-Type", "")
             if "text/html" not in root_ctype.lower():
@@ -141,7 +115,7 @@ def run_smoke(bundle_dir, *, expected_version=None):
             }
             mirror_body = None
             try:
-                with urllib.request.urlopen("http://127.0.0.1:8765/api/mirror", timeout=5) as resp:
+                with urllib.request.urlopen(f"{base}/api/mirror", timeout=5) as resp:
                     mirror_status = resp.status
                     mirror_body = json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as exc:
@@ -153,7 +127,7 @@ def run_smoke(bundle_dir, *, expected_version=None):
             import_status = None
             try:
                 req = urllib.request.Request(
-                    "http://127.0.0.1:8765/api/mirror/import",
+                    f"{base}/api/mirror/import",
                     data=b"{}",
                     method="POST",
                     headers={"Content-Type": "application/json"},
@@ -173,12 +147,6 @@ def run_smoke(bundle_dir, *, expected_version=None):
             if import_status not in (HTTPStatus.FORBIDDEN, HTTPStatus.UNAUTHORIZED):
                 report["error"] = f"expected POST /api/mirror/import -> 403/401, got {import_status}"
                 return report
-    finally:
-        if proc is not None and proc.poll() is None:
-            if sys.platform == "win32":
-                subprocess.run(["taskkill", "/F", "/PID", str(proc.pid), "/T"], capture_output=True, check=False)
-            else:
-                proc.terminate()
     if not isinstance(config, dict):
         report["error"] = "invalid /api/config response"
         return report
@@ -229,8 +197,14 @@ def main():
         "-o", "--json-out", dest="json_out", type=Path, default=None,
         help="Write JSON report to file (default: stdout)"
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=BUNDLE_SMOKE_PORT,
+        help=f"Port for the smoke server (default {BUNDLE_SMOKE_PORT})",
+    )
     args = parser.parse_args()
-    report = run_smoke(Path(args.bundle_dir))
+    report = run_smoke(Path(args.bundle_dir), port=args.port)
     text = json.dumps(report, indent=2)
     if args.json_out:
         args.json_out.write_text(text + "\n", encoding="utf-8")

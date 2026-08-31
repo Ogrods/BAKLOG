@@ -69,6 +69,6 @@ Copy these folders/files to the new machine (or sync via Dropbox/OneDrive):
 
 Re-run fetchers on the new machine to refresh stale data, or copy `cache/` to skip re-downloading API responses.
 
-## Optional invite-only accounts
+## Optional account sign-in
 
-Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing.
+When configured, account sign-in can require a login before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without those env vars, local behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing.

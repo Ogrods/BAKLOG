@@ -16,7 +16,7 @@ Before **tagging or publishing** any release (`vX.Y.Z`, `replace_release_tag.ps1
    - Run `.\scripts\release_preflight.ps1 -TagVersion vX.Y.Z` (full gate: tests + Inno stub + `packaging\build_windows.ps1`), or at minimum `packaging\build_windows.ps1` alone.
    - Automated smokes run inside the build: `frozen_bundle_smoke`, `frozen_import_smoke`, `frozen_connect_smoke`.
    - **Manual smoke** on `release\BAKLOG\`: launch `BAKLOG Tray.exe`, confirm version badge, sign-in gate, and one Connect if relevant.
-   - Local zip/Setup is for testing only; **do not upload it**. Tagging triggers `release.yml`, which rebuilds on GitHub and publishes authoritative assets.
+   - Local zip/Setup is for testing only; **do not upload it**. Tagging triggers `release.yml`, which rebuilds on GitHub and publishes authoritative assets (Windows Setup + win64/macos/linux64 zips).
 5. Flow: commit → push → merge to `main` → confirm clean tree + CI green → local frozen build + manual smoke → `git tag -a vX.Y.Z` and `git push origin vX.Y.Z` so `release.yml` builds assets.
 
 Do **not** tag a dirty tree, an unmerged feature branch, or a commit whose CI failed/is pending.

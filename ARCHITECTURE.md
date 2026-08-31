@@ -76,10 +76,10 @@ Without Supabase, Pro is **`license.json` on disk** (honor system for local dev;
 Polar activation for paid users). With Supabase, plan comes from JWT / admin
 metadata. Source is public; paying supports development, not a secret fork.
 
-## Open source vs invite beta
+## Open source vs open beta
 
 - **MIT + full source** in this repo (server, fetchers, UI, packaging scripts).
-- **Invite-only** refers to packaged beta builds and rollout, not hidden code.
+- **Open beta** means packaged builds and rollout pacing, not hidden code.
 - **Gitignored** paths: personal `profiles/`, `games_*.json`, `.env`, and
   maintainer-only `admin/`, `marketing/`, internal `docs/` (synced to private repo).
 

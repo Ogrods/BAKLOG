@@ -33,21 +33,23 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.01] - 2026-08-31
+
 ### Added
 
-- Experimental Linux zip build (`BAKLOG-linux64.zip`) for testers who prefer a packaged app to running from source (server + Start script; no tray yet).
+- Packaged Linux zip (`BAKLOG-linux64.zip`) on GitHub Releases (server + Start script; no tray yet). Prefer a desktop or GUI session - Connect needs a headed browser.
 
 ### Changed
 
-- baklog.app is open beta: signup email still collected, confirmation includes the GitHub Releases download link.
-- Maintainer admin console will not attach to the default installed library folder unless you explicitly allow it. Prefer a separate data folder for admin work.
-- Free claims feed rebuilt from current approved auto rows (stale approved-only ids dropped).
+- baklog.app is open beta: signup confirmation includes the GitHub Releases download link.
+- Free claims feed refreshed (stale approved-only ids dropped).
+- Docs and in-app tips describe open beta downloads for Windows, macOS, and Linux.
 
 ### Fixed
 
 - In-app updates on Windows refresh the version shown in Settings → Apps for Setup installs.
 - Dashboard and picks jumps to a library row re-check the target after scroll so the wrong game is not left under the sticky header on phone and mid-width layouts.
-- Dev and installed runs no longer share one browser error history when both use the same localhost origin; each runtime keeps its own log.
+- Source and packaged runs no longer share one browser error history when both use the same localhost origin; each runtime keeps its own log.
 
 ## [0.9.00] - 2026-08-18
 

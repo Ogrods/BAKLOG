@@ -1,7 +1,7 @@
-BAKLOG beta — quick start (Windows)
+BAKLOG beta - quick start (Windows)
 ===================================
 
-Recommended: run BAKLOG-Setup.exe from your invite link.
+Download BAKLOG-Setup.exe from GitHub Releases or baklog.app.
 
 1. If Windows SmartScreen warns "Unknown publisher":
    click More info, then Run anyway.
@@ -32,10 +32,10 @@ window unless you launched the server-console shortcut.
 
 Your data stays on this PC. Nothing is uploaded to our servers.
 
-If your invite build uses account sign-in (Supabase), you will see a sign-in
-screen before the dashboard. Create a free account on that screen, or sign in
-if you already have one. Store Connect prefers Chrome or Edge; otherwise
-BAKLOG downloads a one-time browser (~150 MB) on first Connect.
+If your build uses account sign-in, you will see a sign-in screen before the
+dashboard. Create a free account on that screen, or sign in if you already
+have one. Store Connect prefers Chrome or Edge; otherwise BAKLOG downloads a
+one-time browser (~150 MB) on first Connect.
 
-Bug reports: use the app menu (Report a bug…) or Discord #bug-reports.
-Version: see the About line in the app or BAKLOG-*.sha256 next to the zip.
+Bug reports: use the app menu (Report a bug...) or Discord #bug-reports.
+Community: https://discord.gg/VFvxN5nCCB

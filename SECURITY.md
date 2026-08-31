@@ -7,7 +7,7 @@ defends, what it explicitly does **not**, and the cryptography behind the
 claims. For the plain-language data inventory and network-host list, see
 [PRIVACY.md](PRIVACY.md).
 
-**Optional invite-only accounts:** When `BAKLOG_SUPABASE_*` is set, Supabase
+**Optional account sign-in:** When `BAKLOG_SUPABASE_*` is set, Supabase
 hosts login only (email + JWT). Your library and Connections secrets still live
 under `profiles/<user-id>/` on the machine running `server.py`. Configure
 `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`).

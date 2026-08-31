@@ -9,7 +9,7 @@ machine. On frozen Windows beta installs, the default data root is
 `%LOCALAPPDATA%\BAKLOG-Data` (override with `BAKLOG_DATA_DIR`). Profile-scoped
 files live under `profiles/<id>/` inside that root.
 
-**Optional Supabase sign-in:** If you enable invite-only auth (set
+**Optional account sign-in:** If you enable auth (set
 `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env`), Supabase stores your account
 email and session metadata on their hosted service. BAKLOG still keeps library
 JSON and Connections secrets locally; only the login handshake talks to Supabase.

@@ -149,7 +149,7 @@ export const SUPPORT_GROUPS = [
     "Fewer sponsored slots? Pro supporters help fund BAKLOG.",
   ],
   [
-    "Not in the beta yet? Request an invite at baklog.app - we onboard in small waves.",
+    "Grab the open beta at baklog.app or GitHub Releases - Windows, macOS, and Linux zips.",
     "Know someone who'd love BAKLOG? Send them to baklog.app to grab an invite.",
   ],
   [

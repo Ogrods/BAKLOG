@@ -1,7 +1,7 @@
-# Experimental Linux frozen build (workflow_dispatch preview).
+# Manual Linux frozen preview (workflow_dispatch).
 # Builds BAKLOG-linux64.zip on ubuntu-22.04 (glibc 2.35 baseline), runs frozen
-# smokes headlessly, then uploads zip + sha256 + SBOM as workflow artifacts.
-# Promote into release.yml on v* tags only after 2-3 clean dispatch runs.
+# smokes, then uploads zip + sha256 + SBOM as workflow artifacts (14-day retention).
+# Tagged releases publish the same zip via release.yml (build-linux job).
 name: Build Linux (preview)
 
 on:

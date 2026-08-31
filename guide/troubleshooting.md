@@ -172,7 +172,7 @@ If you still have `BAKLOG-Data`, reinstall BAKLOG and launch normally - first bo
 
 ## Known issues (beta)
 
-These are expected limits in the current invite-only beta, not one-off bugs:
+These are expected limits in the current open beta, not one-off bugs:
 
 | Topic | What to expect |
 |-------|----------------|
@@ -186,11 +186,11 @@ These are expected limits in the current invite-only beta, not one-off bugs:
 
 ## Unsigned beta builds (no code signing)
 
-BAKLOG beta builds are **not code-signed** yet. That is normal for invite-only testing — you are not doing anything wrong.
+BAKLOG beta builds are **not code-signed** yet. That is normal for open beta - you are not doing anything wrong.
 
 | Platform | What you may see | What to do |
 |----------|------------------|------------|
-| **Windows** | SmartScreen "Unknown publisher" on first launch or after manual download | **More info** → **Run anyway**. Only download from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases) or your official invite link. |
+| **Windows** | SmartScreen "Unknown publisher" on first launch or after manual download | **More info** → **Run anyway**. Only download from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases) or [baklog.app](https://baklog.app). |
 | **Windows Setup + in-app updates** | Add/Remove Programs shows an older version than the app header | Expected: zip-based in-app updates replace files but do not refresh Inno's registry entry. Re-run **BAKLOG-Setup.exe** when you want Settings → Apps to match, or ignore if the in-app version is correct. **Copy diagnostics** shows `install_source`, `arp_version`, and `arp_version_mismatch`. |
 | **macOS** | "App can't be opened" or quarantine after download/update | Right-click the app → **Open** once, or `xattr -cr /path/to/BAKLOG` in Terminal. Unzip to Applications or another stable folder, not directly from Downloads. |
 
@@ -210,13 +210,13 @@ We skip paid signing for now; future releases may add certificates. Verify SHA-2
 
 **Apply failure:** If install fails mid-copy, the updater restores your previous build from a backup when possible and writes `%TEMP%\\BAKLOG-update\\apply-result.json`. The UI shows the error; if BAKLOG does not restart automatically, open **BAKLOG Tray** from the Start Menu (or run `BAKLOG Tray.exe`).
 
-**In-app update vs Setup.exe:** Use in-app **Update now** for routine binary updates on Windows/macOS frozen builds. Re-run **BAKLOG-Setup.exe** when Add/Remove Programs version drifts, shortcuts break, or `apply_update.ps1` / `apply_update.sh` is missing from the install folder.
+**In-app update vs Setup.exe:** Use in-app **Update now** for routine binary updates on Windows, macOS, and Linux frozen builds. Re-run **BAKLOG-Setup.exe** when Add/Remove Programs version drifts, shortcuts break, or `apply_update.ps1` / `apply_update.sh` is missing from the install folder.
 
 **Zip-only uninstall:** Portable zip installs include **Uninstall BAKLOG.bat** beside the exes. Run it to clear login autostart and optionally wipe library data, then delete the install folder.
 
 **Version:** Your current build version appears at the bottom of the **⋮** menu on installed builds.
 
-**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses `BAKLOG-macos.zip` + `apply_update.sh` on tagged releases (built in CI alongside Windows).
+**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses `BAKLOG-macos.zip` + `apply_update.sh`. Linux uses `BAKLOG-linux64.zip` + `apply_update.sh` (no tray relaunch - the Start script keeps the server in the terminal).
 
 **Add/Remove Programs vs in-app version:** On Windows Setup installs, zip-based in-app updates replace app files but do not refresh the Inno uninstall registry version. Use **Copy diagnostics** or `GET /api/diagnostics` (`install_source`, `arp_version`, `arp_version_mismatch`, `trust_note`) to compare; re-run **BAKLOG-Setup.exe** when Settings → Apps should match the running build.
 

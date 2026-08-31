@@ -14,38 +14,36 @@ On Windows, use the project `.venv` Python - not the Microsoft Store `python.exe
 
 ## Beta (Windows)
 
-If you received a beta invite:
-
-1. Download and run **BAKLOG-Setup.exe** from your invite link.
-2. If SmartScreen warns about an unknown publisher, click **More info**, then **Run anyway**. BAKLOG is an unsigned beta — see [Unsigned beta builds](troubleshooting.md#unsigned-beta-builds-no-code-signing).
+1. Download **BAKLOG-Setup.exe** (or the portable zip) from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest) or [baklog.app](https://baklog.app).
+2. If SmartScreen warns about an unknown publisher, click **More info**, then **Run anyway**. BAKLOG is an unsigned beta - see [Unsigned beta builds](troubleshooting.md#unsigned-beta-builds-no-code-signing).
 3. Launch **BAKLOG** from the Start Menu. A tray icon appears and your browser opens.
 4. Open the **Connections** tab and connect each store you use (Chrome or Edge required).
 
 Your library data (profiles, games, connections) lives in `%LOCALAPPDATA%\BAKLOG-Data`, separate from the app folder (or beside the exe when `portable.txt` is present). Uninstalling BAKLOG removes the app and always clears login autostart; the uninstall wizard lets you keep your library or remove everything (data folder and saved sign-ins). Zip-only installs can run **Uninstall BAKLOG.bat** in the install folder for the same cleanup before deleting the folder.
 
-**Maintainers testing dev and frozen on one PC:** set both in `.env` before `python server.py`:
+**Running from source and a packaged install on one PC:** set both in `.env` before `python server.py`:
 
 ```env
 BAKLOG_DATA_DIR=%LOCALAPPDATA%\BAKLOG-Dev
 PORT=8766
 ```
 
-That keeps library files out of `BAKLOG-Data` and gives dev its own browser origin so localStorage is not shared with the installed app on port 8765. The dashboard header shows a **Dev server** chip when the dev server is active. See [troubleshooting](troubleshooting.md#dev-server-vs-frozen-exe-same-browser-origin).
+That keeps library files out of `BAKLOG-Data` and gives the source run its own browser origin so localStorage is not shared with the installed app on port 8765. The dashboard header shows a **Dev server** chip when that mode is active. See [troubleshooting](troubleshooting.md#dev-server-vs-frozen-exe-same-browser-origin).
 
 Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.bat` or `BAKLOG Tray.exe`. Add an empty `portable.txt` beside `BAKLOG.exe` only if you want all data in the unzip folder (thumb drives). See `BETA-README.txt` in the bundle.
 
 ## Beta (macOS)
 
-1. Download **BAKLOG-macos.zip** from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest) (or your invite link once tagged).
-2. Unzip to a normal folder (not Downloads directly — Gatekeeper is stricter there). Double-click **Start BAKLOG.command** or run **BAKLOG Tray** from the `BAKLOG` folder.
+1. Download **BAKLOG-macos.zip** from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest).
+2. Unzip to a normal folder (not Downloads directly - Gatekeeper is stricter there). Double-click **Start BAKLOG.command** or run **BAKLOG Tray** from the `BAKLOG` folder.
 3. If macOS blocks the app ("cannot be opened"), right-click **BAKLOG Tray** → **Open** once, or run `xattr -cr /path/to/BAKLOG` in Terminal. See [Unsigned beta builds](troubleshooting.md#unsigned-beta-builds-no-code-signing).
 4. Library data lives in `~/Library/Application Support/BAKLOG-Data` (or beside the app when `portable.txt` is present). In-app updates use `apply_update.sh` once a mac zip is on the release.
 
 ## Beta (Linux)
 
-Experimental packaged zip (no tray icon yet). Prefer a desktop session or GUI VM - Connect needs a headed browser.
+Experimental packaged zip (no tray icon yet). Prefer a desktop session or GUI VM - Connect needs a headed browser. Needs a modern glibc (2.35+), same baseline as Ubuntu 22.04.
 
-1. Download **BAKLOG-linux64.zip** from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest) when published, or from a CI preview artifact while it is still experimental.
+1. Download **BAKLOG-linux64.zip** from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest).
 2. Unzip to a normal folder, then run:
 
    ```bash
@@ -141,4 +139,4 @@ $env:BAKLOG_SERVE_BUILT='1'; python server.py   # PowerShell
 
 - [Connecting stores](connecting-stores.md) - per-store Connect steps and CLI fallbacks
 - [Using the dashboard](using-the-dashboard.md) - tabs, filters, statuses
-- [FAQ](faq.md) - free vs paid, invite-only access, no-games-yet paths
+- [FAQ](faq.md) - free vs paid, open beta access, no-games-yet paths

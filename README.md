@@ -6,7 +6,7 @@
 
 **BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
 
-**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Invite-only early access.** Request access at **[baklog.app](https://baklog.app)**. Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
+**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Open beta.** Download at **[baklog.app](https://baklog.app)** or [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
 
 **Reviewing the repo?** See [ARCHITECTURE.md](ARCHITECTURE.md) for an honest map (local vs network, monolith shape, Pro licensing, store ToS).
 
@@ -61,7 +61,7 @@ See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: library and cre
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
 | **macOS** | Supported with limits — **Amazon Games (launcher)** and **GOG Galaxy (local)** are Windows/macOS-only local sources |
-| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Experimental frozen zip (`BAKLOG-linux64.zip`) available via CI preview; source-run still recommended |
+| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Packaged zip (`BAKLOG-linux64.zip`) on GitHub Releases (experimental; no tray yet) |
 
 The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local source:** **Amazon Games (launcher)** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent) — on macOS/Linux use **Amazon (Prime Gaming, web)** Connect instead; the Amazon fetcher still runs and auto-picks the web session. **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) — there is no supported Linux path, so Linux users use **GOG (web)** instead. Platform-restricted local providers show as **Unavailable** on unsupported OSes; their fetcher chips stay enabled when a web fallback exists.
 
@@ -89,7 +89,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 
 **Pro background refresh:** when the server process is alive (tray or `python server.py`), the paid tier scheduler refreshes stale stores without an open browser tab. Under Supabase auth, sign in once in the browser so the server caches your plan for headless refresh.
 
-**Optional invite-only accounts:** Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without Supabase env vars, behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing. Set `BAKLOG_LOCAL_PROFILES=1` to keep the local Work/Play profile switcher available while Supabase sign-in stays on (optional per-profile PINs gate switching; profile mutations require the in-app `X-BAKLOG-Local` header).
+**Optional account sign-in:** When configured, Supabase Auth can require sign-in before the dashboard loads; each user gets their own profile data directory. Set `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). Without those env vars, local behavior is unchanged. Use `BAKLOG_AUTH_DISABLED=1` to skip the gate while testing. Set `BAKLOG_LOCAL_PROFILES=1` to keep the local Work/Play profile switcher available while sign-in stays on (optional per-profile PINs gate switching; profile mutations require the in-app `X-BAKLOG-Local` header).
 
 ### Store availability by platform
 
@@ -329,4 +329,4 @@ pytest tests/test_cdp_browser.py -m integration
 
 On GitHub, use **Actions → CDP smoke (manual) → Run workflow** after a suspected Chrome/Edge regression.
 
-BAKLOG is **local-first**: your library JSON and store credentials stay on your machine. Optional invite Supabase sign-in and Polar Pro checkout exist when configured; catalogs are not hosted in a BAKLOG cloud by default.
+BAKLOG is **local-first**: your library JSON and store credentials stay on your machine. Optional account sign-in and Polar Pro checkout exist when configured; catalogs are not hosted in a BAKLOG cloud by default.

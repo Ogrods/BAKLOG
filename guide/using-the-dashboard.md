@@ -105,11 +105,11 @@ Free forever to import and browse. Optional **$5/mo** ($50/yr) adds:
 
 See [FAQ](faq.md) for the full free-vs-paid breakdown.
 
-## Auto-behaviors (default on)
+## Auto-behaviors
 
-- **Auto-fetch on connect:** when you connect or reconnect a store, BAKLOG auto-fetches its library and opens the fetcher log
-- **Auto-refresh stale stores:** quietly refreshes one store older than 24h every ~30 min while the app is open (Connections toggle)
-- **Auto-enrich:** after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags
-- **ITAD auto-refresh:** deal prices refresh on a 15-60 min schedule while the dashboard is open
+- **Auto-fetch on connect** (default on): when you connect or reconnect a store, BAKLOG auto-fetches its library and opens the fetcher log
+- **Auto-refresh stale stores** (default on): quietly refreshes one store older than 24h every ~30 min while the app is open (Connections toggle)
+- **Auto-enrich new games** (default off): after a library fetch adds games, optionally queues HLTB, reviews, covers, and co-op tags (Fetcher health toggle)
+- **ITAD auto-refresh** (default on): deal prices refresh on a 15-60 min schedule while the dashboard is open
 
 Details: [Refresh and enrichment](refresh-and-enrichment.md).

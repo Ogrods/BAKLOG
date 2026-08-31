@@ -44,6 +44,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - baklog.app is open beta: signup confirmation includes the GitHub Releases download link.
 - Free claims feed refreshed (stale approved-only ids dropped).
 - Docs and in-app tips describe open beta downloads for Windows, macOS, and Linux.
+- Auto-enrich new games stays off by default (opt in from Fetcher health).
 
 ### Fixed
 

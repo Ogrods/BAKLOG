@@ -130,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 - **Connections tab:** one-click store auth (browser sign-in or API keys), encrypted credential storage, portable secrets bundle
 - **Auto-fetch on connect** (default on): when you connect or reconnect a store, BAKLOG auto-fetches its library and opens the fetcher log
 - **Auto-refresh stale stores** (default on): Connections toggle — quietly refreshes one store older than 24h every ~30 min while the app is open
-- **Auto-enrich** (default on): after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags
+- **Auto-enrich** (default off): after a library fetch adds games, optionally queues HLTB, reviews, covers, and co-op tags (Fetcher health toggle)
 - **ITAD auto-refresh** (default on): deal prices refresh on a 15–60 min schedule while the dashboard is open
 
 ### Paid tier ($5/mo)

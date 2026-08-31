@@ -9,7 +9,7 @@ brotli==1.2.0
 browser-cookie3==0.20.1
 certifi==2026.7.22
 cffi==2.1.1
-charset-normalizer==3.4.7
+charset-normalizer==3.5.1
 colorama==0.4.6
 cryptography==50.0.1
 fake-useragent==2.2.0

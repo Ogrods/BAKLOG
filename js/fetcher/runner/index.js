@@ -1489,7 +1489,14 @@ export const fetcherRunner = (() => {
           `[warning: ${hint} - open Connections before running]`,
         );
       }
-      const cmdSuffix = refresh ? ' --refresh' : '';
+      const refreshArgHint = {
+        hltb: ' --retry-misses',
+        steamReviews: ' --retry-misses',
+        steamCovers: ' --retry-misses',
+        steamTags: ' --refresh',
+        protondb: ' --retry-misses --refresh',
+      };
+      const cmdSuffix = refresh ? (refreshArgHint[key] || ' --refresh') : '';
       logEvent('cmd', `$ ${src.cmd}${cmdSuffix}`);
       if (!auto) scrollPopoverModule('console');
     }

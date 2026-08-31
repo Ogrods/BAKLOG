@@ -80,7 +80,7 @@ const REFRESH_HINTS = {
   psn: 'Re-fetch every PlayStation entry, ignoring local cache',
   epic: 'Re-fetch every Epic entry, ignoring local cache',
   wishlistGog: 'Re-fetch every wishlist entry from GOG, ignoring cached details',
-  hltb: 'Also retry titles previously cached as "no HLTB match" - use after HLTB adds new entries',
+  hltb: 'Also retry titles previously cached as "no HLTB match" - use after an API outage or client bump',
   steamReviews:
     'Also retry titles previously cached as "no Steam app match" - use after Steam lists the game',
   steamCovers: 'Also retry rows previously cached as "no Steam match" - use after Steam adds new entries',
@@ -101,7 +101,7 @@ const REFRESH_HINTS = {
 //              won't change the numbers much.
 //   noMatch  → cached as "no match" so the fetcher skips on a normal click.
 //              Only Shift+click (HLTB) can revisit.
-function pendingForEnrich(key) {
+export function pendingForEnrich(key) {
   if (key === 'hltb') {
     const cache = state.libraryMeta.hltb || {};
     const rows = allLibraryRows();

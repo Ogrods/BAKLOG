@@ -20,7 +20,7 @@ dependencies = [
     "keyring>=25.0.0",
     "cryptography>=50.0.0",
     "requests>=2.31.0",
-    "howlongtobeatpy>=1.0.0",
+    "howlongtobeatpy>=1.0.23",
     "psnawp>=3.0.0",
     "PyJWT>=2.8.0",
 ]

@@ -19,7 +19,9 @@ Click any chip in **Fetcher health** to enqueue that fetcher. Output streams liv
 - Shift+click on supported library/wishlist chips adds `--refresh`
 - Shift+click on HLTB, Reviews, Covers enrichers adds `--retry-misses`
 
-**Stall watchdog:** when a fetcher runs via `server.py`, if stdout is silent for 30s the server injects `[server] no output for Ns - still running (PID …)` into the log panel (repeats every 60s). Informational only - the process is not killed.
+**HLTB backlog:** if many titles still need hours (or you Shift+click to retry cached misses), BAKLOG shows a confirm dialog with a rough ETA before starting. Matched hours are saved as the run progresses. If HowLongToBeat's search API is down, the enricher stops after a streak of empty results so it does not mark your whole library as "no match" - bump `howlongtobeatpy` if needed, then Shift+click HLTB to retry.
+
+**Stall watchdog:** when a fetcher runs via `server.py`, if stdout is silent for about 60s the server injects `[server] no output for Ns - still running (PID …)` into the log panel (repeats). If silence continues for 180s with no heartbeat, the process is force-killed. HLTB prints heartbeats during slow lookups so healthy runs stay alive.
 
 Run logs also land in `profiles/<id>/cache/runs/*.jsonl`.
 

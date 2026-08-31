@@ -118,11 +118,12 @@ export function renderDashboardFetcherHealth() {
   const showReadonly = probeDone && !apiReady;
   const summaryTooltip = [
     'Click a chip → run an incremental sync (fast - fills gaps, uses cache where safe).',
-    'Shift+click → force a full refresh that ignores local cache (slower; only on chips that support it).',
+    'Shift+click on library/wishlist chips → force a full refresh that ignores local cache (slower; only on chips that support it).',
+    'Shift+click on HLTB / Reviews / Covers → retry titles cached as "no match".',
     'Hover any chip to see exactly what click vs. Shift+click will do for that source.',
   ].join('\n');
   const clickHint = apiReady
-    ? `<span class="fh-legend-item" title="${escapeAttr(summaryTooltip)}"><span class="fh-chip-warn" aria-hidden="true">!</span> click a chip = sync &middot; Shift+click = full refresh</span>`
+    ? `<span class="fh-legend-item" title="${escapeAttr(summaryTooltip)}"><span class="fh-chip-warn" aria-hidden="true">!</span> click a chip = sync &middot; Shift+click = refresh or retry misses</span>`
     : '';
   const readonlyBanner = showReadonly
     ? (isAccountAuthMode()
@@ -185,7 +186,13 @@ export function renderDashboardFetcherHealth() {
           enrichLine,
           `Click: ${clickHint}`,
           refreshHint ? `Shift+click: ${refreshHint}` : 'Shift+click: not supported for this fetcher',
-          `Command: ${src.cmd}${refreshHint ? ' [+ --refresh on Shift+click]' : ''}`,
+          `Command: ${src.cmd}${refreshHint
+            ? (src.key === 'hltb' || src.key === 'steamReviews' || src.key === 'steamCovers'
+              ? ' [+ --retry-misses on Shift+click]'
+              : src.key === 'protondb'
+                ? ' [+ --retry-misses --refresh on Shift+click]'
+                : ' [+ --refresh on Shift+click]')
+            : ''}`,
           needsConfig ? 'Not configured for this profile - open Connections to add keys.' : '',
           configHint ? `Note:${configHint}` : '',
         ].filter(Boolean)

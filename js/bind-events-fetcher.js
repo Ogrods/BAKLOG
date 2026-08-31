@@ -8,6 +8,11 @@ import {
   primaryFailureNavigateTarget,
   dismissStickyFailedState,
 } from './fetcher-health.js';
+import { pendingForEnrich } from './fetcher/source-meta.js';
+import {
+  confirmHltbEstimate,
+  shouldConfirmHltbRun,
+} from './hltb-estimate-modal.js';
 import { reconnectProvider } from './connections.js';
 
 /** @internal Vitest + bind-events entry for global status pill clicks. */
@@ -119,7 +124,18 @@ export function bindFetcherHealthEvents() {
     }
     if (chip.disabled) return;
     e.preventDefault();
-    fetcherRunner.run(chip.dataset.fetcherKey, { refresh: e.shiftKey });
+    const key = chip.dataset.fetcherKey;
+    const refresh = e.shiftKey;
+    if (key === 'hltb') {
+      const pending = pendingForEnrich('hltb');
+      if (shouldConfirmHltbRun(pending, { refresh })) {
+        void confirmHltbEstimate(pending, { refresh }).then((ok) => {
+          if (ok) fetcherRunner.run(key, { refresh });
+        });
+        return;
+      }
+    }
+    fetcherRunner.run(key, { refresh });
   });
 
   // Pro-only deep achievement/trophy sync: re-pull the store's achievement data.

@@ -16,7 +16,7 @@ fake-useragent==2.2.0
 fonttools==4.63.0
 frozenlist==1.8.0
 git-filter-repo==2.47.0
-howlongtobeatpy==1.0.21
+howlongtobeatpy==1.0.23
 idna==3.19
 iniconfig==2.3.0
 jaraco.classes==3.4.0

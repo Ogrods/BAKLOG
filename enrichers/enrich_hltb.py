@@ -7,7 +7,13 @@ previously failed - so this is cheap to run on a cron.
 
 Negative lookups are cached as the literal value False so retries don't spam
 HowLongToBeat. Pass --retry-misses to force re-lookup of those.
+
+If HowLongToBeat's search API is down (many consecutive empty results with no
+exceptions), stop early so we do not poison the map with False for the whole
+library. Mid-run catalog flushes keep already-matched hours on disk.
 """
+
+from __future__ import annotations
 
 import argparse
 import json
@@ -27,9 +33,14 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 def mapping_file() -> Path:
     return cache_json_path("hltb_map.json")
-QUERY_DELAY_SEC = 0.15  # light spacing; each lookup is ~7s network-bound (see runtime logs)
+
+
+QUERY_DELAY_SEC = 0.15  # light spacing; each lookup is ~7s network-bound
+LOOKUP_NETWORK_SEC = 7.5  # used for ETA (matches UI modal formula)
 SAVE_EVERY_N_LOOKUPS = 25
 HEARTBEAT_EVERY = 25
+# Soft API outage: empty search() with no exception looks like "no match".
+CONSECUTIVE_EMPTY_ABORT = 15
 
 STORE_FILES = [
     ("games_steam.json", "steam", None),
@@ -57,6 +68,12 @@ HLTB_FIELDS = (
 )
 
 
+def estimate_lookup_seconds(pending: int) -> float:
+    """Wall-clock estimate for *pending* live HLTB network lookups."""
+    n = max(0, int(pending))
+    return n * (QUERY_DELAY_SEC + LOOKUP_NETWORK_SEC)
+
+
 def load_mapping() -> dict:
     path = mapping_file()
     if path.exists():
@@ -74,6 +91,11 @@ def save_mapping(mapping: dict) -> None:
     path.write_text(
         json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+
+
+def _flush_catalog(rel: Path, data: dict, games: list) -> None:
+    data["game_count"] = len(games)
+    write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
 
 
 def main() -> int:
@@ -96,6 +118,8 @@ def main() -> int:
     mapping = load_mapping()
     grand_lookups = 0
     grand_updated = 0
+    consecutive_empty = 0
+    api_outage = False
     # Pre-pass: count pending lookups so the run prints an up-front time estimate
     # (each lookup is ~7.5s network-bound, so a large backlog can run for a while).
     pending_lookups = 0
@@ -117,10 +141,10 @@ def main() -> int:
             if isinstance(cached, dict):
                 continue
             pending_lookups += 1
-    est_sec = pending_lookups * (QUERY_DELAY_SEC + 7.5)
+    est_sec = estimate_lookup_seconds(pending_lookups)
     print(
         f"  ~{pending_lookups} HLTB lookups pending "
-        f"(est. {int(est_sec // 60)}m at ~{QUERY_DELAY_SEC + 7.5:.1f}s each)",
+        f"(est. {int(est_sec // 60)}m at ~{QUERY_DELAY_SEC + LOOKUP_NETWORK_SEC:.1f}s each)",
         flush=True,
     )
     # Wall-clock heartbeat: HLTB network lookups are slow and often miss, so a
@@ -130,6 +154,8 @@ def main() -> int:
     hb = HeartbeatTimer(45.0)
 
     for filename, store, row_filter in STORE_FILES:
+        if api_outage:
+            break
         if args.store and args.store != store:
             continue
         rel = Path(filename)
@@ -155,13 +181,16 @@ def main() -> int:
         store_misses = 0
         store_skipped = 0
         processed = 0
+        catalog_dirty = False
         for i, g in enumerate(missing, 1):
+            if api_outage:
+                break
             key = f"{store}:{g.get('id')}"
             cached = mapping.get(key)
             processed += 1
             hb.tick(
                 f"{filename}: [{i}/{len(missing)}] {store_lookups} lookups "
-                f"(+{store_hits} hits) — still working"
+                f"(+{store_hits} hits) - still working"
             )
 
             if cached is False and not args.retry_misses:
@@ -169,7 +198,7 @@ def main() -> int:
                 if processed % HEARTBEAT_EVERY == 0:
                     hb.tick(
                         f"[{i}/{len(missing)}] skipped {store_skipped} cached misses, "
-                        f"{store_lookups} lookups (+{store_hits} hits) — still working"
+                        f"{store_lookups} lookups (+{store_hits} hits) - still working"
                     )
                     hb.reset()
                 continue
@@ -181,17 +210,33 @@ def main() -> int:
                 try:
                     hit = hltb.lookup(g.get("name") or "")
                 except Exception as e:
+                    consecutive_empty = 0
                     stats.warn(f"hltb error for {g.get('name')!r}: {e}")
                     continue
                 grand_lookups += 1
                 store_lookups += 1
                 if hit:
+                    consecutive_empty = 0
                     store_hits += 1
+                    mapping[key] = hit
                 else:
+                    consecutive_empty += 1
                     store_misses += 1
-                mapping[key] = hit if hit else False
-                if grand_lookups % SAVE_EVERY_N_LOOKUPS == 0:
+                    mapping[key] = False
+                    if consecutive_empty >= CONSECUTIVE_EMPTY_ABORT:
+                        api_outage = True
+                        print(
+                            f"  HLTB search API appears down: {consecutive_empty} "
+                            f"consecutive empty lookups with no errors. "
+                            "Stopping so we do not cache more misses. "
+                            "Bump howlongtobeatpy or retry later; "
+                            "use Shift+click / --retry-misses after a fix.",
+                            flush=True,
+                        )
+                if grand_lookups % SAVE_EVERY_N_LOOKUPS == 0 or api_outage:
                     save_mapping(mapping)
+                if api_outage:
+                    break
 
             if not hit:
                 continue
@@ -201,18 +246,21 @@ def main() -> int:
                     g[field] = hit[field]
             updated += 1
             grand_updated += 1
+            catalog_dirty = True
             stats.ok += 1
-            if updated % 25 == 0:
+            if updated % SAVE_EVERY_N_LOOKUPS == 0:
                 print(
                     f"  [{i}/{len(missing)}] {updated} updated so far "
                     f"({g.get('name')} -> {hit.get('hltb_main_hours')}h, "
                     f"match {hit.get('hltb_match_confidence')})",
                     flush=True,
                 )
+                _flush_catalog(rel, data, games)
+                catalog_dirty = False
                 hb.reset()
 
-        data["game_count"] = len(games)
-        write_catalog_text(rel, json.dumps(data, indent=2, ensure_ascii=False))
+        if catalog_dirty or updated:
+            _flush_catalog(rel, data, games)
         print(
             f"  saved {updated} HLTB updates to {filename} "
             f"({store_lookups} lookups: {store_hits} hits, {store_misses} no-match, "
@@ -223,11 +271,15 @@ def main() -> int:
 
     save_mapping(mapping)
     stats.ok = grand_updated
+    exit_code = 1 if api_outage else 0
+    extra = f"{grand_lookups} lookups, {grand_updated} updated"
+    if api_outage:
+        extra += f", aborted after {CONSECUTIVE_EMPTY_ABORT} consecutive empty searches"
     return stats.finish(
         "enrich_hltb",
         t0,
-        exit_code=0,
-        extra=f"{grand_lookups} lookups, {grand_updated} updated",
+        exit_code=exit_code,
+        extra=extra,
     )
 
 

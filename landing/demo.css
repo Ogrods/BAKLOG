@@ -697,7 +697,7 @@ html.ui-resizing .dash-ribbon-chart canvas {
   transform-origin: left center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  font-size: clamp(24px, 3.5vw, 40px);
+  font-size: clamp(22px, 3.2vw, 40px);
   line-height: 1;
   color: #6ee7b7;
   text-shadow: 0 0 10px rgba(110, 231, 183, 0.65), 0 1px 3px rgba(0, 0, 0, 0.65);
@@ -724,14 +724,14 @@ html.ui-resizing .dash-ribbon-chart canvas {
   animation: baklog-libcount-pop 700ms ease-out forwards;
 }
 @keyframes baklog-libcount-pop-hero {
-  0% { opacity: 0; transform: translate(var(--baklog-dx, 0), 0.15em) scale(0.85); }
-  18% { opacity: 1; transform: translate(calc(var(--baklog-dx, 0) + 0.12em), -0.28em) scale(1.18); }
-  100% { opacity: 0; transform: translate(calc(var(--baklog-dx, 0) + 0.38em), -1.65em) scale(1); }
+  0% { opacity: 0; transform: translate(var(--baklog-dx, 0), 0em) scale(0.85); }
+  18% { opacity: 1; transform: translate(calc(var(--baklog-dx, 0) + 0.1em), -0.18em) scale(1.12); }
+  100% { opacity: 0; transform: translate(calc(var(--baklog-dx, 0) + 0.28em), -0.85em) scale(1); }
 }
 @keyframes baklog-libcount-pop {
-  0% { opacity: 0; transform: translate(var(--baklog-dx,0), 6px) scale(0.85); }
-  18% { opacity: 1; transform: translate(calc(var(--baklog-dx,0) + 4px), -10px) scale(1.15); }
-  100% { opacity: 0; transform: translate(calc(var(--baklog-dx,0) + 12px), -58px) scale(1); }
+  0% { opacity: 0; transform: translate(var(--baklog-dx,0), 4px) scale(0.85); }
+  18% { opacity: 1; transform: translate(calc(var(--baklog-dx,0) + 4px), -8px) scale(1.12); }
+  100% { opacity: 0; transform: translate(calc(var(--baklog-dx,0) + 10px), -36px) scale(1); }
 }
 
 /* Funnel: logo wall */

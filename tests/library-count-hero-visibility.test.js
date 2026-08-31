@@ -1,16 +1,21 @@
 /**
  * Regression: dashboard hero "+N" combat-text must be readable and not clipped
- * by .dash-mega overflow. Popups float to document.body via position:fixed.
+ * by .dash-mega overflow. Popups float to document.body via position:fixed,
+ * mid-line anchored beside the digit/pill.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flashCountUp, strictSyncRollMs } from '../js/library-count-animation.js';
+import {
+  computeLibraryCountPopupPlacement,
+  flashCountUp,
+  strictSyncRollMs,
+} from '../js/library-count-animation.js';
 import { countUpDurationForDelta } from '../js/dashboard-shared.js';
 
 const APP_CSS = readFileSync(join(import.meta.dirname, '..', 'app.css'), 'utf8');
-/** Keep in sync with js/library-count-animation.js SEQ_POPUP_GAP_MS. */
-const SEQ_POPUP_GAP_MS = 300;
+/** Capture once — vi.spyOn(getComputedStyle) must not nest mocks across tests. */
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
 
 function extractRuleBlock(css, selector) {
   const re = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm');
@@ -43,6 +48,23 @@ function mountDashHeroSurface({ w = 220, h = 84, left = 100, top = 200 } = {}) {
     </div>`;
   const hero = document.getElementById('dashHeroCount');
   stubLayoutRect(hero, { w, h, left, top });
+  Object.defineProperty(hero, 'style', {
+    configurable: true,
+    value: { fontSize: '72px' },
+  });
+  // getComputedStyle in happy-dom may not see fixture CSS; stub fontSize.
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+    const cs = nativeGetComputedStyle(el);
+    if (el === hero || el?.id === 'dashHeroCount') {
+      return new Proxy(cs, {
+        get(target, prop) {
+          if (prop === 'fontSize') return '72px';
+          return Reflect.get(target, prop);
+        },
+      });
+    }
+    return cs;
+  });
   return hero;
 }
 
@@ -65,6 +87,75 @@ function rafSync() {
     }
   };
 }
+
+describe('computeLibraryCountPopupPlacement', () => {
+  const desktopHero = { top: 180, right: 320, height: 84, width: 220 };
+  const phoneHero = { top: 120, right: 200, height: 48, width: 140 };
+  const pill = { top: 64, right: 120, height: 22, width: 36 };
+
+  it('anchors hero mid-band beside digits (desktop)', () => {
+    const p = computeLibraryCountPopupPlacement({
+      rect: desktopHero,
+      fontSize: 72,
+      kind: 'hero',
+      stackIndex: 0,
+      viewport: { width: 1280, height: 800 },
+    });
+    const mid = desktopHero.top + desktopHero.height / 2;
+    expect(p.top).toBeGreaterThanOrEqual(desktopHero.top + desktopHero.height * 0.25);
+    expect(p.top).toBeLessThanOrEqual(desktopHero.top + desktopHero.height * 0.75);
+    expect(Math.abs(p.top + p.popupFs * 0.45 - mid)).toBeLessThan(2);
+    expect(p.left).toBeGreaterThanOrEqual(desktopHero.right);
+    expect(p.left - desktopHero.right).toBeLessThanOrEqual(12);
+    expect(p.popupFs).toBeGreaterThanOrEqual(22);
+    expect(p.popupFs).toBeLessThanOrEqual(40);
+  });
+
+  it('anchors hero mid-band on phone-sized digits', () => {
+    const p = computeLibraryCountPopupPlacement({
+      rect: phoneHero,
+      fontSize: 40,
+      kind: 'hero',
+      stackIndex: 0,
+      viewport: { width: 390, height: 844 },
+    });
+    expect(p.top).toBeGreaterThanOrEqual(phoneHero.top + phoneHero.height * 0.2);
+    expect(p.top).toBeLessThanOrEqual(phoneHero.top + phoneHero.height * 0.8);
+    expect(p.popupFs).toBeLessThanOrEqual(40);
+  });
+
+  it('sizes chip popups near pill digit size (not larger than 1.35x)', () => {
+    const chipFs = 14;
+    const p = computeLibraryCountPopupPlacement({
+      rect: pill,
+      fontSize: chipFs,
+      kind: 'chip',
+      stackIndex: 0,
+      viewport: { width: 1024, height: 768 },
+    });
+    expect(p.popupFs).toBeLessThanOrEqual(chipFs * 1.35);
+    expect(p.popupFs).toBeGreaterThanOrEqual(14);
+    expect(p.top).toBeGreaterThanOrEqual(pill.top + pill.height * 0.15);
+    expect(p.top).toBeLessThanOrEqual(pill.top + pill.height * 0.85);
+  });
+
+  it('stacks hero upward and chip downward within a short train', () => {
+    const h0 = computeLibraryCountPopupPlacement({
+      rect: desktopHero, fontSize: 72, kind: 'hero', stackIndex: 0,
+    });
+    const h1 = computeLibraryCountPopupPlacement({
+      rect: desktopHero, fontSize: 72, kind: 'hero', stackIndex: 1,
+    });
+    expect(h1.top).toBeLessThan(h0.top);
+    const c0 = computeLibraryCountPopupPlacement({
+      rect: pill, fontSize: 14, kind: 'chip', stackIndex: 0,
+    });
+    const c2 = computeLibraryCountPopupPlacement({
+      rect: pill, fontSize: 14, kind: 'chip', stackIndex: 2,
+    });
+    expect(c2.top - c0.top).toBeLessThanOrEqual(pill.height * 1.5 + c0.popupFs);
+  });
+});
 
 describe('library-count hero visibility CSS contract', () => {
   it('escapes .dash-mega overflow via fixed floated popups', () => {
@@ -98,14 +189,9 @@ describe('library-count hero visibility CSS contract', () => {
     expect(APP_CSS).toMatch(/@keyframes baklog-libcount-pop-hero/);
   });
 
-  it('anchors hero floats from left top (spawn point matches fixed top/left)', () => {
-    const heroFloat = extractRuleBlock(
-      APP_CSS,
-      '.library-count-popup--floated:not(.library-count-popup--floated-chip)',
-    );
+  it('anchors floated popups from left center (mid-line spawn)', () => {
     const floated = extractRuleBlock(APP_CSS, '.library-count-popup--floated');
-    const origin = heroFloat || floated;
-    expect(origin).toMatch(/transform-origin:\s*left\s+top/);
+    expect(floated).toMatch(/transform-origin:\s*left\s+center/);
   });
 
   it('does not start hero keyframes below the anchor (no positive 0% Y offset)', () => {
@@ -115,6 +201,11 @@ describe('library-count hero visibility CSS contract', () => {
     const frame0 = heroKeyframes.match(/0%\s*\{([^}]*)\}/)?.[1] ?? '';
     expect(frame0).not.toMatch(/translate\([^)]*,\s*0\.15em\)/);
     expect(frame0).toMatch(/,\s*0em\)\s*scale/);
+  });
+
+  it('keeps hero climb short (end Y around -0.85em, not -1.65em)', () => {
+    expect(APP_CSS).toMatch(/baklog-libcount-pop-hero[\s\S]*?-0\.85em/);
+    expect(APP_CSS).not.toMatch(/baklog-libcount-pop-hero[\s\S]*?-1\.65em/);
   });
 });
 
@@ -152,6 +243,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -164,7 +256,7 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     expect(popup, 'popup element').toBeTruthy();
     expect(popup.parentElement).toBe(document.body);
     expect(popup.classList.contains('library-count-popup--floated')).toBe(true);
-    const px = parseFloat(getComputedStyle(popup).fontSize);
+    const px = parseFloat(popup.style.fontSize) || parseFloat(getComputedStyle(popup).fontSize);
     expect(px, 'floated hero font-size').toBeGreaterThanOrEqual(20);
     expect(px, 'regression: 0.5em body trap').not.toBe(8);
   });
@@ -177,10 +269,11 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     const popup = document.querySelector('.library-count-popup--floated');
     expect(popup?.isConnected).toBe(true);
     expect(popup?.textContent).toBe('+1');
-    expect(parseFloat(getComputedStyle(popup).fontSize)).toBeGreaterThanOrEqual(20);
+    const px = parseFloat(popup.style.fontSize) || parseFloat(getComputedStyle(popup).fontSize);
+    expect(px).toBeGreaterThanOrEqual(20);
   });
 
-  it('anchors single +1 at the hero top-right (not bottom-right of digits)', () => {
+  it('anchors single +1 in the hero mid-band (beside digits)', () => {
     const heroTop = 200;
     const heroHeight = 84;
     const hero = mountDashHeroSurface({ top: heroTop, h: heroHeight });
@@ -191,10 +284,11 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     expect(popup, 'hero popup').toBeTruthy();
     const popupTop = parseFloat(popup.style.top);
     const rect = hero.getBoundingClientRect();
-    expect(popupTop, 'spawn near hero top edge').toBeLessThanOrEqual(rect.top + 4);
-    expect(popupTop, 'not middle/bottom anchored').toBeLessThan(rect.top + rect.height * 0.35);
+    expect(popupTop, 'mid-band lower bound').toBeGreaterThanOrEqual(rect.top + rect.height * 0.25);
+    expect(popupTop, 'mid-band upper bound').toBeLessThanOrEqual(rect.top + rect.height * 0.75);
     const popupLeft = parseFloat(popup.style.left);
     expect(popupLeft, 'spawn to the right of digits').toBeGreaterThanOrEqual(rect.right);
+    expect(popupLeft - rect.right, 'tight horizontal gap').toBeLessThanOrEqual(16);
   });
 
   it('stacks hero +1 popups upward on strict-sync bursts', () => {
@@ -213,26 +307,41 @@ describe('library-count hero popup mount (happy-dom + app.css)', () => {
     expect(tops[2], 'third popup stacks above second').toBeLessThan(tops[1]);
   });
 
-  it('chip popups still stack downward (unchanged chip behavior)', () => {
+  it('chip popups are pill-scaled and stack downward tightly', () => {
     document.body.innerHTML = `
       <span class="library-count-host" data-libcount-host>
         <span data-count-target="library">10</span>
       </span>`;
     const chip = document.querySelector('[data-count-target="library"]');
     stubLayoutRect(chip, { w: 40, h: 20, left: 50, top: 60 });
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+      const cs = nativeGetComputedStyle(el);
+      if (el === chip) {
+        return new Proxy(cs, {
+          get(target, prop) {
+            if (prop === 'fontSize') return '14px';
+            return Reflect.get(target, prop);
+          },
+        });
+      }
+      return cs;
+    });
     flashCountUp(chip, 10, 12, (n) => String(Math.round(n)), { popups: true });
     const dur = strictSyncRollMs(2, 2);
     flushRaf(dur + 50);
     vi.advanceTimersByTime(Math.ceil(dur));
-    const popups = document.querySelectorAll('.library-count-popup');
+    const popups = [...document.querySelectorAll('.library-count-popup')];
     expect(popups.length).toBe(2);
     for (const el of popups) {
       expect(el.classList.contains('library-count-popup--floated')).toBe(true);
       expect(el.classList.contains('library-count-popup--floated-chip')).toBe(true);
       expect(el.parentElement).toBe(document.body);
       expect(el.textContent).toBe('+1');
+      const fs = parseFloat(el.style.fontSize);
+      expect(fs).toBeLessThanOrEqual(14 * 1.35);
     }
-    const tops = [...popups].map(el => parseFloat(el.style.top));
+    const tops = popups.map(el => parseFloat(el.style.top));
     expect(tops[1]).toBeGreaterThan(tops[0]);
+    expect(tops[1] - tops[0]).toBeLessThanOrEqual(20 * 1.5);
   });
 });

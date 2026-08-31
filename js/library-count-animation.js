@@ -127,6 +127,53 @@ export function strictSyncRollMs(delta, popupCap) {
   return Math.max(120, durationMs);
 }
 
+/**
+ * Pure placement for body-fixed +1 popups (hero digits or summary/rowcount pills).
+ * Mid-line vertical anchor; pill-scaled type; stack hugs the glyph.
+ *
+ * @param {{
+ *   rect: { top: number, right: number, height: number, width?: number },
+ *   fontSize: number,
+ *   kind: 'hero' | 'chip',
+ *   stackIndex?: number,
+ *   viewport?: { width: number, height: number } | null,
+ * }} opts
+ * @returns {{ left: number, top: number, popupFs: number, kind: 'hero' | 'chip' }}
+ */
+export function computeLibraryCountPopupPlacement({
+  rect,
+  fontSize,
+  kind,
+  stackIndex = 0,
+  viewport = null,
+}) {
+  const fs = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 16;
+  const stack = Math.max(0, Math.round(stackIndex) || 0);
+  const isHero = kind === 'hero';
+  const popupFs = isHero
+    ? Math.max(22, Math.min(40, fs * 0.38))
+    : Math.max(14, Math.min(22, fs * 1.12));
+  const gapX = Math.max(2, fs * 0.12);
+  let left = rect.right + gapX;
+  // Optical center of the digit/pill, then stack up (hero) or down (chip).
+  let top = rect.top + rect.height / 2 - popupFs * 0.45;
+  if (isHero) {
+    top -= stack * popupFs * 0.4;
+  } else {
+    top += stack * popupFs * 0.4;
+  }
+  if (viewport && Number.isFinite(viewport.width) && Number.isFinite(viewport.height)) {
+    left = Math.min(left, viewport.width - 48);
+    left = Math.max(4, left);
+    // Soft clamp: only pull when the spawn would leave the viewport entirely.
+    const minTop = 4;
+    const maxTop = viewport.height - popupFs - 8;
+    if (top < minTop) top = minTop;
+    else if (top > maxTop) top = maxTop;
+  }
+  return { left, top, popupFs, kind: isHero ? 'hero' : 'chip' };
+}
+
 /** Mount one scrolling-combat-text +1 popup beside `anchorNode`. */
 function mountOnePopup(host, anchorNode, stackIndex = null) {
   if (!host || !host.isConnected) return;
@@ -144,31 +191,21 @@ function mountOnePopup(host, anchorNode, stackIndex = null) {
   if (hasRect && typeof document !== 'undefined') {
     const fs = parseFloat(getComputedStyle(anchorEl).fontSize) || 16;
     const isHero = anchorEl.id === 'dashHeroCount';
-    el.classList.add('library-count-popup--floated');
-    let popupFs;
-    if (!isHero) {
-      el.classList.add('library-count-popup--floated-chip');
-      popupFs = Math.max(20, Math.min(32, fs * 1.75));
-      el.style.fontSize = `${popupFs.toFixed(1)}px`;
-    } else {
-      popupFs = Math.max(28, Math.min(52, fs * 0.48));
-      el.style.fontSize = `${popupFs.toFixed(1)}px`;
-    }
     const stack = Number.isFinite(stackIndex) ? stackIndex : activePopupStackIndex(anchorNode);
-    let left = rect.right + Math.max(3, fs * 0.25);
-    let top;
-    if (isHero) {
-      // Top-right anchor; stack upward so bursts do not pile at the bottom-right.
-      top = rect.top - stack * popupFs * 0.55;
-    } else {
-      top = rect.top + stack * fs * 0.55;
-    }
-    if (typeof window !== 'undefined') {
-      left = Math.min(left, window.innerWidth - 80);
-      top = Math.max(8, Math.min(top, window.innerHeight - 40));
-    }
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
+    const place = computeLibraryCountPopupPlacement({
+      rect,
+      fontSize: fs,
+      kind: isHero ? 'hero' : 'chip',
+      stackIndex: stack,
+      viewport: typeof window !== 'undefined'
+        ? { width: window.innerWidth, height: window.innerHeight }
+        : null,
+    });
+    el.classList.add('library-count-popup--floated');
+    if (place.kind === 'chip') el.classList.add('library-count-popup--floated-chip');
+    el.style.fontSize = `${place.popupFs.toFixed(1)}px`;
+    el.style.left = `${place.left}px`;
+    el.style.top = `${place.top}px`;
     document.body.appendChild(el);
   } else {
     host.appendChild(el);

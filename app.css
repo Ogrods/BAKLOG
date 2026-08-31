@@ -12816,13 +12816,13 @@ html[data-theme="ember"] .conn-primary:hover {
   top: auto;
   margin-left: 0;
   z-index: 120;
-  font-size: clamp(28px, 4.5vw, 48px);
-  transform-origin: left top;
+  font-size: clamp(22px, 3.2vw, 40px);
+  transform-origin: left center;
   animation: baklog-libcount-pop-hero 700ms ease-out forwards;
 }
-/* Summary chip + row count: smaller than hero, still clearly readable. */
+/* Summary chip + row count: pill-scaled, smaller than the chip digits. */
 .library-count-popup--floated-chip {
-  font-size: clamp(20px, 2.4vw, 32px);
+  font-size: clamp(14px, 1.6vw, 22px);
   transform-origin: left center;
   animation: baklog-libcount-pop 820ms ease-out forwards;
 }
@@ -12833,26 +12833,26 @@ html[data-theme="ember"] .conn-primary:hover {
   }
   18% {
     opacity: 1;
-    transform: translate(calc(var(--baklog-dx, 0) + 0.12em), -0.28em)
-      scale(1.18);
+    transform: translate(calc(var(--baklog-dx, 0) + 0.1em), -0.18em)
+      scale(1.12);
   }
   100% {
     opacity: 0;
-    transform: translate(calc(var(--baklog-dx, 0) + 0.38em), -1.65em) scale(1);
+    transform: translate(calc(var(--baklog-dx, 0) + 0.28em), -0.85em) scale(1);
   }
 }
 @keyframes baklog-libcount-pop {
   0% {
     opacity: 0;
-    transform: translate(var(--baklog-dx, 0px), 8px) scale(0.85);
+    transform: translate(var(--baklog-dx, 0px), 4px) scale(0.85);
   }
   18% {
     opacity: 1;
-    transform: translate(calc(var(--baklog-dx, 0px) + 5px), -14px) scale(1.18);
+    transform: translate(calc(var(--baklog-dx, 0px) + 4px), -8px) scale(1.12);
   }
   100% {
     opacity: 0;
-    transform: translate(calc(var(--baklog-dx, 0px) + 14px), -72px) scale(1);
+    transform: translate(calc(var(--baklog-dx, 0px) + 10px), -36px) scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {

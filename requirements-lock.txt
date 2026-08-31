@@ -46,7 +46,7 @@ pytest==9.1.1
 pytest-sugar==1.1.1
 pytest-timeout==2.4.0
 python-dotenv==1.2.2
-pywin32==311
+pywin32==312
 pywin32-ctypes==0.2.3
 requests==2.34.2
 ruff==0.15.21

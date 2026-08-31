@@ -103,7 +103,7 @@ Without the Resend trio, `/api/subscribe` returns `500 Server not configured` an
 
 ### BAKLOG account signup notifications (Supabase auth)
 
-When invite-only auth is on, users create accounts via **Create account** in the local app (`js/auth-gate.js` → Supabase `signUp`). That writes directly to Supabase Auth; it does **not** hit `/api/subscribe`.
+When account sign-in is on, users create accounts via **Create account** in the local app (`js/auth-gate.js` → Supabase `signUp`). That writes directly to Supabase Auth; it does **not** hit `/api/subscribe`.
 
 To get an email when a new `auth.users` row appears:
 

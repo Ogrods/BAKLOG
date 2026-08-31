@@ -48,9 +48,9 @@ The marketing site at [baklog.app](https://baklog.app) has a separate waitlist a
 
 No telemetry by default. Optional anonymous aggregate metrics (active sessions, sponsored-slot impressions) stay off unless you turn on **Share anonymous stats** in Connections. No library data or per-game telemetry leaves your machine. See [PRIVACY.md](../PRIVACY.md).
 
-## Why invite-only right now?
+## Is BAKLOG open beta?
 
-We are onboarding in small waves so we can fix what breaks on real setups before opening the doors. Request access at [baklog.app](https://baklog.app).
+Yes. Download from [baklog.app](https://baklog.app) or [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Builds are unsigned beta - see [troubleshooting](troubleshooting.md#unsigned-beta-builds-no-code-signing).
 
 ## Supported platforms
 
@@ -58,7 +58,7 @@ We are onboarding in small waves so we can fix what breaks on real setups before
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
 | **macOS** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) are Windows/macOS-only local sources |
-| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Experimental `BAKLOG-linux64.zip` packaged build in preview |
+| **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Packaged `BAKLOG-linux64.zip` on GitHub Releases (experimental; no tray yet) |
 
 The app itself (dashboard, server, secret storage, browser sign-in) is OS-agnostic. Platform-restricted local providers show as **Unavailable** on unsupported OSes; web fallbacks remain available.
 

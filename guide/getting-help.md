@@ -36,7 +36,7 @@ Discord invite and GitHub repo URLs are canonical in [`shared/community.json`](.
 
 1. [Troubleshooting](troubleshooting.md) - auth failures, 403s, empty results, platform limits
 2. [Connecting stores](connecting-stores.md) - per-store privacy settings and CLI fallbacks
-3. [FAQ](faq.md) - free vs paid, invite-only access, count differences
+3. [FAQ](faq.md) - free vs paid, open beta access, count differences
 
 ## Full user guide
 

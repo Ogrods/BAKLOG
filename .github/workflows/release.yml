@@ -1,7 +1,7 @@
-# Immutable releases: a push of a v* tag builds the Windows bundle on a clean
-# runner, attaches a SHA-256 + a signed build-provenance attestation, and
-# publishes the GitHub Release. The artifact is built from the tagged commit by
-# CI (not hand-uploaded), so anyone can verify it with `gh attestation verify`.
+# Immutable releases: a push of a v* tag builds Windows (then attaches macOS +
+# Linux), with SHA-256 + signed build-provenance where configured, and
+# publishes the GitHub Release. Artifacts are built from the tagged commit by
+# CI (not hand-uploaded), so anyone can verify with `gh attestation verify`.
 #
 # Policy: prefer not to move tags. If a published installer is broken for
 # strangers/beta, replace the SAME version: fix on main, run
@@ -216,3 +216,159 @@ jobs:
         run: |
           tag="${{ github.ref_name }}"
           gh release upload "$tag" release/BAKLOG-macos.zip release/BAKLOG-macos.sha256 --clobber
+
+  build-linux:
+    name: Build and attach Linux release
+    runs-on: ubuntu-22.04
+    needs: build
+    timeout-minutes: 45
+    env:
+      BAKLOG_NO_BROWSER: "1"
+      BAKLOG_NO_CHROMIUM_DOWNLOAD: "1"
+      BAKLOG_IDLE_SHUTDOWN_MINUTES: "0"
+      BAKLOG_PROFILE: smoke
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install zip utility
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Verify release auth secrets (fail fast)
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$BAKLOG_SUPABASE_URL" ] || [ -z "$BAKLOG_SUPABASE_ANON_KEY" ]; then
+            echo "::error::GitHub repo secrets BAKLOG_SUPABASE_URL and BAKLOG_SUPABASE_ANON_KEY must be set before tagging."
+            exit 1
+          fi
+          echo "Release auth secrets present (values not printed)."
+
+      - name: Build Linux bundle
+        env:
+          BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
+          BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: bash packaging/build_linux.sh
+
+      - name: Verify bundled auth .env after build
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.frozen_bundle_smoke import _env_has_auth_keys
+          env_path = Path("release/BAKLOG/.env")
+          ok, missing = _env_has_auth_keys(env_path)
+          assert ok, f"bundled .env invalid after build: missing {missing}"
+          print(f"bundled auth ok: {env_path}")
+          PY
+
+      - name: Isolate smoke home (XDG)
+        run: |
+          mkdir -p "$RUNNER_TEMP/baklog-home/.local/share"
+          echo "HOME=$RUNNER_TEMP/baklog-home" >> "$GITHUB_ENV"
+          echo "XDG_DATA_HOME=$RUNNER_TEMP/baklog-home/.local/share" >> "$GITHUB_ENV"
+
+      - name: Chromium pin smoke (linux64)
+        run: |
+          python - <<'PY'
+          from shared.chromium_runtime import is_allowed_cft_url, load_pin, platform_key
+          assert platform_key() == "linux64", platform_key()
+          pin = load_pin()
+          entry = (pin.get("platforms") or {}).get("linux64")
+          assert isinstance(entry, dict), entry
+          url = str(entry.get("url") or "")
+          sha = str(entry.get("sha256") or "")
+          assert is_allowed_cft_url(url), url
+          assert len(sha) == 64, sha
+          print("chromium pin linux64 ok")
+          PY
+
+      - name: XDG data-dir smoke
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from shared.install_paths import default_frozen_data_dir
+          home = Path(os.environ["HOME"]).resolve()
+          xdg = Path(os.environ["XDG_DATA_HOME"]).resolve()
+          got = default_frozen_data_dir()
+          expect = (xdg / "baklog").resolve()
+          assert got == expect, (got, expect, home)
+          print(f"default_frozen_data_dir ok: {got}")
+          PY
+
+      - name: Frozen import smoke
+        run: python scripts/frozen_import_smoke.py --exe release/BAKLOG/BAKLOG
+
+      - name: Frozen data-dir migration smoke
+        run: python scripts/frozen_data_dir_migration_smoke.py --bundle-dir release/BAKLOG --port 8766
+
+      - name: Frozen bundle smoke
+        run: python scripts/frozen_bundle_smoke.py release/BAKLOG --port 8765
+
+      - name: Frozen connect smoke
+        run: python scripts/frozen_connect_smoke.py --exe release/BAKLOG/BAKLOG --port 8767
+
+      - name: Verify bundled auth .env survived smokes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.frozen_bundle_smoke import _env_has_auth_keys
+          env_path = Path("release/BAKLOG/.env")
+          ok, missing = _env_has_auth_keys(env_path)
+          assert ok, f"bundled .env lost during smokes: missing {missing}"
+          print(f"bundled auth intact: {env_path}")
+          PY
+
+      - name: Verify Linux artifacts exist
+        run: |
+          test -f release/BAKLOG-linux64.zip
+          test -f release/BAKLOG-linux64.sha256
+          test -x release/BAKLOG/BAKLOG
+          test -x "release/BAKLOG/Start BAKLOG.sh"
+          test ! -e "release/BAKLOG/BAKLOG Tray"
+          (
+            cd release
+            sha256sum -c BAKLOG-linux64.sha256
+          )
+          ls -lh release/BAKLOG-linux64.zip release/BAKLOG-linux64.sha256
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: release/BAKLOG
+          format: spdx-json
+          output-file: release/BAKLOG-linux64.sbom.spdx.json
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: release/BAKLOG-linux64.zip
+
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: release/BAKLOG-linux64.zip
+          sbom-path: release/BAKLOG-linux64.sbom.spdx.json
+
+      - name: Upload Linux assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.ref_name }}"
+          gh release upload "$tag" \
+            release/BAKLOG-linux64.zip \
+            release/BAKLOG-linux64.sha256 \
+            release/BAKLOG-linux64.sbom.spdx.json \
+            --clobber

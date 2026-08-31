@@ -1,5 +1,5 @@
 /**
- * Supabase invite-only gate — blocks the app until the user signs in.
+ * Optional Supabase account gate - blocks the app until the user signs in.
  * Config from GET /api/config; session stored by Supabase client in localStorage.
  */
 

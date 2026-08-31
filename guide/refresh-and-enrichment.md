@@ -8,7 +8,7 @@ Keep library data current and backfill metadata after fetchers run.
 
 **ITAD auto-refresh** (default on): deal prices refresh on a 15-60 min schedule from the Fetcher health panel.
 
-**Auto-enrich** (default on): after a library fetch adds games, queues HLTB, reviews, covers, and co-op tags.
+**Auto-enrich** (default off): after a library fetch adds games, optionally queues HLTB, reviews, covers, and co-op tags. Turn it on from the Fetcher health panel if you want that.
 
 On the free tier, store refresh is one store at a time, on demand (click a fetcher chip). Pro adds scheduled refresh while the app is closed - see [FAQ](faq.md).
 

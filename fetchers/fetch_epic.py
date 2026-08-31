@@ -655,6 +655,8 @@ def main() -> int:
     empty_exit = refuse_empty_result(
         catalog_game_count(games_out),
         label="Epic playable library rows",
+        allow_empty=args.allow_empty,
+        output_path=GAMES_EPIC_JSON,
     )
     if empty_exit is not None:
         return stats.finish("fetch_epic", t0, exit_code=empty_exit)

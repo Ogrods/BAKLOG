@@ -159,6 +159,28 @@ def test_refuse_empty_helper(script: str) -> None:
 
 @pytest.mark.parametrize(
     "script",
+    sorted(REFUSE_EMPTY_SCRIPTS),
+)
+def test_refuse_empty_calls_pass_allow_empty(script: str) -> None:
+    """Every refuse_empty_result(...) must pass allow_empty= (kw-only required)."""
+    import ast
+
+    tree = ast.parse((ROOT / script).read_text(encoding="utf-8"), filename=script)
+    missing: list[int] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = getattr(func, "id", None) or getattr(func, "attr", None)
+        if name != "refuse_empty_result":
+            continue
+        if not any(kw.arg == "allow_empty" for kw in node.keywords):
+            missing.append(getattr(node, "lineno", 0))
+    assert not missing, f"{script}: refuse_empty_result missing allow_empty at lines {missing}"
+
+
+@pytest.mark.parametrize(
+    "script",
     sorted(MANUAL_EMPTY_EXIT_SCRIPTS),
 )
 def test_manual_empty_guard(script: str) -> None:

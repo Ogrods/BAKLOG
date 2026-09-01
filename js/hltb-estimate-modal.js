@@ -88,18 +88,20 @@ export function confirmHltbEstimate(pending, { refresh = false } = {}) {
     modal.insertAdjacentHTML(
       'beforeend',
       `<div class="app-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="hltbEstimateTitle">
-        <h2 id="hltbEstimateTitle" class="text-lg font-semibold text-slate-100">Run HowLongToBeat?</h2>
-        <p class="text-sm text-slate-300 mt-3">
-          About <strong>${escapeHtml(formatNum(lookups))}</strong> lookups
-          (${escapeHtml(formatNum(unchecked))} new${refresh && noMatch ? `, ${escapeHtml(formatNum(noMatch))} retries` : ''}).
-          Rough ETA: <strong>${escapeHtml(eta)}</strong>.
-        </p>
-        ${retryLine}
-        <p class="text-xs text-slate-400 mt-3">
-          Keep this machine awake. Leaving the dashboard open is fine - progress streams in Fetcher health.
-          Matched hours save as the run goes.
-        </p>
-        <div class="flex justify-end gap-2 mt-5">
+        <div class="app-modal-body">
+          <h2 id="hltbEstimateTitle" class="text-lg font-semibold text-slate-100">Run HowLongToBeat?</h2>
+          <p class="text-sm text-slate-300 mt-3">
+            About <strong>${escapeHtml(formatNum(lookups))}</strong> lookups
+            (${escapeHtml(formatNum(unchecked))} new${refresh && noMatch ? `, ${escapeHtml(formatNum(noMatch))} retries` : ''}).
+            Rough ETA: <strong>${escapeHtml(eta)}</strong>.
+          </p>
+          ${retryLine}
+          <p class="text-xs text-slate-400 mt-3">
+            Keep this machine awake. Leaving the dashboard open is fine - progress streams in Fetcher health.
+            Matched hours save as the run goes.
+          </p>
+        </div>
+        <div class="app-modal-actions">
           <button type="button" class="hltb-estimate-cancel text-sm px-3 py-2 rounded hover:bg-slate-700 text-slate-300">Cancel</button>
           <button type="button" class="hltb-estimate-run bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm text-white">Run HLTB</button>
         </div>

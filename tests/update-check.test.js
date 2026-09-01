@@ -586,8 +586,11 @@ describe('renderUpdateModalHtml', () => {
       applySupported: true,
     });
     expect(html).toContain('app-modal-panel');
+    expect(html).toContain('app-modal-body');
+    expect(html).toContain('app-modal-actions');
     expect(html).toContain('bg-cyan-700');
     expect(html).not.toContain('bg-sky-700');
+    expect(html).not.toContain('mt-5');
   });
 
   it('hides Update now when fetchers are in flight', () => {

@@ -105,6 +105,7 @@ import {
   resizeRibbonCharts,
 } from "./dashboard-charts.js";
 import { prewarmTableQueryForView, tableFingerprint, installDrillGeomApi } from "./table-ui.js";
+import { installModalGeomApi } from "./modal-geom-api.js";
 import {
   dashDrillStore,
   dashDrillStatus,
@@ -231,6 +232,7 @@ async function bootstrap() {
   savePrefs();
   bindEvents();
   installDrillGeomApi();
+  installModalGeomApi();
   if (typeof window !== "undefined" && window.__baklogDrillGeom) {
     Object.assign(window.__baklogDrillGeom, {
       dashDrillStore,

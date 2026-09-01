@@ -9688,6 +9688,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 .app-modal > .baklog-bug-report-card {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 .app-modal > [role="dialog"] > .flex-1,
 .app-modal > [role="dialog"] > .overflow-y-auto,

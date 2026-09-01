@@ -3236,13 +3236,13 @@
       role="presentation"
     >
       <div
-        class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-md flex flex-col"
+        class="bg-slate-800 rounded-lg shadow-xl border border-slate-700 w-full max-w-md max-h-[85vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="notesDialogTitle"
       >
         <div
-          class="flex items-center justify-between border-b border-slate-700 p-3"
+          class="flex items-center justify-between border-b border-slate-700 p-3 shrink-0"
         >
           <h3
             id="notesDialogTitle"
@@ -3259,7 +3259,7 @@
             &times;
           </button>
         </div>
-        <div class="p-3">
+        <div class="app-modal-body p-3">
           <label class="sr-only" for="notesDialogInput">Personal notes</label>
           <textarea
             id="notesDialogInput"
@@ -3270,7 +3270,7 @@
           ></textarea>
         </div>
         <div
-          class="border-t border-slate-700 p-3 flex justify-end gap-2 text-sm"
+          class="app-modal-actions border-t border-slate-700 p-3 text-sm"
         >
           <button
             type="button"
@@ -3319,7 +3319,7 @@
             &times;
           </button>
         </div>
-        <div class="p-4 space-y-3 overflow-y-auto theme-scrollbar">
+        <div class="app-modal-body p-4 space-y-3 theme-scrollbar">
           <div
             class="inline-flex rounded border border-slate-600 overflow-hidden text-xs"
             role="group"

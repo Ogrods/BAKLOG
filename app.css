@@ -9668,6 +9668,69 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   margin: auto;
 }
 
+/* === App modal layout contract (always on)
+   Panels stay inside the viewport; body scrolls; actions never overlap copy.
+   Prefer .app-modal-body / .app-modal-actions over purged spacing utilities. === */
+.app-modal > [role="dialog"],
+.app-modal > .app-modal-panel,
+.app-modal > .update-modal-panel,
+.app-modal > .profile-modal-card,
+.app-modal > .baklog-bug-report-card {
+  max-height: min(85vh, calc(100dvh - 2rem));
+  min-height: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.app-modal > .app-modal-panel,
+.app-modal > .update-modal-panel,
+.app-modal > [role="dialog"].flex,
+.app-modal > .profile-modal-card,
+.app-modal > .baklog-bug-report-card {
+  display: flex;
+  flex-direction: column;
+}
+.app-modal > [role="dialog"] > .flex-1,
+.app-modal > [role="dialog"] > .overflow-y-auto,
+.app-modal > [role="dialog"] > .app-modal-body,
+.app-modal > .profile-modal-card > .overflow-y-auto,
+.app-modal > .baklog-bug-report-card .baklog-bug-report-body {
+  min-height: 0;
+}
+.app-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.app-modal-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+/* Bordered footers already separate from the body. */
+.app-modal-actions.border-t {
+  margin-top: 0;
+}
+
+/* Short desktop / zoomed windows: keep panels scrollable (sheet MQ needs hover:none). */
+@media (max-height: 640px) {
+  .app-modal > [role="dialog"],
+  .app-modal > .app-modal-panel,
+  .app-modal > .update-modal-panel,
+  .app-modal > .profile-modal-card,
+  .app-modal > .baklog-bug-report-card {
+    max-height: min(92dvh, calc(100dvh - 1rem));
+  }
+  .cover-gallery-frame {
+    height: auto;
+    max-height: min(70dvh, 760px);
+  }
+}
+
 /* === Phone / short-viewport modal sheets (R4+) — bottom-anchored, safe-area.
    Sheet mode: portrait phone OR short coarse viewport (phone landscape). === */
 @media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
@@ -9708,6 +9771,7 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   }
   .app-modal > [role="dialog"] > .flex-1,
   .app-modal > [role="dialog"] > .overflow-y-auto,
+  .app-modal > [role="dialog"] > .app-modal-body,
   .app-modal > .profile-modal-card > .overflow-y-auto,
   .app-modal > .baklog-bug-report-card .baklog-bug-report-body {
     min-height: 0;
@@ -9723,7 +9787,9 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   .app-modal .update-modal-later,
   .app-modal .update-modal-apply,
   .app-modal .update-install-decline,
-  .app-modal .update-install-confirm {
+  .app-modal .update-install-confirm,
+  .app-modal .hltb-estimate-cancel,
+  .app-modal .hltb-estimate-run {
     min-width: var(--touch-min, 44px);
     min-height: var(--touch-min, 44px);
     display: inline-flex;
@@ -9772,6 +9838,10 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
     overscroll-behavior: contain;
     border-radius: 0.75rem 0.75rem 0 0;
     padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+  .cover-gallery-frame {
+    height: auto;
+    max-height: min(70dvh, 760px);
   }
   .claim-detail-close,
   .cover-gallery-dialog button {

@@ -342,11 +342,13 @@ export function renderUpdateModalHtml(parsed) {
     : "";
   return (
     `<div class="update-modal-panel app-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-lg w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">` +
+    `<div class="app-modal-body">` +
     `<h2 id="updateModalTitle" class="text-lg font-semibold text-slate-100">Update available: v${escapeHtml(parsed.latest || "")}</h2>` +
     `<p class="text-sm text-slate-400 mt-1">You have v${escapeHtml(parsed.current)}.</p>` +
     renderApplyBlockedHint(parsed) +
     notes +
-    `<div class="flex flex-wrap gap-2 justify-end mt-4">` +
+    `</div>` +
+    `<div class="app-modal-actions">` +
     `<a href="${escapeHtml(href)}" class="update-modal-release text-sm text-sky-300 hover:underline px-3 py-2" target="_blank" rel="noopener noreferrer">Release page</a>` +
     '<button type="button" class="update-modal-later text-sm px-3 py-2 rounded hover:bg-slate-700 text-slate-300">Remind me later</button>' +
     updateBtn +
@@ -357,10 +359,12 @@ export function renderUpdateModalHtml(parsed) {
 function renderInstallConfirmModalHtml(hints = _installHints) {
   return (
     `<div class="update-modal-panel app-modal-panel bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-w-md w-full mx-4 p-6" role="dialog" aria-modal="true" aria-labelledby="updateInstallTitle">` +
+    '<div class="app-modal-body">' +
     '<h2 id="updateInstallTitle" class="text-lg font-semibold text-slate-100">Install and restart?</h2>' +
     '<p class="text-sm text-slate-400 mt-2">The update is downloaded and verified. BAKLOG will restart to finish installing. Your library data stays where it is.</p>' +
     renderSetupArpFootnote(hints) +
-    '<div class="flex flex-wrap gap-2 justify-end mt-4">' +
+    "</div>" +
+    '<div class="app-modal-actions">' +
     '<button type="button" class="update-install-decline text-sm px-3 py-2 rounded hover:bg-slate-700 text-slate-300">Not yet</button>' +
     '<button type="button" class="update-install-confirm bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm text-white">Install &amp; restart</button>' +
     "</div></div>"

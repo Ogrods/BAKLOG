@@ -113,6 +113,7 @@ review-report.json
 scripts/_diag_personal.py
 scripts/perf-last-run.json
 scripts/drill-geometry-last-run.json
+scripts/modal-geometry-last-run.json
 scripts/library-count-geometry-last-run.json
 scripts/responsive-overflow-last-run.json
 

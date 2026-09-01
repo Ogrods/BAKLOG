@@ -1,6 +1,46 @@
 {
-  "generated_at": "2026-08-31T20:45:40.296305+00:00",
+  "generated_at": "2026-09-01T20:16:13.834771+00:00",
   "items": [
+    {
+      "id": "gamerpower-3421",
+      "store": "itch",
+      "title": "Very Realistic Game Dev Simulator (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/very-realistic-game-dev-simulator-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6946b7c157bca.jpg",
+      "genres": [],
+      "blurb": "Are you planning on getting into game dev? Then this might be for you! Very Realistic Game Dev Simulator is free on Itch.io for a limited time!",
+      "ends_at": "2026-09-05T23:59:35Z",
+      "source": "gamerpower",
+      "first_seen": "2026-08-01T20:43:42Z"
+    },
+    {
+      "id": "gamerpower-3496",
+      "store": "itch",
+      "title": "Cherophobia (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/cherophobia-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/698fa7369c1f5.jpg",
+      "genres": [],
+      "blurb": "Download Cherophobia for free via Itch.io! Cherophobia is a short 3D psychological horror game.",
+      "ends_at": "2026-09-04T23:59:00Z",
+      "steam_appid": 2994800,
+      "review_percent": 78,
+      "source": "gamerpower",
+      "first_seen": "2026-08-17T18:41:11Z"
+    },
+    {
+      "id": "gamerpower-3422",
+      "store": "itch",
+      "title": "Do You Have a Moment to Talk About Our Lord and Savior? (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/do-you-have-a-moment-to-talk-about-our-lord-and-savior-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6946b8c46bc9b.jpg",
+      "genres": [],
+      "blurb": "Grab “Do You Have a Moment to Talk About Our Lord and Savior?” for free on itch.io! A short 3D roguelike deckbuilder with retro PSX-style graphics.",
+      "ends_at": "2026-09-04T23:59:00Z",
+      "steam_appid": 3063960,
+      "review_percent": 80,
+      "source": "gamerpower",
+      "first_seen": "2026-08-17T18:41:11Z"
+    },
     {
       "id": "gamerpower-3313",
       "store": "indiegala",
@@ -12,46 +52,6 @@
       "ends_at": "2026-09-14T20:45:20Z",
       "steam_appid": 1532580,
       "review_percent": 62,
-      "source": "gamerpower",
-      "first_seen": "2026-08-31T20:45:20Z"
-    },
-    {
-      "id": "gamerpower-3421",
-      "store": "itch",
-      "title": "Very Realistic Game Dev Simulator (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/very-realistic-game-dev-simulator-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6946b7c157bca.jpg",
-      "genres": [],
-      "blurb": "Are you planning on getting into game dev? Then this might be for you! Very Realistic Game Dev Simulator is free on Itch.io for a limited time!",
-      "ends_at": "2026-09-05T23:59:35Z",
-      "source": "gamerpower",
-      "first_seen": "2026-08-31T20:45:20Z"
-    },
-    {
-      "id": "gamerpower-3496",
-      "store": "itch",
-      "title": "Cherophobia (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/cherophobia-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2994800/header.jpg?t=1771719765",
-      "genres": [],
-      "blurb": "Download Cherophobia for free via Itch.io! Cherophobia is a short 3D psychological horror game.",
-      "ends_at": "2026-09-04T23:59:00Z",
-      "steam_appid": 2994800,
-      "review_percent": 78,
-      "source": "gamerpower",
-      "first_seen": "2026-08-31T20:45:20Z"
-    },
-    {
-      "id": "gamerpower-3422",
-      "store": "itch",
-      "title": "Do You Have a Moment to Talk About Our Lord and Savior? (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/do-you-have-a-moment-to-talk-about-our-lord-and-savior-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3063960/header.jpg?t=1739261833",
-      "genres": [],
-      "blurb": "Grab “Do You Have a Moment to Talk About Our Lord and Savior?” for free on itch.io! A short 3D roguelike deckbuilder with retro PSX-style graphics.",
-      "ends_at": "2026-09-04T23:59:00Z",
-      "steam_appid": 3063960,
-      "review_percent": 80,
       "source": "gamerpower",
       "first_seen": "2026-08-31T20:45:20Z"
     },
@@ -68,45 +68,6 @@
       "review_percent": 96,
       "source": "itad",
       "first_seen": "2026-08-31T20:45:20Z"
-    },
-    {
-      "id": "gamerpower-3621",
-      "store": "itch",
-      "title": "Forget-me-not (itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/forget-me-not-itchio-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1952260/header.jpg?t=1650154570",
-      "genres": [],
-      "blurb": "Grab Forget-me-not for free on itch.io! Forget-me-not is a yuri Visual Novel. Give it a look!",
-      "ends_at": "2026-08-31T23:59:00Z",
-      "steam_appid": 1952260,
-      "review_percent": 94,
-      "source": "gamerpower",
-      "first_seen": "2026-08-30T18:33:13Z"
-    },
-    {
-      "id": "steam-dwarven-realms",
-      "store": "steam",
-      "title": "Dwarven Realms",
-      "claim_url": "https://www.amdgaming.com/promotions/dwarven-realms-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2015240/header.jpg?t=1738315434",
-      "genres": [],
-      "blurb": null,
-      "ends_at": null,
-      "steam_appid": 2015240,
-      "review_percent": 82,
-      "first_seen": "2026-08-24T16:40:14Z"
-    },
-    {
-      "id": "gamerpower-3742",
-      "store": "epic",
-      "title": "Targeted – 10 Days (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/targeted-10-days-epic-games-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a7ce767b76aa.jpg",
-      "genres": [],
-      "blurb": "New Giveaway! Download Targeted – 10 Days for free via Epic Games Store! Targeted – 10 Days is a 3d escape-room-style game with multiple difficulty levels.",
-      "ends_at": "2026-08-31T23:59:00Z",
-      "source": "gamerpower",
-      "first_seen": "2026-08-30T18:33:13Z"
     }
   ],
   "attribution": [

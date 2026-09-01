@@ -129,28 +129,36 @@ def _fetch_wishlist_html(timeout_s: int = 45) -> tuple[str, str]:
     poll_deadline_s = min(max(timeout_s - 5, 15), 25)
     poll_interval_ms = 500
 
-    ctx = launch_persistent_profile(str(profile), headless=True)
+    def _load_page() -> tuple[str, str]:
+        ctx = launch_persistent_profile(str(profile), headless=True)
+        try:
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
+
+            title = ""
+            html = ""
+            deadline = time.time() + poll_deadline_s
+            while time.time() < deadline:
+                title = page.title() or ""
+                html = page.content()
+                if _wishlist_page_ready(html):
+                    break
+                if "sign in" in title.lower():
+                    break
+                page.wait_for_timeout(poll_interval_ms)
+
+            return title, html
+        finally:
+            close_browser_bounded(ctx, profile=profile)
+
     try:
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=timeout_s * 1000)
-
-        title = ""
-        html = ""
-        deadline = time.time() + poll_deadline_s
-        while time.time() < deadline:
-            title = page.title() or ""
-            html = page.content()
-            if _wishlist_page_ready(html):
-                break
-            if "sign in" in title.lower():
-                break
-            page.wait_for_timeout(poll_interval_ms)
-
-        return title, html
-
-
-    finally:
-        close_browser_bounded(ctx, profile=profile)
+        return _load_page()
+    except Exception as first_err:
+        # Transient navigation flakes (timeout, net::ERR_*) — one bounded retry.
+        try:
+            return _load_page()
+        except Exception:
+            raise first_err from None
 
 def _classify_kind(name: str, edition: str | None) -> str:
     """Best-effort split between base games and DLC/cosmetics/currency packs.

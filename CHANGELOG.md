@@ -33,7 +33,19 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
-## [0.9.01] - 2026-09-01
+### Added
+
+- Opt-in Playwright modal geometry audit (`npm run test:modal-geometry`) for HLTB confirm, notes, and add-game dialogs on short and phone viewports.
+
+### Changed
+
+- Free claims feed refreshed; stale approved-only ids pruned from the maintainer list.
+
+### Fixed
+
+- Ubisoft wishlist Connect retries once on a transient browser navigation error before failing.
+- Add-game dialog footer uses the shared modal actions layout so body copy cannot overlap buttons on short viewports.
+
 
 ### Added
 

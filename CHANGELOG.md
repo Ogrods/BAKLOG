@@ -33,7 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
-## [0.9.01] - 2026-08-31
+## [0.9.01] - 2026-09-01
 
 ### Added
 
@@ -51,6 +51,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - In-app updates on Windows refresh the version shown in Settings → Apps for Setup installs.
 - Dashboard and picks jumps to a library row re-check the target after scroll so the wrong game is not left under the sticky header on phone and mid-width layouts.
 - Source and packaged runs no longer share one browser error history when both use the same localhost origin; each runtime keeps its own log.
+- HowLongToBeat lookup works again after an API change; the confirm dialog shows an ETA on large runs, Shift+click retries cached misses, and long runs save progress as they go.
+- Library count +1 popup sits on the middle line on phone, mid-width, and desktop layouts.
+- HLTB confirm and other dialogs no longer overlap action buttons on short viewports.
+- Epic library fetch no longer crashes packaged builds when playtime data is empty after a sync.
 
 ## [0.9.00] - 2026-08-18
 

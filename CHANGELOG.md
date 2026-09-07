@@ -40,12 +40,16 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Changed
 
 - Free claims feed refreshed; stale approved-only ids pruned from the maintainer list.
+- Library watch no longer ships with a default Pico Park watch; only watches you arm stay armed.
+- Pro tab label is Back BAKLOG; Pro page hero is a flat brand strip; sample sponsor games are out of the shipped feed.
+- Sponsored deal cards only show review scores and prices the feed actually supplies.
 
 ### Fixed
 
 - Ubisoft wishlist Connect retries once on a transient browser navigation error before failing.
 - Add-game dialog footer uses the shared modal actions layout so body copy cannot overlap buttons on short viewports.
 
+## [0.9.01] - 2026-09-01
 
 ### Added
 

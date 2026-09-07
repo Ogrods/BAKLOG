@@ -13,7 +13,7 @@ charset-normalizer==3.5.1
 colorama==0.4.6
 cryptography==50.0.1
 fake-useragent==2.2.0
-fonttools==4.63.0
+fonttools==4.64.0
 frozenlist==1.8.0
 git-filter-repo==2.47.0
 howlongtobeatpy==1.0.23
@@ -36,11 +36,11 @@ psnawp==3.0.3
 pycountry==26.2.16
 pycparser==3.0
 pycryptodomex==3.23.0
-Pygments==2.20.0
-pyinstaller==6.22.0
+Pygments==2.21.0
+pyinstaller==6.22.2
 pyinstaller-hooks-contrib==2026.6
 PyJWT==2.13.0
-pyrate-limiter==4.4.0
+pyrate-limiter==4.5.0
 pystray==0.19.5
 pytest==9.1.1
 pytest-sugar==1.1.1
@@ -55,7 +55,7 @@ shadowcopy==0.0.4
 six==1.17.0
 soupsieve==2.9.2
 termcolor==3.3.0
-typing_extensions==4.15.0
+typing_extensions==4.16.0
 urllib3==2.7.0
 websocket-client==1.9.0
 WMI==1.5.1

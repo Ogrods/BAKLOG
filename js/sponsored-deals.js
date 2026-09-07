@@ -293,8 +293,8 @@ const V1_PLACEMENT_MAP = {
 const HOUSE_DEFAULTS = {
   'house-support-baklog': {
     kind: 'house',
-    title: 'Support BAKLOG Pro',
-    tagline: 'Optional perks for supporters: bulk refresh, background sync, sponsored deal cards removed.',
+    title: 'Back the BAKLOG roadmap',
+    tagline: 'Pro funds bulk refresh, background sync, and a quieter deal radar - nothing free today moves behind it.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -303,8 +303,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-pro-promo': {
     kind: 'house',
-    title: 'Optional support for BAKLOG Pro',
-    tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - nothing free today moves behind it.',
+    title: 'Back BAKLOG',
+    tagline: 'The app stays free and local-first. Pro is what funds the next stores and sync work.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -312,8 +312,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-lib-backlog': {
     kind: 'house',
-    title: 'You own 600 games. You\'ve played 40.',
-    tagline: 'One honest backlog across every store. Private, Steam-ready.',
+    title: 'One honest backlog across every store',
+    tagline: 'Private, Steam-ready, and local-first. Connect a store to see your real counts.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -322,8 +322,8 @@ const HOUSE_DEFAULTS = {
   },
   'house-itch-privacy': {
     kind: 'house',
-    title: 'Support BAKLOG Pro',
-    tagline: 'Optional perks for supporters: background refresh, cloud sync, sponsored deal cards removed.',
+    title: 'Back the BAKLOG roadmap',
+    tagline: 'Pro funds background refresh, cloud sync, and sponsored deal cards removed - nothing free today moves behind it.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -334,7 +334,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'BAKLOG Pro',
     slogan: 'One honest backlog across every store.',
-    tagline: 'Supporter perks: bulk refresh, cloud sync, sponsored deal cards removed.',
+    tagline: 'Free and local-first. Pro funds the roadmap.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -344,9 +344,9 @@ const HOUSE_DEFAULTS = {
   },
   'house-spotlight-pro-sync': {
     kind: 'house',
-    title: 'Sync every machine',
-    slogan: 'Keep your library and personal data aligned across machines - no manual exports.',
-    tagline: 'Cloud sync for library JSON and personal prefs.',
+    title: 'Library on every machine',
+    slogan: 'Keep library JSON and personal prefs aligned - no manual exports.',
+    tagline: 'Cloud sync for Pro supporters - coming soon.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -356,9 +356,9 @@ const HOUSE_DEFAULTS = {
   },
   'house-spotlight-pro-noads': {
     kind: 'house',
-    title: 'Fewer distractions',
-    slogan: 'Pro supporters see sponsored deal cards removed.',
-    tagline: 'Nothing you use today moves behind paywall.',
+    title: 'A quieter deal radar',
+    slogan: 'Sponsored deal cards removed for Pro supporters.',
+    tagline: 'Nothing you use today moves behind a paywall.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -368,9 +368,9 @@ const HOUSE_DEFAULTS = {
   },
   'house-spotlight-pro-alerts': {
     kind: 'house',
-    title: 'Never miss a free game again',
+    title: 'Catch free drops early',
     slogan: 'Alerts when giveaways and sales land.',
-    tagline: 'Deal & watchlist alerts - coming soon for Pro supporters.',
+    tagline: 'Deal and watchlist alerts - coming soon for Pro.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -777,13 +777,13 @@ const HOUSE_BANNER_FEATURES = [
 // Sync pair: PRO_PROMO ↔ landing/index.html paid tier + FAQ pricing answers.
 export const PRO_PROMO = {
   label: 'BAKLOG Pro',
-  title: 'Optional support for BAKLOG Pro',
+  title: 'Back BAKLOG',
   price: '',
-  tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - nothing free today moves behind it.',
+  tagline: 'BAKLOG stays free and local-first. Pro is optional support that funds the next stores, sync work, and a quieter deal radar - nothing free today moves behind it.',
   cta: 'Support BAKLOG',
   ctaYearly: 'Support BAKLOG',
   url: PRO_CHECKOUT_MONTHLY,
-  founderNote: 'Early support helps fund the roadmap.',
+  founderNote: 'Early support pays for store connectors, packaging, and the sync work still on the roadmap.',
   features: [
     {
       title: 'Queued bulk refresh',
@@ -862,8 +862,8 @@ export function isProPromoSponsorId(id) {
 export const HOUSE_DEAL_ITEM = {
   id: 'house-support-baklog',
   kind: 'house',
-  title: 'Support BAKLOG Pro',
-  tagline: 'Optional perks for supporters: bulk refresh, background sync, sponsored deal cards removed.',
+  title: 'Back the BAKLOG roadmap',
+  tagline: 'Pro funds bulk refresh, background sync, and a quieter deal radar - nothing free today moves behind it.',
   cta: 'Support BAKLOG',
   url: PRO_CHECKOUT_MONTHLY,
   dismissible: true,
@@ -879,8 +879,8 @@ export const PRO_PROMO_ITEM = {
   url: PRO_PROMO.url,
 };
 
-/** Placeholder copy for house-lib-backlog when the library catalog is still empty. */
-export const HOUSE_LIB_BACKLOG_FAKE_STATS = { owned: 600, played: 40 };
+/** Empty-catalog title for house-lib-backlog (no invented owned/played counts). */
+export const HOUSE_LIB_BACKLOG_EMPTY_TITLE = 'One honest backlog across every store';
 
 function isLibraryGamePlayed(g) {
   const norm = normalizeNameForDedup(g.name);
@@ -899,13 +899,10 @@ function formatOwnedGamesLabel(count) {
   return count === 1 ? '1 game' : `${formatNum(count)} games`;
 }
 
-/** Dynamic title for the library house stripe: real counts when loaded, else marketing placeholders. */
+/** Dynamic title for the library house stripe: real counts when loaded, else honest empty copy. */
 export function houseLibBacklogStatsTitle(games = state.allGames) {
   const list = games || [];
-  if (list.length === 0) {
-    const { owned, played } = HOUSE_LIB_BACKLOG_FAKE_STATS;
-    return `You own ${formatOwnedGamesLabel(owned)}. You've played ${formatNum(played)}.`;
-  }
+  if (list.length === 0) return HOUSE_LIB_BACKLOG_EMPTY_TITLE;
   const played = countLibraryPlayedGames(list);
   return `You own ${formatOwnedGamesLabel(list.length)}. You've played ${formatNum(played)}.`;
 }
@@ -1157,14 +1154,16 @@ export function sponsoredDealPickCardHtml(item) {
     ? `<img class="pick-cover${ls}" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onload="window.markLandscape&&window.markLandscape(this)" onerror="this.style.display='none'" />`
     : `<div class="pick-cover placeholder flex items-center justify-center text-slate-500 text-xs">Ad</div>`;
   const s = sponsorFakeStats(item);
-  const priceLabel = `$${s.sale}`;
-  const cutLabel = `-${s.disc}%`;
-  const cutClass = s.disc >= 75
-    ? 'deal-flag-cut deal-flag-cut--huge'
-    : s.disc >= 50
-      ? 'deal-flag-cut deal-flag-cut--big'
-      : 'deal-flag-cut';
-  const rating = `${s.steam}%`;
+  const priceLabel = s.sale != null ? `$${s.sale}` : '';
+  const cutLabel = s.disc != null ? `-${s.disc}%` : '';
+  const cutClass = s.disc == null
+    ? 'deal-flag-cut'
+    : s.disc >= 75
+      ? 'deal-flag-cut deal-flag-cut--huge'
+      : s.disc >= 50
+        ? 'deal-flag-cut deal-flag-cut--big'
+        : 'deal-flag-cut';
+  const rating = s.steam != null ? `${s.steam}%` : '';
   return `<button type="button"
     class="pick-card sponsored-pick-card relative rounded p-2 text-left w-full${sponsorHouseClass(item)}"
     ${sponsorActionAttrs(item)}
@@ -1177,7 +1176,7 @@ export function sponsoredDealPickCardHtml(item) {
     <div class="text-xs text-slate-400 flex justify-between items-center gap-1">
       <span class="text-slate-100">${priceLabel}</span>
       <span class="flex items-center gap-1 shrink-0">
-        <span class="${cutClass}">${cutLabel}</span>
+        ${cutLabel ? `<span class="${cutClass}">${cutLabel}</span>` : ''}
       </span>
     </div>
     <div class="text-[10px] text-slate-500 flex justify-between gap-1 mt-0.5 min-w-0">
@@ -1194,42 +1193,30 @@ export function sponsoredDealPickSlotHtml(locationKey = 'wish-pick') {
   return item ? sponsoredDealPickCardHtml(item) : '';
 }
 
-// FNV-1a-ish string hash → stable 32-bit seed for synthetic stats.
-function sponsorHash(value) {
-  const str = String(value || 'sponsor');
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-const SPONSOR_FAKE_GENRES = ['Roguelike', 'Action', 'Indie', 'RPG', 'Strategy', 'Adventure'];
-
 /**
- * Stable, plausible-looking stats so a sponsored table row reads like a real
- * game row instead of a bare banner. Values are seeded from the item id (so
- * they never flicker between renders) and any explicit feed field wins, letting
- * a real sponsor later pin its own numbers in sponsors.json.
+ * Authored sponsor stats only. Missing fields stay null so renderers can omit
+ * chips instead of inventing review scores / prices for real advertisers.
  */
 function sponsorFakeStats(item) {
-  const seed = sponsorHash(item.id || item.title);
-  const at = (shift, span, min) => min + ((seed >>> shift) % span);
-  const steam = item.steam_review_percent ?? at(0, 16, 82); // 82-97%
-  const mc = item.metacritic_score ?? at(4, 15, 78); // 78-92
-  const hltb = item.hltb_hours ?? at(8, 19, 6); // 6-24h
-  const year = item.release_year ?? at(16, 6, 2020); // 2020-2025
-  const disc = item.discount ?? [20, 25, 33, 40, 50][seed % 5];
-  const baseNum = item.price_base ?? [14.99, 19.99, 24.99, 29.99][(seed >>> 12) % 4];
-  const sale = item.price_sale != null
-    ? Number(item.price_sale).toFixed(2)
-    : (baseNum * (1 - disc / 100)).toFixed(2);
-  const base = baseNum.toFixed(2);
-  const score = (steam / Math.log2(hltb + 2)).toFixed(1);
+  const steam = item.steam_review_percent != null ? Number(item.steam_review_percent) : null;
+  const mc = item.metacritic_score != null ? Number(item.metacritic_score) : null;
+  const hltb = item.hltb_hours != null ? Number(item.hltb_hours) : null;
+  const year = item.release_year != null ? Number(item.release_year) : null;
+  const disc = item.discount != null ? Number(item.discount) : null;
+  const baseNum = item.price_base != null ? Number(item.price_base) : null;
+  let sale = null;
+  if (item.price_sale != null) {
+    sale = Number(item.price_sale).toFixed(2);
+  } else if (baseNum != null && disc != null) {
+    sale = (baseNum * (1 - disc / 100)).toFixed(2);
+  }
+  const base = baseNum != null ? baseNum.toFixed(2) : null;
+  const score = (steam != null && hltb != null)
+    ? (steam / Math.log2(hltb + 2)).toFixed(1)
+    : null;
   const genres = item.genres
     ? (Array.isArray(item.genres) ? item.genres.join(', ') : String(item.genres))
-    : SPONSOR_FAKE_GENRES[seed % SPONSOR_FAKE_GENRES.length];
+    : null;
   return { steam, mc, hltb, year, disc, sale, base, score, genres };
 }
 
@@ -1324,6 +1311,9 @@ export function sponsoredTableRowHtml(item, { isWish: _isWish, locationKey = 'li
   // The whole row is the click target (data-action on the <tr>); the focusable
   // name button gives keyboard users an Enter/Space activation that bubbles to
   // the same document-level sponsored-deal handler.
+  const priceCell = (s.disc != null && s.sale != null)
+    ? `<span class="sponsored-table-deal-pill">-${s.disc}% $${s.sale}</span>`
+    : (s.sale != null ? `$${s.sale}` : SP_DASH);
   return `<tr class="sponsored-table-row${sponsorHouseClass(item)}" data-sponsored-row="1"
     ${sponsorActionAttrs(item)} title="${escapeAttr(discTitle)}">
     <td class="col-select p-2 text-center" aria-hidden="true"></td>
@@ -1338,15 +1328,15 @@ export function sponsoredTableRowHtml(item, { isWish: _isWish, locationKey = 'li
       </button>
     </td>
     <td class="col-status p-2"><span class="sponsored-table-status-pill">Deal</span></td>
-    <td class="col-score p-2 text-right">${s.score}</td>
+    <td class="col-score p-2 text-right">${s.score != null ? s.score : SP_DASH}</td>
     <td class="col-played p-2 text-right text-slate-300">${SP_DASH}</td>
-    <td class="col-hltb p-2 text-right text-slate-300">${s.hltb}h</td>
-    <td class="col-steam p-2 text-right">${s.steam}%</td>
-    <td class="col-mc p-2 text-right text-slate-300">${s.mc}</td>
-    <td class="col-price p-2 text-right"><span class="sponsored-table-deal-pill">-${s.disc}% $${s.sale}</span></td>
-    <td class="col-released p-2 text-slate-300 whitespace-nowrap">${s.year}</td>
+    <td class="col-hltb p-2 text-right text-slate-300">${s.hltb != null ? `${s.hltb}h` : SP_DASH}</td>
+    <td class="col-steam p-2 text-right">${s.steam != null ? `${s.steam}%` : SP_DASH}</td>
+    <td class="col-mc p-2 text-right text-slate-300">${s.mc != null ? s.mc : SP_DASH}</td>
+    <td class="col-price p-2 text-right">${priceCell}</td>
+    <td class="col-released p-2 text-slate-300 whitespace-nowrap">${s.year != null ? s.year : SP_DASH}</td>
     <td class="col-lastplayed p-2 text-slate-300">${SP_DASH}</td>
-    <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${escapeAttr(s.genres)}">${escapeHtml(s.genres)}</td>
+    <td class="col-genres p-2 text-slate-400 text-xs truncate" title="${escapeAttr(s.genres || '')}">${escapeHtml(s.genres || '')}</td>
     <td class="col-notes p-2 sponsored-table-notes">
       <span class="sponsored-deal-cta">${escapeHtml(cta)} &rarr;</span>
       ${sponsorDismissHtml(item)}
@@ -1364,7 +1354,9 @@ export function sponsoredVersusRowHtml(item, { metric = 'rating', locationKey = 
     ? `<img class="dash-list-cover" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" />`
     : `<div class="dash-list-cover placeholder flex items-center justify-center text-slate-500 text-xs">Ad</div>`;
   const s = sponsorFakeStats(item);
-  const scoreLabel = metric === 'hltb' ? `${s.hltb}h` : `${s.steam}%`;
+  const scoreLabel = metric === 'hltb'
+    ? (s.hltb != null ? `${s.hltb}h` : '')
+    : (s.steam != null ? `${s.steam}%` : '');
   const accentCls = metric === 'hltb' ? 'dash-versus-row--fast' : 'dash-versus-row--rated';
   return `<button type="button"
     class="dash-list-row dash-versus-row ${accentCls} sponsored-versus-row${sponsorHouseClass(item)}"
@@ -1392,6 +1384,7 @@ export function sponsoredCoopPickRowHtml(item, locationKey = 'dash-coop-online')
     ? `<img class="coop-pick-cover" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" />`
     : `<div class="coop-pick-cover placeholder flex items-center justify-center text-slate-500 text-xs">Ad</div>`;
   const s = sponsorFakeStats(item);
+  const rating = s.steam != null ? `${s.steam}%` : '';
   return `<button type="button"
     class="coop-pick-row sponsored-coop-row${sponsorHouseClass(item)}"
     ${sponsorActionAttrs(item)}
@@ -1401,21 +1394,21 @@ export function sponsoredCoopPickRowHtml(item, locationKey = 'dash-coop-online')
       <span class="coop-pick-name">${escapeHtml(item.title)}</span>
       ${sponsorBadgeHtml(item, 'sponsored-coop-badge')}
     </span>
-    <span class="coop-pick-rating">${s.steam}%</span>
+    <span class="coop-pick-rating">${rating}</span>
     ${sponsorDismissHtml(item)}
   </button>`;
 }
 
-// Sub-card stat chips for the full feature ad. Each is a backgrounded mini
-// card; values come from sponsorFakeStats (authored fields win, otherwise a
-// stable synthetic value seeded from the item id).
+// Sub-card stat chips for the full feature ad. Authored feed fields only;
+// missing values omit the chip rather than inventing scores.
 function sponsoredFeatureStatsHtml(s) {
   const chips = [
-    { label: 'Steam', value: `${s.steam}%`, cls: ' is-rating' },
-    { label: 'Metacritic', value: String(s.mc), cls: ' is-mc' },
-    { label: 'Main story', value: `${s.hltb}h`, cls: '' },
-    { label: 'Released', value: String(s.year), cls: '' },
-  ];
+    s.steam != null ? { label: 'Steam', value: `${s.steam}%`, cls: ' is-rating' } : null,
+    s.mc != null ? { label: 'Metacritic', value: String(s.mc), cls: ' is-mc' } : null,
+    s.hltb != null ? { label: 'Main story', value: `${s.hltb}h`, cls: '' } : null,
+    s.year != null ? { label: 'Released', value: String(s.year), cls: '' } : null,
+  ].filter(Boolean);
+  if (!chips.length) return '';
   return chips
     .map(c => `<span class="sponsored-feature-stat${c.cls}">
         <span class="sponsored-feature-stat-value">${escapeHtml(c.value)}</span>
@@ -1432,11 +1425,12 @@ function sponsoredBundleStatsHtml(item, s) {
   const items = Number(item.bundle_items) || 0;
   const creators = Number(item.bundle_creators) || 0;
   const chips = [
-    { label: 'Items', value: String(items), cls: '' },
-    { label: 'Creators', value: String(creators), cls: '' },
-    { label: 'Off', value: `${s.disc}%`, cls: ' is-discount' },
-    { label: 'Bundle', value: `$${s.sale}`, cls: ' is-price' },
-  ];
+    items > 0 ? { label: 'Items', value: String(items), cls: '' } : null,
+    creators > 0 ? { label: 'Creators', value: String(creators), cls: '' } : null,
+    s.disc != null ? { label: 'Off', value: `${s.disc}%`, cls: ' is-discount' } : null,
+    s.sale != null ? { label: 'Bundle', value: `$${s.sale}`, cls: ' is-price' } : null,
+  ].filter(Boolean);
+  if (!chips.length) return '';
   return chips
     .map(c => `<span class="sponsored-feature-stat${c.cls}">
         <span class="sponsored-feature-stat-value">${escapeHtml(c.value)}</span>
@@ -1469,7 +1463,7 @@ function sponsoredFeatureBundleAdHtml(item, { banner = false } = {}) {
   const coverUrl = sponsorCoverUrl(item.cover);
   const s = sponsorFakeStats(item);
   const network = item.network ? escapeHtml(String(item.network)) : '';
-  const showWas = s.disc > 0 && s.base;
+  const showWas = s.disc != null && s.disc > 0 && s.base;
   const artLayers = coverUrl
     ? `<img class="sponsored-feature-art-bg" src="${escapeAttr(coverUrl)}" alt="" aria-hidden="true" loading="lazy" onerror="this.style.display='none'" />
       <img class="sponsored-feature-art" src="${escapeAttr(coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'" />
@@ -1477,6 +1471,13 @@ function sponsoredFeatureBundleAdHtml(item, { banner = false } = {}) {
     : '';
   const bannerCls = banner ? ' sponsored-feature-card--banner' : '';
   const noArtCls = coverUrl ? '' : ' no-art';
+  const priceLine = (s.disc != null || s.sale != null)
+    ? `<div class="sponsored-feature-priceline">
+          ${s.disc != null ? `<span class="sponsored-feature-cut">-${s.disc}%</span>` : ''}
+          ${s.sale != null ? `<span class="sponsored-feature-sale">$${s.sale}</span>` : ''}
+          ${showWas ? `<span class="sponsored-feature-was">$${s.base}</span>` : ''}
+        </div>`
+    : '';
   const body = `<div class="sponsored-feature-body">
       <div class="sponsored-feature-head">
         <span class="dash-kpi-label">Featured bundle</span>
@@ -1484,11 +1485,7 @@ function sponsoredFeatureBundleAdHtml(item, { banner = false } = {}) {
       <div class="sponsored-feature-hero">
         <div class="sponsored-feature-title">${escapeHtml(item.title)}</div>
         ${item.tagline ? `<p class="sponsored-feature-blurb">${escapeHtml(item.tagline)}</p>` : ''}
-        <div class="sponsored-feature-priceline">
-          <span class="sponsored-feature-cut">-${s.disc}%</span>
-          <span class="sponsored-feature-sale">$${s.sale}</span>
-          ${showWas ? `<span class="sponsored-feature-was">$${s.base}</span>` : ''}
-        </div>
+        ${priceLine}
       </div>
       <div class="sponsored-feature-panel">
         <div class="sponsored-feature-stats sponsored-feature-stats--bundle">
@@ -1526,7 +1523,7 @@ function sponsoredFeatureAdHtml(item, { banner = false } = {}) {
   const coverUrl = sponsorCoverUrl(item.cover);
   const s = sponsorFakeStats(item);
   const network = item.network ? escapeHtml(String(item.network)) : '';
-  const showWas = s.disc > 0 && s.base;
+  const showWas = s.disc != null && s.disc > 0 && s.base;
   // Portrait box art is shown as a contained poster inside the card (a left
   // column beside the copy) rather than the right-to-left bleed/fade used for
   // landscape key art, which would crop a tall cover to a sliver.
@@ -1542,6 +1539,14 @@ function sponsoredFeatureAdHtml(item, { banner = false } = {}) {
   const bannerCls = banner ? ' sponsored-feature-card--banner' : '';
   const portraitCls = portrait ? ' sponsored-feature-card--portrait' : '';
   const noArtCls = coverUrl ? '' : ' no-art';
+  const priceLine = (s.disc != null || s.sale != null)
+    ? `<div class="sponsored-feature-priceline">
+          ${s.disc != null ? `<span class="sponsored-feature-cut">-${s.disc}%</span>` : ''}
+          ${s.sale != null ? `<span class="sponsored-feature-sale">$${s.sale}</span>` : ''}
+          ${showWas ? `<span class="sponsored-feature-was">$${s.base}</span>` : ''}
+        </div>`
+    : '';
+  const statsHtml = sponsoredFeatureStatsHtml(s);
   const body = `<div class="sponsored-feature-body">
       <div class="sponsored-feature-head">
         <span class="dash-kpi-label">Featured</span>
@@ -1549,19 +1554,15 @@ function sponsoredFeatureAdHtml(item, { banner = false } = {}) {
       <div class="sponsored-feature-hero">
         <div class="sponsored-feature-title">${escapeHtml(item.title)}</div>
         ${item.tagline ? `<p class="sponsored-feature-blurb">${escapeHtml(item.tagline)}</p>` : ''}
-        <div class="sponsored-feature-priceline">
-          <span class="sponsored-feature-cut">-${s.disc}%</span>
-          <span class="sponsored-feature-sale">$${s.sale}</span>
-          ${showWas ? `<span class="sponsored-feature-was">$${s.base}</span>` : ''}
-        </div>
+        ${priceLine}
       </div>
-      <div class="sponsored-feature-panel">
+      ${statsHtml ? `<div class="sponsored-feature-panel">
         <div class="sponsored-feature-stats">
-          ${sponsoredFeatureStatsHtml(s)}
+          ${statsHtml}
         </div>
-      </div>
+      </div>` : ''}
       <div class="sponsored-feature-detail">
-        <span class="sponsored-feature-genre">${escapeHtml(s.genres)}</span>
+        ${s.genres ? `<span class="sponsored-feature-genre">${escapeHtml(s.genres)}</span>` : ''}
         ${network ? `<span class="sponsored-feature-by">${network}</span>` : ''}
       </div>
       <span class="sponsored-feature-cta">${escapeHtml(cta)} &rarr;</span>

@@ -111,7 +111,7 @@ describe('marketing copy guardrails', () => {
       expect(text).not.toMatch(/Leveled up with bulk refresh/);
     }
     expect(promo).toMatch(/HOUSE_PRO_BANNERS_ENABLED = false/);
-    expect(promo).toMatch(/Optional support for BAKLOG Pro/);
+    expect(promo).toMatch(/title: 'Back BAKLOG'/);
   });
 
   const UNQUALIFIED_TELEMETRY = /\b(?:No|Zero) telemetry\b/gi;

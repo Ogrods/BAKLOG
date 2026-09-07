@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """
-Render the BAKLOG Pro product cover image for the Polar.sh listing.
+Render BAKLOG Pro cover art for Polar listings and the in-app Pro hero strip.
 
-Fully hardcoded composition (no AI): dark slate-navy background with a sky-blue
-radial glow, the canonical 3-pill BAKLOG mark (favicon.svg geometry), a Space
-Grotesk wordmark + PRO badge, the real tagline, three feature pills, and the
-$5/mo price tag.
+Fully hardcoded composition (no AI): dark slate-navy background, the canonical
+3-pill BAKLOG mark (favicon.svg geometry), a Space Grotesk wordmark + PRO badge,
+and a short tagline.
 
 Run from repo root:
-  python tools/make_pro_cover.py            # monthly ($5/mo)
-  python tools/make_pro_cover.py --yearly   # yearly ($50/yr)
+  python tools/make_pro_cover.py                 # Polar monthly cover (1200x630)
+  python tools/make_pro_cover.py --yearly        # Polar yearly cover
+  python tools/make_pro_cover.py --strip         # In-app flat strip (1600x300)
+  python tools/make_pro_cover.py --strip --yearly
 Output:
-  assets/baklog-pro-polar.png          (1200x630, Polar cover / OG-sized)
-  assets/baklog-pro-polar-yearly.png   (yearly variant)
+  assets/baklog-pro-polar.png
+  assets/baklog-pro-polar-yearly.png
+  assets/baklog-pro-strip.png
+  assets/baklog-pro-strip-yearly.png
 """
 
 from __future__ import annotations
@@ -30,6 +33,8 @@ FONT_GROTESK = ROOT / "landing" / "assets" / "fonts" / "space-grotesk-latin.woff
 FONT_DMSANS = ROOT / "landing" / "assets" / "fonts" / "dm-sans-latin.woff2"
 OUT_MONTHLY = ROOT / "assets" / "baklog-pro-polar.png"
 OUT_YEARLY = ROOT / "assets" / "baklog-pro-polar-yearly.png"
+OUT_STRIP_MONTHLY = ROOT / "assets" / "baklog-pro-strip.png"
+OUT_STRIP_YEARLY = ROOT / "assets" / "baklog-pro-strip-yearly.png"
 
 # Canonical BAKLOG mark geometry (favicon.svg / sponsored-deals.js baklogBannerMarkHtml).
 PILLS = ((2, 52, 46, 24), (52, 52, 46, 24), (27, 24, 46, 24))
@@ -39,8 +44,10 @@ KNOB_R = 8
 MARK_MINX, MARK_MINY = 2, 24
 MARK_VW, MARK_VH = 96, 52
 
-# Output canvas (Polar cover / OG image size), supersampled then downscaled.
+# Polar / OG canvas, supersampled then downscaled.
 DISPLAY_W, DISPLAY_H = 1200, 630
+# Flat in-app hero strip.
+STRIP_W, STRIP_H = 1600, 300
 SS = 2
 W, H = DISPLAY_W * SS, DISPLAY_H * SS
 
@@ -50,24 +57,23 @@ BG_DEEP = (8, 13, 26)        # deeper corner
 WHITE = (240, 249, 255)
 MUTED = (148, 163, 184)      # slate-400 tagline
 PILL_BG = (30, 41, 59)       # #1e293b feature pill fill
-PILL_BORDER = (51, 65, 85)   # #334155
 
-# Accent palettes — sky-blue (monthly) vs violet (yearly).
+# Accent palettes - sky-blue (monthly) vs violet (yearly).
 ACCENT = (56, 189, 248)         # #38bdf8
 ACCENT_BRIGHT = (14, 165, 233)  # #0ea5e9
 ACCENT_HI = (125, 211, 252)     # #7dd3fc
 GRID = (30, 44, 70)
 
 PALETTE_BLUE = {
-    "ACCENT": (56, 189, 248),       # #38bdf8
-    "ACCENT_BRIGHT": (14, 165, 233),  # #0ea5e9
-    "ACCENT_HI": (125, 211, 252),   # #7dd3fc
+    "ACCENT": (56, 189, 248),
+    "ACCENT_BRIGHT": (14, 165, 233),
+    "ACCENT_HI": (125, 211, 252),
     "GRID": (30, 44, 70),
 }
 PALETTE_PURPLE = {
-    "ACCENT": (168, 85, 247),       # #a855f7
-    "ACCENT_BRIGHT": (147, 51, 234),  # #9333ea
-    "ACCENT_HI": (216, 180, 254),   # #d8b4fe
+    "ACCENT": (168, 85, 247),
+    "ACCENT_BRIGHT": (147, 51, 234),
+    "ACCENT_HI": (216, 180, 254),
     "GRID": (49, 36, 73),
 }
 
@@ -81,10 +87,12 @@ def apply_palette(purple: bool) -> None:
     ACCENT_HI = p["ACCENT_HI"]
     GRID = p["GRID"]
 
+
 WORDMARK = "BAKLOG"
 TRACKING_EM = 0.04
 TAGLINE = "One honest backlog across every store."
 FEATURES = ("Bulk refresh", "Cloud sync", "No ads")
+STRIP_TAGLINE = "Free and local-first. Pro funds the roadmap."
 
 
 def load_font(path: Path, size: int) -> ImageFont.FreeTypeFont:
@@ -115,6 +123,22 @@ def draw_background(img: Image.Image) -> None:
                 min(255, round(base[0] + (ACCENT[0] - base[0]) * g)),
                 min(255, round(base[1] + (ACCENT[1] - base[1]) * g)),
                 min(255, round(base[2] + (ACCENT[2] - base[2]) * g)),
+            )
+
+
+def draw_flat_background(img: Image.Image) -> None:
+    """Solid slate panel with a soft left-to-right accent wash (no grid, no glow)."""
+    px = img.load()
+    ww, hh = img.size
+    for y in range(hh):
+        for x in range(ww):
+            t = x / max(ww - 1, 1)
+            base = lerp(BG, BG_DEEP, t * 0.35)
+            wash = 0.08 * (1.0 - t)
+            px[x, y] = (
+                min(255, round(base[0] + (ACCENT[0] - base[0]) * wash)),
+                min(255, round(base[1] + (ACCENT[1] - base[1]) * wash)),
+                min(255, round(base[2] + (ACCENT[2] - base[2]) * wash)),
             )
 
 
@@ -149,8 +173,15 @@ def mark_mask(scale: float, ox: float, oy: float) -> Image.Image:
     return mask
 
 
-def draw_mark(img: Image.Image, scale: float, ox: float, oy: float) -> tuple[float, float]:
-    """Paint the mark with a vertical sky-blue gradient + soft glow. Returns (w, h)."""
+def draw_mark(
+    img: Image.Image,
+    scale: float,
+    ox: float,
+    oy: float,
+    *,
+    glow: bool = True,
+) -> tuple[float, float]:
+    """Paint the mark with a vertical sky-blue gradient. Returns (w, h)."""
     mask = mark_mask(scale, ox, oy)
     mw, mh = mask.size
 
@@ -165,13 +196,13 @@ def draw_mark(img: Image.Image, scale: float, ox: float, oy: float) -> tuple[flo
     tile.paste(grad, (0, 0))
     tile.putalpha(mask)
 
-    # Soft glow behind the mark.
-    glow = Image.new("RGBA", (mw, mh), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    gd.bitmap((0, 0), mask, fill=(*ACCENT, 130))
-    from PIL import ImageFilter
-    glow = glow.filter(ImageFilter.GaussianBlur(10 * SS))
-    img.alpha_composite(glow, (int(ox) - 2, int(oy) - 2))
+    if glow:
+        from PIL import ImageFilter
+        soft = Image.new("RGBA", (mw, mh), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(soft)
+        gd.bitmap((0, 0), mask, fill=(*ACCENT, 130))
+        soft = soft.filter(ImageFilter.GaussianBlur(10 * SS))
+        img.alpha_composite(soft, (int(ox) - 2, int(oy) - 2))
     img.alpha_composite(tile, (int(ox), int(oy)))
     return MARK_VW * scale, MARK_VH * scale
 
@@ -194,7 +225,48 @@ def draw_tracked(d, xy, s, font, fill, tracking=0.0):
             x += tracking
 
 
-def main(yearly: bool = False):
+def draw_pro_badge(img, d, *, badge_x, badge_y, grotesk_pro, corner_radius=None):
+    pro_txt = "PRO"
+    pro_track = grotesk_pro.size * 0.10
+    pro_w = text_w(grotesk_pro, pro_txt, pro_track)
+    pad_x = 30 * SS
+    pad_y = 14 * SS
+    pro_bb = d.textbbox((0, 0), "PRO", font=grotesk_pro)
+    pro_h = pro_bb[3] - pro_bb[1]
+    badge_w = pro_w + 2 * pad_x
+    badge_h = pro_h + 2 * pad_y
+    badge = Image.new("RGBA", (int(badge_w), int(badge_h)), (0, 0, 0, 0))
+    bgrad = Image.new("RGB", (int(badge_w), int(badge_h)))
+    bp = bgrad.load()
+    for yy in range(int(badge_h)):
+        t = yy / max(int(badge_h) - 1, 1)
+        col = lerp(ACCENT, ACCENT_BRIGHT, t)
+        for xx in range(int(badge_w)):
+            bp[xx, yy] = col
+    bmask = Image.new("L", (int(badge_w), int(badge_h)), 0)
+    radius = badge_h / 2 if corner_radius is None else corner_radius
+    ImageDraw.Draw(bmask).rounded_rectangle(
+        (0, 0, badge_w - 1, badge_h - 1),
+        radius=radius,
+        fill=255,
+    )
+    badge.paste(bgrad, (0, 0))
+    badge.putalpha(bmask)
+    img.alpha_composite(badge, (int(badge_x), int(badge_y)))
+    draw_tracked(
+        d,
+        (badge_x + pad_x, badge_y + pad_y - pro_bb[1]),
+        pro_txt,
+        grotesk_pro,
+        (8, 17, 30),
+        pro_track,
+    )
+    return badge_w, badge_h
+
+
+def main_polar(yearly: bool = False):
+    global W, H
+    W, H = DISPLAY_W * SS, DISPLAY_H * SS
     apply_palette(purple=yearly)
     price_num = "$50" if yearly else "$5"
     price_unit = "/yr" if yearly else "/mo"
@@ -214,7 +286,6 @@ def main(yearly: bool = False):
 
     margin = 96 * SS
 
-    # --- Logo lockup: mark + wordmark on one baseline ---
     mark_scale = (150 * SS) / MARK_VH
     wm_track = grotesk_big.size * TRACKING_EM
     wm_w = text_w(grotesk_big, WORDMARK, wm_track)
@@ -231,41 +302,14 @@ def main(yearly: bool = False):
     wm_y = mark_oy + (mh - wm_h) / 2 - wm_bb[1]
     draw_tracked(d, (wm_x, wm_y), WORDMARK, grotesk_big, WHITE, wm_track)
 
-    # --- PRO badge, pill to the right of the wordmark ---
-    pro_txt = "PRO"
-    pro_track = grotesk_pro.size * 0.10
-    pro_w = text_w(grotesk_pro, pro_txt, pro_track)
-    pad_x = 30 * SS
-    pad_y = 14 * SS
-    pro_bb = d.textbbox((0, 0), "PRO", font=grotesk_pro)
-    pro_h = pro_bb[3] - pro_bb[1]
-    badge_w = pro_w + 2 * pad_x
-    badge_h = pro_h + 2 * pad_y
     badge_x = wm_x + wm_w + 28 * SS
-    badge_y = mark_oy + (mh - badge_h) / 2
-    badge = Image.new("RGBA", (int(badge_w), int(badge_h)), (0, 0, 0, 0))
-    bgrad = Image.new("RGB", (int(badge_w), int(badge_h)))
-    bp = bgrad.load()
-    for yy in range(int(badge_h)):
-        t = yy / max(int(badge_h) - 1, 1)
-        col = lerp(ACCENT, ACCENT_BRIGHT, t)
-        for xx in range(int(badge_w)):
-            bp[xx, yy] = col
-    bmask = Image.new("L", (int(badge_w), int(badge_h)), 0)
-    ImageDraw.Draw(bmask).rounded_rectangle(
-        (0, 0, badge_w - 1, badge_h - 1), radius=badge_h / 2, fill=255
-    )
-    badge.paste(bgrad, (0, 0))
-    badge.putalpha(bmask)
-    img.alpha_composite(badge, (int(badge_x), int(badge_y)))
-    draw_tracked(d, (badge_x + pad_x, badge_y + pad_y - pro_bb[1]), pro_txt,
-                 grotesk_pro, (8, 17, 30), pro_track)
+    # Approximate vertical center; badge height derived inside draw_pro_badge.
+    badge_y = mark_oy + (mh - (52 * SS + 28 * SS)) / 2
+    draw_pro_badge(img, d, badge_x=badge_x, badge_y=badge_y, grotesk_pro=grotesk_pro)
 
-    # --- Tagline ---
     tag_y = mark_oy + mh + 46 * SS
     d.text((margin, tag_y), TAGLINE, font=dm_tag, fill=MUTED)
 
-    # --- Feature pills (fixed height; text vertically centered) ---
     feat_y = tag_y + 96 * SS
     fx = margin
     fpad_x = 32 * SS
@@ -287,7 +331,6 @@ def main(yearly: bool = False):
                font=dm_feat, fill=WHITE, anchor="lm")
         fx += pill_w + 28 * SS
 
-    # --- Price tag, bottom-right ---
     pn_bb = d.textbbox((0, 0), price_num, font=dm_price)
     pn_w = d.textlength(price_num, font=dm_price)
     pn_h = pn_bb[3] - pn_bb[1]
@@ -314,9 +357,83 @@ def main(yearly: bool = False):
     print(f"Wrote {out_path} ({DISPLAY_W}x{DISPLAY_H})")
 
 
+def main_strip(yearly: bool = False):
+    """Flat brand strip for the in-app Pro hero: no grid, no glow, 4px corners."""
+    apply_palette(purple=yearly)
+    out_path = OUT_STRIP_YEARLY if yearly else OUT_STRIP_MONTHLY
+    ww, hh = STRIP_W * SS, STRIP_H * SS
+
+    img = Image.new("RGBA", (ww, hh), (*BG, 255))
+    draw_flat_background(img)
+    d = ImageDraw.Draw(img)
+
+    grotesk_big = load_font(FONT_GROTESK, 88 * SS)
+    grotesk_pro = load_font(FONT_GROTESK, 36 * SS)
+    dm_tag = load_font(FONT_DMSANS, 28 * SS)
+
+    margin_x = 72 * SS
+    mark_scale = (88 * SS) / MARK_VH
+    wm_track = grotesk_big.size * TRACKING_EM
+    wm_w = text_w(grotesk_big, WORDMARK, wm_track)
+    wm_bb = d.textbbox((0, 0), "BAKLOG", font=grotesk_big)
+    wm_h = wm_bb[3] - wm_bb[1]
+
+    mark_ox = margin_x
+    mark_h = MARK_VH * mark_scale
+    row_h = max(mark_h, wm_h)
+    mark_oy = (hh - row_h) / 2
+    mw, mh = draw_mark(img, mark_scale, mark_ox, mark_oy, glow=False)
+
+    gap = 28 * SS
+    wm_x = mark_ox + mw + gap
+    wm_y = mark_oy + (mh - wm_h) / 2 - wm_bb[1]
+    draw_tracked(d, (wm_x, wm_y), WORDMARK, grotesk_big, WHITE, wm_track)
+
+    pro_bb = d.textbbox((0, 0), "PRO", font=grotesk_pro)
+    pad_y = 10 * SS
+    badge_h = (pro_bb[3] - pro_bb[1]) + 2 * pad_y
+    badge_x = wm_x + wm_w + 20 * SS
+    badge_y = mark_oy + (mh - badge_h) / 2
+    badge_w, _ = draw_pro_badge(
+        img, d,
+        badge_x=badge_x, badge_y=badge_y,
+        grotesk_pro=grotesk_pro,
+        corner_radius=4 * SS,
+    )
+
+    tag_x = badge_x + badge_w + 36 * SS
+    tag_bb = d.textbbox((0, 0), STRIP_TAGLINE, font=dm_tag)
+    tag_h = tag_bb[3] - tag_bb[1]
+    tag_y = mark_oy + (mh - tag_h) / 2 - tag_bb[1]
+    max_tag_w = ww - margin_x - tag_x
+    if d.textlength(STRIP_TAGLINE, font=dm_tag) <= max_tag_w:
+        d.text((tag_x, tag_y), STRIP_TAGLINE, font=dm_tag, fill=MUTED)
+    else:
+        under_y = mark_oy + mh + 18 * SS
+        d.text((margin_x, under_y), STRIP_TAGLINE, font=dm_tag, fill=MUTED)
+
+    out = img.convert("RGB").resize((STRIP_W, STRIP_H), Image.LANCZOS)
+    mask = Image.new("L", (STRIP_W, STRIP_H), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, STRIP_W - 1, STRIP_H - 1), radius=4, fill=255
+    )
+    rgba = out.convert("RGBA")
+    rgba.putalpha(mask)
+    final = Image.new("RGB", (STRIP_W, STRIP_H), BG)
+    final.paste(rgba, (0, 0), rgba)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    final.save(out_path, "PNG")
+    print(f"Wrote {out_path} ({STRIP_W}x{STRIP_H})")
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Render the BAKLOG Pro product cover.")
+    parser = argparse.ArgumentParser(description="Render BAKLOG Pro cover art.")
     parser.add_argument("--yearly", action="store_true",
-                        help="Render the $50/yr purple variant.")
+                        help="Render the purple yearly variant.")
+    parser.add_argument("--strip", action="store_true",
+                        help="Render the flat in-app hero strip (1600x300).")
     args = parser.parse_args()
-    main(yearly=args.yearly)
+    if args.strip:
+        main_strip(yearly=args.yearly)
+    else:
+        main_polar(yearly=args.yearly)

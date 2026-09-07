@@ -11229,16 +11229,10 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   flex-direction: column;
   gap: 1rem;
   padding: 0.85rem 1rem 1.1rem;
-  border-radius: 14px;
+  border-radius: 6px;
   border: 1px solid
     color-mix(in srgb, var(--accent, #38bdf8) 35%, var(--border));
-  background:
-    radial-gradient(
-      ellipse 80% 60% at 100% 0%,
-      color-mix(in srgb, var(--accent) 14%, transparent),
-      transparent 55%
-    ),
-    linear-gradient(
+  background: linear-gradient(
       165deg,
       color-mix(in srgb, var(--accent) 8%, var(--bg-panel)),
       var(--bg-panel)
@@ -11248,11 +11242,8 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 10px;
+  border-radius: 4px;
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
-    0 12px 40px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .pro-view-headline {
   margin: 0 0 0.5rem;

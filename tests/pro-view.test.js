@@ -55,7 +55,7 @@ describe('renderProView', () => {
     expect(root.innerHTML).not.toMatch(/\$5\s*\/\s*mo/i);
     expect(root.innerHTML).toContain('buy.polar.sh');
     expect(root.querySelector('[data-pro-hero-banner]')).toBeTruthy();
-    expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-polar-yearly');
+    expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-strip-yearly');
     expect(root.querySelector('.pro-view-funnel--yearly')).toBeTruthy();
     expect(root.querySelector('[data-pro-plan="monthly"]')).toBeTruthy();
     expect(root.querySelector('[data-pro-plan="yearly"]')).toBeTruthy();
@@ -96,7 +96,7 @@ describe('renderProView', () => {
     root.querySelector('[data-pro-plan="monthly"]')?.click();
     expect(root.querySelector('[data-pro-checkout]')?.textContent).toContain('Support BAKLOG');
     expect(root.innerHTML).not.toMatch(/\$5\s*\/\s*mo/i);
-    expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-polar.png');
+    expect(root.querySelector('[data-pro-hero-banner]')?.getAttribute('src')).toContain('baklog-pro-strip.png');
     expect(root.querySelector('.pro-view-funnel--monthly')).toBeTruthy();
   });
 

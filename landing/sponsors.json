@@ -1,43 +1,7 @@
 {
   "version": 2,
-  "generated_at": "2026-06-13T22:40:52.413Z",
+  "generated_at": "2026-09-07T22:00:00.000Z",
   "ads": {
-    "ad-spotlight-hero-emberfall": {
-      "kind": "sponsor",
-      "title": "Emberfall",
-      "tagline": "Critically acclaimed open-world adventure",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/hero-emberfall.webp",
-      "enabled": false
-    },
-    "ad-spotlight-cover-ironveil": {
-      "kind": "sponsor",
-      "title": "Ironveil",
-      "tagline": "Couch co-op dungeon crawler",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "enabled": false
-    },
-    "ad-picks-ironveil": {
-      "kind": "sponsor",
-      "title": "Ironveil",
-      "tagline": "On sale now - 80% off",
-      "cta": "Grab it",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "enabled": false
-    },
-    "ad-table-encore": {
-      "kind": "sponsor",
-      "title": "Encore",
-      "tagline": "Replay-worthy roguelike - weekend-sized",
-      "cta": "Learn more",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-encore.webp",
-      "enabled": false
-    },
     "house-table-every-store": {
       "kind": "house",
       "title": "BAKLOG Pro",
@@ -45,26 +9,6 @@
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "enabled": true
-    },
-    "ad-dash-picks-dawnbanner": {
-      "kind": "sponsor",
-      "title": "Dawnbanner",
-      "tagline": "Lead a band of exiles across a sundered kingdom in this turn-based tactical RPG. Build your banner, win the war.",
-      "cta": "View the deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": false,
-      "network": "Lantern Forge Studios",
-      "genres": [
-        "Tactical RPG",
-        "Strategy"
-      ],
-      "steam_review_percent": 94,
-      "metacritic_score": 88,
-      "hltb_hours": 32,
-      "release_year": 2025,
-      "discount": 35,
-      "price_base": 29.99
     },
     "ad-dash-picks-itch-pride": {
       "kind": "sponsor",
@@ -89,132 +33,10 @@
       ],
       "ends": "2026-07-06"
     },
-    "ad-feature-banner-emberfall": {
-      "kind": "sponsor",
-      "title": "Emberfall",
-      "tagline": "Forge your legend in a dying world. A sprawling open-world action RPG where every ember you rekindle reshapes the map.",
-      "cta": "View the deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/hero-emberfall.webp",
-      "enabled": false,
-      "network": "Cinderpeak Games",
-      "genres": [
-        "Action RPG",
-        "Open World"
-      ],
-      "steam_review_percent": 96,
-      "metacritic_score": 91,
-      "hltb_hours": 45,
-      "release_year": 2025,
-      "discount": 40,
-      "price_base": 39.99
-    },
-    "ad-dash-versus-dawnbanner": {
-      "kind": "sponsor",
-      "title": "Dawnbanner",
-      "tagline": "Trending tactical RPG",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/hero-dawnbanner.webp",
-      "enabled": false,
-      "steam_review_percent": 94
-    },
-    "ad-dash-versus-zephyr": {
-      "kind": "sponsor",
-      "title": "Zephyr Edge",
-      "tagline": "Blistering arcade racer",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-zephyr-edge.webp",
-      "enabled": false,
-      "hltb_hours": 7
-    },
-    "ad-coop-online-zephyr": {
-      "kind": "sponsor",
-      "title": "Zephyr Edge",
-      "tagline": "Blistering arcade racer",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-zephyr-edge.webp",
-      "enabled": false,
-      "steam_review_percent": 96
-    },
-    "ad-coop-couch-ironveil": {
-      "kind": "sponsor",
-      "title": "Ironveil",
-      "tagline": "Couch co-op dungeon crawler",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-ironveil.webp",
-      "enabled": false,
-      "steam_review_percent": 93
-    },
-    "ad-claimable-hollowmaw": {
-      "kind": "sponsor",
-      "title": "Hollowmaw",
-      "tagline": "Hidden gem horror adventure",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-hollowmaw.webp",
-      "portrait": true,
-      "enabled": false,
-      "network": "Gravewax Interactive",
-      "genres": [
-        "Horror",
-        "Adventure"
-      ],
-      "steam_review_percent": 90,
-      "metacritic_score": 83,
-      "hltb_hours": 9,
-      "release_year": 2024,
-      "discount": 60,
-      "price_base": 19.99
-    },
-    "ad-claimable-apex-velocity": {
-      "kind": "sponsor",
-      "title": "Apex Velocity",
-      "tagline": "Blistering arcade racer - drift through neon cities",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/cover-apex-velocity.webp",
-      "portrait": true,
-      "enabled": false,
-      "network": "Velocity Interactive",
-      "genres": [
-        "Racing",
-        "Arcade"
-      ],
-      "steam_review_percent": 89,
-      "metacritic_score": 84,
-      "hltb_hours": 6,
-      "release_year": 2024,
-      "discount": 50,
-      "price_base": 24.99
-    },
-    "ad-claimable-tidewright": {
-      "kind": "sponsor",
-      "title": "Tidewright",
-      "tagline": "Bend the tides to raise a sunken world",
-      "cta": "View deal",
-      "url": "https://baklog.app/#waitlist",
-      "cover": "/assets/ads-sample/hero-tidewright.webp",
-      "enabled": false,
-      "network": "Saltmarsh Studio",
-      "genres": [
-        "Adventure",
-        "Exploration"
-      ],
-      "steam_review_percent": 89,
-      "metacritic_score": 86,
-      "hltb_hours": 26,
-      "release_year": 2025,
-      "discount": 30,
-      "price_base": 29.99
-    },
     "house-support-baklog": {
       "kind": "house",
-      "title": "Support BAKLOG Pro",
-      "tagline": "Optional perks for supporters: bulk refresh, background sync, sponsored deal cards removed.",
+      "title": "Back the BAKLOG roadmap",
+      "tagline": "Pro funds bulk refresh, background sync, and a quieter deal radar - nothing free today moves behind it.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -223,8 +45,8 @@
     },
     "house-pro-promo": {
       "kind": "house",
-      "title": "Optional support for BAKLOG Pro",
-      "tagline": "Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - nothing free today moves behind it.",
+      "title": "Back BAKLOG",
+      "tagline": "The app stays free and local-first. Pro is what funds the next stores and sync work.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -232,8 +54,8 @@
     },
     "house-lib-backlog": {
       "kind": "house",
-      "title": "You own 600 games. You've played 40.",
-      "tagline": "One honest backlog across every store. Private, Steam-ready.",
+      "title": "One honest backlog across every store",
+      "tagline": "Private, Steam-ready, and local-first. Connect a store to see your real counts.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -242,8 +64,8 @@
     },
     "house-itch-privacy": {
       "kind": "house",
-      "title": "Support BAKLOG Pro",
-      "tagline": "Optional perks for supporters: background refresh, cloud sync, sponsored deal cards removed.",
+      "title": "Back the BAKLOG roadmap",
+      "tagline": "Pro funds background refresh, cloud sync, and sponsored deal cards removed - nothing free today moves behind it.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -254,7 +76,7 @@
       "kind": "house",
       "title": "BAKLOG Pro",
       "slogan": "One honest backlog across every store.",
-      "tagline": "Supporter perks: bulk refresh, cloud sync, sponsored deal cards removed.",
+      "tagline": "Free and local-first. Pro funds the roadmap.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -264,9 +86,9 @@
     },
     "house-spotlight-pro-sync": {
       "kind": "house",
-      "title": "Sync every machine",
-      "slogan": "Keep your library and personal data aligned across machines - no manual exports.",
-      "tagline": "Cloud sync for library JSON and personal prefs.",
+      "title": "Library on every machine",
+      "slogan": "Keep library JSON and personal prefs aligned - no manual exports.",
+      "tagline": "Cloud sync for Pro supporters - coming soon.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -276,9 +98,9 @@
     },
     "house-spotlight-pro-noads": {
       "kind": "house",
-      "title": "Fewer distractions",
-      "slogan": "Pro supporters see sponsored deal cards removed.",
-      "tagline": "Nothing you use today moves behind paywall.",
+      "title": "A quieter deal radar",
+      "slogan": "Sponsored deal cards removed for Pro supporters.",
+      "tagline": "Nothing you use today moves behind a paywall.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -288,9 +110,9 @@
     },
     "house-spotlight-pro-alerts": {
       "kind": "house",
-      "title": "Never miss a free game again",
+      "title": "Catch free drops early",
       "slogan": "Alerts when giveaways and sales land.",
-      "tagline": "Deal & watchlist alerts - coming soon for Pro supporters.",
+      "tagline": "Deal and watchlist alerts - coming soon for Pro.",
       "cta": "Support BAKLOG",
       "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
       "cover": "",
@@ -312,79 +134,45 @@
     }
   },
   "locations": {
-    "dash-spotlight": [
-      "ad-spotlight-hero-emberfall",
-      "ad-spotlight-cover-ironveil"
-    ],
-    "dash-feature-banner": [
-      "ad-feature-banner-emberfall"
-    ],
-    "dash-coop-online": [
-      "ad-coop-online-zephyr"
-    ],
-    "dash-coop-couch": [
-      "ad-coop-couch-ironveil"
-    ],
-    "dash-versus-rated": [
-      "ad-dash-versus-dawnbanner"
-    ],
-    "dash-versus-fast": [
-      "ad-dash-versus-zephyr"
-    ],
+    "dash-spotlight": [],
+    "dash-feature-banner": [],
+    "dash-coop-online": [],
+    "dash-coop-couch": [],
+    "dash-versus-rated": [],
+    "dash-versus-fast": [],
     "dash-pick": [
       "ad-dash-picks-itch-pride"
     ],
     "dash-house": [
       "house-pro-promo"
     ],
-    "lib-pick": [
-      "ad-picks-ironveil"
-    ],
+    "lib-pick": [],
     "lib-row": [
-      "ad-table-encore",
       "house-table-every-store"
     ],
     "lib-house": [
       "house-lib-backlog"
     ],
-    "wish-pick": [
-      "ad-picks-ironveil"
-    ],
+    "wish-pick": [],
     "wish-row": [
-      "ad-table-encore",
       "house-table-every-store"
     ],
     "wish-house": [
       "house-support-baklog"
     ],
-    "wish-deal-hero": [
-      "ad-feature-banner-emberfall"
-    ],
-    "wish-deal-portrait": [
-      "ad-dash-versus-zephyr",
-      "ad-spotlight-cover-ironveil"
-    ],
-    "deals-pick": [
-      "ad-picks-ironveil"
-    ],
+    "wish-deal-hero": [],
+    "wish-deal-portrait": [],
+    "deals-pick": [],
     "deals-row": [
-      "ad-table-encore",
       "house-table-every-store"
     ],
-    "itch-pick": [
-      "ad-picks-ironveil"
-    ],
+    "itch-pick": [],
     "itch-row": [
-      "ad-table-encore",
       "house-table-every-store"
     ],
     "itch-house": [
       "house-itch-privacy"
     ],
-    "claim-cards": [
-      "ad-claimable-hollowmaw",
-      "ad-claimable-apex-velocity",
-      "ad-claimable-tidewright"
-    ]
+    "claim-cards": []
   }
 }

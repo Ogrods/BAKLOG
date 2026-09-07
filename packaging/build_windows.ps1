@@ -147,6 +147,12 @@ if (Test-Path $PyProject) {
     }
 }
 
+# Optional Authenticode (no-op unless BAKLOG_SIGN_WINDOWS=1). See
+# baklog-internal/docs/CODE_SIGNING.md and scripts/sign_windows_artifacts.ps1.
+Write-Host "Optional code signing (bundle exes)..."
+& powershell -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\sign_windows_artifacts.ps1")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $ZipName = "BAKLOG-win64.zip"
 $ZipPath = Join-Path $ReleaseDir $ZipName
 if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
@@ -196,6 +202,12 @@ if ($Iscc) {
 
 if ($env:BAKLOG_REQUIRE_INSTALLER -eq "1" -and -not (Test-Path $SetupExe)) {
     Write-Error "BAKLOG-Setup.exe missing and BAKLOG_REQUIRE_INSTALLER=1."
+}
+
+if (Test-Path $SetupExe) {
+    Write-Host "Optional code signing (Setup.exe)..."
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\sign_windows_artifacts.ps1") -SetupOnly
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 Write-Host ""

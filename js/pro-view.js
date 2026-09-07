@@ -25,8 +25,8 @@ import { proWelcomeSessionKey } from './profiles.js';
 
 export const PRO_WELCOME_STORAGE_KEY = 'baklog-pro-welcome';
 
-const PRO_BANNER_MONTHLY = 'assets/baklog-pro-polar.png';
-const PRO_BANNER_YEARLY = 'assets/baklog-pro-polar-yearly.png';
+const PRO_BANNER_MONTHLY = 'assets/baklog-pro-strip.png';
+const PRO_BANNER_YEARLY = 'assets/baklog-pro-strip-yearly.png';
 
 let proViewWired = false;
 let checkoutSuccessPending = false;
@@ -92,7 +92,7 @@ function proHeroBannerSrc(plan) {
 
 function proHeroBannerHtml(plan) {
   const src = escapeAttr(proHeroBannerSrc(plan));
-  return `<img class="pro-view-hero-banner" data-pro-hero-banner src="${src}" alt="BAKLOG Pro" width="1200" height="630" loading="lazy" decoding="async" />`;
+  return `<img class="pro-view-hero-banner" data-pro-hero-banner src="${src}" alt="BAKLOG Pro" width="1600" height="300" loading="lazy" decoding="async" />`;
 }
 
 function proFeaturesListHtml({ compact = false } = {}) {

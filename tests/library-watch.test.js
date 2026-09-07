@@ -11,7 +11,7 @@ import {
   checkLibraryWatches,
   hasArmedWatches,
   listArmedWatches,
-  PICO_PARK_WATCH,
+  initLibraryWatches,
 } from '../js/library-watch.js';
 
 const WATCH_LS_KEY = profileScopedStorageKey('baklog-library-watch');
@@ -83,13 +83,35 @@ describe('checkLibraryWatches', () => {
     expect(readWatches()).toHaveLength(1);
   });
 
-  it('matches any appid in PICO_PARK_WATCH', () => {
-    armLibraryWatch(PICO_PARK_WATCH);
+  it('matches any appid in a multi-appid watch', () => {
+    armLibraryWatch({
+      id: 'multi-app',
+      name: 'Multi App Game',
+      store: 'steam',
+      appids: [111, 222],
+    });
     state.libraryMeta.steam = {
-      games: [{ appid: 453090, name: 'Pico Park Classic' }],
+      games: [{ appid: 222, name: 'Multi App Edition' }],
     };
     expect(checkLibraryWatches()).toBe(true);
     expect(readWatches()).toHaveLength(0);
+  });
+});
+
+describe('initLibraryWatches', () => {
+  it('clears the legacy pico-park debug watch without arming anything', () => {
+    armLibraryWatch({
+      id: 'pico-park',
+      name: 'PICO PARK',
+      store: 'steam',
+      appids: [1509960],
+    });
+    armLibraryWatch(TEST_WATCH);
+    initLibraryWatches();
+    const watches = readWatches();
+    expect(watches.some(w => w.id === 'pico-park')).toBe(false);
+    expect(watches).toHaveLength(1);
+    expect(watches[0].id).toBe('test-game');
   });
 });
 

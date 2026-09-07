@@ -17,13 +17,8 @@ function watchLsKey() {
 }
 const POLL_MS = 5 * 60 * 1000;
 
-/** PICO PARK (2021) and Pico Park Classic — either counts. */
-export const PICO_PARK_WATCH = {
-  id: 'pico-park',
-  name: 'PICO PARK',
-  store: 'steam',
-  appids: [1509960, 453090],
-};
+/** Legacy debug watch id - cleared on boot so it never reappears. */
+const LEGACY_PICO_PARK_WATCH_ID = 'pico-park';
 
 let _pollTimer = null;
 
@@ -216,11 +211,9 @@ function stopWatchPoll() {
   }
 }
 
-/** Boot: drop the legacy auto-armed Pico Park watch, then resume any user watches. */
+/** Boot: clear the legacy debug watch, then resume any user-armed watches. */
 export function initLibraryWatches() {
-  // Pico Park was auto-armed for a one-off request; clear it so the waiting
-  // banner no longer reappears on every boot.
-  dismissLibraryWatch(PICO_PARK_WATCH.id);
+  dismissLibraryWatch(LEGACY_PICO_PARK_WATCH_ID);
   renderWaitingBanner();
   checkLibraryWatches();
   scheduleWatchPoll();

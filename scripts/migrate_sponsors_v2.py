@@ -28,8 +28,11 @@ PLACEMENT_TO_LOCATIONS: dict[str, list[str]] = {
 HOUSE_DEFAULTS = {
     "house-support-baklog": {
         "kind": "house",
-        "title": "Support BAKLOG Pro",
-        "tagline": "Optional perks for supporters: bulk refresh, background sync, sponsored deal cards removed.",
+        "title": "Back the BAKLOG roadmap",
+        "tagline": (
+            "Pro funds bulk refresh, background sync, and a quieter deal radar - "
+            "nothing free today moves behind it."
+        ),
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -38,10 +41,10 @@ HOUSE_DEFAULTS = {
     },
     "house-pro-promo": {
         "kind": "house",
-        "title": "Optional support for BAKLOG Pro",
+        "title": "Back BAKLOG",
         "tagline": (
-            "Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - "
-            "nothing free today moves behind it."
+            "The app stays free and local-first. Pro is what funds the next stores "
+            "and sync work."
         ),
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
@@ -50,8 +53,11 @@ HOUSE_DEFAULTS = {
     },
     "house-lib-backlog": {
         "kind": "house",
-        "title": "You own 600 games. You've played 40.",
-        "tagline": "One honest backlog across every store. Private, Steam-ready.",
+        "title": "One honest backlog across every store",
+        "tagline": (
+            "Private, Steam-ready, and local-first. Connect a store to see your "
+            "real counts."
+        ),
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -60,8 +66,11 @@ HOUSE_DEFAULTS = {
     },
     "house-itch-privacy": {
         "kind": "house",
-        "title": "Support BAKLOG Pro",
-        "tagline": "Optional perks for supporters: background refresh, cloud sync, sponsored deal cards removed.",
+        "title": "Back the BAKLOG roadmap",
+        "tagline": (
+            "Pro funds background refresh, cloud sync, and sponsored deal cards "
+            "removed - nothing free today moves behind it."
+        ),
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -72,7 +81,7 @@ HOUSE_DEFAULTS = {
         "kind": "house",
         "title": "BAKLOG Pro",
         "slogan": "One honest backlog across every store.",
-        "tagline": "Supporter perks: bulk refresh, cloud sync, sponsored deal cards removed.",
+        "tagline": "Free and local-first. Pro funds the roadmap.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -82,12 +91,11 @@ HOUSE_DEFAULTS = {
     },
     "house-spotlight-pro-sync": {
         "kind": "house",
-        "title": "Sync every machine",
+        "title": "Library on every machine",
         "slogan": (
-            "Keep your library and personal data aligned across machines "
-            "- no manual exports."
+            "Keep library JSON and personal prefs aligned - no manual exports."
         ),
-        "tagline": "Cloud sync for library JSON and personal prefs.",
+        "tagline": "Cloud sync for Pro supporters - coming soon.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -97,9 +105,9 @@ HOUSE_DEFAULTS = {
     },
     "house-spotlight-pro-noads": {
         "kind": "house",
-        "title": "Fewer distractions",
-        "slogan": "Pro supporters see sponsored deal cards removed.",
-        "tagline": "Nothing you use today moves behind paywall.",
+        "title": "A quieter deal radar",
+        "slogan": "Sponsored deal cards removed for Pro supporters.",
+        "tagline": "Nothing you use today moves behind a paywall.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",
@@ -109,9 +117,9 @@ HOUSE_DEFAULTS = {
     },
     "house-spotlight-pro-alerts": {
         "kind": "house",
-        "title": "Never miss a free game again",
+        "title": "Catch free drops early",
         "slogan": "Alerts when giveaways and sales land.",
-        "tagline": "Deal & watchlist alerts - coming soon for Pro supporters.",
+        "tagline": "Deal and watchlist alerts - coming soon for Pro.",
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",

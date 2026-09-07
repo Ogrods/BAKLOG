@@ -26,13 +26,28 @@ else:
 
 block_cipher = None
 
+# Bundle assets except sample/demo art (ads-sample, game-covers). Those stay in
+# the repo for screenshot tooling (scripts/generate-demo-profile.mjs) but must
+# not install onto end-user machines.
+_assets_root = root / "assets"
+_assets_skip = {"ads-sample", "game-covers"}
+_asset_datas = []
+if _assets_root.is_dir():
+    for child in sorted(_assets_root.iterdir()):
+        if child.name in _assets_skip:
+            continue
+        if child.is_dir():
+            _asset_datas.append((str(child), f"assets/{child.name}"))
+        else:
+            _asset_datas.append((str(child), "assets"))
+
 datas = [
     (str(root / "index.html"), "."),
     (str(root / "favicon.svg"), "."),
     (str(root / "packaging" / "BAKLOG.ico"), "."),
     (str(root / "assets" / "tray-icon.png"), "assets"),
     (str(root / "dist"), "dist"),
-    (str(root / "assets"), "assets"),
+    *_asset_datas,
     (str(root / "vendor"), "vendor"),
     (str(root / "curated"), "curated"),
     (str(root / "fetchers" / "manifest.json"), "fetchers"),

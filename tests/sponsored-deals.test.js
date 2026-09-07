@@ -44,7 +44,7 @@ import {
   houseDealBannerHtml,
   houseStripeCardHtml,
   houseLibBacklogStatsTitle,
-  HOUSE_LIB_BACKLOG_FAKE_STATS,
+  HOUSE_LIB_BACKLOG_EMPTY_TITLE,
   houseTableRowHtml,
   sponsoredTableRowHtml,
 } from '../js/sponsored-deals.js';
@@ -88,8 +88,8 @@ function proPromoItem(overrides = {}) {
     id: 'house-pro-promo',
     kind: 'house',
     banner: 'pro',
-    title: 'Optional support for BAKLOG Pro',
-    tagline: 'Back the roadmap. Pro adds bulk refresh, background sync, and sponsored deal cards removed - nothing free today moves behind it.',
+    title: 'Back BAKLOG',
+    tagline: 'The app stays free and local-first. Pro is what funds the next stores and sync work.',
     cta: 'Get Pro — $5/mo',
     url: 'https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw',
     placements: 'dash-deal-rail',
@@ -751,21 +751,20 @@ describe('renderHouseLocationSlot', () => {
 });
 
 describe('house promo dismiss', () => {
-  it('uses placeholder stats when the library is empty', () => {
+  it('uses honest empty-state copy when the library is empty', () => {
     state.allGames = [];
     state.playedTitleNorms = new Set();
-    expect(houseLibBacklogStatsTitle()).toBe(
-      `You own ${HOUSE_LIB_BACKLOG_FAKE_STATS.owned} games. You've played ${HOUSE_LIB_BACKLOG_FAKE_STATS.played}.`,
-    );
+    expect(houseLibBacklogStatsTitle()).toBe(HOUSE_LIB_BACKLOG_EMPTY_TITLE);
     const stripe = houseStripeCardHtml({
       id: 'house-lib-backlog',
       kind: 'house',
-      title: 'You own 600 games. You\'ve played 40.',
-      tagline: 'One honest backlog across every store.',
+      title: 'One honest backlog across every store',
+      tagline: 'Private, Steam-ready, and local-first.',
       cta: 'Support BAKLOG',
       url: 'https://baklog.app/',
     });
-    expect(stripe).toContain(`You've played ${HOUSE_LIB_BACKLOG_FAKE_STATS.played}`);
+    expect(stripe).toContain(HOUSE_LIB_BACKLOG_EMPTY_TITLE);
+    expect(stripe).not.toContain('600');
   });
 
   it('uses real library stats when games are loaded', () => {
@@ -794,7 +793,7 @@ describe('house promo dismiss', () => {
     const stripe = houseStripeCardHtml({
       id: 'house-lib-backlog',
       kind: 'house',
-      title: 'You own 600 games. You\'ve played 40.',
+      title: 'One honest backlog across every store',
       tagline: 'One honest backlog across every store.',
       cta: 'Start free',
       url: 'https://baklog.app/',
@@ -830,7 +829,7 @@ describe('sponsoredDealSlotHtml', () => {
     wireWishHouse();
     const html = sponsoredDealSlotHtml();
     expect(html).toContain('sponsored-deal-house');
-    expect(html).toContain('Support BAKLOG Pro');
+    expect(html).toContain('Back the BAKLOG roadmap');
     expect(html).toContain('data-sponsor-house="1"');
     expect(html).not.toContain('sponsored-dismiss');
   });

@@ -36,7 +36,7 @@ psnawp==3.0.3
 pycountry==26.2.16
 pycparser==3.0
 pycryptodomex==3.23.0
-Pygments==2.20.0
+Pygments==2.21.0
 pyinstaller==6.22.0
 pyinstaller-hooks-contrib==2026.6
 PyJWT==2.13.0

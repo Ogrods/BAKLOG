@@ -1719,9 +1719,10 @@ async function startBrowserConnect(provider) {
         if (log) log.textContent = "Previous sign-in cancelled. Retrying…";
         hideConnectCancelControl(card);
         try {
-          res = await baklogFetch(`/api/auth/${provider}/start?fresh=1`, {
-            method: "POST",
-          });
+          res = await baklogFetch(
+            `/api/auth/${provider}/start${fresh ? "?fresh=1" : ""}`,
+            { method: "POST" },
+          );
           data = await res.json().catch(() => ({}));
         } catch {
           if (log)

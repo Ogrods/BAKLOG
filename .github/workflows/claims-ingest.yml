@@ -1,5 +1,6 @@
 # Phase 1: fetch + summarize (read-only). Soft-warn on stale baklog.app feed.
 # Phase 2: rebuild published ids → sticky PR only when fingerprint changes.
+# Auto-merge (squash) when fingerprint adds 0 new ids; human merge if any added.
 # No artifacts, no secrets, no blind auto-approve of new scrapes.
 name: Claims ingest
 
@@ -159,16 +160,18 @@ jobs:
             echo
             echo "Automated refresh of **already-published** free-claims ids from live sources."
             echo "New scrapes are **not** auto-approved."
+            echo "Squash auto-merge is enabled only when this fingerprint has **0 added** ids."
             echo
             cat /tmp/claims-fp-diff.md
             echo
-            echo "Merge to publish to baklog.app via the normal landing deploy."
+            echo "Merge publishes to baklog.app via the normal landing deploy."
           } > "$BODY_FILE"
 
           EXISTING=$(gh pr list --head chore/claims-feed-refresh --state open --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
-            gh pr edit "$EXISTING" --body-file "$BODY_FILE"
-            echo "Updated PR #$EXISTING"
+            PR_NUMBER="$EXISTING"
+            gh pr edit "$PR_NUMBER" --body-file "$BODY_FILE"
+            echo "Updated PR #$PR_NUMBER"
           else
             set +e
             CREATE_OUT=$(gh pr create \
@@ -185,4 +188,17 @@ jobs:
               exit "$CREATE_CODE"
             fi
             echo "$CREATE_OUT"
+            PR_NUMBER=$(gh pr list --head chore/claims-feed-refresh --state open --json number --jq '.[0].number // empty')
+            if [ -z "$PR_NUMBER" ]; then
+              echo "::error::PR create reported success but no open PR found for chore/claims-feed-refresh"
+              exit 1
+            fi
+          fi
+
+          ADDED=$(python3 -c "import json; print(len(json.load(open('/tmp/claims-fp-diff.json'))['added']))")
+          if [ "$ADDED" -eq 0 ]; then
+            echo "Enabling squash auto-merge on #$PR_NUMBER (0 added claim ids)."
+            gh pr merge "$PR_NUMBER" --squash --auto
+          else
+            echo "Skipping auto-merge on #$PR_NUMBER: $ADDED added claim id(s) need human review."
           fi

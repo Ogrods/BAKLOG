@@ -58,3 +58,37 @@ def test_empty_wishlist_does_not_overwrite_existing_prices(_isolated: Path):
     exit_code = fetch_itad.main()
     assert exit_code == 0
     assert json.loads(existing.read_text(encoding="utf-8")) == prior
+
+
+def test_zero_priced_rows_refuse_before_write(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    catalogs = tmp_path / "catalogs"
+    catalogs.mkdir()
+    existing = catalogs / "itad_prices.json"
+    prior = {"count": 4, "by_key": {f"wishlist:{i}": {"price": 1} for i in range(4)}}
+    existing.write_text(json.dumps(prior), encoding="utf-8")
+    wishlist = catalogs / "games_wishlist.json"
+    wishlist.write_text(
+        json.dumps({"games": [{"appid": 1, "name": "One"}, {"appid": 2, "name": "Two"}]}),
+        encoding="utf-8",
+    )
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        def lookup_title(self, title, appid=None):
+            return f"plain-{title}"
+
+        def prices_for_plains(self, plains):
+            return {}
+
+    monkeypatch.setattr(fetch_itad, "catalog_path", lambda name: catalogs / str(name))
+    monkeypatch.setattr(fetch_itad, "itad_path", lambda: existing)
+    monkeypatch.setattr(fetch_itad, "resolve_env", lambda *a, **k: "test-key")
+    monkeypatch.setattr(fetch_itad, "ensure_fx_rates", lambda **k: None)
+    monkeypatch.setattr(fetch_itad, "ItadClient", _Client)
+    monkeypatch.setattr(fetch_itad, "refresh_wishlist_fx_after_itad", lambda *_a, **_k: (0, 0))
+    monkeypatch.setattr("sys.argv", ["fetchers.fetch_itad.py"])
+
+    assert fetch_itad.main() == 2
+    assert json.loads(existing.read_text(encoding="utf-8")) == prior

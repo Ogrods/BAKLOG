@@ -86,7 +86,16 @@ function makeSyntheticRows(n) {
       statusLabel: statuses[i % statuses.length],
       playtimeHours: (i % 40) + 0.5,
       hltbMain: (i % 20) + 1,
+      hltbExtra: (i % 10) + 2,
       notes: i % 17 === 0 ? 'note' : '',
+      coverUrl: i % 5 === 0 ? 'https://cdn.akamai.steamstatic.com/steam/apps/570/header.jpg' : '',
+      steamPercent: 70 + (i % 30),
+      metacritic: 60 + (i % 40),
+      priceLabel: i % 9 === 0 ? '$4.99 (-50%)' : '',
+      released: '2020-01-01',
+      lastPlayed: i % 3 === 0 ? 'Jan 2, 2026' : '',
+      genres: i % 4 === 0 ? ['Action', 'RPG'] : [],
+      platforms: '',
     });
   }
   return rows;

@@ -30,6 +30,7 @@ export const STORE_LABELS = {
 };
 
 const CATALOG_ARTIFACT_RE = /^games_(?!wishlist_)([a-z0-9_]+)\.json$/;
+const STEAM_HEADER_CDN = 'https://cdn.akamai.steamstatic.com/steam/apps';
 
 /** @param {string} path */
 export function storeFromCatalogArtifact(path) {
@@ -51,6 +52,36 @@ function storeRank(store) {
   const order = Object.keys(STORE_LABELS);
   const idx = order.indexOf(store || '');
   return idx === -1 ? order.length : idx;
+}
+
+/** @param {unknown} url */
+export function sanitizeMirrorCoverUrl(url) {
+  if (!url) return '';
+  let u = String(url).trim();
+  if (!u) return '';
+  u = u.replace('://images-eds.xboxlive.com/', '://images-eds-ssl.xboxlive.com/');
+  if (u.includes('${size}') && /cdn\.nintendo\.net/i.test(u)) {
+    u = u.replace(/\$\{size\}/g, '256');
+  }
+  if (!/^https?:\/\//i.test(u)) return '';
+  return u;
+}
+
+/**
+ * Prefer library_image, then header_image, then Steam header CDN.
+ * @param {Record<string, unknown>} g
+ */
+export function mirrorCoverUrlFor(g) {
+  const lib = sanitizeMirrorCoverUrl(g?.library_image);
+  if (lib) return lib;
+  const header = sanitizeMirrorCoverUrl(g?.header_image);
+  if (header) return header;
+  const store = String(g?.store || '').toLowerCase();
+  const id = g?.id;
+  if (store === 'steam' && id != null && String(id).trim() !== '' && /^\d+$/.test(String(id))) {
+    return `${STEAM_HEADER_CDN}/${id}/header.jpg`;
+  }
+  return '';
 }
 
 /** @param {Record<string, unknown>} g */
@@ -98,6 +129,100 @@ function personalMap(personalDoc) {
   return personalDoc;
 }
 
+function finiteOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** @param {unknown} raw */
+function genresFromGame(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((g) => (typeof g === 'string' ? g : g?.description || g?.name || ''))
+      .map((s) => String(s).trim())
+      .filter(Boolean)
+      .slice(0, 2);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw
+      .split(/[,;/|]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+  }
+  return [];
+}
+
+/** @param {Record<string, unknown>} g */
+function platformsFromGame(g) {
+  const raw = g.platforms ?? g.platform ?? g.psn_platforms;
+  if (Array.isArray(raw)) {
+    return raw
+      .map((p) => String(p || '').trim())
+      .filter(Boolean)
+      .slice(0, 4)
+      .join(', ');
+  }
+  const s = String(raw || '').trim();
+  return s || '';
+}
+
+/** @param {unknown} value */
+function dateLabel(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Steam rtime_last_played is unix seconds.
+    const ms = value > 1e12 ? value : value * 1000;
+    const d = new Date(ms);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  }
+  const s = String(value).trim();
+  if (!s) return '';
+  const parsed = Date.parse(s);
+  if (!Number.isNaN(parsed)) {
+    return new Date(parsed).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  return s;
+}
+
+/**
+ * Compact ITAD label from a by_key entry (`price_str`, optional cut).
+ * @param {Record<string, unknown> | null | undefined} entry
+ */
+export function formatItadPriceLabel(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const cut = finiteOrNull(entry.cut);
+  const priceStr = String(entry.price_str || '').trim();
+  if (priceStr && cut != null && cut > 0) return `${priceStr} (-${Math.round(cut)}%)`;
+  if (priceStr) return priceStr;
+  const price = finiteOrNull(entry.price);
+  if (price == null) return '';
+  const currency = String(entry.currency || 'USD').trim() || 'USD';
+  const base = `${currency} ${price % 1 === 0 ? price : price.toFixed(2)}`;
+  if (cut != null && cut > 0) return `${base} (-${Math.round(cut)}%)`;
+  return base;
+}
+
+/**
+ * Attach `priceLabel` from mirrored `itad_prices.json` (`by_key`).
+ * @param {ReturnType<typeof mergeMirrorLibrary>} rows
+ * @param {unknown} itadDoc
+ */
+export function mergeItadPrices(rows, itadDoc) {
+  const byKey =
+    itadDoc && typeof itadDoc === 'object' && itadDoc.by_key && typeof itadDoc.by_key === 'object'
+      ? itadDoc.by_key
+      : {};
+  return (rows || []).map((row) => {
+    const entry = byKey[row.key];
+    const priceLabel = formatItadPriceLabel(entry && typeof entry === 'object' ? entry : null);
+    return priceLabel ? { ...row, priceLabel } : { ...row, priceLabel: row.priceLabel || '' };
+  });
+}
+
 /**
  * @param {{ path: string, doc: unknown }[]} catalogEntries
  * @param {unknown} personalDoc
@@ -118,6 +243,12 @@ export function mergeMirrorLibrary(catalogEntries, personalDoc, options = {}) {
       const hidden = rec.hidden === true;
       if (hidden && !options.includeHidden) continue;
       const status = String(rec.status || g.status || 'backlog');
+      const steamPercent =
+        finiteOrNull(g.steam_percent) ??
+        finiteOrNull(g.review_percent) ??
+        finiteOrNull(g.steam_rating) ??
+        finiteOrNull(g.rating);
+      const metacritic = finiteOrNull(g.metacritic) ?? finiteOrNull(g.metacritic_score);
       rows.push({
         key,
         store,
@@ -126,9 +257,19 @@ export function mergeMirrorLibrary(catalogEntries, personalDoc, options = {}) {
         status,
         statusLabel: STATUS_LABELS[status] || status,
         playtimeHours: playtimeHoursFromGame(g),
-        hltbMain: g.hltb_main_hours ?? g.hltb_main ?? null,
+        hltbMain: finiteOrNull(g.hltb_main_hours ?? g.hltb_main),
+        hltbExtra: finiteOrNull(g.hltb_extra_hours ?? g.hltb_extra),
+        hltbCompletionist: finiteOrNull(g.hltb_completionist_hours ?? g.hltb_completionist),
         notes: String(rec.notes || ''),
         hidden,
+        coverUrl: mirrorCoverUrlFor(g),
+        steamPercent,
+        metacritic,
+        released: dateLabel(g.release_date ?? g.released ?? g.release),
+        lastPlayed: dateLabel(g.last_played ?? g.rtime_last_played ?? g.lastplayed),
+        genres: genresFromGame(g.genres ?? g.genre),
+        platforms: platformsFromGame(g),
+        priceLabel: '',
       });
     }
   }
@@ -150,7 +291,8 @@ export function filterMirrorRows(rows, filters = {}) {
     if (status && row.status !== status) return false;
     if (store && row.store !== store) return false;
     if (search) {
-      const hay = `${row.title} ${row.notes} ${row.storeLabel}`.toLowerCase();
+      const genreHay = Array.isArray(row.genres) ? row.genres.join(' ') : '';
+      const hay = `${row.title} ${row.notes} ${row.storeLabel} ${genreHay} ${row.platforms || ''}`.toLowerCase();
       if (!hay.includes(search)) return false;
     }
     return true;
@@ -184,6 +326,14 @@ export function sortMirrorRows(rows, sort = {}) {
       case 'hltb':
         va = a.hltbMain ?? -1;
         vb = b.hltbMain ?? -1;
+        break;
+      case 'steam':
+        va = a.steamPercent ?? -1;
+        vb = b.steamPercent ?? -1;
+        break;
+      case 'metacritic':
+        va = a.metacritic ?? -1;
+        vb = b.metacritic ?? -1;
         break;
       default:
         va = a.title;

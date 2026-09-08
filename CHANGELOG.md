@@ -39,6 +39,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- Hosted cloud library rows show covers (store CDNs) plus playtime, HLTB, Steam %, Metacritic, deal price when synced, release, and last played - closer to the desktop library table without uploading image files.
 - Hosted cloud library About this view explains read-only sync vs desktop Import; when more than one cloud profile is uploaded it notes that the table is merged.
 - Import from cloud mirror can choose which cloud profile folder to pull into the current local profile.
 - Hosted cloud library (`/mirror`) is usable on phone and tablet: app breakpoint ladder, touch-sized controls, and card rows on narrow viewports.

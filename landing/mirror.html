@@ -94,8 +94,8 @@
       <details class="mirror-scope-note">
         <summary>About this view</summary>
         <div class="mirror-scope-note-body">
-          <p>Read-only library from your home PC after <strong>Cloud sync</strong> / <strong>Sync now</strong> in BAKLOG. You see store catalogs plus statuses and notes from mirrored personal data.</p>
-          <p>Wishlists, deal prices, and claimables are not shown here. Claimables stay on the public feed. Wishlists and prices may still upload for desktop restore.</p>
+          <p>Read-only library from your home PC after <strong>Cloud sync</strong> / <strong>Sync now</strong> in BAKLOG. You see store catalogs, covers from store CDNs, statuses and notes, and deal prices when those files were synced.</p>
+          <p>Wishlists and claimables are not listed here. Claimables stay on the public feed. Wishlists may still upload for desktop restore.</p>
           <p><strong>Import from cloud mirror</strong> is a desktop Connections action that overwrites local files. It does not fill this page.</p>
         </div>
       </details>
@@ -114,11 +114,16 @@
         <table class="mirror-table">
           <thead>
             <tr>
-              <th scope="col">Title</th>
-              <th scope="col">Store</th>
+              <th scope="col" class="col-cover"><span class="sr-only">Cover</span></th>
+              <th scope="col">Game</th>
               <th scope="col">Status</th>
-              <th scope="col" class="col-num">Playtime</th>
+              <th scope="col" class="col-num">Played</th>
               <th scope="col" class="col-num">HLTB</th>
+              <th scope="col" class="col-num">Steam %</th>
+              <th scope="col" class="col-num">MC</th>
+              <th scope="col" class="col-num">Price</th>
+              <th scope="col">Released</th>
+              <th scope="col">Last played</th>
             </tr>
           </thead>
           <tbody id="mirrorTableBody"></tbody>

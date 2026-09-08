@@ -52,7 +52,8 @@ def handle_mirror_get(handler) -> None:
             )
         else:
             artifacts = list_remote_mirror_artifacts(authorization=authorization, profile_id=profile)
-            local_state = read_mirror_upload_state(profile_id=profile)
+            # Local upload status is always for the active profile (never the ?profile= query).
+            local_state = read_mirror_upload_state()
             srv._send_json(
                 handler,
                 HTTPStatus.OK,

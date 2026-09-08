@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -21,12 +22,14 @@ from shared.mirror_artifacts import (
 )
 from shared.mirror_session import get_mirror_session
 from shared.pro_settings import read_pro_settings
-from shared.profile_paths import get_active_profile_id, profile_root, runs_dir
+from shared.profile_paths import PROFILES_DIR, get_active_profile_id, profile_root
 from shared.supabase_mirror import mirror_device_id
 
 DEBOUNCE_SEC = 30.0
 _FLUSH_POLL_SEC = 5.0
 MIRROR_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+# Inline regex so CodeQL sees a path-segment sanitizer at the sink (no / or \).
+_PROFILE_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _lock = threading.Lock()
 _pending: dict[str, dict[str, Any]] = {}
 _worker_started = False
@@ -34,6 +37,14 @@ _worker_started = False
 
 class MirrorProfileMismatch(ValueError):
     """Import requested a profile other than the active one."""
+
+
+def _safe_profile_segment(profile_id: str) -> str:
+    """Return a single path-safe profile id segment or raise ValueError."""
+    pid = (profile_id or "").strip()
+    if not _PROFILE_SEGMENT_RE.fullmatch(pid):
+        raise ValueError(f"invalid profile id: {profile_id!r}")
+    return pid
 
 
 def start_flush_worker() -> None:
@@ -129,23 +140,21 @@ def maybe_flush_mirror_uploads(*, force: bool = False) -> None:
 
 
 def _mirror_state_path(profile_id: str) -> Path:
-    """Resolve mirror upload state under a validated profile runs dir."""
-    from shared.profile_paths import normalize_profile_id
-
-    pid = normalize_profile_id(profile_id)
-    runs = runs_dir(profile_id=pid).resolve()
-    path = (runs / "mirror_upload_state.json").resolve()
-    if not path.is_relative_to(runs):
-        raise ValueError("mirror state path escapes profile runs dir")
+    """Resolve mirror upload state under profiles/<id>/cache/runs/."""
+    pid = _safe_profile_segment(profile_id)
+    base = PROFILES_DIR.resolve()
+    path = (base / pid / "cache" / "runs" / "mirror_upload_state.json").resolve()
+    if not path.is_relative_to(base):
+        raise ValueError("mirror state path escapes profiles dir")
     return path
 
 
 def read_mirror_upload_state(*, profile_id: str | None = None) -> dict[str, Any]:
-    raw_pid = profile_id if profile_id is not None else get_active_profile_id()
+    """Read local upload status for a profile (defaults to active; never remote-only ids)."""
     try:
-        from shared.profile_paths import normalize_profile_id
-
-        pid = normalize_profile_id(raw_pid)
+        pid = _safe_profile_segment(
+            profile_id if profile_id is not None else get_active_profile_id()
+        )
     except ValueError:
         return {"artifacts": {}, "last_upload_at": None, "device_id": None}
     try:
@@ -194,10 +203,8 @@ def _looks_like_account_profile_id(profile_id: str) -> bool:
 
 
 def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
-    from shared.profile_paths import normalize_profile_id
-
     try:
-        pid = normalize_profile_id(profile_id)
+        pid = _safe_profile_segment(profile_id)
     except ValueError:
         return
     if not mirror_upload_allowed(profile_id=pid):
@@ -221,8 +228,12 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
             )
         return
     from shared.supabase_mirror import upload_mirror_object, upsert_mirror_snapshot_row
+    from shared.profile_paths import ROOT as REPO_ROOT
 
     root = profile_root(profile_id=pid).resolve()
+    allowed = (PROFILES_DIR.resolve(), Path(REPO_ROOT).resolve())
+    if not any(root == base or root.is_relative_to(base) for base in allowed):
+        return
     uploaded: dict[str, str] = {}
     errors: list[str] = []
     device = mirror_device_id()

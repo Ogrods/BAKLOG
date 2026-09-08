@@ -37,7 +37,7 @@ const tableWrap = document.querySelector('.mirror-table-wrap');
 
 const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 const CATALOG_FETCH_CONCURRENCY = 5;
-const COLSPAN = 10;
+const COLSPAN = 11;
 
 /** Retry header/Steam CDN once, then leave the letter placeholder visible. */
 function mirrorCoverError(img) {
@@ -184,6 +184,25 @@ function gameCellHtml(row) {
   return `<td class="col-game" data-label="Game"><div class="mirror-game-title">${escapeHtml(row.title)}</div>${note}<div class="mirror-row-meta">${metaBits.join('')}</div></td>`;
 }
 
+function statsChipHtml(label, valueHtml) {
+  return `<span class="mirror-stat-chip"><span class="mirror-stat-chip-label">${escapeHtml(label)}</span><span class="mirror-stat-chip-value">${valueHtml}</span></span>`;
+}
+
+/** Phone/card band with every metric; hidden on desktop via CSS. */
+function statsCellHtml(row) {
+  const chips = [
+    statsChipHtml('Status', `<span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span>`),
+    statsChipHtml('Played', escapeHtml(formatHours(row.playtimeHours))),
+    statsChipHtml('HLTB', escapeHtml(formatHltb(row))),
+    statsChipHtml('Steam %', escapeHtml(formatPercent(row.steamPercent))),
+    statsChipHtml('MC', escapeHtml(formatScore(row.metacritic))),
+    statsChipHtml('Price', escapeHtml(row.priceLabel || ' - ')),
+    statsChipHtml('Released', escapeHtml(row.released || ' - ')),
+    statsChipHtml('Last played', escapeHtml(row.lastPlayed || ' - ')),
+  ];
+  return `<td class="col-stats" data-label="Stats">${chips.join('')}</td>`;
+}
+
 function rowHtml(row, index) {
   return `<tr data-row-index="${index}">
         ${coverCellHtml(row)}
@@ -196,6 +215,7 @@ function rowHtml(row, index) {
         <td class="col-num col-price" data-label="Price">${escapeHtml(row.priceLabel || ' - ')}</td>
         <td class="col-date col-released" data-label="Released">${escapeHtml(row.released || ' - ')}</td>
         <td class="col-date col-lastplayed" data-label="Last played">${escapeHtml(row.lastPlayed || ' - ')}</td>
+        ${statsCellHtml(row)}
       </tr>`;
 }
 

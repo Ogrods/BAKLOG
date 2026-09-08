@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T19:05:53.129765+00:00",
+  "generated_at": "2026-09-08T18:29:37.697680+00:00",
   "items": [
     {
       "id": "gamerpower-3313",
@@ -9,11 +9,11 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1532580/header.jpg?t=1654494842",
       "genres": [],
       "blurb": "Dreaming about Wordle? What a coincidence, it’s on IndieGala for free! Download it now and make your dreams come true.",
-      "ends_at": "2026-09-21T19:05:33Z",
+      "ends_at": "2026-09-22T18:29:17Z",
       "steam_appid": 1532580,
       "review_percent": 62,
       "source": "gamerpower",
-      "first_seen": "2026-09-07T19:05:33Z"
+      "first_seen": "2026-09-08T18:29:17Z"
     },
     {
       "id": "gamerpower-3421",
@@ -25,7 +25,7 @@
       "blurb": "Are you planning on getting into game dev? Then this might be for you! Very Realistic Game Dev Simulator is free on Itch.io for a limited time!",
       "ends_at": "2026-09-18T23:59:35Z",
       "source": "gamerpower",
-      "first_seen": "2026-09-07T19:05:33Z"
+      "first_seen": "2026-09-08T18:29:17Z"
     },
     {
       "id": "gamerpower-3496",
@@ -39,7 +39,7 @@
       "steam_appid": 2994800,
       "review_percent": 78,
       "source": "gamerpower",
-      "first_seen": "2026-09-07T19:05:33Z"
+      "first_seen": "2026-09-08T18:29:17Z"
     },
     {
       "id": "gamerpower-3422",
@@ -53,7 +53,7 @@
       "steam_appid": 3063960,
       "review_percent": 80,
       "source": "gamerpower",
-      "first_seen": "2026-09-07T19:05:33Z"
+      "first_seen": "2026-09-08T18:29:17Z"
     },
     {
       "id": "itad-4617ce1ab23a",
@@ -63,11 +63,11 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3218690/header.jpg?t=1730801171",
       "genres": [],
       "blurb": "Scamster Kombat",
-      "ends_at": "2026-09-21T19:05:33Z",
+      "ends_at": "2026-09-22T18:29:17Z",
       "steam_appid": 3218690,
       "review_percent": 96,
       "source": "itad",
-      "first_seen": "2026-09-07T19:05:33Z"
+      "first_seen": "2026-09-08T18:29:17Z"
     }
   ],
   "attribution": [

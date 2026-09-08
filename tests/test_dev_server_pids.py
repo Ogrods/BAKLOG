@@ -121,5 +121,48 @@ def test_reclaim_or_exit_reclaims_then_returns(
     monkeypatch.setattr(dsp, "clear_stale_pid_file", lambda _f: False)
     monkeypatch.setattr(dsp, "port_busy", _busy)
     monkeypatch.setattr(dsp, "reclaim_stale_server", lambda *a, **k: True)
+    monkeypatch.setattr(dsp.time, "sleep", lambda *_a, **_k: None)
     dsp.reclaim_or_exit("127.0.0.1", 8765, tmp_path / "pid", "busy")
     assert calls["busy"] == 2
+
+
+def test_cmdline_looks_like_baklog_server() -> None:
+    assert dsp._cmdline_looks_like_baklog_server("python server.py") is True
+    assert dsp._cmdline_looks_like_baklog_server("/opt/BAKLOG/BAKLOG") is True
+    assert dsp._cmdline_looks_like_baklog_server("nginx: worker process") is False
+
+
+def test_pid_is_python_server_rejects_unrelated_unix_cmdline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(dsp.sys, "platform", "linux")
+    monkeypatch.setattr(dsp, "pid_alive", lambda _pid: True)
+    monkeypatch.setattr(
+        dsp.Path,
+        "is_file",
+        lambda self: str(self).replace("\\", "/").endswith("cmdline"),
+    )
+    monkeypatch.setattr(
+        dsp.Path,
+        "read_bytes",
+        lambda self: b"nginx\x00worker",
+    )
+    assert dsp.pid_is_python_server(4242) is False
+
+
+def test_pid_is_python_server_accepts_server_py_unix_cmdline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(dsp.sys, "platform", "linux")
+    monkeypatch.setattr(dsp, "pid_alive", lambda _pid: True)
+    monkeypatch.setattr(
+        dsp.Path,
+        "is_file",
+        lambda self: str(self).replace("\\", "/").endswith("cmdline"),
+    )
+    monkeypatch.setattr(
+        dsp.Path,
+        "read_bytes",
+        lambda self: b"python\x00server.py",
+    )
+    assert dsp.pid_is_python_server(4242) is True

@@ -61,25 +61,53 @@ def terminate_pid(pid: int) -> None:
             pass
 
 
+def _cmdline_looks_like_baklog_server(cmdline: str) -> bool:
+    """True when process cmdline/exe text looks like our server or frozen tray."""
+    low = cmdline.lower()
+    return (
+        "server.py" in low
+        or "baklog" in low
+        or ("python" in low and "steam-backlog" in low)
+    )
+
+
 def pid_is_python_server(pid: int) -> bool:
     """Best-effort confirm pid is a live BAKLOG server process (dev python.exe or
     a frozen BAKLOG.exe) so reclaim never kills an unrelated process that reused
     the pid. Frozen tester builds run as ``BAKLOG.exe``, not ``python``."""
     if not pid_alive(pid):
         return False
-    if sys.platform != "win32":
-        return True
+    if sys.platform == "win32":
+        try:
+            out = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            name = (out.stdout or "").lower()
+            return "python" in name or "baklog" in name
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    # Non-Windows: require cmdline evidence (never treat any live PID as ours).
+    try:
+        proc_cmd = Path(f"/proc/{pid}/cmdline")
+        if proc_cmd.is_file():
+            raw = proc_cmd.read_bytes().replace(b"\x00", b" ").decode("utf-8", "replace")
+            return _cmdline_looks_like_baklog_server(raw)
+    except OSError:
+        pass
     try:
         out = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            ["ps", "-p", str(pid), "-o", "args="],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        name = (out.stdout or "").lower()
-        return "python" in name or "baklog" in name
+        return _cmdline_looks_like_baklog_server(out.stdout or "")
     except (OSError, subprocess.TimeoutExpired):
         return False
 

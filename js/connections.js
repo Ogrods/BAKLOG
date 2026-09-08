@@ -532,10 +532,14 @@ function renderConnPrefs() {
     capabilityStatus("cloud_sync_mirror") === "live";
   if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
   if (syncBtn) {
+    syncBtn.classList.toggle("hidden", !showCloudMirror);
     syncBtn.hidden = !showCloudMirror;
     syncBtn.disabled = !showCloudMirror || getProSettings().cloudMirrorEnabled !== true;
   }
-  if (importBtn) importBtn.hidden = !showCloudMirror;
+  if (importBtn) {
+    importBtn.classList.toggle("hidden", !showCloudMirror);
+    importBtn.hidden = !showCloudMirror;
+  }
   if (cloudToggle && showCloudMirror) {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
   }

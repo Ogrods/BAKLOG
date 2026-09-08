@@ -2,8 +2,8 @@
 
 export const MIRROR_VIRTUAL_THRESHOLD = 60;
 export const MIRROR_VIRTUAL_OVERSCAN = 12;
-export const MIRROR_ROW_HEIGHT_DESKTOP = 40;
-export const MIRROR_ROW_HEIGHT_PHONE = 120;
+export const MIRROR_ROW_HEIGHT_DESKTOP = 56;
+export const MIRROR_ROW_HEIGHT_PHONE = 148;
 
 /**
  * @param {number} listLen

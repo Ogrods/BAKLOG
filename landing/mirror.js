@@ -4,6 +4,7 @@ import {
   STORE_LABELS,
   catalogArtifactPaths,
   filterMirrorRows,
+  mergeItadPrices,
   mergeMirrorLibrary,
   sortMirrorRows,
   summarizeMirrorRows,
@@ -36,7 +37,7 @@ const tableWrap = document.querySelector('.mirror-table-wrap');
 
 const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 const CATALOG_FETCH_CONCURRENCY = 5;
-const COLSPAN = 5;
+const COLSPAN = 10;
 
 /** @type {ReturnType<typeof mergeMirrorLibrary>} */
 let allRows = [];
@@ -95,6 +96,63 @@ function formatHours(value) {
   if (value == null || !Number.isFinite(Number(value))) return ' - ';
   const n = Number(value);
   return `${n % 1 === 0 ? n : n.toFixed(1)}h`;
+}
+
+function formatHltb(row) {
+  const main = row.hltbMain;
+  const extra = row.hltbExtra;
+  if (main == null && extra == null) return ' - ';
+  if (main != null && extra != null) {
+    return `${formatHours(main).replace(/h$/, '')} / ${formatHours(extra)}`;
+  }
+  return formatHours(main ?? extra);
+}
+
+function formatPercent(value) {
+  if (value == null || !Number.isFinite(Number(value))) return ' - ';
+  return `${Math.round(Number(value))}%`;
+}
+
+function formatScore(value) {
+  if (value == null || !Number.isFinite(Number(value))) return ' - ';
+  return String(Math.round(Number(value)));
+}
+
+function coverCellHtml(row) {
+  const initial = escapeHtml(String(row.title || '?').trim().charAt(0).toUpperCase() || '?');
+  const url = String(row.coverUrl || '').trim();
+  if (url && /^https?:\/\//i.test(url)) {
+    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none';var f=this.nextElementSibling;if(f)f.hidden=false" /><span class="mirror-cover-fallback" hidden aria-hidden="true">${initial}</span></div></td>`;
+  }
+  return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><span class="mirror-cover-fallback" aria-hidden="true">${initial}</span></div></td>`;
+}
+
+function gameCellHtml(row) {
+  const note = row.notes ? `<div class="mirror-note">${escapeHtml(row.notes)}</div>` : '';
+  const metaBits = [];
+  metaBits.push(`<span class="mirror-store-chip">${escapeHtml(row.storeLabel)}</span>`);
+  if (Array.isArray(row.genres) && row.genres.length) {
+    metaBits.push(`<span class="mirror-meta-text">${escapeHtml(row.genres.join(', '))}</span>`);
+  }
+  if (row.platforms) {
+    metaBits.push(`<span class="mirror-meta-text">${escapeHtml(row.platforms)}</span>`);
+  }
+  return `<td class="col-game" data-label="Game"><div class="mirror-game-title">${escapeHtml(row.title)}</div>${note}<div class="mirror-row-meta">${metaBits.join('')}</div></td>`;
+}
+
+function rowHtml(row, index) {
+  return `<tr data-row-index="${index}">
+        ${coverCellHtml(row)}
+        ${gameCellHtml(row)}
+        <td data-label="Status"><span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span></td>
+        <td class="col-num" data-label="Played">${formatHours(row.playtimeHours)}</td>
+        <td class="col-num" data-label="HLTB">${formatHltb(row)}</td>
+        <td class="col-num col-steam" data-label="Steam %">${formatPercent(row.steamPercent)}</td>
+        <td class="col-num col-mc" data-label="MC">${formatScore(row.metacritic)}</td>
+        <td class="col-num col-price" data-label="Price">${escapeHtml(row.priceLabel || ' - ')}</td>
+        <td class="col-date col-released" data-label="Released">${escapeHtml(row.released || ' - ')}</td>
+        <td class="col-date col-lastplayed" data-label="Last played">${escapeHtml(row.lastPlayed || ' - ')}</td>
+      </tr>`;
 }
 
 function statusClass(status) {
@@ -221,17 +279,6 @@ function populateFilters(rows) {
   storeFilter.value = [...storeFilter.options].some((o) => o.value === currentStore) ? currentStore : '';
 }
 
-function rowHtml(row, index) {
-  const note = row.notes ? `<div class="mirror-note">${escapeHtml(row.notes)}</div>` : '';
-  return `<tr data-row-index="${index}">
-        <td data-label="Title">${escapeHtml(row.title)}${note}</td>
-        <td data-label="Store">${escapeHtml(row.storeLabel)}</td>
-        <td data-label="Status"><span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span></td>
-        <td class="col-num" data-label="Playtime">${formatHours(row.playtimeHours)}</td>
-        <td class="col-num" data-label="HLTB">${formatHours(row.hltbMain)}</td>
-      </tr>`;
-}
-
 function spacerHtml(kind, heightPx) {
   const h = Math.max(0, heightPx);
   return `<tr class="mirror-virtual-spacer mirror-virtual-spacer--${kind}" aria-hidden="true"><td colspan="${COLSPAN}" style="height:${h}px"></td></tr>`;
@@ -326,6 +373,7 @@ async function loadLibrary(session) {
     const list = await mirrorFetch('', token);
     let catalogRows = (list.artifacts || []).filter((row) => catalogArtifactPaths([row]).length);
     const personalRows = (list.artifacts || []).filter((row) => row.path === 'data/personal.json');
+    const itadRows = (list.artifacts || []).filter((row) => row.path === 'itad_prices.json');
 
     if (!catalogRows.length) {
       setMergeHint([]);
@@ -349,14 +397,30 @@ async function loadLibrary(session) {
       doc: await mirrorFetch(row.path, token, row.profile),
     }));
     let personal = null;
+    let personalProfile = null;
     if (personalRows.length) {
       const pref =
         personalRows.find((row) => row.profile === userId)
         || personalRows.find((row) => row.profile === 'default')
         || personalRows[0];
+      personalProfile = pref.profile;
       personal = await mirrorFetch('data/personal.json', token, pref.profile);
     }
     allRows = mergeMirrorLibrary(catalogs, personal);
+
+    if (itadRows.length) {
+      const itadPref =
+        (personalProfile && itadRows.find((row) => row.profile === personalProfile))
+        || itadRows.find((row) => row.profile === userId)
+        || itadRows.find((row) => row.profile === 'default')
+        || itadRows[0];
+      try {
+        const itadDoc = await mirrorFetch('itad_prices.json', token, itadPref.profile);
+        allRows = mergeItadPrices(allRows, itadDoc);
+      } catch {
+        // Prices are optional enrichment.
+      }
+    }
 
     if (!allRows.length) {
       setMergeHint([]);

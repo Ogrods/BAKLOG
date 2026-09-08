@@ -1,3 +1,9 @@
+/* Responsive system (mirror) — same ladder as app.css Phase 0.
+   --bp-tablet-max: 1023.98px
+   --bp-phone-max:  639.98px  (+ short landscape sheet MQ)
+   --bp-compact-max: 400px
+   Touch: --touch-min >= 44px on phone/sheet. */
+
 :root {
   color-scheme: dark;
   --bg: #0f172a;
@@ -17,7 +23,10 @@
   --accent-border: rgba(56, 189, 248, 0.45);
   --accent-muted: #7dd3fc;
   --header-control-h: 34px;
-  --brand-lockup-gap: clamp(-3.5rem, -5vw, -1rem);
+  --touch-min: 44px;
+  --bp-tablet-max: 1023.98px;
+  --bp-phone-max: 639.98px;
+  --bp-compact-max: 400px;
 }
 
 * {
@@ -36,6 +45,7 @@ body {
   line-height: 1.5;
   background: var(--bg);
   color: var(--text);
+  overflow-x: clip;
 }
 
 a {
@@ -45,13 +55,11 @@ a {
 .mirror-shell {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 1rem;
-}
-
-@media (min-width: 768px) {
-  .mirror-shell {
-    padding: 1.5rem;
-  }
+  padding:
+    max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1.5rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
 }
 
 .mirror-header {
@@ -79,8 +87,6 @@ a {
 
 .brand-logo-mark {
   display: inline-flex;
-  /* 26px matches the app phone/header-sheet density; 30px reads oversized
-     when the brand sits alone without view tabs beside it. */
   height: 26px;
   flex-shrink: 0;
   color: #fff;
@@ -96,8 +102,6 @@ a {
   fill: currentColor;
 }
 
-/* Cap at text-2xl (1.5rem). The app also uses md:text-3xl, but that only
-   balances next to tabs/actions - alone on /mirror it looks scaled up. */
 .brand-wordmark {
   margin: 0;
   font-size: 1.5rem;
@@ -108,11 +112,10 @@ a {
   color: #fff;
 }
 
-.brand-beta {
+.mirror-cloud-chip {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 0.3em;
   margin-top: 0.15rem;
   padding: 0.18em 0.45em;
   border-radius: 999px;
@@ -123,16 +126,11 @@ a {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   white-space: nowrap;
-  transform: translate(-3px, -3px);
 }
 
-.brand-beta-label {
+.mirror-cloud-chip .brand-beta-label {
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.mirror-cloud-chip {
-  transform: translate(-3px, -3px);
 }
 
 .mirror-lead {
@@ -403,13 +401,59 @@ table.mirror-table {
   border: 1px solid color-mix(in srgb, var(--text-mute) 18%, transparent);
 }
 
+.mirror-scope-note summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-dim);
+  list-style: none;
+}
+
+.mirror-scope-note summary::-webkit-details-marker {
+  display: none;
+}
+
+.mirror-scope-note[open] summary {
+  margin-bottom: 0.35rem;
+}
+
+.mirror-scope-note .mirror-scope-note-body {
+  margin: 0;
+}
+
 .hidden {
   display: none !important;
 }
 
-@media (max-width: 640px) {
+/* --- Tablet --- */
+@media (max-width: 1023.98px) {
+  .mirror-toolbar {
+    gap: 0.5rem;
+  }
+
+  .mirror-toolbar input,
+  .mirror-toolbar select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .mirror-table th:nth-child(5),
+  .mirror-table td:nth-child(5) {
+    display: none;
+  }
+}
+
+/* --- Phone + short landscape sheet --- */
+@media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  .mirror-shell {
+    padding:
+      max(0.75rem, env(safe-area-inset-top, 0px))
+      max(0.75rem, env(safe-area-inset-right, 0px))
+      max(1.25rem, env(safe-area-inset-bottom, 0px))
+      max(0.75rem, env(safe-area-inset-left, 0px));
+  }
+
   .mirror-header-row {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.5rem 0.75rem;
   }
 
@@ -423,25 +467,116 @@ table.mirror-table {
     font-size: 1.25rem;
   }
 
-  .brand-logo-mark {
-    height: 26px;
-  }
-
-  .brand-beta {
+  .mirror-cloud-chip {
     transform: none;
   }
 
   .mirror-header-actions {
     margin-left: 0;
-    flex-shrink: 0;
+    flex: 1 1 100%;
+  }
+
+  .mirror-actions {
+    width: 100%;
+  }
+
+  .mirror-actions .mirror-btn--ghost {
+    flex: 1 1 auto;
+    min-height: var(--touch-min);
+    height: auto;
+  }
+
+  .mirror-panel--narrow {
+    max-width: none;
+    margin: 1.25rem 0 0;
+  }
+
+  .mirror-panel input,
+  .mirror-panel select {
+    min-height: var(--touch-min);
+    margin-bottom: 0.65rem;
+  }
+
+  .mirror-btn--primary {
+    min-height: var(--touch-min);
+  }
+
+  .mirror-table-wrap {
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  table.mirror-table,
+  .mirror-table tbody,
+  .mirror-table tr,
+  .mirror-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .mirror-table thead {
+    display: none;
+  }
+
+  .mirror-table tbody tr {
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.5rem;
+    background: var(--bg-panel);
+  }
+
+  .mirror-table tbody tr:hover {
+    background: var(--bg-panel);
+  }
+
+  .mirror-table td {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+    align-items: start;
+    padding: 0.28rem 0;
+    border-bottom: none;
+    text-align: left;
+  }
+
+  .mirror-table td.col-num {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .mirror-table td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    padding-top: 0.15rem;
+  }
+
+  .mirror-table td[data-label="Title"] {
+    grid-template-columns: 1fr;
+    padding-bottom: 0.45rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+
+  .mirror-table td[data-label="Title"]::before {
+    display: none;
   }
 
   .mirror-table th:nth-child(5),
   .mirror-table td:nth-child(5) {
-    display: none;
+    display: grid;
   }
 }
 
+/* --- Compact phones --- */
 @media (max-width: 400px) {
   .brand-wordmark {
     font-size: 1.125rem;
@@ -451,8 +586,16 @@ table.mirror-table {
     height: 22px;
   }
 
-  .brand-beta {
+  .mirror-cloud-chip {
     font-size: 0.52rem;
     padding: 0.14em 0.35em;
+  }
+
+  .mirror-table tbody tr {
+    padding: 0.55rem 0.65rem;
+  }
+
+  .mirror-table td {
+    grid-template-columns: 4.75rem minmax(0, 1fr);
   }
 }

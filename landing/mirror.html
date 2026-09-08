@@ -61,7 +61,7 @@
             </svg>
           </span>
           <h1 class="brand-wordmark">BAKLOG</h1>
-          <span class="brand-beta mirror-cloud-chip" aria-label="Read-only cloud mirror">
+          <span class="mirror-cloud-chip" aria-label="Read-only cloud mirror">
             <span class="brand-beta-label">Cloud</span>
           </span>
         </div>
@@ -91,7 +91,10 @@
     </section>
 
     <section class="hidden" id="mirrorLibraryPanel">
-      <p class="mirror-scope-note">Library backlog only  -  wishlists and deal prices sync with your account and appear here after you <strong>Import from cloud mirror</strong> in the desktop app. Claimables stay on the public feed and are not mirrored.</p>
+      <details class="mirror-scope-note">
+        <summary>About this view</summary>
+        <p class="mirror-scope-note-body">Library backlog only  -  wishlists and deal prices sync with your account and appear here after you <strong>Import from cloud mirror</strong> in the desktop app. Claimables stay on the public feed and are not mirrored.</p>
+      </details>
       <div class="mirror-stats" id="mirrorStats" aria-live="polite"></div>
       <div class="mirror-toolbar">
         <input type="search" id="mirrorSearch" placeholder="Search title or notes" aria-label="Search library" />

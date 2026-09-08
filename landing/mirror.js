@@ -171,11 +171,11 @@ function renderTable() {
     .map((row) => {
       const note = row.notes ? `<div class="mirror-note">${escapeHtml(row.notes)}</div>` : '';
       return `<tr>
-        <td>${escapeHtml(row.title)}${note}</td>
-        <td>${escapeHtml(row.storeLabel)}</td>
-        <td><span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span></td>
-        <td class="col-num">${formatHours(row.playtimeHours)}</td>
-        <td class="col-num">${formatHours(row.hltbMain)}</td>
+        <td data-label="Title">${escapeHtml(row.title)}${note}</td>
+        <td data-label="Store">${escapeHtml(row.storeLabel)}</td>
+        <td data-label="Status"><span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span></td>
+        <td class="col-num" data-label="Playtime">${formatHours(row.playtimeHours)}</td>
+        <td class="col-num" data-label="HLTB">${formatHours(row.hltbMain)}</td>
       </tr>`;
     })
     .join('');

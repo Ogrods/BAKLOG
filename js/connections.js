@@ -95,6 +95,8 @@ let pollTimer = null;
 // True while refreshConnections() is running, so the baklog:auth-status listener
 // (below) doesn't redundantly re-render — refreshConnections renders itself.
 let _connRefreshInFlight = false;
+/** Shared promise so overlapping refreshConnections callers await one run. */
+let _connRefreshPromise = null;
 let _connRenderFingerprint = "";
 let _connAuthFingerprint = "";
 
@@ -102,6 +104,8 @@ const POST_CONNECT_FAST_POLL_MS = 3000;
 const POST_CONNECT_FAST_POLL_MAX_MS = 30_000;
 let postConnectFastPollTimer = null;
 let postConnectFastPollStopAt = 0;
+/** Active Connect EventSource by provider (cancel / error teardown). */
+const _activeConnectStreams = new Map();
 
 let gridWired = false;
 let noteSaveTimer = null;
@@ -703,6 +707,17 @@ function handleLayoutClick(ev) {
       log.textContent = "Cancelling sign-in…";
     }
     void (async () => {
+      const activeEs = _activeConnectStreams.get(provider);
+      if (activeEs) {
+        try {
+          activeEs.onerror = null;
+          activeEs.close();
+        } catch (_) {
+          /* noop */
+        }
+        _activeConnectStreams.delete(provider);
+      }
+      stopPostConnectFastPoll();
       const ok = await cancelBrowserConnect(provider);
       if (log) {
         log.textContent = ok
@@ -1739,12 +1754,19 @@ async function startBrowserConnect(provider) {
   }
 
   showConnectCancelControl(card, provider, log);
+  if (!data.session_id) {
+    if (log) log.textContent = "Connect start returned no session id.";
+    hideConnectCancelControl(card);
+    stopPostConnectFastPoll();
+    return;
+  }
   startPostConnectFastPoll();
 
   const streamUrl = await urlWithStreamTicket(
     `/api/auth/${data.session_id}/stream`,
   );
   const es = new EventSource(streamUrl);
+  _activeConnectStreams.set(provider, es);
   let connectUiFinished = false;
   let transportErrorStreak = 0;
 
@@ -1761,6 +1783,7 @@ async function startBrowserConnect(provider) {
     } catch (_) {
       /* noop */
     }
+    _activeConnectStreams.delete(provider);
     try {
       await refreshConnections();
       const row = getAuthStatusSnapshot().find((r) => r.key === provider);
@@ -1790,6 +1813,7 @@ async function startBrowserConnect(provider) {
     } catch (_) {
       /* noop */
     }
+    _activeConnectStreams.delete(provider);
   };
 
   es.addEventListener("waiting_for_user", (ev) => {
@@ -1836,7 +1860,13 @@ async function startBrowserConnect(provider) {
 
     connectUiFinished = true;
     hideConnectCancelControl(card);
-    es.close();
+    stopPostConnectFastPoll();
+    try {
+      es.close();
+    } catch (_) {
+      /* noop */
+    }
+    _activeConnectStreams.delete(provider);
   });
 
   es.addEventListener("done", () => {
@@ -1878,45 +1908,50 @@ function renderBrowserWarn() {
 }
 
 export async function refreshConnections() {
+  if (_connRefreshPromise) return _connRefreshPromise;
   _connRefreshInFlight = true;
-  try {
-    await refreshBrowserPreflight();
-    await fetchAuthStatus();
+  _connRefreshPromise = (async () => {
+    try {
+      await refreshBrowserPreflight();
+      await fetchAuthStatus();
 
-    clearConnRefreshError();
-
-    renderConnections();
-    renderBrowserWarn();
-
-    renderReconnectBanner();
-
-    const { applyItchTabVisibility } = await import("./filters-ui.js");
-    applyItchTabVisibility();
-  } catch (err) {
-    const msg = connectionStatusErrorMessage(err);
-
-    if (getAuthStatusSnapshot().length > 0) {
-      renderConnections();
-
-      showConnRefreshError(msg);
-    } else {
       clearConnRefreshError();
 
-      const rail = document.getElementById("connRail");
+      renderConnections();
+      renderBrowserWarn();
 
-      const pane = document.getElementById("connPane");
+      renderReconnectBanner();
 
-      if (rail) rail.innerHTML = "";
+      const { applyItchTabVisibility } = await import("./filters-ui.js");
+      applyItchTabVisibility();
+    } catch (err) {
+      const msg = connectionStatusErrorMessage(err);
 
-      if (pane) {
-        pane.innerHTML = `<p class="text-sm text-amber-400">${escapeHtml(msg)}</p>`;
+      if (getAuthStatusSnapshot().length > 0) {
+        renderConnections();
+
+        showConnRefreshError(msg);
+      } else {
+        clearConnRefreshError();
+
+        const rail = document.getElementById("connRail");
+
+        const pane = document.getElementById("connPane");
+
+        if (rail) rail.innerHTML = "";
+
+        if (pane) {
+          pane.innerHTML = `<p class="text-sm text-amber-400">${escapeHtml(msg)}</p>`;
+        }
       }
-    }
 
-    renderHero();
-  } finally {
-    _connRefreshInFlight = false;
-  }
+      renderHero();
+    } finally {
+      _connRefreshInFlight = false;
+      _connRefreshPromise = null;
+    }
+  })();
+  return _connRefreshPromise;
 }
 
 function startPostConnectFastPoll() {

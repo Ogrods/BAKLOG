@@ -39,23 +39,38 @@ const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 const CATALOG_FETCH_CONCURRENCY = 5;
 const COLSPAN = 11;
 
+/** Cover URLs that already 403/404'd this session - skip on virtual re-paint. */
+const _failedCoverUrls = new Set();
+
+function markCoverUrlFailed(url) {
+  const u = String(url || '').trim();
+  if (u) _failedCoverUrls.add(u);
+}
+
 /** Retry header/Steam CDN once, then leave the letter placeholder visible. */
 function mirrorCoverError(img) {
   if (!img || img.classList.contains('mirror-cover--failed')) return;
   const wrap = img.closest('.mirror-cover-wrap');
   const showPlaceholder = () => {
     img.classList.add('mirror-cover--failed');
+    markCoverUrlFailed(img.getAttribute('src') || '');
     img.removeAttribute('src');
     img.alt = '';
     const letter = wrap?.querySelector('.mirror-cover-fallback');
     if (letter) letter.hidden = false;
   };
+  markCoverUrlFailed(img.getAttribute('src') || '');
   if (img.dataset.mirrorCoverTried === '1') {
     showPlaceholder();
     return;
   }
   const next = String(img.dataset.fallback || '').trim();
-  if (next && /^https?:\/\//i.test(next) && next !== img.getAttribute('src')) {
+  if (
+    next &&
+    /^https?:\/\//i.test(next) &&
+    next !== img.getAttribute('src') &&
+    !_failedCoverUrls.has(next)
+  ) {
     img.dataset.mirrorCoverTried = '1';
     img.src = next;
     return;
@@ -157,9 +172,16 @@ function formatScore(value) {
 
 function coverCellHtml(row) {
   const initial = escapeHtml(String(row.title || '?').trim().charAt(0).toUpperCase() || '?');
-  const url = String(row.coverUrl || '').trim();
-  const fallback = String(row.coverFallbackUrl || '').trim();
+  let url = String(row.coverUrl || '').trim();
+  let fallback = String(row.coverFallbackUrl || '').trim();
   const letter = `<span class="mirror-cover-fallback" aria-hidden="true">${initial}</span>`;
+  // Virtual scroll re-creates rows; never re-request a URL that already failed.
+  if (url && _failedCoverUrls.has(url)) url = '';
+  if (fallback && _failedCoverUrls.has(fallback)) fallback = '';
+  if (!url && fallback) {
+    url = fallback;
+    fallback = '';
+  }
   if (url && /^https?:\/\//i.test(url)) {
     const fbAttr =
       fallback && /^https?:\/\//i.test(fallback) && fallback !== url
@@ -472,6 +494,7 @@ async function loadLibrary(session) {
       personalProfile = pref.profile;
       personal = await mirrorFetch('data/personal.json', token, pref.profile);
     }
+    _failedCoverUrls.clear();
     allRows = mergeMirrorLibrary(catalogs, personal);
 
     if (itadRows.length) {
@@ -580,6 +603,7 @@ refreshBtn.addEventListener('click', async () => {
 
 signOutBtn.addEventListener('click', async () => {
   if (supabase) await supabase.auth.signOut();
+  _failedCoverUrls.clear();
   allRows = [];
   filteredRows = [];
   tableBody.innerHTML = '';

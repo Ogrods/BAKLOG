@@ -55,6 +55,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Free claims download will not replace a newer local feed with an older baklog.app copy (for example right after Publish, before the site updates). Re-fetching the same hosted feed no longer fails after a successful write.
+- Hosted cloud library (`/mirror`) remembers cover URLs that already failed so virtual scroll does not re-request dead itch CDN images on every scroll.
 - Hosted cloud library cover fallback no longer uses inline `onerror` (blocked by CSP); dead CDN art still shows the letter placeholder.
 - Hosted cloud library always keeps a letter placeholder under covers, so dead itch/Steam art never leaves an empty hole.
 - Hosted cloud library covers fall back to the Steam header art when the portrait library capsule is missing (for example Afterfall InSanity Extended Edition).

@@ -101,6 +101,10 @@ export function sanitizeMirrorCoverUrl(url) {
   u = u.replace('://images-eds.xboxlive.com/', '://images-eds-ssl.xboxlive.com/');
   // itch occasionally ships a broken "originalb" size token; original works when the asset exists.
   u = u.replace(/\/originalb\//g, '/original/');
+  // itch cover hashes sometimes include a leading slash (…/%2FnFWga.jpg → …/nFWga.jpg).
+  if (/img\.itch\.zone/i.test(u)) {
+    u = u.replace(/\/(%2[fF])([^/?#]+)$/, '/$2');
+  }
   if (u.includes('${size}') && /cdn\.nintendo\.net/i.test(u)) {
     u = u.replace(/\$\{size\}/g, '256');
   }

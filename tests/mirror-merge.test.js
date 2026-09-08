@@ -99,6 +99,14 @@ describe('mirror-merge', () => {
     ).toBe('https://img.itch.zone/aW1nLzE=/original/x.gif');
   });
 
+  it('strips leading slash from itch cover hash segment', () => {
+    expect(
+      sanitizeMirrorCoverUrl(
+        'https://img.itch.zone/aW1nLzE4NDg2NTE1LmpwZw==/315x250%23c/%2FnFWga.jpg',
+      ),
+    ).toBe('https://img.itch.zone/aW1nLzE4NDg2NTE1LmpwZw==/315x250%23c/nFWga.jpg');
+  });
+
   it('joins ITAD prices by game key', () => {
     const rows = mergeMirrorLibrary(
       [{ path: 'games_steam.json', doc: { games: [{ id: '1', name: 'A', store: 'steam' }] } }],

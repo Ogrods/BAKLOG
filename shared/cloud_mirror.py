@@ -129,14 +129,28 @@ def maybe_flush_mirror_uploads(*, force: bool = False) -> None:
 
 
 def _mirror_state_path(profile_id: str) -> Path:
-    return runs_dir(profile_id=profile_id) / "mirror_upload_state.json"
+    """Resolve mirror upload state under a validated profile runs dir."""
+    from shared.profile_paths import normalize_profile_id
+
+    pid = normalize_profile_id(profile_id)
+    runs = runs_dir(profile_id=pid).resolve()
+    path = (runs / "mirror_upload_state.json").resolve()
+    if not path.is_relative_to(runs):
+        raise ValueError("mirror state path escapes profile runs dir")
+    return path
 
 
 def read_mirror_upload_state(*, profile_id: str | None = None) -> dict[str, Any]:
-    pid = profile_id if profile_id is not None else get_active_profile_id()
+    raw_pid = profile_id if profile_id is not None else get_active_profile_id()
+    try:
+        from shared.profile_paths import normalize_profile_id
+
+        pid = normalize_profile_id(raw_pid)
+    except ValueError:
+        return {"artifacts": {}, "last_upload_at": None, "device_id": None}
     try:
         doc = json.loads(_mirror_state_path(pid).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, ValueError):
         return {"artifacts": {}, "last_upload_at": None, "device_id": None}
     if not isinstance(doc, dict):
         return {"artifacts": {}, "last_upload_at": None, "device_id": None}
@@ -180,7 +194,13 @@ def _looks_like_account_profile_id(profile_id: str) -> bool:
 
 
 def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
-    if not mirror_upload_allowed(profile_id=profile_id):
+    from shared.profile_paths import normalize_profile_id
+
+    try:
+        pid = normalize_profile_id(profile_id)
+    except ValueError:
+        return
+    if not mirror_upload_allowed(profile_id=pid):
         return
     from shared.supabase_auth import auth_enabled
 
@@ -193,23 +213,25 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
         return
     user_id, bearer = session
     # Account profiles are keyed by Supabase user id — never upload under another account.
-    if _looks_like_account_profile_id(profile_id) and profile_id != user_id:
+    if _looks_like_account_profile_id(pid) and pid != user_id:
         if os.environ.get("BAKLOG_DEBUG"):
             print(
-                f"[cloud_mirror] skip upload: profile {profile_id!r} != session user {user_id!r}",
+                f"[cloud_mirror] skip upload: profile {pid!r} != session user {user_id!r}",
                 file=sys.stderr,
             )
         return
     from shared.supabase_mirror import upload_mirror_object, upsert_mirror_snapshot_row
 
-    root = profile_root(profile_id=profile_id)
+    root = profile_root(profile_id=pid).resolve()
     uploaded: dict[str, str] = {}
     errors: list[str] = []
     device = mirror_device_id()
     for rel in sorted(paths):
         if not is_allowed_relative(rel) or is_denied_relative(rel):
             continue
-        file_path = root / rel
+        file_path = (root / rel).resolve()
+        if not file_path.is_relative_to(root):
+            continue
         try:
             body = file_path.read_bytes()
         except OSError as exc:
@@ -220,11 +242,11 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
             continue
         try:
             upload_mirror_object(
-                user_id=user_id, profile_id=profile_id, artifact_path=rel, body=body, bearer_token=bearer
+                user_id=user_id, profile_id=pid, artifact_path=rel, body=body, bearer_token=bearer
             )
             upsert_mirror_snapshot_row(
                 user_id=user_id,
-                profile_id=profile_id,
+                profile_id=pid,
                 artifact_path=rel,
                 byte_size=len(body),
                 bearer_token=bearer,
@@ -234,9 +256,9 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{rel}: {exc}")
             uploaded[rel] = "error"
-    _save_mirror_upload_state(profile_id, uploaded)
+    _save_mirror_upload_state(pid, uploaded)
     if os.environ.get("BAKLOG_DEBUG"):
-        payload = {"profile_id": profile_id, "uploaded": sorted(uploaded.keys()), "errors": errors}
+        payload = {"profile_id": pid, "uploaded": sorted(uploaded.keys()), "errors": errors}
         print(f"[cloud_mirror] upload flush: {json.dumps(payload)}", file=sys.stderr, flush=True)
 
 

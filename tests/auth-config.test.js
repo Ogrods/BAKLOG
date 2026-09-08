@@ -74,11 +74,11 @@ describe('landing/api/auth-config.js', () => {
     expect(res.status).toBe(405);
   });
 
-  it('rate limits more than five requests per IP per minute', async () => {
+  it('rate limits more than sixty requests per IP per minute', async () => {
     process.env.BAKLOG_SUPABASE_URL = 'https://demo.supabase.co';
     process.env.BAKLOG_SUPABASE_ANON_KEY = 'anon';
     const ip = '192.168.2.99';
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 60; i += 1) {
       const res = await handleAuthConfig(makeRequest({ ip }));
       expect(res.status).toBe(200);
     }

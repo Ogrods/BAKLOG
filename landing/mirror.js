@@ -70,10 +70,30 @@ function statusClass(status) {
   return 'mirror-status';
 }
 
+const AUTH_CONFIG_CACHE_KEY = 'baklog-mirror-auth-config';
+
 async function loadConfig() {
+  try {
+    const cached = sessionStorage.getItem(AUTH_CONFIG_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed?.supabaseUrl && parsed?.supabaseAnonKey) return parsed;
+    }
+  } catch {
+    // ignore cache parse / quota errors
+  }
   const res = await fetch('/api/auth-config');
+  if (res.status === 429) {
+    throw new Error('Too many requests - wait about a minute, then refresh once.');
+  }
   if (!res.ok) throw new Error('Auth not configured');
-  return res.json();
+  const cfg = await res.json();
+  try {
+    sessionStorage.setItem(AUTH_CONFIG_CACHE_KEY, JSON.stringify(cfg));
+  } catch {
+    // ignore quota
+  }
+  return cfg;
 }
 
 async function mirrorFetch(path, token, profile) {
@@ -93,7 +113,10 @@ async function mirrorFetch(path, token, profile) {
     body = null;
   }
   if (!res.ok) {
-    const msg = body?.error || `Mirror request failed (${res.status})`;
+    const msg =
+      res.status === 429
+        ? 'Too many requests - wait about a minute, then refresh once.'
+        : (body?.error || `Mirror request failed (${res.status})`);
     const err = new Error(msg);
     err.status = res.status;
     throw err;
@@ -251,9 +274,9 @@ async function boot() {
       return;
     }
     showPanel('signin');
-  } catch {
+  } catch (err) {
     showPanel('signin');
-    showAlert('Cloud mirror sign-in is not available right now.', { error: true });
+    showAlert(err?.message || 'Cloud mirror sign-in is not available right now.', { error: true });
   }
 }
 

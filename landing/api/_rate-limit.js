@@ -2,6 +2,7 @@
 // Falls back to in-memory buckets in dev/test when KV creds are absent.
 
 const RATE_WINDOW_MS = 60_000;
+/** Default max for write-ish / abuse-sensitive endpoints (subscribe, report, metrics). */
 const RATE_MAX = 5;
 
 /** @type {Map<string, { start: number, count: number }>} */
@@ -23,8 +24,8 @@ function isProductionWithoutKv() {
   return process.env.VERCEL_ENV === "production" && !kvCredentials();
 }
 
-function isRateLimitedInMemory(ip, namespace) {
-  const key = `${namespace}:${ip}`;
+function isRateLimitedInMemory(ip, namespace, max) {
+  const key = `${namespace}:${max}:${ip}`;
   const now = Date.now();
   let entry = memoryBuckets.get(key);
   if (!entry || now - entry.start > RATE_WINDOW_MS) {
@@ -37,11 +38,12 @@ function isRateLimitedInMemory(ip, namespace) {
       if (now - bucket.start > RATE_WINDOW_MS) memoryBuckets.delete(bucketKey);
     }
   }
-  return entry.count > RATE_MAX;
+  return entry.count > max;
 }
 
-async function getKvLimiter(namespace) {
-  let limiter = kvLimiters.get(namespace);
+async function getKvLimiter(namespace, max) {
+  const cacheKey = `${namespace}:${max}`;
+  let limiter = kvLimiters.get(cacheKey);
   if (limiter) return limiter;
 
   const creds = kvCredentials();
@@ -55,30 +57,33 @@ async function getKvLimiter(namespace) {
   const redis = new Redis({ url: creds.url, token: creds.token });
   limiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(RATE_MAX, `${RATE_WINDOW_MS} ms`),
-    prefix: `${namespace}:rate`,
+    limiter: Ratelimit.slidingWindow(max, `${RATE_WINDOW_MS} ms`),
+    // Include max in prefix so raising a limit does not reuse a stale low bucket.
+    prefix: `${namespace}:rate:${max}`,
   });
-  kvLimiters.set(namespace, limiter);
+  kvLimiters.set(cacheKey, limiter);
   return limiter;
 }
 
 /**
  * @param {string} ip
- * @param {{ namespace?: string }} [options]
+ * @param {{ namespace?: string, max?: number }} [options]
  * @returns {Promise<{ limited: boolean, misconfigured: boolean }>}
  */
-export async function checkRateLimit(ip, { namespace = "default" } = {}) {
+export async function checkRateLimit(ip, { namespace = "default", max = RATE_MAX } = {}) {
+  const limit = Number.isFinite(max) && max > 0 ? Math.floor(max) : RATE_MAX;
+
   if (isProductionWithoutKv()) {
     return { limited: false, misconfigured: true };
   }
 
-  const limiter = await getKvLimiter(namespace);
+  const limiter = await getKvLimiter(namespace, limit);
   if (!limiter) {
     if (!loggedMemoryFallback) {
       console.warn("rate-limit: using in-memory fallback");
       loggedMemoryFallback = true;
     }
-    return { limited: isRateLimitedInMemory(ip, namespace), misconfigured: false };
+    return { limited: isRateLimitedInMemory(ip, namespace, limit), misconfigured: false };
   }
 
   const { success } = await limiter.limit(ip);

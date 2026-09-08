@@ -88,7 +88,8 @@ export default {
     }
 
     const ip = clientIp(request);
-    const rate = await checkRateLimit(ip, { namespace: "mirror" });
+    // Library boot fetches list + one GET per catalog artifact (often 20+).
+    const rate = await checkRateLimit(ip, { namespace: "mirror", max: 120 });
     if (rate.misconfigured) {
       return jsonResponse({ error: "Server not configured" }, 503, request);
     }

@@ -46,6 +46,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Cloud mirror page no longer hits "Too many requests" when loading a full library (higher limits for `/api/mirror` and `/api/auth-config`).
 - Ubisoft wishlist Connect retries once on a transient browser navigation error before failing.
 - Add-game dialog footer uses the shared modal actions layout so body copy cannot overlap buttons on short viewports.
 

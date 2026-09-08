@@ -95,7 +95,10 @@ HOUSE_DEFAULTS = {
         "slogan": (
             "Keep library JSON and personal prefs aligned - no manual exports."
         ),
-        "tagline": "Cloud sync for Pro supporters - opt-in upload of catalogs and personal statuses. Credentials stay local.",
+        "tagline": (
+            "Cloud sync for Pro supporters - opt-in upload of catalogs and personal "
+            "statuses. Credentials stay local."
+        ),
         "cta": "Support BAKLOG",
         "url": "https://buy.polar.sh/polar_cl_1BV0qvxl87f2YEGmZo36HvXdmTf4GHthbIjh92P2yNw",
         "cover": "",

@@ -337,6 +337,7 @@ table.mirror-table {
 }
 
 .mirror-cover-wrap {
+  position: relative;
   width: 2.5rem;
   height: 3.35rem;
   border-radius: 0.3rem;
@@ -348,16 +349,28 @@ table.mirror-table {
 }
 
 .mirror-cover {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  z-index: 1;
+  background: var(--bg-elev);
+}
+
+.mirror-cover.mirror-cover--failed {
+  display: none;
 }
 
 .mirror-cover-fallback {
+  position: relative;
+  z-index: 0;
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-mute);
+  line-height: 1;
+  user-select: none;
 }
 
 .mirror-game-title {

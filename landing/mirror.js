@@ -8,6 +8,12 @@ import {
   sortMirrorRows,
   summarizeMirrorRows,
 } from './mirror-merge.js';
+import {
+  MIRROR_ROW_HEIGHT_DESKTOP,
+  MIRROR_ROW_HEIGHT_PHONE,
+  computeMirrorVirtualRange,
+  usesMirrorVirtualScroll,
+} from './mirror-virtual.js';
 
 const signInPanel = document.getElementById('mirrorSignInPanel');
 const libraryPanel = document.getElementById('mirrorLibraryPanel');
@@ -25,11 +31,23 @@ const storeFilter = document.getElementById('mirrorStoreFilter');
 const tableBody = document.getElementById('mirrorTableBody');
 const emptyFiltered = document.getElementById('mirrorEmptyFiltered');
 const lead = document.getElementById('mirrorLead');
+const tableWrap = document.querySelector('.mirror-table-wrap');
+
+const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
+const CATALOG_FETCH_CONCURRENCY = 5;
+const COLSPAN = 5;
 
 /** @type {ReturnType<typeof mergeMirrorLibrary>} */
 let allRows = [];
+/** @type {ReturnType<typeof mergeMirrorLibrary>} */
+let filteredRows = [];
 /** @type {import('@supabase/supabase-js').SupabaseClient | null} */
 let supabase = null;
+
+let _rowHeightPx = MIRROR_ROW_HEIGHT_DESKTOP;
+let _virtualWindow = { start: 0, end: 0 };
+let _virtualScrollRaf = 0;
+let _virtualScrollBound = false;
 
 function showAlert(message, { error = false } = {}) {
   if (!message) {
@@ -68,6 +86,22 @@ function statusClass(status) {
   if (status === 'finished') return 'mirror-status mirror-status--finished';
   if (status === 'next') return 'mirror-status mirror-status--next';
   return 'mirror-status';
+}
+
+function isPhoneLayout() {
+  return typeof matchMedia === 'function' && matchMedia(PHONE_MQ).matches;
+}
+
+function estimateRowHeight() {
+  return isPhoneLayout() ? MIRROR_ROW_HEIGHT_PHONE : MIRROR_ROW_HEIGHT_DESKTOP;
+}
+
+function refreshMeasuredRowHeight() {
+  const row = tableBody?.querySelector('tr[data-row-index]');
+  if (!row) return;
+  const h = row.getBoundingClientRect().height;
+  if (!(h > 0) || Math.abs(h - _rowHeightPx) < 0.5) return;
+  _rowHeightPx = h;
 }
 
 const AUTH_CONFIG_CACHE_KEY = 'baklog-mirror-auth-config';
@@ -124,6 +158,27 @@ async function mirrorFetch(path, token, profile) {
   return body;
 }
 
+/**
+ * @template T
+ * @param {T[]} items
+ * @param {number} concurrency
+ * @param {(item: T, index: number) => Promise<unknown>} worker
+ */
+async function mapPool(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  const limit = Math.max(1, Math.min(concurrency, items.length || 1));
+  async function run() {
+    while (next < items.length) {
+      const i = next;
+      next += 1;
+      results[i] = await worker(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => run()));
+  return results;
+}
+
 function populateFilters(rows) {
   const summary = summarizeMirrorRows(rows);
   const currentStatus = statusFilter.value;
@@ -150,8 +205,78 @@ function populateFilters(rows) {
   storeFilter.value = [...storeFilter.options].some((o) => o.value === currentStore) ? currentStore : '';
 }
 
+function rowHtml(row, index) {
+  const note = row.notes ? `<div class="mirror-note">${escapeHtml(row.notes)}</div>` : '';
+  return `<tr data-row-index="${index}">
+        <td data-label="Title">${escapeHtml(row.title)}${note}</td>
+        <td data-label="Store">${escapeHtml(row.storeLabel)}</td>
+        <td data-label="Status"><span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span></td>
+        <td class="col-num" data-label="Playtime">${formatHours(row.playtimeHours)}</td>
+        <td class="col-num" data-label="HLTB">${formatHours(row.hltbMain)}</td>
+      </tr>`;
+}
+
+function spacerHtml(kind, heightPx) {
+  const h = Math.max(0, heightPx);
+  return `<tr class="mirror-virtual-spacer mirror-virtual-spacer--${kind}" aria-hidden="true"><td colspan="${COLSPAN}" style="height:${h}px"></td></tr>`;
+}
+
+function tableTopY() {
+  const el = tableWrap || tableBody?.closest('table');
+  if (!el) return 0;
+  return el.getBoundingClientRect().top + window.scrollY;
+}
+
+function ensureVirtualScrollBound() {
+  if (_virtualScrollBound) return;
+  _virtualScrollBound = true;
+  const onScrollOrResize = () => {
+    if (_virtualScrollRaf) return;
+    _virtualScrollRaf = requestAnimationFrame(() => {
+      _virtualScrollRaf = 0;
+      if (!usesMirrorVirtualScroll(filteredRows.length)) return;
+      paintMirrorSlice();
+    });
+  };
+  window.addEventListener('scroll', onScrollOrResize, { passive: true });
+  window.addEventListener('resize', onScrollOrResize, { passive: true });
+}
+
+function paintMirrorSlice() {
+  const list = filteredRows;
+  const len = list.length;
+  if (!usesMirrorVirtualScroll(len)) {
+    tableBody.innerHTML = list.map((row, i) => rowHtml(row, i)).join('');
+    _virtualWindow = { start: 0, end: len };
+    refreshMeasuredRowHeight();
+    return;
+  }
+
+  ensureVirtualScrollBound();
+  _rowHeightPx = _rowHeightPx || estimateRowHeight();
+  const { start, end } = computeMirrorVirtualRange(len, {
+    scrollY: window.scrollY,
+    viewportH: window.innerHeight,
+    rowHeight: _rowHeightPx,
+    tableTop: tableTopY(),
+  });
+
+  if (start === _virtualWindow.start && end === _virtualWindow.end && tableBody.querySelector('tr[data-row-index]')) {
+    return;
+  }
+  _virtualWindow = { start, end };
+
+  const parts = [spacerHtml('top', start * _rowHeightPx)];
+  for (let i = start; i < end; i += 1) {
+    parts.push(rowHtml(list[i], i));
+  }
+  parts.push(spacerHtml('bottom', (len - end) * _rowHeightPx));
+  tableBody.innerHTML = parts.join('');
+  refreshMeasuredRowHeight();
+}
+
 function renderTable() {
-  const filtered = sortMirrorRows(
+  filteredRows = sortMirrorRows(
     filterMirrorRows(allRows, {
       search: searchInput.value,
       status: statusFilter.value,
@@ -164,23 +289,14 @@ function renderTable() {
   statsEl.innerHTML = `
     <span><strong>${summary.total}</strong> games mirrored</span>
     <span><strong>${summary.stores.length}</strong> store${summary.stores.length === 1 ? '' : 's'}</span>
-    <span>Showing <strong>${filtered.length}</strong></span>
+    <span>Showing <strong>${filteredRows.length}</strong></span>
   `;
 
-  tableBody.innerHTML = filtered
-    .map((row) => {
-      const note = row.notes ? `<div class="mirror-note">${escapeHtml(row.notes)}</div>` : '';
-      return `<tr>
-        <td data-label="Title">${escapeHtml(row.title)}${note}</td>
-        <td data-label="Store">${escapeHtml(row.storeLabel)}</td>
-        <td data-label="Status"><span class="${statusClass(row.status)}">${escapeHtml(row.statusLabel)}</span></td>
-        <td class="col-num" data-label="Playtime">${formatHours(row.playtimeHours)}</td>
-        <td class="col-num" data-label="HLTB">${formatHours(row.hltbMain)}</td>
-      </tr>`;
-    })
-    .join('');
+  _rowHeightPx = estimateRowHeight();
+  _virtualWindow = { start: -1, end: -1 };
+  paintMirrorSlice();
 
-  emptyFiltered.classList.toggle('hidden', filtered.length > 0 || allRows.length === 0);
+  emptyFiltered.classList.toggle('hidden', filteredRows.length > 0 || allRows.length === 0);
 }
 
 async function loadLibrary(session) {
@@ -192,7 +308,7 @@ async function loadLibrary(session) {
   refreshBtn.disabled = true;
   try {
     const list = await mirrorFetch('', token);
-    const catalogRows = (list.artifacts || []).filter((row) => catalogArtifactPaths([row]).length);
+    let catalogRows = (list.artifacts || []).filter((row) => catalogArtifactPaths([row]).length);
     const personalRows = (list.artifacts || []).filter((row) => row.path === 'data/personal.json');
 
     if (!catalogRows.length) {
@@ -201,12 +317,20 @@ async function loadLibrary(session) {
       return;
     }
 
-    const catalogs = await Promise.all(
-      catalogRows.map(async (row) => ({
-        path: row.path,
-        doc: await mirrorFetch(row.path, token, row.profile),
-      })),
-    );
+    catalogRows = [...catalogRows].sort((a, b) => {
+      const rank = (row) => {
+        const p = String(row.profile || '');
+        if (userId && p === userId) return 0;
+        if (p === 'default') return 1;
+        return 2;
+      };
+      return rank(a) - rank(b);
+    });
+
+    const catalogs = await mapPool(catalogRows, CATALOG_FETCH_CONCURRENCY, async (row) => ({
+      path: row.path,
+      doc: await mirrorFetch(row.path, token, row.profile),
+    }));
     let personal = null;
     if (personalRows.length) {
       const pref =
@@ -308,6 +432,7 @@ refreshBtn.addEventListener('click', async () => {
 signOutBtn.addEventListener('click', async () => {
   if (supabase) await supabase.auth.signOut();
   allRows = [];
+  filteredRows = [];
   tableBody.innerHTML = '';
   showAlert('');
   showPanel('signin');
@@ -317,5 +442,28 @@ signOutBtn.addEventListener('click', async () => {
 searchInput.addEventListener('input', renderTable);
 statusFilter.addEventListener('change', renderTable);
 storeFilter.addEventListener('change', renderTable);
+
+/** Test hook for geometry audits (synthetic rows, no auth). */
+window.__baklogMirrorTest = {
+  setRows(rows) {
+    allRows = Array.isArray(rows) ? rows : [];
+    populateFilters(allRows);
+    showPanel('library');
+    lead.textContent = 'Test library';
+    renderTable();
+  },
+  render() {
+    renderTable();
+  },
+  getPaintedRowCount() {
+    return tableBody.querySelectorAll('tr[data-row-index]').length;
+  },
+  getFilteredCount() {
+    return filteredRows.length;
+  },
+  usesVirtual() {
+    return usesMirrorVirtualScroll(filteredRows.length);
+  },
+};
 
 boot();

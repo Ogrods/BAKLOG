@@ -44,13 +44,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Import from cloud mirror can choose which cloud profile folder to pull into the current local profile.
 - Hosted cloud library (`/mirror`) is usable on phone and tablet: app breakpoint ladder, touch-sized controls, and card rows on narrow viewports.
 - Hosted cloud library (`/mirror`) header uses the same brand lockup as the desktop app (logo, wordmark, Cloud chip) at a denser size so it does not read oversized without the app nav beside it; Refresh and Sign out stay in the header.
-- Free claims feed refreshed; stale approved-only ids pruned from the maintainer list.
+- Free claims feed refreshed (Epic Alone With You, GOG State of Mind, and related giveaways).
 - Library watch no longer ships with a default Pico Park watch; only watches you arm stay armed.
 - Pro tab label is Back BAKLOG; Pro page hero is a flat brand strip; sample sponsor games are out of the shipped feed.
 - Sponsored deal cards only show review scores and prices the feed actually supplies.
 
 ### Fixed
 
+- Free claims download will not replace a newer local feed with an older baklog.app copy (for example right after Publish, before the site updates).
 - Hosted cloud library cover fallback no longer uses inline `onerror` (blocked by CSP); dead CDN art still shows the letter placeholder.
 - Hosted cloud library always keeps a letter placeholder under covers, so dead itch/Steam art never leaves an empty hole.
 - Hosted cloud library covers fall back to the Steam header art when the portrait library capsule is missing (for example Afterfall InSanity Extended Edition).

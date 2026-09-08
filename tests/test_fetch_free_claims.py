@@ -96,3 +96,66 @@ def test_drift_allowed_with_flag(monkeypatch, out_path):
     code = _run(monkeypatch, {"items": [_valid_item("only")]}, "--allow-drift")
     assert code == 0
     assert len(json.loads(out_path.read_text(encoding="utf-8"))["items"]) == 1
+
+
+def test_older_hosted_refuses_with_exit_3(monkeypatch, out_path):
+    prior = {
+        "generated_at": "2026-09-08T22:10:49Z",
+        "fetched_at": "2026-09-08T22:10:49Z",
+        "items": [_valid_item(f"g{i}") for i in range(7)],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    hosted = {
+        "generated_at": "2026-09-08T18:29:37Z",
+        "items": [_valid_item(f"h{i}") for i in range(5)],
+    }
+    code = _run(monkeypatch, hosted)
+    assert code == 3
+    assert json.loads(out_path.read_text(encoding="utf-8")) == prior
+
+
+def test_older_hosted_allowed_with_allow_drift(monkeypatch, out_path):
+    prior = {
+        "generated_at": "2026-09-08T22:10:49Z",
+        "items": [_valid_item(f"g{i}") for i in range(7)],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    hosted = {
+        "generated_at": "2026-09-08T18:29:37Z",
+        "items": [_valid_item(f"h{i}") for i in range(5)],
+    }
+    code = _run(monkeypatch, hosted, "--allow-drift")
+    assert code == 0
+    assert len(json.loads(out_path.read_text(encoding="utf-8"))["items"]) == 5
+
+
+def test_newer_hosted_overwrites_local(monkeypatch, out_path):
+    prior = {
+        "generated_at": "2026-09-08T18:29:37Z",
+        "items": [_valid_item(f"g{i}") for i in range(5)],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    hosted = {
+        "generated_at": "2026-09-08T22:10:49Z",
+        "items": [_valid_item(f"h{i}") for i in range(7)],
+    }
+    code = _run(monkeypatch, hosted)
+    assert code == 0
+    doc = json.loads(out_path.read_text(encoding="utf-8"))
+    assert len(doc["items"]) == 7
+    assert doc["generated_at"] == "2026-09-08T22:10:49Z"
+
+
+def test_equal_hosted_generated_at_allowed(monkeypatch, out_path):
+    prior = {
+        "generated_at": "2026-09-08T22:10:49Z",
+        "items": [_valid_item("a"), _valid_item("b")],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    hosted = {
+        "generated_at": "2026-09-08T22:10:49Z",
+        "items": [_valid_item("a"), _valid_item("b"), _valid_item("c")],
+    }
+    code = _run(monkeypatch, hosted)
+    assert code == 0
+    assert len(json.loads(out_path.read_text(encoding="utf-8"))["items"]) == 3

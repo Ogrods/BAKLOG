@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -23,6 +25,74 @@ from shared.safe_write import safe_write_text
 
 DEFAULT_URL = "https://baklog.app/free-claims.json"
 USER_AGENT = "BAKLOG-fetch_free_claims/1.0"
+
+
+def _parse_feed_timestamp(value: object) -> datetime | None:
+    """Parse a feed ``generated_at`` / ``fetched_at`` string to UTC, or None."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _local_feed_timestamp(doc: dict) -> datetime | None:
+    """Newest of local ``generated_at`` / ``fetched_at`` (admin publish or last fetch)."""
+    stamps = [
+        ts
+        for ts in (
+            _parse_feed_timestamp(doc.get("generated_at")),
+            _parse_feed_timestamp(doc.get("fetched_at")),
+        )
+        if ts is not None
+    ]
+    return max(stamps) if stamps else None
+
+
+def refuse_older_hosted_result(
+    hosted: dict,
+    *,
+    output_path: Path | None,
+    allow_drift: bool,
+) -> int | None:
+    """Return exit code 3 when hosted ``generated_at`` is older than the local feed.
+
+    Prevents a lagging baklog.app deploy from overwriting a fresher admin-publish
+    (or local build) after count-based drift alone would allow the write.
+    ``--allow-drift`` opts out. Missing timestamps skip the check.
+    """
+    if allow_drift or output_path is None or not output_path.is_file():
+        return None
+    hosted_ts = _parse_feed_timestamp(hosted.get("generated_at"))
+    if hosted_ts is None:
+        return None
+    try:
+        local_doc = json.loads(output_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(local_doc, dict):
+        return None
+    local_ts = _local_feed_timestamp(local_doc)
+    if local_ts is None or hosted_ts >= local_ts:
+        return None
+    print(
+        f"ERROR: hosted free-claims feed generated_at ({hosted_ts.isoformat()}) "
+        f"is older than the local feed ({local_ts.isoformat()} at {output_path}).\n"
+        "Refusing to overwrite a newer local publish. Re-run with --allow-drift "
+        "to force, or wait until baklog.app catches up.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
 
 
 def _fetch_url(url: str, *, timeout: int = 30) -> dict:
@@ -99,6 +169,13 @@ def main() -> int:
     )
     if drift_exit is not None:
         return stats.finish("fetch_free_claims", t0, exit_code=drift_exit)
+    older_exit = refuse_older_hosted_result(
+        data,
+        output_path=out,
+        allow_drift=args.allow_drift,
+    )
+    if older_exit is not None:
+        return stats.finish("fetch_free_claims", t0, exit_code=older_exit)
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

@@ -79,7 +79,9 @@ a {
 
 .brand-logo-mark {
   display: inline-flex;
-  height: 30px;
+  /* 26px matches the app phone/header-sheet density; 30px reads oversized
+     when the brand sits alone without view tabs beside it. */
+  height: 26px;
   flex-shrink: 0;
   color: #fff;
 }
@@ -94,7 +96,8 @@ a {
   fill: currentColor;
 }
 
-/* Match app: text-2xl (1.5rem), md:text-3xl (1.875rem). */
+/* Cap at text-2xl (1.5rem). The app also uses md:text-3xl, but that only
+   balances next to tabs/actions - alone on /mirror it looks scaled up. */
 .brand-wordmark {
   margin: 0;
   font-size: 1.5rem;
@@ -103,12 +106,6 @@ a {
   line-height: 1;
   white-space: nowrap;
   color: #fff;
-}
-
-@media (min-width: 768px) {
-  .brand-wordmark {
-    font-size: 1.875rem;
-  }
 }
 
 .brand-beta {
@@ -442,5 +439,20 @@ table.mirror-table {
   .mirror-table th:nth-child(5),
   .mirror-table td:nth-child(5) {
     display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .brand-wordmark {
+    font-size: 1.125rem;
+  }
+
+  .brand-logo-mark {
+    height: 22px;
+  }
+
+  .brand-beta {
+    font-size: 0.52rem;
+    padding: 0.14em 0.35em;
   }
 }

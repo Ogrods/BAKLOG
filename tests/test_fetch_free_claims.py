@@ -159,3 +159,35 @@ def test_equal_hosted_generated_at_allowed(monkeypatch, out_path):
     code = _run(monkeypatch, hosted)
     assert code == 0
     assert len(json.loads(out_path.read_text(encoding="utf-8"))["items"]) == 3
+
+
+def test_refetch_same_hosted_generated_at_allowed(monkeypatch, out_path):
+    """After a successful fetch, fetched_at is wall-clock-now; must not refuse."""
+    prior = {
+        "generated_at": "2026-09-08T22:10:49.809769+00:00",
+        "fetched_at": "2026-09-08T22:17:16.357271+00:00",
+        "items": [_valid_item(f"g{i}") for i in range(7)],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    hosted = {
+        "generated_at": "2026-09-08T22:10:49.809769+00:00",
+        "items": [_valid_item(f"g{i}") for i in range(7)],
+    }
+    code = _run(monkeypatch, hosted)
+    assert code == 0
+    assert len(json.loads(out_path.read_text(encoding="utf-8"))["items"]) == 7
+
+
+def test_fetched_at_fallback_when_generated_at_missing(monkeypatch, out_path):
+    prior = {
+        "fetched_at": "2026-09-08T22:17:16Z",
+        "items": [_valid_item(f"g{i}") for i in range(7)],
+    }
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    hosted = {
+        "generated_at": "2026-09-08T18:29:37Z",
+        "items": [_valid_item(f"h{i}") for i in range(5)],
+    }
+    code = _run(monkeypatch, hosted)
+    assert code == 3
+    assert json.loads(out_path.read_text(encoding="utf-8")) == prior

@@ -46,16 +46,16 @@ def _parse_feed_timestamp(value: object) -> datetime | None:
 
 
 def _local_feed_timestamp(doc: dict) -> datetime | None:
-    """Newest of local ``generated_at`` / ``fetched_at`` (admin publish or last fetch)."""
-    stamps = [
-        ts
-        for ts in (
-            _parse_feed_timestamp(doc.get("generated_at")),
-            _parse_feed_timestamp(doc.get("fetched_at")),
-        )
-        if ts is not None
-    ]
-    return max(stamps) if stamps else None
+    """Local feed time for older-hosted checks.
+
+    Prefer ``generated_at`` (same clock as the hosted feed). Only fall back to
+    ``fetched_at`` when ``generated_at`` is missing — using max(fetched, generated)
+    would fail every re-fetch after a successful write, because ``fetched_at`` is
+    always wall-clock-now.
+    """
+    return _parse_feed_timestamp(doc.get("generated_at")) or _parse_feed_timestamp(
+        doc.get("fetched_at")
+    )
 
 
 def refuse_older_hosted_result(

@@ -159,7 +159,7 @@ Sign-up and password-reset emails redirect to **baklog.app**, not `127.0.0.1`, s
 
 - Never set `BAKLOG_SUPABASE_ANON_KEY` to the **service_role** key. Use the public **anon** key only.
 - The anon key is public by design (same as the local app `/api/config`). The security boundary is Supabase Auth settings + RLS on any `anon`-accessible tables.
-- `/api/auth-config` is rate-limited by client IP (5 requests per minute), same as `/api/subscribe`. Production requires Vercel KV / Upstash credentials or the endpoint returns `503`.
+- `/api/auth-config` is rate-limited by client IP (60 requests per minute). `/api/mirror` allows 120/min so a full library boot (list + per-artifact GETs) fits. Write endpoints (`/api/subscribe`, `/api/report`, `/api/metrics`) stay at 5/min. Production requires Vercel KV / Upstash credentials or these endpoints return `503`.
 
 Deploy landing, then add redirect URLs in Supabase before shipping an app build that points at these pages.
 
@@ -178,7 +178,7 @@ Supabase sends confirm / reset / invite mail. Branding is configured in the **Su
 
 ## Rate limiting (required for production)
 
-`/api/subscribe` rate-limits by client IP (5 requests per minute). `/api/auth-config` uses the same limit and KV requirement. Production uses a **distributed** store so limits survive Vercel cold starts and scale-out. Without KV credentials in production, `/api/subscribe` and `/api/auth-config` return `503 Server not configured`.
+`/api/subscribe` rate-limits by client IP (5 requests per minute). `/api/auth-config` allows 60/min (public anon config for `/mirror` and `/auth-reset`). `/api/mirror` allows 120/min so one library load does not trip the limit. Production uses a **distributed** store so limits survive Vercel cold starts and scale-out. Without KV credentials in production, `/api/subscribe` and `/api/auth-config` return `503 Server not configured`.
 
 1. Vercel project (root `landing/`) → **Storage** → **Create Database** → **KV** → connect to this project.
 2. Redeploy so Production receives the auto-injected credentials below.

@@ -25,7 +25,8 @@ export default {
     }
 
     const ip = clientIp(request);
-    const rate = await checkRateLimit(ip, { namespace: "auth-config" });
+    // Public read of anon key; allow enough reloads for /mirror and /auth-reset.
+    const rate = await checkRateLimit(ip, { namespace: "auth-config", max: 60 });
     if (rate.misconfigured) {
       console.error("auth-config: missing KV rate-limit credentials in production");
       return Response.json({ error: "Server not configured" }, { status: 503 });

@@ -1280,6 +1280,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/auth/session":
             self._handle_auth_session_get()
             return
+        if path == "/api/mirror":
+            from shared.server_mirror import handle_mirror_get
+
+            handle_mirror_get(self)
+            return
         if path == "/api/auth/status":
             self._handle_auth_status()
             return
@@ -1316,6 +1321,17 @@ class Handler(SimpleHTTPRequestHandler):
             if self._reject_if_csrf_strict():
                 return
             self._handle_shutdown()
+            return
+        if path == "/api/auth/sign-out":
+            if self._reject_if_csrf_strict():
+                return
+            try:
+                from shared.entitlement import clear_background_auth_caches
+
+                clear_background_auth_caches()
+            except Exception:
+                pass
+            _send_json(self, HTTPStatus.OK, {"ok": True})
             return
         if path in (
             "/api/update/download",
@@ -1465,6 +1481,11 @@ class Handler(SimpleHTTPRequestHandler):
 
             handle_catalogs_import_post(self)
             return
+        if path == "/api/mirror/import":
+            from shared.server_mirror import handle_mirror_import_post
+
+            handle_mirror_import_post(self)
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API
@@ -1517,6 +1538,11 @@ class Handler(SimpleHTTPRequestHandler):
             server_internal_routes.handle_internal_sponsors_put(self)
             return
         if not _require_api_auth(self):
+            return
+        if path == "/api/pro/settings":
+            from shared.server_pro_settings import handle_pro_settings_put
+
+            handle_pro_settings_put(self)
             return
         if path == "/api/personal":
             if self._reject_if_csrf_strict():
@@ -1592,14 +1618,20 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_config_get(self) -> None:
         from shared.entitlement import current_plan, maybe_refresh_local_license
         from shared.polar_license import polar_configured
+        from shared.pro_capabilities import resolve_capabilities
         from shared.pro_checkout import pro_checkout_enabled, public_checkout_urls
+        from shared.pro_settings import read_pro_settings
         from shared.supabase_auth import auth_enabled, public_auth_config
 
         maybe_refresh_local_license()
         config = dict(public_auth_config())
         # Entitlement: signed JWT claim (when a bearer is sent) wins, else the
         # local license file / BAKLOG_PLAN override. Defaults to "free".
-        config["plan"] = current_plan(self.headers.get("Authorization"))
+        plan = current_plan(self.headers.get("Authorization"))
+        pro_settings = read_pro_settings()
+        config["plan"] = plan
+        config["capabilities"] = resolve_capabilities(plan=plan, pro_settings=pro_settings)
+        config["proSettings"] = pro_settings
         config["licenseActivation"] = polar_configured() and not auth_enabled()
         config["proCheckoutEnabled"] = pro_checkout_enabled()
         config["proCheckout"] = public_checkout_urls()
@@ -1781,6 +1813,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             MANAGER.cancel_all_and_wait()
             result = set_active_profile(profile_id)
+            try:
+                from shared.mirror_session import clear_mirror_session
+
+                clear_mirror_session()
+            except Exception:
+                pass
             _refresh_personal_paths()
             _send_json(self, HTTPStatus.OK, result)
         except ValueError as exc:
@@ -2709,6 +2747,12 @@ def main() -> None:
     _reclaim_or_exit(HOST, PORT, PID_FILE, _DEV_SERVER_BUSY_MSG)
     MANAGER._reap_orphan_processes()
     _start_background_scheduler()
+    try:
+        from shared.cloud_mirror import start_flush_worker
+
+        start_flush_worker()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[cloud_mirror] worker not started: {exc!r}", file=sys.stderr, flush=True)
     _start_idle_shutdown_watchdog()
     handler = partial(Handler, directory=str(static_root()))
     try:

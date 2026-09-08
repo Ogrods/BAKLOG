@@ -4,6 +4,10 @@
  */
 
 import { stopBootTipRotation } from "./tips.js";
+import {
+  setCapabilitiesFromConfig,
+  setProSettingsFromConfig,
+} from "./pro-capabilities.js";
 
 // Loaded lazily inside initAuthGate so merely importing this module (e.g. via
 // api-client.js in unit tests) never triggers the remote esm.sh fetch, and the
@@ -286,6 +290,8 @@ function applyConfigEntitlement(config) {
     monthly: checkout?.monthly || "",
     yearly: checkout?.yearly || "",
   };
+  setCapabilitiesFromConfig(config.capabilities);
+  setProSettingsFromConfig(config.proSettings);
 }
 
 export function licenseActivationEnabled() {
@@ -830,6 +836,18 @@ export async function signOutAccount(opts = {}) {
   if (_supabase) await _supabase.auth.signOut();
   _accessToken = null;
   _accountProfileId = "";
+  try {
+    await fetch("/api/auth/sign-out", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-BAKLOG-Local": "1",
+      },
+      body: "{}",
+    });
+  } catch {
+    // Best-effort clear of server-side mirror session.
+  }
   if (opts.intentional) {
     showAuthGatePanel("signin");
     setOverlayVisible(true);

@@ -20,6 +20,9 @@ FAQ JSON-LD must match the `#faq` details list via `npm run check:landing-seo`. 
 - `vendor/supabase-js.mjs` — bundled copy of `@supabase/supabase-js` for `/auth-reset` (sync via `npm run vendor:supabase` from repo root).
 - `supabase-email-templates/` — copy-paste Supabase dashboard email subjects + HTML (BAKLOG-branded).
 - `api/_rate-limit.js` — shared distributed rate limiter (Vercel KV / Upstash) used by `subscribe.js`.
+- `api/mirror.js` + `api/_mirror-helpers.js` — Pro read-only cloud mirror API (`GET /api/mirror`). Requires `BAKLOG_SUPABASE_URL` + `BAKLOG_SUPABASE_ANON_KEY` (or `SUPABASE_*`), optional `BAKLOG_COMP_PRO_EMAILS`, and the same KV vars as other rate-limited routes (`KV_REST_API_URL` / `KV_REST_API_TOKEN` or Upstash aliases). Production without KV returns `503`. Comp-Pro emails pass the Vercel entitlement check, but Supabase Storage RLS still needs `app_metadata.plan=pro` on the JWT (sign out/in after a grant).
+- `mirror.html` / `mirror.js` / `mirror-merge.js` / `mirror.css` — signed-in Pro viewer for mirrored library backlog (`/mirror`, noindex). Wishlists and prices sync; claimables are not mirrored.
+- `sql/cloud_mirror.sql` — one-time Supabase bucket + RLS for `baklog-mirror` and `cloud_mirror_snapshots` (25 MiB object cap).
 - `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
 - `api/metrics.js` — Vercel serverless function; receives opt-in anonymous aggregate metrics from the local app (session counts + sponsored-slot impressions/clicks). Optional Supabase log via `sql/aggregate_metrics.sql`.

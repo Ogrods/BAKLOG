@@ -194,6 +194,22 @@ def note_authenticated_plan(plan: str) -> None:
     _LAST_AUTH_PLAN = (time.time(), norm)
 
 
+def clear_authenticated_plan_cache() -> None:
+    global _LAST_AUTH_PLAN
+    _LAST_AUTH_PLAN = None
+
+
+def clear_background_auth_caches() -> None:
+    """Drop process-local JWT plan + mirror session (sign-out / profile switch)."""
+    clear_authenticated_plan_cache()
+    try:
+        from shared.mirror_session import clear_mirror_session
+
+        clear_mirror_session()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def current_plan(authorization: str | None = None) -> str:
     """Resolve the effective plan. See module docstring for the resolution matrix."""
     if _auth_enabled():
@@ -216,6 +232,13 @@ def current_plan(authorization: str | None = None) -> str:
                 except Exception:  # noqa: BLE001 - entitlement must never crash a request
                     pass
                 note_authenticated_plan(plan)
+                if plan == PLAN_PRO:
+                    try:
+                        from shared.mirror_session import note_authenticated_mirror_session
+
+                        note_authenticated_mirror_session(authorization)
+                    except Exception:  # noqa: BLE001
+                        pass
                 return plan
         return PLAN_FREE
 

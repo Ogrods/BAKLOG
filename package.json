@@ -33,6 +33,7 @@
     "test:modal-geometry": "node scripts/modal-geometry-audit.mjs",
     "test:libcount-geometry": "node scripts/library-count-geometry-audit.mjs",
     "test:responsive": "node scripts/responsive-overflow-audit.mjs",
+    "test:mirror-responsive": "node scripts/mirror-overflow-audit.mjs",
     "perf:profile": "node scripts/generate-perf-profile.mjs",
     "audit:header": "node scripts/audit-header-rule.mjs",
     "audit:tab-curtain": "node scripts/audit-tab-curtain.mjs",

@@ -424,6 +424,17 @@ table.mirror-table {
   display: none !important;
 }
 
+.mirror-virtual-spacer td {
+  padding: 0 !important;
+  border: none !important;
+  line-height: 0;
+  background: transparent !important;
+}
+
+.mirror-virtual-spacer:hover td {
+  background: transparent !important;
+}
+
 /* --- Tablet --- */
 @media (max-width: 1023.98px) {
   .mirror-toolbar {
@@ -526,6 +537,16 @@ table.mirror-table {
     border: 1px solid var(--border-subtle);
     border-radius: 0.5rem;
     background: var(--bg-panel);
+    min-height: 7.5rem;
+  }
+
+  .mirror-table tbody tr.mirror-virtual-spacer {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    min-height: 0;
   }
 
   .mirror-table tbody tr:hover {

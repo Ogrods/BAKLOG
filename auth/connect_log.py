@@ -33,7 +33,9 @@ def connect_log(provider: str, message: str, *, key: str | None = None) -> None:
         stale = [k for k, t in _last_log_by_key.items() if t < cutoff]
         for k in stale:
             _last_log_by_key.pop(k, None)
-    line = f"[{prov}] {message}"
+    from shared.log_redact import redact_log_line
+
+    line = redact_log_line(f"[{prov}] {message}")
     print(line, file=sys.stderr, flush=True)
     try:
         path = _log_paths.get(prov)

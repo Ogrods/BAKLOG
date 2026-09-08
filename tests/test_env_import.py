@@ -43,18 +43,17 @@ def isolated_default_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     secrets._cache = None
 
 
+def _read_profile_blob(provider: str, profile_id: str = "default") -> dict:
+    """Read a provider blob from a profile's secrets store."""
+    from auth.manager import _with_profile_secrets
+
+    with _with_profile_secrets(profile_id):
+        return get_provider_blob(provider)
+
+
 def _read_default_blob(provider: str) -> dict:
     """Read a provider blob from the default profile's secrets store."""
-    target = profile_paths.auth_dir(profile_id="default")
-    saved = (secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache)
-    secrets.AUTH_DIR = target
-    secrets.SECRETS_FILE = target / "secrets.bin"
-    secrets.MASTER_KEY_FILE = target / ".master_key"
-    secrets._cache = None
-    try:
-        return get_provider_blob(provider)
-    finally:
-        secrets.AUTH_DIR, secrets.SECRETS_FILE, secrets.MASTER_KEY_FILE, secrets._cache = saved
+    return _read_profile_blob(provider, "default")
 
 
 def test_imports_env_into_default_blob(monkeypatch: pytest.MonkeyPatch):
@@ -193,3 +192,18 @@ def test_remediates_existing_env_imported_archive(tmp_path: Path):
     assert err is None
     assert count == 0
     assert not stale.exists()
+
+
+def test_import_into_non_active_profile_uses_matching_hkdf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Import must encrypt with the *target* profile id, not the live active one."""
+    other = "work"
+    (tmp_path / "profiles" / other).mkdir(parents=True, exist_ok=True)
+    # Keep index active on default while writing into ``work``.
+    monkeypatch.setenv("ITCH_API_KEY", "itch-for-work")
+    imported = import_env_credentials(profile_id=other)
+    assert "itch" in imported
+    blob = _read_profile_blob("itch", other)
+    assert blob["status"] == "connected"
+    assert blob["ITCH_API_KEY"] == "itch-for-work"

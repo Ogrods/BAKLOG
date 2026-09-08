@@ -713,13 +713,6 @@ SCHEDULER: Any = None
 _DEV_HTTPD: ThreadingHTTPServer | None = None
 
 
-def _header_hostname(value: str | None) -> str | None:
-    if not value:
-        return None
-    host = (urlparse(value).hostname or "").lower()
-    return host or None
-
-
 def _normalize_host(raw: str | None) -> str:
     """Lowercased hostname with IPv6 brackets and any :port stripped.
 
@@ -743,29 +736,12 @@ def _request_host_is_local(handler: SimpleHTTPRequestHandler) -> bool:
     return _normalize_host(handler.headers.get("Host", "")) in _LOCAL_HOSTNAMES
 
 
-def _origin_is_local(handler: SimpleHTTPRequestHandler) -> bool:
-    for name in ("Origin", "Referer"):
-        host = _header_hostname(handler.headers.get(name))
-        if host in _LOCAL_HOSTNAMES:
-            return True
-    return False
-
-
-def _csrf_allowed(handler: SimpleHTTPRequestHandler) -> bool:
-    """Block cross-site POST/PUT/DELETE to localhost while the dev server runs."""
-    from shared.supabase_auth import auth_enabled, verify_bearer_user
-
-    if auth_enabled() and verify_bearer_user(handler.headers.get("Authorization")):
-        return True
-    if not _request_host_is_local(handler):
-        return False
-    if handler.headers.get(_BAKLOG_LOCAL_HEADER) == "1":
-        return True
-    return _origin_is_local(handler)
-
-
 def _csrf_allowed_strict(handler: SimpleHTTPRequestHandler) -> bool:
-    """Stricter CSRF for profile mutations — require explicit app header or bearer."""
+    """Mutating-route CSRF gate: localhost Host plus X-BAKLOG-Local (or bearer).
+
+    Origin/Referer alone is never enough — that loose path was removed so new
+    routes cannot accidentally reintroduce it.
+    """
     from shared.supabase_auth import auth_enabled, verify_bearer_user
 
     if auth_enabled() and verify_bearer_user(handler.headers.get("Authorization")):
@@ -1132,25 +1108,19 @@ class Handler(SimpleHTTPRequestHandler):
         finally:
             clear_request_profile_id()
 
-    def _reject_if_csrf(self) -> bool:
-        """Return True when the request was rejected (caller should return)."""
-        if _csrf_allowed(self):
-            return False
-        _send_json(
-            self,
-            HTTPStatus.FORBIDDEN,
-            {"error": "cross-origin request blocked — open BAKLOG from http://127.0.0.1 and retry"},
-        )
-        return True
-
     def _reject_if_csrf_strict(self) -> bool:
-        """Stricter CSRF gate for profile admin routes."""
+        """Return True when the request was rejected (caller should return)."""
         if _csrf_allowed_strict(self):
             return False
         _send_json(
             self,
             HTTPStatus.FORBIDDEN,
-            {"error": "cross-origin request blocked — open BAKLOG from http://127.0.0.1 and retry"},
+            {
+                "error": (
+                    "cross-origin request blocked - open BAKLOG from "
+                    "http://127.0.0.1 and retry"
+                )
+            },
         )
         return True
 

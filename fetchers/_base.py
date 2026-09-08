@@ -183,14 +183,14 @@ def row_key_by_appid(row: dict[str, Any]) -> str:
 
 
 def refuse_empty_result(
-    items: list[Any] | int,
+    items: list[Any] | dict[Any, Any] | int,
     *,
     label: str,
     allow_empty: bool,
     output_path: Path | None = None,
 ) -> int | None:
     """Return exit code 2 when result is empty and --allow-empty was not passed."""
-    count = len(items) if isinstance(items, list) else items
+    count = items if isinstance(items, int) else len(items)
     if count or allow_empty:
         return None
     where = f" ({output_path})" if output_path else ""
@@ -204,8 +204,12 @@ def refuse_empty_result(
 
 
 def _previous_game_count(output_path: Path | None) -> int | None:
-    """Read game_count from the previous on-disk file, if any. Resilient to
-    malformed JSON or schema drift — callers should treat None as 'no baseline'."""
+    """Read a prior catalog size from disk. Resilient to malformed JSON or
+    schema drift — callers should treat None as 'no baseline'.
+
+    Supports library catalogs (``game_count`` / ``games``), free-claims feeds
+    (``items``), and ITAD price files (``count`` / ``by_key``).
+    """
     if output_path is not None:
         output_path = resolve_catalog_path(output_path)
     if output_path is None or not output_path.exists():
@@ -216,17 +220,22 @@ def _previous_game_count(output_path: Path | None) -> int | None:
         return None
     if not isinstance(data, dict):
         return None
-    gc = data.get("game_count")
-    if isinstance(gc, int) and gc >= 0:
-        return gc
-    games = data.get("games")
-    if isinstance(games, list):
-        return len(games)
+    for key in ("game_count", "count"):
+        value = data.get(key)
+        if isinstance(value, int) and value >= 0:
+            return value
+    for key in ("games", "items"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return len(value)
+    by_key = data.get("by_key")
+    if isinstance(by_key, dict):
+        return len(by_key)
     return None
 
 
 def refuse_drift_result(
-    items: list[Any] | int,
+    items: list[Any] | dict[Any, Any] | int,
     *,
     label: str,
     allow_drift: bool,
@@ -246,7 +255,7 @@ def refuse_drift_result(
     First-run behavior: when no previous file exists or it has no count
     field, this function returns None (no baseline → can't measure drift).
     """
-    new_count = len(items) if isinstance(items, list) else items
+    new_count = items if isinstance(items, int) else len(items)
     prev = _previous_game_count(output_path)
     if prev is None or prev <= 0 or allow_drift:
         return None

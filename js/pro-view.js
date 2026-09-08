@@ -9,6 +9,7 @@ import {
   getAccountEmail,
   getAccountProfileId,
   isAccountAuthMode,
+  isAdminMode,
   isPro,
   licenseActivationEnabled,
   proCheckoutEnabled,
@@ -36,6 +37,11 @@ let selectedProPlan = 'yearly';
 /** True while checkout return or license activation is still in flight (before reload). */
 export function isProActivationPending() {
   return checkoutSuccessPending || licenseActivating;
+}
+
+/** Pro tab / #pro: free users, checkout pending, or local admin preview. */
+export function canOpenProView() {
+  return !isPro() || isProActivationPending() || isAdminMode();
 }
 
 function clearActivationPending() {
@@ -270,14 +276,14 @@ function applyProPlanToggle(root, plan) {
 export function renderProView({ showSuccess = false } = {}) {
   const el = document.getElementById('proViewRoot');
   if (!el) return;
-  // Confirmed Pro: active card only (never treat URL/pending as success alone).
-  if (isPro()) {
+  // Confirmed Pro: active card only - unless local admin is previewing the pitch.
+  if (isPro() && !isAdminMode()) {
     el.innerHTML = proActiveHtml();
     return;
   }
   // Keep checkoutSuccessPending, but show waiting-for-activation until isPro().
   const pending = showSuccess || checkoutSuccessPending;
-  el.innerHTML = proPitchHtml({ showPending: pending });
+  el.innerHTML = proPitchHtml({ showPending: pending && !isPro() });
   applyProPlanToggle(el, selectedProPlan);
 }
 
@@ -293,7 +299,7 @@ export function applyProTabVisibility() {
   const tab = document.querySelector('.view-tab[data-view="pro"]');
   if (!tab) return;
   const pending = isProActivationPending();
-  const show = !isPro() || pending;
+  const show = canOpenProView();
   tab.classList.toggle('hidden', !show);
   tab.hidden = !show;
   tab.setAttribute('aria-hidden', show ? 'false' : 'true');
@@ -305,7 +311,7 @@ export function applyProTabVisibility() {
 }
 
 export function goToProView() {
-  if (isPro() && !isProActivationPending()) return;
+  if (!canOpenProView()) return;
   switchView('pro');
 }
 
@@ -359,7 +365,7 @@ export function consumeCheckoutQuery() {
 }
 
 export function consumeProHash() {
-  if (location.hash !== '#pro' || isPro()) return false;
+  if (location.hash !== '#pro' || !canOpenProView()) return false;
   saveActiveView('pro');
   state.activeView = 'pro';
   return true;

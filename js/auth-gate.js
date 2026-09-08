@@ -35,6 +35,7 @@ let _authHandling = null;
 let _accountProfileId = "";
 let _localProfiles = false;
 let _plan = "free";
+let _adminMode = false;
 let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: "", yearly: "" };
@@ -118,6 +119,11 @@ export function getPlan() {
 export function isPro() {
   if (isDebugProEnabled()) return true;
   return _plan === "pro";
+}
+
+/** Local maintainer console (`BAKLOG_ADMIN=1`) - not a user entitlement. */
+export function isAdminMode() {
+  return _adminMode;
 }
 
 export function getAccessToken() {
@@ -283,6 +289,7 @@ export function showAuthGatePanel(panel = "signin") {
 function applyConfigEntitlement(config) {
   if (!config || typeof config !== "object") return;
   if (typeof config.plan === "string" && config.plan) setPlan(config.plan);
+  _adminMode = !!config.admin;
   _licenseActivation = !!config.licenseActivation;
   _proCheckoutEnabled = !!config.proCheckoutEnabled;
   const checkout = config.proCheckout;

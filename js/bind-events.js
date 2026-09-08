@@ -79,8 +79,7 @@ import { initCustomListPicksDnd } from './custom-lists-picks-dnd.js';
 import { stopSpotlightRotation } from './dashboard-spotlight.js';
 import { recordSponsoredClick } from './anon-metrics.js';
 import { dismissSponsoredDeal, isProPromoSponsorId, refreshSponsoredSurfaces } from './sponsored-deals.js';
-import { goToProView, isProActivationPending } from './pro-view.js';
-import { isPro } from './auth-gate.js';
+import { goToProView, canOpenProView } from './pro-view.js';
 import { baklogFetch } from './api-client.js';
 import { openCoverGallery } from './cover-gallery.js';
 import { initTrophyPopover } from './trophy-popover.js';
@@ -656,7 +655,8 @@ export function bindEvents() {
         return;
       }
       // Pro users should not open Support (house promos use goToProView with the same guard).
-      if (view === 'pro' && isPro() && !isProActivationPending()) return;
+      // Local admin (BAKLOG_ADMIN=1) can still open it to preview the pitch.
+      if (view === 'pro' && !canOpenProView()) return;
       // Top-tab clicks (never drill-ins, never the dashboard drill helpers)
       // should land the user at the top of the page so they see the header,
       // summary, then picks, then table. Scroll BEFORE switchView so the

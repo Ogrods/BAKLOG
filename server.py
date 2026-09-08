@@ -1640,6 +1640,7 @@ class Handler(SimpleHTTPRequestHandler):
         config["licenseActivation"] = polar_configured() and not auth_enabled()
         config["proCheckoutEnabled"] = pro_checkout_enabled()
         config["proCheckout"] = public_checkout_urls()
+        config["admin"] = bool(ADMIN_ENABLED)
         config["frozen"] = is_frozen()
         config["version"] = _app_version()
         config["chromium_available"] = _chromium_available()

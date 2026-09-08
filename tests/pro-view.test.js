@@ -3,6 +3,7 @@ import { isProPromoSponsorId, proPromoBannerHtml, PRO_PROMO, PRO_PROMO_ITEM } fr
 
 vi.mock('../js/auth-gate.js', () => ({
   isPro: vi.fn(() => false),
+  isAdminMode: vi.fn(() => false),
   isAccountAuthMode: vi.fn(() => false),
   isLocalProfilesEnabled: vi.fn(() => false),
   licenseActivationEnabled: vi.fn(() => true),
@@ -235,6 +236,32 @@ describe('Pro activation UX', () => {
     const tab = document.querySelector('.view-tab[data-view="pro"]');
     expect(tab.classList.contains('hidden')).toBe(true);
     expect(tab.hidden).toBe(true);
+  });
+
+  it('applyProTabVisibility keeps Pro tab for admin even when already Pro', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isPro.mockReturnValue(true);
+    authGate.isAdminMode.mockReturnValue(true);
+    const { applyProTabVisibility } = await import('../js/pro-view.js');
+    applyProTabVisibility();
+    const tab = document.querySelector('.view-tab[data-view="pro"]');
+    expect(tab.classList.contains('hidden')).toBe(false);
+    expect(tab.hidden).toBe(false);
+  });
+
+  it('renderProView shows pitch for admin Pro preview', async () => {
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isPro.mockReturnValue(true);
+    authGate.isAdminMode.mockReturnValue(true);
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div id="proContainer"><div id="proViewRoot"></div></div>',
+    );
+    const { renderProView } = await import('../js/pro-view.js');
+    renderProView();
+    const root = document.getElementById('proViewRoot');
+    expect(root.querySelector('.pro-view-funnel')).toBeTruthy();
+    expect(root.textContent).toContain(PRO_PROMO.title);
   });
 
   it('showProWelcomeBanner renders once when flag is set and user is Pro', async () => {

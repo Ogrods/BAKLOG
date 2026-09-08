@@ -1,0 +1,84 @@
+# CodeRabbit config for BAKLOG (public OSS - free PR reviews).
+# Docs: https://docs.coderabbit.ai/configuration/auto-review
+language: en-US
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    # Pause noisy push storms; comment @coderabbitai review when ready again
+    auto_pause_after_reviewed_commits: 5
+    ignore_title_keywords:
+      - WIP
+      - DO NOT MERGE
+      - "[skip review]"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "renovate[bot]"
+  path_filters:
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/release/**"
+    - "!**/node_modules/**"
+    - "!**/.venv/**"
+    - "!**/vendor/**"
+    - "!**/js/vendor/**"
+    - "!**/landing/vendor/**"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    - "!**/package-lock.json"
+    - "!**/pnpm-lock.yaml"
+    - "!**/yarn.lock"
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.jpeg"
+    - "!**/*.webp"
+    - "!**/*.ico"
+    - "!**/*.woff"
+    - "!**/*.woff2"
+    - "!**/assets/store-logos/**"
+    - "!**/lighthouse/**"
+    - "!**/.pytest_cache/**"
+    - "!**/.ruff_cache/**"
+    - "!**/__pycache__/**"
+  path_instructions:
+    - path: "server.py"
+      instructions: >
+        Local-only stdlib HTTP server on 127.0.0.1. Mutating routes need X-BAKLOG-Local: 1.
+        Prefer keeping server.py under the line budget; admin routes live in
+        shared/server_internal_routes.py. Flag auth bypass, SSRF, path traversal, and
+        accidental binding beyond localhost.
+    - path: "auth/**"
+      instructions: >
+        Credential and CDP browser sign-in code. Never suggest logging secrets, writing
+        secrets.bin contents, or weakening AES-GCM / keyring handling. Watch for profile
+        isolation bugs and PIN bypass via BAKLOG_PROFILE.
+    - path: "fetch_*.py"
+      instructions: >
+        Fetcher contract: main() -> int with exit codes 0 ok, 1 error, 2 empty refused,
+        3 drift refused, 4 auth. Prefer shared helpers over duplicating store logic.
+    - path: "fetchers/**"
+      instructions: >
+        Manifest and registry must stay aligned with js/fetcher-registry.js (generated).
+        Avoid committing personal library JSON or credentials.
+    - path: "js/**"
+      instructions: >
+        Vanilla ESM dashboard. Respect module line caps (~3800). Prefer extending
+        registries over growing monoliths. No em dashes in user-visible strings.
+        Keep sync pairs noted in AGENTS.md when touching brand colors, themes, claims,
+        or sponsors.
+    - path: "landing/**"
+      instructions: >
+        Marketing site only. No personal data. Sponsors feed edits that should ship
+        online belong in landing/sponsors.json (hosted baklog.app wins over curated/).
+    - path: "tests/**"
+      instructions: >
+        Prefer focused regression tests. Use .venv Python on Windows guidance; do not
+        require network or personal profile data in unit tests.
+chat:
+  auto_reply: true

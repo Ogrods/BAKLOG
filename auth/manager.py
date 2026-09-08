@@ -515,43 +515,32 @@ def migrate_existing_itch_local_opt_in() -> list[str]:
 def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]:
     """One-time migration: copy legacy ``.env`` creds into a profile's encrypted blob.
 
-    Writes to ``profile_id``'s ``secrets.bin`` regardless of the active profile by
-    temporarily pointing the secrets module at that profile's auth dir. Providers
-    already explicitly connected/expired are left untouched. Returns the list of
-    provider keys that were imported.
+    Writes to ``profile_id``'s ``secrets.bin`` via ``_with_profile_secrets`` so the
+    HKDF profile subkey matches the target dir (not only the live active profile).
+    Providers already explicitly connected/expired are left untouched. Returns the
+    list of provider keys that were imported.
     """
-    import auth.secrets as _secrets
-
-    target_dir = auth_dir(profile_id=profile_id)
-    saved = (_secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache)
     imported: list[str] = []
-    with _secrets._lock:
-        _secrets.AUTH_DIR = target_dir
-        _secrets.SECRETS_FILE = target_dir / "secrets.bin"
-        _secrets.MASTER_KEY_FILE = target_dir / ".master_key"
-        _secrets._cache = None
-        try:
-            for provider, spec in PROVIDERS.items():
-                if spec.kind == "local" or not spec.env_keys:
-                    continue
-                existing = get_provider_blob(provider).get("status")
-                if existing in ("connected", "expired"):
-                    continue
-                creds: dict[str, str] = {}
-                for key in spec.env_keys:
-                    val = os.getenv(key, "").strip()
-                    if val:
-                        creds[key] = val
-                for alias in _LEGACY_ENV_ALIASES.get(provider, ()):  # legacy cookie names
-                    val = os.getenv(alias, "").strip()
-                    if val:
-                        creds[alias] = val
-                if not creds:
-                    continue
-                mark_connected(provider, creds)
-                imported.append(provider)
-        finally:
-            _secrets.AUTH_DIR, _secrets.SECRETS_FILE, _secrets.MASTER_KEY_FILE, _secrets._cache = saved
+    with _with_profile_secrets(profile_id):
+        for provider, spec in PROVIDERS.items():
+            if spec.kind == "local" or not spec.env_keys:
+                continue
+            existing = get_provider_blob(provider).get("status")
+            if existing in ("connected", "expired"):
+                continue
+            creds: dict[str, str] = {}
+            for key in spec.env_keys:
+                val = os.getenv(key, "").strip()
+                if val:
+                    creds[key] = val
+            for alias in _LEGACY_ENV_ALIASES.get(provider, ()):  # legacy cookie names
+                val = os.getenv(alias, "").strip()
+                if val:
+                    creds[alias] = val
+            if not creds:
+                continue
+            mark_connected(provider, creds)
+            imported.append(provider)
     return imported
 
 

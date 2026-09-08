@@ -520,9 +520,9 @@ function renderConnPrefs() {
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
   if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
+  const cloudStrip = document.getElementById("connCloudPrefs");
   const cloudWrap = document.getElementById("cloudMirrorToggleWrap");
   const cloudToggle = document.getElementById("cloudMirrorEnabledToggle");
-  const cloudNote = document.getElementById("cloudMirrorPlanNote");
   const syncBtn = document.getElementById("cloudMirrorSyncBtn");
   const importBtn = document.getElementById("cloudMirrorImportBtn");
   const showCloudMirror =
@@ -530,6 +530,7 @@ function renderConnPrefs() {
     isAccountAuthMode() &&
     !!getAccessToken() &&
     capabilityStatus("cloud_sync_mirror") === "live";
+  if (cloudStrip) cloudStrip.hidden = !showCloudMirror;
   if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
   if (syncBtn) {
     syncBtn.classList.toggle("hidden", !showCloudMirror);
@@ -542,17 +543,6 @@ function renderConnPrefs() {
   }
   if (cloudToggle && showCloudMirror) {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
-  }
-  if (cloudNote) {
-    if (showCloudMirror) {
-      cloudNote.hidden = false;
-      cloudNote.classList.add("conn-prefs-note--pro");
-      cloudNote.textContent = getProSettings().cloudMirrorEnabled
-        ? "Cloud sync is on. Use Sync now to upload catalogs (credentials stay on this PC). Browse at baklog.app/mirror."
-        : "Enable Cloud sync, then use Sync now to upload catalog JSON to your account (credentials stay on this PC).";
-    } else {
-      cloudNote.hidden = true;
-    }
   }
 
   const note = document.getElementById("bgRefreshPlanNote");

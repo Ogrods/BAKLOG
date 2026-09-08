@@ -1005,7 +1005,7 @@
               </label>
               <label
                 class="fh-toggle"
-                title="While BAKLOG is open - including minimized or unfocused - quietly refresh any store whose data is older than 24 hours, one store at a time (~30 min apart). Does not run while fully closed."
+                title="While BAKLOG is open - including minimized or unfocused - quietly refresh any store whose data is older than 24 hours, one store at a time (~30 min apart). Does not run while fully closed. Pro: background refresh keeps stale stores fresh even when BAKLOG is closed to the tray."
               >
                 <input
                   id="autoFetchStale24hToggle"
@@ -1024,39 +1024,48 @@
                   type="checkbox"
                   class="rounded"
                 />
-                Share anonymous usage counts (helps fund BAKLOG)
+                Share anonymous usage counts
               </label>
-              <label
-                class="fh-toggle"
-                id="cloudMirrorToggleWrap"
-                hidden
-                title="Upload catalog JSON to your BAKLOG account with Sync now. Credentials stay on this PC. Browse read-only at baklog.app/mirror."
-              >
-                <input id="cloudMirrorEnabledToggle" type="checkbox" class="rounded" />
-                Cloud sync to your account
-              </label>
-              <p id="cloudMirrorPlanNote" class="conn-prefs-note" hidden></p>
+              <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
+            </div>
+            <div
+              id="connCloudPrefs"
+              class="conn-prefs conn-cloud-prefs"
+              role="group"
+              aria-label="Cloud sync"
+              hidden
+            >
+              <div class="conn-cloud-prefs-row">
+                <label
+                  class="fh-toggle"
+                  id="cloudMirrorToggleWrap"
+                  title="Upload catalog JSON to your BAKLOG account with Sync now. Credentials stay on this PC. Browse read-only at baklog.app/mirror."
+                >
+                  <input id="cloudMirrorEnabledToggle" type="checkbox" class="rounded" />
+                  Cloud sync to your account
+                </label>
+                <button
+                  type="button"
+                  id="cloudMirrorSyncBtn"
+                  class="conn-prefs-import hidden"
+                  title="Upload library catalogs and personal data to your cloud mirror now"
+                >
+                  Sync now
+                </button>
+                <button
+                  type="button"
+                  id="cloudMirrorImportBtn"
+                  class="conn-prefs-import hidden"
+                  title="Replace local catalogs and personal data with your cloud mirror"
+                >
+                  Import from cloud mirror
+                </button>
+              </div>
               <p
                 id="cloudMirrorUploadStatus"
                 class="conn-prefs-note conn-prefs-note--mirror-status"
                 hidden
               ></p>
-              <button
-                type="button"
-                id="cloudMirrorSyncBtn"
-                class="conn-prefs-import hidden"
-                title="Upload library catalogs and personal data to your cloud mirror now"
-              >
-                Sync now
-              </button>
-              <button
-                type="button"
-                id="cloudMirrorImportBtn"
-                class="conn-prefs-import hidden"
-                title="Replace local catalogs and personal data with your cloud mirror"
-              >
-                Import from cloud mirror
-              </button>
               <dialog
                 id="cloudMirrorImportDialog"
                 class="conn-mirror-import-dialog"
@@ -1082,7 +1091,6 @@
                   </div>
                 </form>
               </dialog>
-              <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
             </div>
           </div>
           <div id="connOnboard" hidden></div>

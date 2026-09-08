@@ -352,7 +352,8 @@ async function bootstrap() {
     const available = await fetcherRunner.probeApi();
     if (!available) return;
     try {
-      const cfgRes = await fetch("/api/config");
+      const { baklogFetch } = await import("./api-client.js");
+      const cfgRes = await baklogFetch("/api/config");
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
         if (typeof cfg.frozen === "boolean" || cfg.runtime_label)

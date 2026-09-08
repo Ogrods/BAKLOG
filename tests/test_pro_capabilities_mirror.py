@@ -79,19 +79,13 @@ def _request(
             return exc.code, {"error": raw}
 
 
-def test_capability_registry_status_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("BAKLOG_CAP_CLOUD_MIRROR", raising=False)
-    assert capability_registry_status("cloud_sync_mirror") == "soon"
-    monkeypatch.setenv("BAKLOG_CAP_CLOUD_MIRROR", "live")
+def test_capability_registry_status_default_live() -> None:
     assert capability_registry_status("cloud_sync_mirror") == "live"
-    monkeypatch.setenv("BAKLOG_CAP_CLOUD_MIRROR", "off")
-    assert capability_registry_status("cloud_sync_mirror") == "off"
 
 
-def test_pro_settings_enable_forbidden_when_soon(
-    pro_settings_server: str, monkeypatch: pytest.MonkeyPatch
+def test_pro_settings_rejects_non_boolean_cloud_mirror(
+    pro_settings_server: str,
 ) -> None:
-    monkeypatch.setenv("BAKLOG_CAP_CLOUD_MIRROR", "soon")
     status, data = _request(
         pro_settings_server,
         "/api/pro/settings",
@@ -101,16 +95,13 @@ def test_pro_settings_enable_forbidden_when_soon(
             "Authorization": "Bearer tok",
             server._BAKLOG_LOCAL_HEADER: "1",
         },
-        body=json.dumps({"cloudMirrorEnabled": True}).encode(),
+        body=json.dumps({"cloudMirrorEnabled": "yes"}).encode(),
     )
-    assert status == 403, data
-    assert "not available" in str(data.get("error") or "").lower()
+    assert status == 400, data
+    assert "boolean" in str(data.get("error") or "").lower()
 
 
-def test_pro_settings_enable_ok_when_live(
-    pro_settings_server: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("BAKLOG_CAP_CLOUD_MIRROR", "live")
+def test_pro_settings_enable_ok_when_live(pro_settings_server: str) -> None:
     status, data = _request(
         pro_settings_server,
         "/api/pro/settings",
@@ -124,3 +115,21 @@ def test_pro_settings_enable_ok_when_live(
     )
     assert status == 200, data
     assert data.get("proSettings", {}).get("cloudMirrorEnabled") is True
+
+
+def test_pro_settings_sign_in_required_before_pro_check(
+    pro_settings_server: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("shared.server_pro_settings.is_pro", lambda *_a, **_k: False)
+    status, data = _request(
+        pro_settings_server,
+        "/api/pro/settings",
+        method="PUT",
+        headers={
+            "Content-Type": "application/json",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
+        body=json.dumps({"cloudMirrorEnabled": True}).encode(),
+    )
+    assert status == 401, data
+    assert "sign in" in str(data.get("error") or "").lower()

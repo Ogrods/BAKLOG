@@ -76,7 +76,7 @@ def mirrorable_relative_path(path: Path, *, profile_id: str | None = None) -> st
 def mirror_upload_allowed(*, profile_id: str | None = None) -> bool:
     from shared.pro_capabilities import capability_registry_status
 
-    # Capability soon/off must block uploads even if a client forced opt-in on disk.
+    # Opt-in must be on; capability is live in the registry.
     if capability_registry_status("cloud_sync_mirror") != "live":
         return False
     if not is_pro_background():
@@ -243,22 +243,29 @@ def read_mirror_upload_state(*, profile_id: str | None = None) -> dict[str, Any]
 def _save_mirror_upload_state(profile_id: str, uploaded: dict[str, str]) -> None:
     if not uploaded:
         return
-    path = _mirror_state_path(profile_id)
-    state = read_mirror_upload_state(profile_id=profile_id)
-    artifacts = dict(state.get("artifacts") or {})
-    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    for rel, status in uploaded.items():
-        artifacts[rel] = {"status": status, "uploaded_at": now}
-    doc = {
-        "artifacts": artifacts,
-        "last_upload_at": now,
-        "device_id": mirror_device_id(),
-    }
+    from shared.safe_write import atomic_write_text
+
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
-    except OSError:
-        pass
+        pid = _safe_profile_segment(profile_id)
+    except ValueError:
+        return
+    path = _mirror_state_path(pid)
+    with _lock:
+        state = read_mirror_upload_state(profile_id=pid)
+        artifacts = dict(state.get("artifacts") or {})
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        for rel, status in uploaded.items():
+            artifacts[rel] = {"status": status, "uploaded_at": now}
+        doc = {
+            "artifacts": artifacts,
+            "last_upload_at": now,
+            "device_id": mirror_device_id(),
+        }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(path, json.dumps(doc, indent=2) + "\n")
+        except OSError:
+            pass
 
 
 def _looks_like_account_profile_id(profile_id: str) -> bool:

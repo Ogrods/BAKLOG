@@ -38,6 +38,27 @@ describe('mirror-merge', () => {
     expect(alpha?.notes).toBe('fun');
   });
 
+  it('applies each catalog entry with that profile personal doc', () => {
+    const rows = mergeMirrorLibrary([
+      {
+        path: 'games_steam.json',
+        profile: 'home',
+        doc: { games: [{ id: '1', name: 'Shared', store: 'steam' }] },
+        personal: { personal: { 'steam:1': { status: 'playing', notes: 'home' } } },
+      },
+      {
+        path: 'games_steam.json',
+        profile: 'laptop',
+        doc: { games: [{ id: '1', name: 'Shared', store: 'steam' }] },
+        personal: { personal: { 'steam:1': { status: 'finished', notes: 'laptop' } } },
+      },
+    ]);
+    expect(rows).toHaveLength(2);
+    const byNotes = Object.fromEntries(rows.map((r) => [r.notes, r.status]));
+    expect(byNotes.home).toBe('playing');
+    expect(byNotes.laptop).toBe('finished');
+  });
+
   it('passes cover URL and catalog metrics through', () => {
     const rows = mergeMirrorLibrary(
       [

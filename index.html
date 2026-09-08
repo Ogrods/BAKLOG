@@ -1039,7 +1039,7 @@
                 <label
                   class="fh-toggle"
                   id="cloudMirrorToggleWrap"
-                  title="Upload catalog JSON to your BAKLOG account with Sync now. Credentials stay on this PC. Browse read-only at baklog.app/mirror."
+                  title="Uploads library catalogs and personal statuses to your BAKLOG account. Credentials stay on this PC. Readable on baklog.app/mirror while signed in. Confirm the risk dialog before enabling."
                 >
                   <input id="cloudMirrorEnabledToggle" type="checkbox" class="rounded" />
                   Cloud sync to your account
@@ -1056,7 +1056,7 @@
                   type="button"
                   id="cloudMirrorImportBtn"
                   class="conn-prefs-import hidden"
-                  title="Replace local catalogs and personal data with your cloud mirror"
+                  title="Overwrite matching files in the current local profile from your cloud mirror"
                 >
                   Import from cloud mirror
                 </button>
@@ -1074,8 +1074,10 @@
                 <form method="dialog" class="conn-mirror-import-form">
                   <h3 id="cloudMirrorImportDialogTitle">Import from cloud mirror</h3>
                   <p id="cloudMirrorImportIntro" class="conn-mirror-import-intro">
-                    Matching files in the <strong>current local profile</strong> will be replaced
-                    from the selected cloud folder. Store credentials are not copied.
+                    This <strong>overwrites</strong> matching files in the
+                    <strong>current local profile</strong> with copies from the selected cloud
+                    folder. Store credentials are not copied. Existing local catalog and personal
+                    data for those paths will be replaced.
                   </p>
                   <label class="conn-mirror-import-source hidden" id="cloudMirrorImportSourceWrap" hidden>
                     <span class="conn-mirror-import-source-label">Cloud profile</span>

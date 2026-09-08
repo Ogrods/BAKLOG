@@ -19,11 +19,11 @@ def handle_pro_settings_put(handler):
     if not srv._require_api_auth(handler):
         return
     authorization = handler.headers.get("Authorization")
-    if not is_pro(authorization):
-        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
-        return
     if auth_enabled() and (not authorization):
         srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "Sign in required"})
+        return
+    if not is_pro(authorization):
+        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
         return
     try:
         length = int(handler.headers.get("Content-Length") or 0)
@@ -44,6 +44,13 @@ def handle_pro_settings_put(handler):
         return
     if not isinstance(payload, dict):
         srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "expected JSON object"})
+        return
+    if "cloudMirrorEnabled" in payload and not isinstance(payload.get("cloudMirrorEnabled"), bool):
+        srv._send_json(
+            handler,
+            HTTPStatus.BAD_REQUEST,
+            {"error": "cloudMirrorEnabled must be boolean"},
+        )
         return
     if payload.get("cloudMirrorEnabled") is True:
         from shared.pro_capabilities import capability_registry_status

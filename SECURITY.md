@@ -57,16 +57,21 @@ storefront calls you ask for and the files you explicitly export. Optional
 Supabase auth adds a small hosted login box (credentials stay on your machine).
 Pro users can optionally opt into a **read-only cloud mirror** of catalog JSON
 (`games_*.json`, prices, personal statuses) to a private Supabase Storage bucket
-for browsing at baklog.app/mirror and importing onto another PC. Credentials,
-cache/, and secrets never leave the machine. Mirror upload is off by default,
-gated behind Connections → Cloud sync, and requires the `cloud_sync_mirror`
-capability to be `live` (override with `BAKLOG_CAP_CLOUD_MIRROR=live` for
-maintainer E2E). Individual objects are capped at **25 MiB** in the app and the
-`baklog-mirror` bucket. Comp-Pro emails on `BAKLOG_COMP_PRO_EMAILS` pass the
-hosted Vercel gate, but Storage RLS still requires a Pro plan claim on the JWT -
-sign out/in once after a grant so `app_metadata.plan` refreshes. Deleting hosted
-mirror objects is owner-side for now (Supabase dashboard / Storage); an in-app
-delete path is planned.
+for browsing at baklog.app/mirror and importing onto another PC. That viewer
+lives on the marketing site under `landing/` as an **opt-in Pro surface**: data
+appears there only after the signed-in Pro user enables Cloud sync and uploads.
+Credentials, cache/, and secrets never leave the machine. Mirror upload is off
+by default, gated behind Connections → Cloud sync with a blocking risk confirm.
+Individual objects are capped at **25 MiB** in the app and the `baklog-mirror`
+bucket. Comp-Pro emails on `BAKLOG_COMP_PRO_EMAILS` pass the hosted Vercel gate,
+but Storage RLS still requires a Pro plan claim on the JWT - sign out/in once
+after a grant so `app_metadata.plan` refreshes. Do not weaken Storage RLS to an
+email allowlist without a separate security review. Deleting hosted mirror
+objects is owner-side for now (Supabase dashboard / Storage); an in-app delete
+path is planned.
+
+Policy: no personal library data is hosted **unless the signed-in Pro user
+opted into Cloud sync**. Default remains local-only.
 
 ## Assets we protect
 

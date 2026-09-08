@@ -151,7 +151,13 @@ export default {
         headers: { apikey: anonKey, Authorization: session.auth },
       });
       if (!res.ok) {
-        return jsonResponse({ error: "Artifact not found" }, res.status === 404 ? 404 : 502, request);
+        const detail =
+          res.status === 404
+            ? "Artifact not found"
+            : res.status >= 500
+              ? "Storage upstream error"
+              : "Could not download artifact";
+        return jsonResponse({ error: detail }, res.status === 404 ? 404 : 502, request);
       }
       const text = await res.text();
       try {

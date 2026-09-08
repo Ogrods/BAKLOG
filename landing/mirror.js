@@ -482,24 +482,32 @@ async function loadLibrary(session) {
 
     const catalogs = await mapPool(catalogRows, CATALOG_FETCH_CONCURRENCY, async (row) => ({
       path: row.path,
+      profile: row.profile,
       doc: await mirrorFetch(row.path, token, row.profile),
     }));
-    let personal = null;
-    let personalProfile = null;
-    if (personalRows.length) {
-      const pref =
-        personalRows.find((row) => row.profile === userId)
-        || personalRows.find((row) => row.profile === 'default')
-        || personalRows[0];
-      personalProfile = pref.profile;
-      personal = await mirrorFetch('data/personal.json', token, pref.profile);
+
+    const personalByProfile = {};
+    await mapPool(personalRows, CATALOG_FETCH_CONCURRENCY, async (row) => {
+      const pid = String(row.profile || '');
+      if (!pid || Object.prototype.hasOwnProperty.call(personalByProfile, pid)) return;
+      try {
+        personalByProfile[pid] = await mirrorFetch('data/personal.json', token, pid);
+      } catch {
+        personalByProfile[pid] = null;
+      }
+    });
+    for (const entry of catalogs) {
+      const pid = String(entry.profile || '');
+      entry.personal = pid ? personalByProfile[pid] ?? null : null;
     }
     _failedCoverUrls.clear();
-    allRows = mergeMirrorLibrary(catalogs, personal);
+    allRows = mergeMirrorLibrary(catalogs);
 
     if (itadRows.length) {
+      // Prefer ITAD from the same profile as the first catalog row (already ranked).
+      const preferredProfile = catalogs[0]?.profile;
       const itadPref =
-        (personalProfile && itadRows.find((row) => row.profile === personalProfile))
+        (preferredProfile && itadRows.find((row) => row.profile === preferredProfile))
         || itadRows.find((row) => row.profile === userId)
         || itadRows.find((row) => row.profile === 'default')
         || itadRows[0];

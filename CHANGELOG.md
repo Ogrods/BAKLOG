@@ -39,6 +39,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- Pro **Cloud sync** is live (opt-in): risk confirm before enable, Sync now uploads catalogs and personal statuses, browse at baklog.app/mirror, Import overwrites the active local profile. Credentials stay on your PC. Turning sync off stops uploads; existing cloud files remain until you delete them in account storage.
 - Hosted cloud library metric columns (status, playtime, scores, dates) are vertically centered in the row while the title stays top-aligned.
 - Hosted cloud library keeps every metric column on tablet via horizontal scroll instead of hiding Price / Metacritic / Released.
 - Hosted cloud library phone cards show all metrics in a wrapping stats band under the title (Status through Last played).

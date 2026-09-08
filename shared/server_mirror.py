@@ -12,7 +12,9 @@ from shared.cloud_mirror import (
     import_remote_mirror_to_profile,
     list_remote_mirror_artifacts,
     mirror_read_allowed,
+    mirror_upload_allowed,
     read_mirror_upload_state,
+    sync_mirror_now,
 )
 
 
@@ -133,5 +135,36 @@ def handle_mirror_import_post(handler) -> None:
         return
     except Exception as exc:  # noqa: BLE001
         srv._api_error(handler, HTTPStatus.BAD_GATEWAY, "mirror_import_failed", exc)
+        return
+    srv._send_json(handler, HTTPStatus.OK, result)
+
+
+def handle_mirror_sync_post(handler) -> None:
+    """POST /api/mirror/sync — upload allowlisted local artifacts now (no fetch debounce)."""
+    srv = _srv()
+    if handler._reject_if_csrf_strict():
+        return
+    if not srv._require_api_auth(handler):
+        return
+    authorization = handler.headers.get("Authorization") or ""
+    from shared.supabase_auth import auth_enabled
+
+    if auth_enabled() and not authorization:
+        srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "Sign in required"})
+        return
+    # Refresh JWT plan cache so mirror_upload_allowed sees Pro for this request.
+    from shared.entitlement import current_plan
+
+    current_plan(authorization or None)
+    if not mirror_upload_allowed():
+        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Cloud sync is not available"})
+        return
+    try:
+        result = sync_mirror_now(authorization=authorization or None)
+    except PermissionError as exc:
+        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": str(exc)})
+        return
+    except Exception as exc:  # noqa: BLE001
+        srv._api_error(handler, HTTPStatus.BAD_GATEWAY, "mirror_sync_failed", exc)
         return
     srv._send_json(handler, HTTPStatus.OK, result)

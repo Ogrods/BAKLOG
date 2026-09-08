@@ -204,10 +204,4 @@ def save_personal_doc(payload: dict[str, Any], *, allow_empty: bool = False) -> 
             json.dump(doc, f, ensure_ascii=False, indent=2)
         os.replace(tmp, path)
         _rebind_after_save()
-        try:
-            from shared.cloud_mirror import schedule_mirror_upload
-
-            schedule_mirror_upload(path)
-        except Exception:  # noqa: BLE001 - never break personal save on mirror schedule
-            pass
         return doc

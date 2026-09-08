@@ -299,6 +299,7 @@ describe('cloud mirror prefs visibility', () => {
       </label>
       <p id="cloudMirrorPlanNote" hidden></p>
       <p id="cloudMirrorUploadStatus" hidden></p>
+      <button id="cloudMirrorSyncBtn" type="button" hidden>Sync now</button>
       <button id="cloudMirrorImportBtn" type="button" hidden>Import</button>
       <p id="bgRefreshPlanNote" hidden></p>
       <input id="autoFetchOnConnectToggle" type="checkbox" />
@@ -321,6 +322,7 @@ describe('cloud mirror prefs visibility', () => {
 
     expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(true);
+    expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorPlanNote')?.hidden).toBe(true);
   });
 
@@ -339,5 +341,7 @@ describe('cloud mirror prefs visibility', () => {
 
     expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(false);
+    expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(false);
+    expect(document.getElementById('cloudMirrorSyncBtn')?.disabled).toBe(true);
   });
 });

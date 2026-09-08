@@ -1486,6 +1486,11 @@ class Handler(SimpleHTTPRequestHandler):
 
             handle_mirror_import_post(self)
             return
+        if path == "/api/mirror/sync":
+            from shared.server_mirror import handle_mirror_sync_post
+
+            handle_mirror_sync_post(self)
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
 
     def do_DELETE(self) -> None:  # noqa: N802 - http.server API

@@ -40,6 +40,10 @@ alter table public.cloud_mirror_snapshots
 
 alter table public.cloud_mirror_snapshots enable row level security;
 
+-- Table privileges (RLS alone is not enough; PostgREST needs GRANT for authenticated).
+-- Owner E2E 2026-09-08: without this, upserts return 42501 permission denied.
+grant select, insert, update on public.cloud_mirror_snapshots to authenticated;
+
 -- JWT plan helper (Pro / paid / premium aliases).
 create or replace function public.mirror_is_pro_jwt()
 returns boolean

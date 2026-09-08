@@ -51,6 +51,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Hosted cloud library remembers dead cover CDN URLs for the page session so scrolling virtual rows does not re-request the same 403/404 art.
 - Hosted cloud library cover fallback no longer uses inline `onerror` (blocked by CSP); dead CDN art still shows the letter placeholder.
 - Hosted cloud library always keeps a letter placeholder under covers, so dead itch/Steam art never leaves an empty hole.
 - Hosted cloud library covers fall back to the Steam header art when the portrait library capsule is missing (for example Afterfall InSanity Extended Edition).

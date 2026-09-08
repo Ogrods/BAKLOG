@@ -1,4 +1,4 @@
-"""personal.json save must schedule a mirror upload when allowlisted."""
+"""personal.json save must not auto-schedule mirror uploads (Sync now only)."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def profile_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def test_save_personal_doc_schedules_mirror_upload(
+def test_save_personal_doc_does_not_schedule_mirror_upload(
     profile_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scheduled: list[Path] = []
@@ -46,6 +46,4 @@ def test_save_personal_doc_schedules_mirror_upload(
         allow_empty=True,
     )
     assert doc.get("personal", {}).get("steam:a", {}).get("status") == "backlog"
-    assert len(scheduled) == 1
-    assert scheduled[0].name == "personal.json"
-    assert scheduled[0].parent.name == "data"
+    assert scheduled == []

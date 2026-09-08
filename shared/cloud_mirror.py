@@ -139,6 +139,73 @@ def maybe_flush_mirror_uploads(*, force: bool = False) -> None:
         _flush_profile_uploads(pid, paths)
 
 
+def discover_local_mirror_paths(*, profile_id: str | None = None) -> list[Path]:
+    """Allowlisted on-disk catalog/personal files for the active (or given) profile."""
+    pid = profile_id if profile_id is not None else get_active_profile_id()
+    root = profile_root(profile_id=pid)
+    found: list[Path] = []
+    try:
+        for path in sorted(root.glob("games_*.json")):
+            if path.is_file() and mirrorable_relative_path(path, profile_id=pid):
+                found.append(path)
+        itad = root / "itad_prices.json"
+        if itad.is_file() and mirrorable_relative_path(itad, profile_id=pid):
+            found.append(itad)
+        personal = root / "data" / "personal.json"
+        if personal.is_file() and mirrorable_relative_path(personal, profile_id=pid):
+            found.append(personal)
+    except OSError:
+        return []
+    return found
+
+
+def sync_mirror_now(
+    *, profile_id: str | None = None, authorization: str | None = None
+) -> dict[str, Any]:
+    """Upload all local allowlisted artifacts immediately (Connections Sync now)."""
+    from shared.mirror_session import note_authenticated_mirror_session
+    from shared.supabase_auth import auth_enabled
+
+    pid = profile_id if profile_id is not None else get_active_profile_id()
+    if authorization:
+        note_authenticated_mirror_session(authorization)
+    if not auth_enabled():
+        raise PermissionError("Sign in required")
+    if not mirror_upload_allowed(profile_id=pid):
+        raise PermissionError("Cloud sync is not available")
+    if get_mirror_session() is None:
+        raise PermissionError("Sign in required")
+
+    paths = discover_local_mirror_paths(profile_id=pid)
+    rels: set[str] = set()
+    pre_status: dict[str, str] = {}
+    for path in paths:
+        rel = mirrorable_relative_path(path, profile_id=pid)
+        if not rel:
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        if size > MIRROR_MAX_UPLOAD_BYTES:
+            pre_status[rel] = "too_large"
+            continue
+        rels.add(rel)
+    if pre_status:
+        _save_mirror_upload_state(pid, pre_status)
+    flush = _flush_profile_uploads(pid, rels) if rels else {"uploaded": {}, "errors": []}
+    uploaded = dict(flush.get("uploaded") or {})
+    uploaded.update(pre_status)
+    errors = list(flush.get("errors") or [])
+    return {
+        "ok": not errors and not any(s == "error" for s in uploaded.values()),
+        "scheduled": sorted(rels),
+        "uploaded": uploaded,
+        "errors": errors,
+        "localUploadState": read_mirror_upload_state(profile_id=pid),
+    }
+
+
 def _mirror_state_path(profile_id: str) -> Path:
     """Resolve mirror upload state under profiles/<id>/cache/runs/."""
     pid = _safe_profile_segment(profile_id)
@@ -202,22 +269,23 @@ def _looks_like_account_profile_id(profile_id: str) -> bool:
         return False
 
 
-def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
+def _flush_profile_uploads(profile_id: str, paths: set[str]) -> dict[str, Any]:
+    empty: dict[str, Any] = {"uploaded": {}, "errors": []}
     try:
         pid = _safe_profile_segment(profile_id)
     except ValueError:
-        return
+        return empty
     if not mirror_upload_allowed(profile_id=pid):
-        return
+        return {"uploaded": {}, "errors": ["Cloud sync is not available"]}
     from shared.supabase_auth import auth_enabled
 
     if not auth_enabled():
-        return
+        return {"uploaded": {}, "errors": ["Sign in required"]}
     session = get_mirror_session()
     if session is None:
         if os.environ.get("BAKLOG_DEBUG"):
             print("[cloud_mirror] skip upload: no cached bearer session", file=sys.stderr)
-        return
+        return {"uploaded": {}, "errors": ["Sign in required"]}
     user_id, bearer = session
     # Account profiles are keyed by Supabase user id — never upload under another account.
     if _looks_like_account_profile_id(pid) and pid != user_id:
@@ -226,13 +294,16 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
                 f"[cloud_mirror] skip upload: profile {pid!r} != session user {user_id!r}",
                 file=sys.stderr,
             )
-        return
+        return {
+            "uploaded": {},
+            "errors": [f"profile {pid!r} does not match signed-in account"],
+        }
     from shared.supabase_mirror import upload_mirror_object, upsert_mirror_snapshot_row
 
     root = profile_root(profile_id=pid).resolve()
     allowed = (PROFILES_DIR.resolve(), Path(ROOT).resolve())
     if not any(root == base or root.is_relative_to(base) for base in allowed):
-        return
+        return empty
     uploaded: dict[str, str] = {}
     errors: list[str] = []
     device = mirror_device_id()
@@ -270,6 +341,7 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
     if os.environ.get("BAKLOG_DEBUG"):
         payload = {"profile_id": pid, "uploaded": sorted(uploaded.keys()), "errors": errors}
         print(f"[cloud_mirror] upload flush: {json.dumps(payload)}", file=sys.stderr, flush=True)
+    return {"uploaded": uploaded, "errors": errors}
 
 
 def list_remote_mirror_artifacts(*, authorization: str, profile_id: str | None = None) -> list[dict[str, Any]]:

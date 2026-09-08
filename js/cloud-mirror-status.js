@@ -36,7 +36,7 @@ export function summarizeLocalUploadState(localUploadState) {
     artifacts && typeof artifacts === 'object' ? Object.entries(artifacts) : [];
   if (!entries.length) {
     return {
-      line: 'No uploads yet - refresh a store or save your library (~30s debounce).',
+      line: 'No uploads yet - enable Cloud sync and click Sync now.',
       kind: 'pending',
     };
   }

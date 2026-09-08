@@ -523,6 +523,7 @@ function renderConnPrefs() {
   const cloudWrap = document.getElementById("cloudMirrorToggleWrap");
   const cloudToggle = document.getElementById("cloudMirrorEnabledToggle");
   const cloudNote = document.getElementById("cloudMirrorPlanNote");
+  const syncBtn = document.getElementById("cloudMirrorSyncBtn");
   const importBtn = document.getElementById("cloudMirrorImportBtn");
   const showCloudMirror =
     isPro() &&
@@ -530,6 +531,10 @@ function renderConnPrefs() {
     !!getAccessToken() &&
     capabilityStatus("cloud_sync_mirror") === "live";
   if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
+  if (syncBtn) {
+    syncBtn.hidden = !showCloudMirror;
+    syncBtn.disabled = !showCloudMirror || getProSettings().cloudMirrorEnabled !== true;
+  }
   if (importBtn) importBtn.hidden = !showCloudMirror;
   if (cloudToggle && showCloudMirror) {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
@@ -539,8 +544,8 @@ function renderConnPrefs() {
       cloudNote.hidden = false;
       cloudNote.classList.add("conn-prefs-note--pro");
       cloudNote.textContent = getProSettings().cloudMirrorEnabled
-        ? "Cloud sync uploads catalog JSON after fetch/save (~30s). Browse library backlog at baklog.app/mirror (wishlists import via button below)."
-        : "Enable to upload catalog JSON to your account after fetch/save (credentials stay on this PC).";
+        ? "Cloud sync is on. Use Sync now to upload catalogs (credentials stay on this PC). Browse at baklog.app/mirror."
+        : "Enable Cloud sync, then use Sync now to upload catalog JSON to your account (credentials stay on this PC).";
     } else {
       cloudNote.hidden = true;
     }
@@ -614,6 +619,57 @@ async function saveCloudMirrorEnabled(enabled) {
   if (data.proSettings) setProSettings(data.proSettings);
   await refreshAccountPlan();
   return data;
+}
+
+async function handleCloudMirrorSyncNow() {
+  const btn = document.getElementById("cloudMirrorSyncBtn");
+  const statusEl = document.getElementById("cloudMirrorUploadStatus");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await baklogFetch("/api/mirror/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `Sync failed (${res.status})`);
+    }
+    const errors = Array.isArray(data.errors) ? data.errors : [];
+    const uploaded = data.uploaded && typeof data.uploaded === "object" ? data.uploaded : {};
+    const okCount = Object.values(uploaded).filter((s) => s === "ok").length;
+    const errCount = Object.values(uploaded).filter((s) => s === "error").length;
+    if (statusEl) {
+      statusEl.hidden = false;
+      if (errors.length || errCount) {
+        const first = errors[0] ? String(errors[0]) : `${errCount} file(s) failed`;
+        statusEl.textContent = `Mirror sync: ${okCount} ok, ${errCount || errors.length} failed. ${first}`;
+        statusEl.classList.add("conn-prefs-note--error");
+      } else if (!okCount && !(data.scheduled || []).length) {
+        statusEl.textContent = "Nothing to sync yet - connect a store and fetch first.";
+        statusEl.classList.remove("conn-prefs-note--error");
+      } else {
+        statusEl.textContent = `Mirror sync: ${okCount} file${okCount === 1 ? "" : "s"} uploaded.`;
+        statusEl.classList.remove("conn-prefs-note--error");
+      }
+    }
+    void refreshCloudMirrorUploadStatus();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent = err?.message || "Mirror sync failed.";
+      statusEl.classList.add("conn-prefs-note--error");
+    } else {
+      window.alert(err?.message || "Mirror sync failed.");
+    }
+  } finally {
+    renderConnPrefs();
+  }
 }
 
 async function handleCloudMirrorToggle(ev) {
@@ -799,6 +855,11 @@ function renderConnections() {
 
 function handleLayoutClick(ev) {
   const target = ev.target;
+
+  if (target.id === "cloudMirrorSyncBtn") {
+    void handleCloudMirrorSyncNow();
+    return;
+  }
 
   if (target.id === "cloudMirrorImportBtn") {
     void handleCloudMirrorImport();

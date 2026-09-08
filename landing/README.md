@@ -23,6 +23,17 @@ FAQ JSON-LD must match the `#faq` details list via `npm run check:landing-seo`. 
 - `api/mirror.js` + `api/_mirror-helpers.js` — Pro read-only cloud mirror API (`GET /api/mirror`). Requires `BAKLOG_SUPABASE_URL` + `BAKLOG_SUPABASE_ANON_KEY` (or `SUPABASE_*`), optional `BAKLOG_COMP_PRO_EMAILS`, and the same KV vars as other rate-limited routes (`KV_REST_API_URL` / `KV_REST_API_TOKEN` or Upstash aliases). Production without KV returns `503`. Comp-Pro emails pass the Vercel entitlement check, but Supabase Storage RLS still needs `app_metadata.plan=pro` on the JWT (sign out/in after a grant).
 - `mirror.html` / `mirror.js` / `mirror-merge.js` / `mirror.css` — signed-in Pro viewer for mirrored library backlog (`/mirror`, noindex). Wishlists and prices sync; claimables are not mirrored.
 - `sql/cloud_mirror.sql` — one-time Supabase bucket + RLS for `baklog-mirror` and `cloud_mirror_snapshots` (25 MiB object cap).
+
+### Cloud mirror owner E2E (before capability live)
+
+Capability `cloud_sync_mirror` defaults to **soon** (Connections UI hidden). Do not flip marketing or the registry default until this passes:
+
+1. Run `sql/cloud_mirror.sql` in the Supabase SQL editor. Confirm bucket `baklog-mirror` is **private**, RLS policies use `mirror_is_pro_jwt()`, and `device_id` exists on `cloud_mirror_snapshots`. Object size limit is **25 MiB** (matches the app).
+2. Vercel Production env: `BAKLOG_SUPABASE_URL` + anon key (or `SUPABASE_*`), optional `BAKLOG_COMP_PRO_EMAILS`, and KV (`KV_REST_API_*` or Upstash). Without KV, prod `GET /api/mirror` returns **503**.
+3. Non-Pro signed-in user → hosted `GET /api/mirror` returns **403**.
+4. Local app with `BAKLOG_CAP_CLOUD_MIRROR=live`: Pro + account sign-in → enable **Cloud sync** on Connections → fetch stores as needed → **Sync now** → objects under `baklog-mirror/{uid}/{profile}/` → open [baklog.app/mirror](https://baklog.app/mirror) → **Import from cloud mirror** on a second profile/PC. Wrong profile claim → **409**. Comp-Pro: sign out/in once after a grant so Storage RLS sees `plan=pro` on the JWT.
+5. Only then: set capability default / marketing to live and stamp tracker `p6_cloud_sync_mirror` **[DONE]**.
+
 - `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
 - `api/metrics.js` — Vercel serverless function; receives opt-in anonymous aggregate metrics from the local app (session counts + sponsored-slot impressions/clicks). Optional Supabase log via `sql/aggregate_metrics.sql`.

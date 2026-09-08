@@ -32,6 +32,8 @@ body {
     -apple-system,
     Segoe UI,
     sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
   background: var(--bg);
   color: var(--text);
 }
@@ -41,13 +43,20 @@ a {
 }
 
 .mirror-shell {
-  max-width: 72rem;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 1.25rem 1rem 2.5rem;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .mirror-shell {
+    padding: 1.5rem;
+  }
 }
 
 .mirror-header {
-  margin-bottom: 1.25rem;
+  padding-top: 0;
+  margin-bottom: 0.75rem;
 }
 
 .mirror-header-row {
@@ -55,7 +64,9 @@ a {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.75rem;
+  box-shadow: 0 1px 0 var(--border-subtle);
 }
 
 .app-header-brand {
@@ -83,14 +94,21 @@ a {
   fill: currentColor;
 }
 
+/* Match app: text-2xl (1.5rem), md:text-3xl (1.875rem). */
 .brand-wordmark {
   margin: 0;
-  font-size: clamp(1.5rem, 3vw, 1.875rem);
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   line-height: 1;
   white-space: nowrap;
   color: #fff;
+}
+
+@media (min-width: 768px) {
+  .brand-wordmark {
+    font-size: 1.875rem;
+  }
 }
 
 .brand-beta {
@@ -117,14 +135,14 @@ a {
 }
 
 .mirror-cloud-chip {
-  transform: translate(-6px, -3px);
+  transform: translate(-3px, -3px);
 }
 
 .mirror-lead {
-  margin: 0.65rem 0 0;
+  margin: 0.5rem 0 0;
   color: var(--text-mute);
-  line-height: 1.5;
-  font-size: 0.95rem;
+  line-height: 1.45;
+  font-size: 0.875rem;
 }
 
 .mirror-header-actions {
@@ -141,34 +159,36 @@ a {
 .mirror-panel {
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
+  border-radius: 0.5rem;
+  padding: 1rem;
 }
 
 .mirror-panel--narrow {
   max-width: 28rem;
-  margin: 2.5rem auto 0;
+  margin: 2rem auto 0;
 }
 
 .mirror-panel-title {
-  margin: 0 0 0.75rem;
-  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-bright);
 }
 
 .mirror-signin-hint {
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.875rem;
 }
 
 .mirror-back-link {
-  margin: 1rem 0 0;
-  font-size: 0.9rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.875rem;
 }
 
 .mirror-panel label {
   display: block;
-  margin: 0 0 0.35rem;
-  font-size: 0.9rem;
+  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
   color: var(--text-dim);
 }
 
@@ -177,13 +197,14 @@ a {
 .mirror-toolbar input,
 .mirror-toolbar select {
   width: 100%;
-  padding: 0.65rem 0.75rem;
-  margin-bottom: 0.85rem;
-  border-radius: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.375rem;
   border: 1px solid var(--border-subtle);
   background: var(--bg);
   color: var(--text-bright);
   font: inherit;
+  font-size: 0.875rem;
 }
 
 .mirror-panel input:focus,
@@ -198,10 +219,11 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 1rem;
-  border-radius: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.375rem;
   border: none;
   font: inherit;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -262,9 +284,9 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   color: var(--text-mute);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
 }
 
 .mirror-stats strong {
@@ -274,19 +296,19 @@ a {
 .mirror-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background: var(--bg-panel);
 }
 
 table.mirror-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.875rem;
 }
 
 .mirror-table th,
 .mirror-table td {
-  padding: 0.65rem 0.75rem;
+  padding: 0.5rem 0.65rem;
   border-bottom: 1px solid var(--border-subtle);
   text-align: left;
   vertical-align: top;
@@ -295,7 +317,7 @@ table.mirror-table {
 .mirror-table th {
   background: color-mix(in srgb, var(--bg) 70%, var(--bg-panel));
   color: var(--text-dim);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -390,13 +412,31 @@ table.mirror-table {
 
 @media (max-width: 640px) {
   .mirror-header-row {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .app-header-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .brand-wordmark {
+    font-size: 1.25rem;
+  }
+
+  .brand-logo-mark {
+    height: 26px;
+  }
+
+  .brand-beta {
+    transform: none;
   }
 
   .mirror-header-actions {
     margin-left: 0;
-    width: 100%;
+    flex-shrink: 0;
   }
 
   .mirror-table th:nth-child(5),

@@ -39,7 +39,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
-- Hosted cloud library (`/mirror`) header uses the same brand lockup as the desktop app (logo, wordmark, Beta), plus a Cloud chip; Refresh and Sign out stay in the header.
+- Hosted cloud library (`/mirror`) header uses the same brand lockup as the desktop app (logo, wordmark, Cloud chip); Refresh and Sign out stay in the header.
 - Free claims feed refreshed; stale approved-only ids pruned from the maintainer list.
 - Library watch no longer ships with a default Pico Park watch; only watches you arm stay armed.
 - Pro tab label is Back BAKLOG; Pro page hero is a flat brand strip; sample sponsor games are out of the shipped feed.

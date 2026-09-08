@@ -420,6 +420,20 @@ table.mirror-table {
   margin: 0;
 }
 
+.mirror-scope-note .mirror-scope-note-body p {
+  margin: 0 0 0.45rem;
+}
+
+.mirror-scope-note .mirror-scope-note-body p:last-child {
+  margin-bottom: 0;
+}
+
+.mirror-merge-hint {
+  margin: -0.35rem 0 0.85rem;
+  font-size: 0.78rem;
+  color: var(--text-mute);
+}
+
 .hidden {
   display: none !important;
 }

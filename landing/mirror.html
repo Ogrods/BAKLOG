@@ -93,8 +93,13 @@
     <section class="hidden" id="mirrorLibraryPanel">
       <details class="mirror-scope-note">
         <summary>About this view</summary>
-        <p class="mirror-scope-note-body">Library backlog only  -  wishlists and deal prices sync with your account and appear here after you <strong>Import from cloud mirror</strong> in the desktop app. Claimables stay on the public feed and are not mirrored.</p>
+        <div class="mirror-scope-note-body">
+          <p>Read-only library from your home PC after <strong>Cloud sync</strong> / <strong>Sync now</strong> in BAKLOG. You see store catalogs plus statuses and notes from mirrored personal data.</p>
+          <p>Wishlists, deal prices, and claimables are not shown here. Claimables stay on the public feed. Wishlists and prices may still upload for desktop restore.</p>
+          <p><strong>Import from cloud mirror</strong> is a desktop Connections action that overwrites local files. It does not fill this page.</p>
+        </div>
       </details>
+      <p class="mirror-merge-hint hidden" id="mirrorMergeHint" hidden></p>
       <div class="mirror-stats" id="mirrorStats" aria-live="polite"></div>
       <div class="mirror-toolbar">
         <input type="search" id="mirrorSearch" placeholder="Search title or notes" aria-label="Search library" />

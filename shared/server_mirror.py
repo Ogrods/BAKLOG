@@ -11,6 +11,7 @@ from shared.cloud_mirror import (
     download_remote_mirror_artifact,
     import_remote_mirror_to_profile,
     list_remote_mirror_artifacts,
+    list_remote_mirror_profile_ids,
     mirror_read_allowed,
     mirror_upload_allowed,
     read_mirror_upload_state,
@@ -53,13 +54,26 @@ def handle_mirror_get(handler) -> None:
                 authorization=authorization, artifact_path=artifact, profile_id=profile
             )
         else:
-            artifacts = list_remote_mirror_artifacts(authorization=authorization, profile_id=profile)
+            profiles = list_remote_mirror_profile_ids(authorization=authorization)
+            list_profile = profile
+            if list_profile is None:
+                from shared.profile_paths import get_active_profile_id
+
+                list_profile = get_active_profile_id()
+            artifacts = list_remote_mirror_artifacts(
+                authorization=authorization, profile_id=list_profile
+            )
             # Local upload status is always for the active profile (never the ?profile= query).
             local_state = read_mirror_upload_state()
             srv._send_json(
                 handler,
                 HTTPStatus.OK,
-                {"artifacts": artifacts, "localUploadState": local_state},
+                {
+                    "artifacts": artifacts,
+                    "profiles": profiles,
+                    "profile": list_profile,
+                    "localUploadState": local_state,
+                },
             )
             return
     except PermissionError as exc:
@@ -116,10 +130,16 @@ def handle_mirror_import_post(handler) -> None:
         paths = paths_raw
     claimed_profile = body.get("profile")
     profile_id = str(claimed_profile).strip() if claimed_profile is not None else None
+    source_raw = body.get("sourceProfile")
+    source_profile_id = str(source_raw).strip() if source_raw is not None else None
+    if source_raw is not None and not source_profile_id:
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "sourceProfile must be a non-empty string"})
+        return
     try:
         result = import_remote_mirror_to_profile(
             authorization=authorization,
             profile_id=profile_id,
+            source_profile_id=source_profile_id,
             paths=paths,
             include_personal=include_personal,
             allow_empty_catalogs=allow_empty_catalogs,

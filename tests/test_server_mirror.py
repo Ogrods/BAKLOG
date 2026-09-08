@@ -132,7 +132,7 @@ def test_get_mirror_unauthorized_on_permission_error(
     def _boom(**kwargs):
         raise PermissionError("invalid session")
 
-    monkeypatch.setattr("shared.server_mirror.list_remote_mirror_artifacts", _boom)
+    monkeypatch.setattr("shared.server_mirror.list_remote_mirror_profile_ids", _boom)
     status, data = _request(
         mirror_server,
         "/api/mirror",

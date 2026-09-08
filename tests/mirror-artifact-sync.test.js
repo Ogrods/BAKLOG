@@ -3,7 +3,9 @@ import { ALLOWED_ARTIFACT_RE_SOURCE, isAllowedMirrorArtifact } from '../js/mirro
 import {
   describeImportScope,
   formatLastUploadedBy,
+  labelMirrorSourceProfile,
   listImportableArtifactPaths,
+  preferMirrorSourceProfile,
   summarizeLocalUploadState,
 } from '../js/cloud-mirror-status.js';
 import { readFileSync } from 'node:fs';
@@ -61,5 +63,23 @@ describe('cloud-mirror-status helpers', () => {
         last_upload_at: '2026-01-01T12:00:00Z',
       }),
     ).toMatch(/Last uploaded by Windows:pc/);
+  });
+
+  it('prefers active then account then default for source profile', () => {
+    const uid = '11111111-1111-1111-1111-111111111111';
+    expect(
+      preferMirrorSourceProfile(['guest', 'default', uid], { activeId: 'default', accountId: uid }),
+    ).toBe('default');
+    expect(preferMirrorSourceProfile(['guest', uid], { activeId: 'x', accountId: uid })).toBe(uid);
+    expect(preferMirrorSourceProfile(['guest', 'default'], { activeId: 'x', accountId: uid })).toBe(
+      'default',
+    );
+  });
+
+  it('labels cloud source profiles for the import dialog', () => {
+    const uid = '11111111-1111-1111-1111-111111111111';
+    expect(labelMirrorSourceProfile('default')).toBe('Default');
+    expect(labelMirrorSourceProfile(uid, { accountId: uid })).toBe('This account');
+    expect(labelMirrorSourceProfile(uid)).toMatch(/11111111/);
   });
 });

@@ -1,6 +1,7 @@
 import { baklogFetch, urlWithStreamTicket } from "./api-client.js";
 import {
   getAccessToken,
+  getAccountProfileId,
   isAccountAuthMode,
   isPro,
   refreshAccountPlan,
@@ -20,6 +21,7 @@ import { state } from "./state.js";
 import { storeLogoHtml } from "./store-logos.js";
 import { STORE_BRAND_COLORS } from "./store-brand-colors.js";
 import { formatPlatformList } from "./platform-labels.js";
+import { activeProfileId } from "./profiles.js";
 import {
   authStatusLoaded,
   connectedProviderCount,
@@ -49,7 +51,9 @@ import {
   describeImportScope,
   fetchMirrorSnapshot,
   formatLastUploadedBy,
+  labelMirrorSourceProfile,
   listImportableArtifactPaths,
+  preferMirrorSourceProfile,
   summarizeLocalUploadState,
 } from "./cloud-mirror-status.js";
 
@@ -682,25 +686,88 @@ async function handleCloudMirrorToggle(ev) {
   }
 }
 
-async function openCloudMirrorImportDialog(artifacts) {
+async function openCloudMirrorImportDialog(initialSnap) {
   const dialog = document.getElementById("cloudMirrorImportDialog");
   const listEl = document.getElementById("cloudMirrorImportArtifactList");
   const personalToggle = document.getElementById("cloudMirrorImportPersonal");
   const intro = document.getElementById("cloudMirrorImportIntro");
+  const sourceWrap = document.getElementById("cloudMirrorImportSourceWrap");
+  const sourceSelect = document.getElementById("cloudMirrorImportSourceProfile");
   if (!dialog || !listEl || !personalToggle) return null;
 
-  const paths = listImportableArtifactPaths(artifacts);
-  if (!paths.length) return null;
+  const accountId = getAccountProfileId() || "";
+  const profiles = Array.isArray(initialSnap?.profiles) ? initialSnap.profiles : [];
+  let sourceProfile =
+    preferMirrorSourceProfile(profiles, {
+      activeId: activeProfileId(),
+      accountId,
+    }) ||
+    initialSnap?.profile ||
+    activeProfileId();
+  let importableCount = 0;
 
-  const scope = describeImportScope(paths);
-  if (intro) {
-    intro.textContent =
-      `This replaces local mirrorable files with your cloud copy (${scope.join(", ")}). ` +
-      "Store credentials are not copied - reconnect stores afterward.";
+  const fillPaths = (artifacts) => {
+    const paths = listImportableArtifactPaths(artifacts);
+    importableCount = paths.length;
+    const scope = describeImportScope(paths);
+    if (intro) {
+      const sourceLabel = labelMirrorSourceProfile(sourceProfile, { accountId });
+      intro.textContent =
+        `Replaces matching files in the current local profile from cloud folder "${sourceLabel}"` +
+        `${scope.length ? ` (${scope.join(", ")})` : ""}. ` +
+        "Store credentials are not copied - reconnect stores afterward.";
+    }
+    listEl.innerHTML = paths.length
+      ? paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")
+      : "<li>No importable files in this cloud profile.</li>";
+    personalToggle.checked = paths.includes("data/personal.json");
+    personalToggle.disabled = !paths.includes("data/personal.json");
+    return paths;
+  };
+
+  let artifacts = initialSnap?.artifacts || [];
+  if (sourceProfile && String(initialSnap?.profile || "") !== sourceProfile) {
+    try {
+      const preferred = await fetchMirrorSnapshot(sourceProfile);
+      artifacts = preferred.artifacts;
+    } catch {
+      artifacts = [];
+    }
   }
-  listEl.innerHTML = paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("");
-  personalToggle.checked = paths.includes("data/personal.json");
-  personalToggle.disabled = !paths.includes("data/personal.json");
+  fillPaths(artifacts);
+  if (!importableCount && profiles.length <= 1) return null;
+
+  if (sourceWrap && sourceSelect) {
+    if (profiles.length > 1) {
+      sourceSelect.innerHTML = profiles
+        .map((pid) => {
+          const label = labelMirrorSourceProfile(pid, { accountId });
+          const selected = pid === sourceProfile ? " selected" : "";
+          return `<option value="${escapeAttr(pid)}"${selected}>${escapeHtml(label)}</option>`;
+        })
+        .join("");
+      sourceWrap.hidden = false;
+      sourceWrap.classList.remove("hidden");
+      sourceSelect.onchange = async () => {
+        sourceProfile = sourceSelect.value;
+        try {
+          const next = await fetchMirrorSnapshot(sourceProfile);
+          fillPaths(next.artifacts);
+        } catch (err) {
+          importableCount = 0;
+          listEl.innerHTML = `<li>${escapeHtml(err?.message || "Could not list this cloud profile.")}</li>`;
+          personalToggle.checked = false;
+          personalToggle.disabled = true;
+        }
+      };
+    } else {
+      sourceWrap.hidden = true;
+      sourceWrap.classList.add("hidden");
+      sourceSelect.onchange = null;
+    }
+  }
+
+  if (!importableCount && profiles.length <= 1) return null;
 
   dialog.returnValue = "cancel";
   dialog.showModal();
@@ -708,9 +775,11 @@ async function openCloudMirrorImportDialog(artifacts) {
     dialog.addEventListener(
       "close",
       () => {
+        if (sourceSelect) sourceSelect.onchange = null;
         resolve({
-          confirmed: dialog.returnValue === "confirm",
+          confirmed: dialog.returnValue === "confirm" && importableCount > 0,
           includePersonal: personalToggle.checked,
+          sourceProfile,
         });
       },
       { once: true },
@@ -723,12 +792,13 @@ async function handleCloudMirrorImport() {
   try {
     if (btn) btn.disabled = true;
     const snap = await fetchMirrorSnapshot();
-    const choice = await openCloudMirrorImportDialog(snap.artifacts);
+    const choice = await openCloudMirrorImportDialog(snap);
     if (!choice?.confirmed) return;
 
     const { importFromCloudMirror } = await import("./cloud-mirror-import.js");
     const result = await importFromCloudMirror({
       includePersonal: choice.includePersonal,
+      sourceProfile: choice.sourceProfile || undefined,
     });
     const count = result?.count ?? 0;
     const imported = Array.isArray(result?.imported) ? result.imported.join(", ") : "";

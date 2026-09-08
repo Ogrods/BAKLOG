@@ -115,6 +115,30 @@ def list_mirror_objects(*, user_id: str, profile_id: str, bearer_token: str, lim
     return _list_prefix(prefix=prefix, bearer_token=bearer_token, limit=limit)
 
 
+def list_mirror_profile_ids(*, user_id: str, bearer_token: str, limit: int = 200) -> list[str]:
+    """List profile folder ids under ``{userId}/`` (non-recursive Storage list)."""
+    from shared.profile_paths import is_valid_profile_id
+
+    uid = (user_id or "").strip()
+    if not uid:
+        return []
+    rows = _list_prefix(prefix=f"{uid}/", bearer_token=bearer_token, limit=limit)
+    out: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        name = str(row.get("name") or "").strip().lstrip("/")
+        if not name or "/" in name:
+            continue
+        if not is_valid_profile_id(name):
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        out.append(name)
+    out.sort()
+    return out
+
+
 def list_mirror_artifacts(
     *, user_id: str, profile_id: str, bearer_token: str, limit: int = 200
 ) -> list[dict[str, Any]]:

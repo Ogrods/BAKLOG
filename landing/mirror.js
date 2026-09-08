@@ -25,6 +25,7 @@ const signedInActions = document.getElementById('mirrorSignedInActions');
 const refreshBtn = document.getElementById('mirrorRefreshBtn');
 const signOutBtn = document.getElementById('mirrorSignOutBtn');
 const statsEl = document.getElementById('mirrorStats');
+const mergeHintEl = document.getElementById('mirrorMergeHint');
 const searchInput = document.getElementById('mirrorSearch');
 const statusFilter = document.getElementById('mirrorStatusFilter');
 const storeFilter = document.getElementById('mirrorStoreFilter');
@@ -65,6 +66,21 @@ function showPanel(name) {
   libraryPanel.classList.toggle('hidden', name !== 'library');
   setupPanel.classList.toggle('hidden', name !== 'setup');
   signedInActions.classList.toggle('hidden', name === 'signin');
+}
+
+/** @param {string[] | undefined} profiles */
+function setMergeHint(profiles) {
+  if (!mergeHintEl) return;
+  const n = Array.isArray(profiles) ? profiles.filter(Boolean).length : 0;
+  if (n > 1) {
+    mergeHintEl.textContent = `Merged from ${n} cloud profiles.`;
+    mergeHintEl.hidden = false;
+    mergeHintEl.classList.remove('hidden');
+  } else {
+    mergeHintEl.textContent = '';
+    mergeHintEl.hidden = true;
+    mergeHintEl.classList.add('hidden');
+  }
 }
 
 function escapeHtml(value) {
@@ -312,6 +328,7 @@ async function loadLibrary(session) {
     const personalRows = (list.artifacts || []).filter((row) => row.path === 'data/personal.json');
 
     if (!catalogRows.length) {
+      setMergeHint([]);
       lead.textContent = 'Signed in  -  waiting for your home PC to upload a mirror.';
       showPanel('setup');
       return;
@@ -342,13 +359,15 @@ async function loadLibrary(session) {
     allRows = mergeMirrorLibrary(catalogs, personal);
 
     if (!allRows.length) {
+      setMergeHint([]);
       lead.textContent = 'Signed in  -  mirror artifacts found but no playable rows yet.';
       showPanel('setup');
       return;
     }
 
+    setMergeHint(list.profiles);
     populateFilters(allRows);
-    lead.textContent = 'Read-only library backlog  -  use Import in Connections for wishlists and full mirror restore.';
+    lead.textContent = 'Read-only library from your synced home PC.';
     showPanel('library');
     renderTable();
   } finally {

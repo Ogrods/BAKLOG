@@ -1074,8 +1074,13 @@
                 <form method="dialog" class="conn-mirror-import-form">
                   <h3 id="cloudMirrorImportDialogTitle">Import from cloud mirror</h3>
                   <p id="cloudMirrorImportIntro" class="conn-mirror-import-intro">
-                    Matching local files will be replaced. Store credentials are not copied.
+                    Matching files in the <strong>current local profile</strong> will be replaced
+                    from the selected cloud folder. Store credentials are not copied.
                   </p>
+                  <label class="conn-mirror-import-source hidden" id="cloudMirrorImportSourceWrap" hidden>
+                    <span class="conn-mirror-import-source-label">Cloud profile</span>
+                    <select id="cloudMirrorImportSourceProfile" aria-label="Cloud profile to import from"></select>
+                  </label>
                   <ul id="cloudMirrorImportArtifactList" class="conn-mirror-import-list"></ul>
                   <label class="fh-toggle conn-mirror-import-personal">
                     <input id="cloudMirrorImportPersonal" type="checkbox" class="rounded" checked />

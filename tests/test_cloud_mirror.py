@@ -78,6 +78,10 @@ def test_schedule_too_large_records_status(profile_home: Path, monkeypatch: pyte
 
 def test_import_non_active_profile_raises(profile_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
         cloud_mirror,
         "list_remote_mirror_artifacts",
         lambda **_: [{"path": "games_steam.json"}],
@@ -86,8 +90,61 @@ def test_import_non_active_profile_raises(profile_home: Path, monkeypatch: pytes
         import_remote_mirror_to_profile(
             authorization="Bearer x",
             profile_id="other",
+            source_profile_id="default",
             paths=["games_steam.json"],
         )
+
+
+def test_import_from_other_cloud_source(profile_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    catalog = profile_home / "games_steam.json"
+    catalog.write_text(
+        json.dumps({"games": [{"id": "1", "title": "Old"}], "store": "steam", "game_count": 1}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    seen: dict[str, str] = {}
+
+    def _list(**kwargs):
+        seen["list_profile"] = str(kwargs.get("profile_id") or "")
+        return [{"path": "games_steam.json"}]
+
+    def _download(*, authorization: str, artifact_path: str, profile_id: str | None = None) -> bytes:
+        seen["download_profile"] = str(profile_id or "")
+        return json.dumps(
+            {"games": [{"id": "9", "title": "From guest"}], "store": "steam", "game_count": 1}
+        ).encode()
+
+    monkeypatch.setattr(cloud_mirror, "list_remote_mirror_artifacts", _list)
+    monkeypatch.setattr(cloud_mirror, "download_remote_mirror_artifact", _download)
+    monkeypatch.setattr("shared.server_personal._rebind_after_save", lambda: None)
+
+    result = import_remote_mirror_to_profile(
+        authorization="Bearer x",
+        source_profile_id="guest",
+        include_personal=False,
+    )
+    assert seen["list_profile"] == "guest"
+    assert seen["download_profile"] == "guest"
+    assert result.get("sourceProfile") == "guest"
+    assert result.get("profile") == "default"
+    rewritten = json.loads(catalog.read_text(encoding="utf-8"))
+    assert rewritten["games"][0]["id"] == "9"
+
+
+def test_prefer_mirror_source_profile_order() -> None:
+    uid = "11111111-1111-1111-1111-111111111111"
+    assert cloud_mirror.prefer_mirror_source_profile(
+        ["guest", "default", uid], active_profile_id="default", user_id=uid
+    ) == "default"
+    assert cloud_mirror.prefer_mirror_source_profile(
+        ["guest", uid], active_profile_id="missing", user_id=uid
+    ) == uid
+    assert cloud_mirror.prefer_mirror_source_profile(
+        ["guest", "default"], active_profile_id="x", user_id=uid
+    ) == "default"
 
 
 def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,6 +152,10 @@ def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.Monk
     prior = {"games": [{"id": "1", "title": "Keep"}], "store": "steam", "game_count": 1}
     catalog.write_text(json.dumps(prior), encoding="utf-8")
 
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
     monkeypatch.setattr(
         cloud_mirror,
         "list_remote_mirror_artifacts",
@@ -118,6 +179,7 @@ def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.Monk
     with pytest.raises(RuntimeError, match="personal save failed"):
         import_remote_mirror_to_profile(
             authorization="Bearer x",
+            source_profile_id="default",
             include_personal=True,
         )
 
@@ -146,6 +208,10 @@ def test_import_successful_overwrite(profile_home: Path, monkeypatch: pytest.Mon
     )
 
     monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
         cloud_mirror,
         "list_remote_mirror_artifacts",
         lambda **_: [{"path": "games_steam.json"}, {"path": "data/personal.json"}],
@@ -170,7 +236,11 @@ def test_import_successful_overwrite(profile_home: Path, monkeypatch: pytest.Mon
     # Avoid importing server during personal save in unit test.
     monkeypatch.setattr("shared.server_personal._rebind_after_save", lambda: None)
 
-    result = import_remote_mirror_to_profile(authorization="Bearer x", include_personal=True)
+    result = import_remote_mirror_to_profile(
+        authorization="Bearer x",
+        source_profile_id="default",
+        include_personal=True,
+    )
     assert "games_steam.json" in (result.get("imported") or [])
     assert result.get("personal") is True
     rewritten = json.loads(catalog.read_text(encoding="utf-8"))

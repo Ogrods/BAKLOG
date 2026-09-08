@@ -5,9 +5,13 @@ import { baklogFetch } from './api-client.js';
  * @typedef {{ artifacts?: Record<string, { status?: string, uploaded_at?: string }>, last_upload_at?: string | null }} LocalUploadState
  */
 
-/** @returns {Promise<{ artifacts: MirrorArtifactRow[], localUploadState: LocalUploadState }>} */
-export async function fetchMirrorSnapshot() {
-  const res = await baklogFetch('/api/mirror');
+/**
+ * @param {string} [profile]
+ * @returns {Promise<{ artifacts: MirrorArtifactRow[], profiles: string[], profile: string | null, localUploadState: LocalUploadState }>}
+ */
+export async function fetchMirrorSnapshot(profile) {
+  const qs = profile ? `?profile=${encodeURIComponent(profile)}` : '';
+  const res = await baklogFetch(`/api/mirror${qs}`);
   let data;
   try {
     data = await res.json();
@@ -19,11 +23,43 @@ export async function fetchMirrorSnapshot() {
   }
   return {
     artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
+    profiles: Array.isArray(data.profiles) ? data.profiles.map(String).filter(Boolean) : [],
+    profile: data.profile != null ? String(data.profile) : null,
     localUploadState:
       data.localUploadState && typeof data.localUploadState === 'object'
         ? data.localUploadState
         : { artifacts: {}, last_upload_at: null },
   };
+}
+
+/**
+ * Prefer active local id, then account uuid, then default.
+ * @param {string[]} profiles
+ * @param {{ activeId?: string, accountId?: string }} [opts]
+ */
+export function preferMirrorSourceProfile(profiles, opts = {}) {
+  const ids = (profiles || []).map((p) => String(p || '').trim()).filter(Boolean);
+  if (!ids.length) return null;
+  const active = String(opts.activeId || '').trim();
+  const account = String(opts.accountId || '').trim();
+  if (active && ids.includes(active)) return active;
+  if (account && ids.includes(account)) return account;
+  if (ids.includes('default')) return 'default';
+  return ids[0];
+}
+
+/**
+ * @param {string} profileId
+ * @param {{ accountId?: string }} [opts]
+ */
+export function labelMirrorSourceProfile(profileId, opts = {}) {
+  const id = String(profileId || '').trim();
+  if (!id) return '';
+  if (id === 'default') return 'Default';
+  const account = String(opts.accountId || '').trim();
+  if (account && id === account) return 'This account';
+  if (id.length > 12) return `${id.slice(0, 8)}…`;
+  return id;
 }
 
 /**

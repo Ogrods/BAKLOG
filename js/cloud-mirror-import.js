@@ -2,12 +2,13 @@ import { baklogFetch } from './api-client.js';
 
 /**
  * Pull mirrored catalogs + personal data from Supabase into the active profile.
- * @param {{ includePersonal?: boolean, paths?: string[] }} [options]
+ * @param {{ includePersonal?: boolean, paths?: string[], sourceProfile?: string }} [options]
  */
 export async function importFromCloudMirror(options = {}) {
   const body = {};
   if (options.includePersonal === false) body.includePersonal = false;
   if (Array.isArray(options.paths) && options.paths.length) body.paths = options.paths;
+  if (options.sourceProfile) body.sourceProfile = String(options.sourceProfile);
 
   const res = await baklogFetch('/api/mirror/import', {
     method: 'POST',

@@ -368,10 +368,50 @@ def list_remote_mirror_artifacts(*, authorization: str, profile_id: str | None =
         if not is_allowed_relative(name):
             continue
         out.append(
-            {"path": name, "id": row.get("id"), "updated_at": row.get("updated_at"), "metadata": row.get("metadata")}
+            {
+                "path": name,
+                "profile": pid,
+                "id": row.get("id"),
+                "updated_at": row.get("updated_at"),
+                "metadata": row.get("metadata"),
+            }
         )
     out.sort(key=lambda item: item.get("path") or "")
     return out
+
+
+def list_remote_mirror_profile_ids(*, authorization: str) -> list[str]:
+    """List cloud profile folder ids for the signed-in user."""
+    from shared.supabase_auth import verify_bearer_user
+    from shared.supabase_mirror import list_mirror_profile_ids
+
+    user = verify_bearer_user(authorization)
+    if not user:
+        raise PermissionError("invalid session")
+    user_id = str(user.get("id") or "")
+    token = _bearer_token(authorization)
+    return list_mirror_profile_ids(user_id=user_id, bearer_token=token)
+
+
+def prefer_mirror_source_profile(
+    profiles: list[str],
+    *,
+    active_profile_id: str | None = None,
+    user_id: str | None = None,
+) -> str | None:
+    """Pick a default cloud source: active, then account uuid, then default."""
+    ids = [str(p).strip() for p in (profiles or []) if str(p).strip()]
+    if not ids:
+        return None
+    active = (active_profile_id or "").strip()
+    uid = (user_id or "").strip()
+    if active and active in ids:
+        return active
+    if uid and uid in ids:
+        return uid
+    if "default" in ids:
+        return "default"
+    return ids[0]
 
 
 def download_remote_mirror_artifact(
@@ -456,16 +496,19 @@ def import_remote_mirror_to_profile(
     *,
     authorization: str,
     profile_id: str | None = None,
+    source_profile_id: str | None = None,
     paths: list[str] | None = None,
     include_personal: bool = True,
     allow_empty_catalogs: bool = False,
 ) -> dict[str, Any]:
     """Import mirrored artifacts into the **active** profile only.
 
-    Naming a different ``profile_id`` raises :class:`MirrorProfileMismatch` (HTTP 409).
+    Naming a different destination ``profile_id`` raises :class:`MirrorProfileMismatch`
+    (HTTP 409). ``source_profile_id`` selects which cloud folder to pull from.
     """
     from shared.server_catalog_import import import_catalog_payload, is_allowed_catalog_filename
     from shared.server_personal import save_personal_doc
+    from shared.supabase_auth import verify_bearer_user
 
     active = get_active_profile_id()
     if profile_id is not None and str(profile_id) != active:
@@ -473,7 +516,25 @@ def import_remote_mirror_to_profile(
             f"profile mismatch (active={active!r}, claimed={str(profile_id)!r})"
         )
     pid = active
-    remote_rows = list_remote_mirror_artifacts(authorization=authorization, profile_id=pid)
+    user = verify_bearer_user(authorization)
+    if not user:
+        raise PermissionError("invalid session")
+    user_id = str(user.get("id") or "")
+
+    source_pid = (source_profile_id or "").strip() or None
+    if source_pid is not None:
+        from shared.profile_paths import normalize_profile_id
+
+        source_pid = normalize_profile_id(source_pid)
+    else:
+        profiles = list_remote_mirror_profile_ids(authorization=authorization)
+        source_pid = prefer_mirror_source_profile(
+            profiles, active_profile_id=active, user_id=user_id
+        )
+        if source_pid is None:
+            source_pid = active
+
+    remote_rows = list_remote_mirror_artifacts(authorization=authorization, profile_id=source_pid)
     remote_paths = {str(row.get("path") or "").strip() for row in remote_rows}
     remote_paths.discard("")
     candidates: list[str] = []
@@ -490,7 +551,9 @@ def import_remote_mirror_to_profile(
         raise ValueError("no importable mirror artifacts")
     staged: dict[str, Any] = {}
     for rel in candidates:
-        body = download_remote_mirror_artifact(authorization=authorization, artifact_path=rel, profile_id=pid)
+        body = download_remote_mirror_artifact(
+            authorization=authorization, artifact_path=rel, profile_id=source_pid
+        )
         doc = _parse_mirror_json(body, rel)
         _validate_mirror_staged_doc(rel, doc, allow_empty_catalogs=allow_empty_catalogs)
         staged[rel] = doc
@@ -535,4 +598,11 @@ def import_remote_mirror_to_profile(
             continue
         seen.add(name)
         ordered.append(name)
-    return {"ok": True, "imported": ordered, "count": len(ordered), "personal": personal_saved}
+    return {
+        "ok": True,
+        "imported": ordered,
+        "count": len(ordered),
+        "personal": personal_saved,
+        "sourceProfile": source_pid,
+        "profile": pid,
+    }

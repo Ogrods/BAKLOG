@@ -7,6 +7,7 @@
   <meta name="robots" content="noindex" />
   <meta name="description" content="Read-only view of your BAKLOG cloud mirror (Pro)." />
   <meta name="theme-color" content="#0f172a" />
+  <meta name="baklog-version" content="0.9.01" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="stylesheet" href="/mirror.css" />
@@ -14,22 +15,72 @@
 <body>
   <div class="mirror-shell">
     <header class="mirror-header">
-      <div>
-        <h1>BAKLOG</h1>
-        <p id="mirrorLead">Browse your cloud library from any browser.</p>
-        <span class="mirror-badge">Read-only · Pro cloud mirror</span>
+      <div class="mirror-header-row">
+        <div
+          class="app-header-brand"
+          title="BAKLOG cloud library - read-only Pro mirror"
+        >
+          <span class="brand-logo-mark" aria-hidden="true">
+            <svg
+              viewBox="2 24 96 52"
+              role="img"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <defs>
+                <linearGradient
+                  id="mirrorBrandMarkGrad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
+                >
+                  <stop offset="0%" stop-color="#fbbf24" />
+                  <stop offset="55%" stop-color="#f97316" />
+                  <stop offset="100%" stop-color="#e2502a" />
+                </linearGradient>
+                <mask
+                  id="mirrorBrandKnobs"
+                  maskUnits="userSpaceOnUse"
+                  x="0"
+                  y="0"
+                  width="100"
+                  height="100"
+                >
+                  <rect width="100" height="100" fill="#fff" />
+                  <circle cx="14" cy="64" r="8" fill="#000" />
+                  <circle cx="64" cy="64" r="8" fill="#000" />
+                  <circle cx="39" cy="36" r="8" fill="#000" />
+                </mask>
+              </defs>
+              <g class="brand-logo-pills" mask="url(#mirrorBrandKnobs)">
+                <rect x="2" y="52" width="46" height="24" rx="12" ry="12" />
+                <rect x="52" y="52" width="46" height="24" rx="12" ry="12" />
+                <rect x="27" y="24" width="46" height="24" rx="12" ry="12" />
+              </g>
+            </svg>
+          </span>
+          <h1 class="brand-wordmark">BAKLOG</h1>
+          <span class="brand-beta" aria-label="Beta">
+            <span class="brand-beta-label">Beta</span>
+          </span>
+          <span class="brand-beta mirror-cloud-chip" aria-label="Read-only cloud mirror">
+            <span class="brand-beta-label">Cloud</span>
+          </span>
+        </div>
+        <div class="mirror-header-actions mirror-actions hidden" id="mirrorSignedInActions">
+          <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorRefreshBtn">Refresh</button>
+          <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorSignOutBtn">Sign out</button>
+        </div>
       </div>
-      <div class="mirror-actions hidden" id="mirrorSignedInActions">
-        <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorRefreshBtn">Refresh</button>
-        <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorSignOutBtn">Sign out</button>
-      </div>
+      <p class="mirror-lead" id="mirrorLead">Browse your cloud library from any browser.</p>
     </header>
 
     <div id="mirrorAlert" class="mirror-alert hidden" role="alert"></div>
 
     <section class="mirror-panel mirror-panel--narrow" id="mirrorSignInPanel">
-      <h2 style="margin:0 0 0.75rem;font-size:1.1rem;">Sign in</h2>
-      <p class="mirror-empty" style="margin:0 0 1rem;">Use the same BAKLOG account as your desktop app. Pro plan required.</p>
+      <h2 class="mirror-panel-title">Sign in</h2>
+      <p class="mirror-empty mirror-signin-hint">Use the same BAKLOG account as your desktop app. Pro plan required.</p>
       <form id="mirrorSignInForm">
         <label for="mirrorEmail">Email</label>
         <input type="email" id="mirrorEmail" name="email" autocomplete="username" required />
@@ -37,7 +88,7 @@
         <input type="password" id="mirrorPassword" name="password" autocomplete="current-password" required />
         <button type="submit" class="mirror-btn mirror-btn--primary" id="mirrorSignInBtn">Sign in</button>
       </form>
-      <p style="margin:1rem 0 0;font-size:0.9rem;">
+      <p class="mirror-back-link">
         <a href="/">Back to baklog.app</a>
       </p>
     </section>
@@ -79,7 +130,7 @@
           <li>Enable <strong>Cloud sync to your account</strong> in Connections on your home PC.</li>
           <li>Run a store refresh or edit your library so catalog JSON uploads.</li>
         </ol>
-        <p style="margin-top:1rem;"><a href="/">Back to baklog.app</a></p>
+        <p class="mirror-back-link"><a href="/">Back to baklog.app</a></p>
       </div>
     </section>
   </div>

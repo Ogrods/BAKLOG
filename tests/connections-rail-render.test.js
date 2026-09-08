@@ -294,17 +294,22 @@ describe('cloud mirror prefs visibility', () => {
       <div id="connOnboard" hidden></div>
       <nav id="connRail" role="listbox"></nav>
       <div id="connPane"></div>
-      <label id="cloudMirrorToggleWrap" hidden>
-        <input id="cloudMirrorEnabledToggle" type="checkbox" />
-      </label>
-      <p id="cloudMirrorPlanNote" hidden></p>
-      <p id="cloudMirrorUploadStatus" hidden></p>
-      <button id="cloudMirrorSyncBtn" type="button" hidden>Sync now</button>
-      <button id="cloudMirrorImportBtn" type="button" hidden>Import</button>
-      <p id="bgRefreshPlanNote" hidden></p>
-      <input id="autoFetchOnConnectToggle" type="checkbox" />
-      <input id="autoFetchStale24hToggle" type="checkbox" />
-      <input id="shareAnonStatsToggle" type="checkbox" />
+      <div id="connPrefs" class="conn-prefs">
+        <input id="autoFetchOnConnectToggle" type="checkbox" />
+        <input id="autoFetchStale24hToggle" type="checkbox" />
+        <input id="shareAnonStatsToggle" type="checkbox" />
+        <p id="bgRefreshPlanNote" hidden></p>
+      </div>
+      <div id="connCloudPrefs" class="conn-prefs conn-cloud-prefs" hidden>
+        <div class="conn-cloud-prefs-row">
+          <label id="cloudMirrorToggleWrap" hidden>
+            <input id="cloudMirrorEnabledToggle" type="checkbox" />
+          </label>
+          <button id="cloudMirrorSyncBtn" type="button" class="hidden" hidden>Sync now</button>
+          <button id="cloudMirrorImportBtn" type="button" class="hidden" hidden>Import</button>
+        </div>
+        <p id="cloudMirrorUploadStatus" hidden></p>
+      </div>
     `;
   }
 
@@ -320,10 +325,10 @@ describe('cloud mirror prefs visibility', () => {
     const { refreshConnections } = await import('../js/connections.js');
     await refreshConnections();
 
+    expect(document.getElementById('connCloudPrefs')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(true);
-    expect(document.getElementById('cloudMirrorPlanNote')?.hidden).toBe(true);
   });
 
   it('shows cloud sync controls when capability is live for Pro account', async () => {
@@ -339,6 +344,7 @@ describe('cloud mirror prefs visibility', () => {
     const { refreshConnections } = await import('../js/connections.js');
     await refreshConnections();
 
+    expect(document.getElementById('connCloudPrefs')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(false);

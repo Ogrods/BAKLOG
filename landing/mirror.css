@@ -1,5 +1,23 @@
 :root {
   color-scheme: dark;
+  --bg: #0f172a;
+  --bg-panel: #1e293b;
+  --bg-elev: #334155;
+  --bg-hover: rgb(51 65 85);
+  --border: rgb(71 85 105);
+  --border-subtle: rgb(51 65 85);
+  --text: #e2e8f0;
+  --text-bright: #f8fafc;
+  --text-dim: #cbd5e1;
+  --text-mute: #94a3b8;
+  --accent: #38bdf8;
+  --accent-bright: #0ea5e9;
+  --accent-dim: #0ea5e9;
+  --accent-subtle: rgba(56, 189, 248, 0.15);
+  --accent-border: rgba(56, 189, 248, 0.45);
+  --accent-muted: #7dd3fc;
+  --header-control-h: 34px;
+  --brand-lockup-gap: clamp(-3.5rem, -5vw, -1rem);
 }
 
 * {
@@ -9,13 +27,17 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "DM Sans", system-ui, sans-serif;
-  background: #0f172a;
-  color: #e2e8f0;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
 }
 
 a {
-  color: #38bdf8;
+  color: var(--accent);
 }
 
 .mirror-shell {
@@ -25,75 +47,151 @@ a {
 }
 
 .mirror-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
-.mirror-header h1 {
+.mirror-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.app-header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.brand-logo-mark {
+  display: inline-flex;
+  height: 30px;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.brand-logo-mark svg {
+  display: block;
+  height: 100%;
+  width: auto;
+}
+
+.brand-logo-pills {
+  fill: currentColor;
+}
+
+.brand-wordmark {
   margin: 0;
-  font-family: "Space Grotesk", system-ui, sans-serif;
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  letter-spacing: 0.04em;
+  font-size: clamp(1.5rem, 3vw, 1.875rem);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
 }
 
-.mirror-header p {
-  margin: 0.35rem 0 0;
-  color: #94a3b8;
-  line-height: 1.5;
-}
-
-.mirror-badge {
-  display: inline-block;
-  margin-top: 0.5rem;
-  padding: 0.2rem 0.55rem;
+.brand-beta {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.3em;
+  margin-top: 0.15rem;
+  padding: 0.18em 0.45em;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #7dd3fc;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  white-space: nowrap;
+  transform: translate(-3px, -3px);
+}
+
+.brand-beta-label {
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
+.mirror-cloud-chip {
+  transform: translate(-6px, -3px);
+}
+
+.mirror-lead {
+  margin: 0.65rem 0 0;
+  color: var(--text-mute);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.mirror-header-actions {
+  margin-left: auto;
+}
+
+.mirror-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .mirror-panel {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
   padding: 1.25rem;
 }
 
 .mirror-panel--narrow {
   max-width: 28rem;
-  margin: 4rem auto 0;
+  margin: 2.5rem auto 0;
+}
+
+.mirror-panel-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  color: var(--text-bright);
+}
+
+.mirror-signin-hint {
+  margin: 0 0 1rem;
+}
+
+.mirror-back-link {
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
 }
 
 .mirror-panel label {
   display: block;
   margin: 0 0 0.35rem;
   font-size: 0.9rem;
-  color: #cbd5e1;
+  color: var(--text-dim);
 }
 
 .mirror-panel input,
-.mirror-panel select {
+.mirror-panel select,
+.mirror-toolbar input,
+.mirror-toolbar select {
   width: 100%;
   padding: 0.65rem 0.75rem;
   margin-bottom: 0.85rem;
   border-radius: 0.5rem;
-  border: 1px solid #334155;
-  background: #0f172a;
-  color: #f8fafc;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg);
+  color: var(--text-bright);
   font: inherit;
 }
 
 .mirror-panel input:focus,
-.mirror-panel select:focus {
-  outline: 2px solid #38bdf8;
-  border-color: #38bdf8;
+.mirror-panel select:focus,
+.mirror-toolbar input:focus,
+.mirror-toolbar select:focus {
+  outline: 2px solid var(--accent);
+  border-color: var(--accent);
 }
 
 .mirror-btn {
@@ -110,13 +208,13 @@ a {
 }
 
 .mirror-btn--primary {
-  background: #38bdf8;
-  color: #0f172a;
+  background: var(--accent);
+  color: var(--bg);
   width: 100%;
 }
 
 .mirror-btn--primary:hover {
-  background: #7dd3fc;
+  background: var(--accent-muted);
 }
 
 .mirror-btn--primary:disabled {
@@ -125,13 +223,24 @@ a {
 }
 
 .mirror-btn--ghost {
+  height: var(--header-control-h);
+  padding: 0 0.75rem;
   background: transparent;
-  color: #38bdf8;
-  border: 1px solid #334155;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .mirror-btn--ghost:hover {
-  border-color: #38bdf8;
+  color: var(--text-bright);
+  border-color: var(--accent-border);
+  background: var(--accent-subtle);
+}
+
+.mirror-btn--ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .mirror-toolbar {
@@ -154,18 +263,19 @@ a {
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 1rem;
-  color: #94a3b8;
+  color: var(--text-mute);
   font-size: 0.9rem;
 }
 
 .mirror-stats strong {
-  color: #f1f5f9;
+  color: var(--text-bright);
 }
 
 .mirror-table-wrap {
   overflow-x: auto;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
+  background: var(--bg-panel);
 }
 
 table.mirror-table {
@@ -177,14 +287,14 @@ table.mirror-table {
 .mirror-table th,
 .mirror-table td {
   padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--border-subtle);
   text-align: left;
   vertical-align: top;
 }
 
 .mirror-table th {
-  background: #172033;
-  color: #cbd5e1;
+  background: color-mix(in srgb, var(--bg) 70%, var(--bg-panel));
+  color: var(--text-dim);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -195,7 +305,7 @@ table.mirror-table {
 }
 
 .mirror-table tbody tr:hover {
-  background: rgba(56, 189, 248, 0.05);
+  background: var(--accent-subtle);
 }
 
 .mirror-table .col-num {
@@ -207,8 +317,8 @@ table.mirror-table {
   display: inline-block;
   padding: 0.15rem 0.45rem;
   border-radius: 0.35rem;
-  background: #334155;
-  color: #e2e8f0;
+  background: var(--bg-elev);
+  color: var(--text);
   font-size: 0.78rem;
 }
 
@@ -218,8 +328,8 @@ table.mirror-table {
 }
 
 .mirror-status--finished {
-  background: rgba(56, 189, 248, 0.18);
-  color: #7dd3fc;
+  background: var(--accent-subtle);
+  color: var(--accent-muted);
 }
 
 .mirror-status--next {
@@ -228,9 +338,10 @@ table.mirror-table {
 }
 
 .mirror-note {
-  color: #64748b;
+  color: var(--text-mute);
   font-size: 0.82rem;
   margin-top: 0.15rem;
+  opacity: 0.85;
 }
 
 .mirror-alert {
@@ -247,13 +358,13 @@ table.mirror-table {
 }
 
 .mirror-alert--info {
-  background: rgba(56, 189, 248, 0.1);
+  background: var(--accent-subtle);
   color: #bae6fd;
   border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .mirror-empty {
-  color: #94a3b8;
+  color: var(--text-mute);
   line-height: 1.6;
 }
 
@@ -268,24 +379,24 @@ table.mirror-table {
   border-radius: 0.5rem;
   font-size: 0.82rem;
   line-height: 1.45;
-  color: #94a3b8;
-  background: rgba(148, 163, 184, 0.08);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: var(--text-mute);
+  background: color-mix(in srgb, var(--text-mute) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-mute) 18%, transparent);
 }
 
 .hidden {
   display: none !important;
 }
 
-.mirror-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
 @media (max-width: 640px) {
-  .mirror-header {
+  .mirror-header-row {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mirror-header-actions {
+    margin-left: 0;
+    width: 100%;
   }
 
   .mirror-table th:nth-child(5),

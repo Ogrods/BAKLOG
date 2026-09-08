@@ -40,8 +40,8 @@ const CATALOG_FETCH_CONCURRENCY = 5;
 const COLSPAN = 10;
 
 /** Retry header/Steam CDN once, then leave the letter placeholder visible. */
-window.__baklogMirrorCoverError = function mirrorCoverError(img) {
-  if (!img) return;
+function mirrorCoverError(img) {
+  if (!img || img.classList.contains('mirror-cover--failed')) return;
   const wrap = img.closest('.mirror-cover-wrap');
   const showPlaceholder = () => {
     img.classList.add('mirror-cover--failed');
@@ -61,7 +61,20 @@ window.__baklogMirrorCoverError = function mirrorCoverError(img) {
     return;
   }
   showPlaceholder();
-};
+}
+
+/** CSP on /mirror forbids inline onerror; bind after each virtual paint. */
+function bindMirrorCoverErrors(root = tableBody) {
+  if (!root) return;
+  root.querySelectorAll('img.mirror-cover:not([data-mirror-cover-bound])').forEach((img) => {
+    img.dataset.mirrorCoverBound = '1';
+    img.addEventListener('error', () => mirrorCoverError(img));
+    // Cached failures can complete before the listener attaches.
+    if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) {
+      mirrorCoverError(img);
+    }
+  });
+}
 
 /** @type {ReturnType<typeof mergeMirrorLibrary>} */
 let allRows = [];
@@ -153,7 +166,7 @@ function coverCellHtml(row) {
         ? ` data-fallback="${escapeHtml(fallback)}"`
         : '';
     // Letter sits under the image so any load failure still leaves a placeholder.
-    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap">${letter}<img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"${fbAttr} onerror="window.__baklogMirrorCoverError&&window.__baklogMirrorCoverError(this)" /></div></td>`;
+    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap">${letter}<img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"${fbAttr} /></div></td>`;
   }
   return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap">${letter}</div></td>`;
 }
@@ -342,6 +355,7 @@ function paintMirrorSlice() {
   if (!usesMirrorVirtualScroll(len)) {
     tableBody.innerHTML = list.map((row, i) => rowHtml(row, i)).join('');
     _virtualWindow = { start: 0, end: len };
+    bindMirrorCoverErrors();
     refreshMeasuredRowHeight();
     return;
   }
@@ -366,6 +380,7 @@ function paintMirrorSlice() {
   }
   parts.push(spacerHtml('bottom', (len - end) * _rowHeightPx));
   tableBody.innerHTML = parts.join('');
+  bindMirrorCoverErrors();
   refreshMeasuredRowHeight();
 }
 

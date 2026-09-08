@@ -40,7 +40,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Changed
 
 - Hosted cloud library rows show covers (store CDNs) plus playtime, HLTB, Steam %, Metacritic, deal price when synced, release, and last played - closer to the desktop library table without uploading image files.
-- Hosted cloud library About this view explains read-only sync vs desktop Import; when more than one cloud profile is uploaded it notes that the table is merged.
+- Hosted cloud library About this view explains read-only sync vs desktop Import, that store credentials stay on your PC, and when more than one cloud profile is uploaded it notes that the table is merged.
 - Import from cloud mirror can choose which cloud profile folder to pull into the current local profile.
 - Hosted cloud library (`/mirror`) is usable on phone and tablet: app breakpoint ladder, touch-sized controls, and card rows on narrow viewports.
 - Hosted cloud library (`/mirror`) header uses the same brand lockup as the desktop app (logo, wordmark, Cloud chip) at a denser size so it does not read oversized without the app nav beside it; Refresh and Sign out stay in the header.
@@ -51,6 +51,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Hosted cloud library cover fallback no longer uses inline `onerror` (blocked by CSP); dead CDN art still shows the letter placeholder.
 - Hosted cloud library always keeps a letter placeholder under covers, so dead itch/Steam art never leaves an empty hole.
 - Hosted cloud library covers fall back to the Steam header art when the portrait library capsule is missing (for example Afterfall InSanity Extended Edition).
 - Hosted cloud library covers load again (CSP allows HTTPS store CDN images on `/mirror`).

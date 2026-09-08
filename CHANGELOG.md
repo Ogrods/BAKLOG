@@ -39,6 +39,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- Hosted cloud library (`/mirror`) is usable on phone and tablet: app breakpoint ladder, touch-sized controls, and card rows on narrow viewports.
 - Hosted cloud library (`/mirror`) header uses the same brand lockup as the desktop app (logo, wordmark, Cloud chip) at a denser size so it does not read oversized without the app nav beside it; Refresh and Sign out stay in the header.
 - Free claims feed refreshed; stale approved-only ids pruned from the maintainer list.
 - Library watch no longer ships with a default Pico Park watch; only watches you arm stay armed.

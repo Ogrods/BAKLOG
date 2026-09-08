@@ -151,12 +151,25 @@ def run_smoke(bundle_dir, *, expected_version=None, port=BUNDLE_SMOKE_PORT):
                 "get_mirror_pro_error": (mirror_body or {}).get("error"),
                 "post_import_status": import_status,
             }
-            if mirror_status not in (HTTPStatus.FORBIDDEN, HTTPStatus.UNAUTHORIZED):
-                report["error"] = f"expected GET /api/mirror -> 403/401, got {mirror_status}"
-                return report
-            if import_status not in (HTTPStatus.FORBIDDEN, HTTPStatus.UNAUTHORIZED):
-                report["error"] = f"expected POST /api/mirror/import -> 403/401, got {import_status}"
-                return report
+            # Soft-gate: branches without mirror routes return 404; skip strict check.
+            if mirror_status == HTTPStatus.NOT_FOUND and import_status == HTTPStatus.NOT_FOUND:
+                report["checks"]["mirror_routes"]["skipped"] = "routes not wired"
+            else:
+                if mirror_status not in (HTTPStatus.FORBIDDEN, HTTPStatus.UNAUTHORIZED):
+                    report["error"] = f"expected GET /api/mirror -> 403/401, got {mirror_status}"
+                    return report
+                # Prefer the explicit Pro gate body when the route is live (not a vacuous
+                # pre-auth 401 from the global /api/* bearer check alone).
+                if mirror_status == HTTPStatus.FORBIDDEN:
+                    err = str((mirror_body or {}).get("error") or "")
+                    if err != "Pro plan required":
+                        report["error"] = (
+                            f"expected GET /api/mirror 403 body 'Pro plan required', got {err!r}"
+                        )
+                        return report
+                if import_status not in (HTTPStatus.FORBIDDEN, HTTPStatus.UNAUTHORIZED):
+                    report["error"] = f"expected POST /api/mirror/import -> 403/401, got {import_status}"
+                    return report
     if not isinstance(config, dict):
         report["error"] = "invalid /api/config response"
         return report

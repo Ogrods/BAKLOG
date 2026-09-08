@@ -54,8 +54,19 @@ flowchart LR
 Everything inside the machine boundary is assumed to run as **your** OS user.
 BAKLOG's security goal is that nothing crosses the boundary except the
 storefront calls you ask for and the files you explicitly export. Optional
-Supabase auth adds a small hosted login box (credentials and catalog JSON still
-on your machine unless you later opt into Phase 6 cloud mirror work).
+Supabase auth adds a small hosted login box (credentials stay on your machine).
+Pro users can optionally opt into a **read-only cloud mirror** of catalog JSON
+(`games_*.json`, prices, personal statuses) to a private Supabase Storage bucket
+for browsing at baklog.app/mirror and importing onto another PC. Credentials,
+cache/, and secrets never leave the machine. Mirror upload is off by default,
+gated behind Connections → Cloud sync, and requires the `cloud_sync_mirror`
+capability to be `live` (override with `BAKLOG_CAP_CLOUD_MIRROR=live` for
+maintainer E2E). Individual objects are capped at **25 MiB** in the app and the
+`baklog-mirror` bucket. Comp-Pro emails on `BAKLOG_COMP_PRO_EMAILS` pass the
+hosted Vercel gate, but Storage RLS still requires a Pro plan claim on the JWT -
+sign out/in once after a grant so `app_metadata.plan` refreshes. Deleting hosted
+mirror objects is owner-side for now (Supabase dashboard / Storage); an in-app
+delete path is planned.
 
 ## Assets we protect
 

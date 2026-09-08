@@ -1,5 +1,15 @@
 import { baklogFetch, urlWithStreamTicket } from "./api-client.js";
-import { isAccountAuthMode, isPro } from "./auth-gate.js";
+import {
+  getAccessToken,
+  isAccountAuthMode,
+  isPro,
+  refreshAccountPlan,
+} from "./auth-gate.js";
+import {
+  capabilityStatus,
+  getProSettings,
+  setProSettings,
+} from "./pro-capabilities.js";
 import { isPageHidden, registerPausable } from "./visibility.js";
 import { escapeAttr, escapeHtml, isSafeHttpUrl } from "./dom-util.js";
 import { bindEscapeClose, trapFocus } from "./focus-trap.js";
@@ -35,6 +45,13 @@ import {
   sourceFacet,
   syncConnRailSelection,
 } from "./connections-rail.js";
+import {
+  describeImportScope,
+  fetchMirrorSnapshot,
+  formatLastUploadedBy,
+  listImportableArtifactPaths,
+  summarizeLocalUploadState,
+} from "./cloud-mirror-status.js";
 
 export { FETCHER_AUTH_PROVIDER };
 export {
@@ -499,6 +516,32 @@ function renderConnPrefs() {
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
   if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
+  const cloudWrap = document.getElementById("cloudMirrorToggleWrap");
+  const cloudToggle = document.getElementById("cloudMirrorEnabledToggle");
+  const cloudNote = document.getElementById("cloudMirrorPlanNote");
+  const importBtn = document.getElementById("cloudMirrorImportBtn");
+  const showCloudMirror =
+    isPro() &&
+    isAccountAuthMode() &&
+    !!getAccessToken() &&
+    capabilityStatus("cloud_sync_mirror") === "live";
+  if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
+  if (importBtn) importBtn.hidden = !showCloudMirror;
+  if (cloudToggle && showCloudMirror) {
+    cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
+  }
+  if (cloudNote) {
+    if (showCloudMirror) {
+      cloudNote.hidden = false;
+      cloudNote.classList.add("conn-prefs-note--pro");
+      cloudNote.textContent = getProSettings().cloudMirrorEnabled
+        ? "Cloud sync uploads catalog JSON after fetch/save (~30s). Browse library backlog at baklog.app/mirror (wishlists import via button below)."
+        : "Enable to upload catalog JSON to your account after fetch/save (credentials stay on this PC).";
+    } else {
+      cloudNote.hidden = true;
+    }
+  }
+
   const note = document.getElementById("bgRefreshPlanNote");
   if (note) {
     if (isPro()) {
@@ -511,6 +554,138 @@ function renderConnPrefs() {
       note.classList.remove("conn-prefs-note--pro");
     }
     note.hidden = false;
+  }
+  void refreshCloudMirrorUploadStatus();
+}
+
+let _cloudMirrorStatusRequest = 0;
+
+async function refreshCloudMirrorUploadStatus() {
+  const el = document.getElementById("cloudMirrorUploadStatus");
+  if (!el) return;
+  const showCloudMirror =
+    isPro() &&
+    isAccountAuthMode() &&
+    !!getAccessToken() &&
+    capabilityStatus("cloud_sync_mirror") === "live";
+  const enabled = getProSettings().cloudMirrorEnabled === true;
+  if (!showCloudMirror || !enabled) {
+    el.hidden = true;
+    el.textContent = "";
+    el.classList.remove("conn-prefs-note--error");
+    return;
+  }
+  const reqId = ++_cloudMirrorStatusRequest;
+  try {
+    const snap = await fetchMirrorSnapshot();
+    if (reqId !== _cloudMirrorStatusRequest) return;
+    const summary = summarizeLocalUploadState(snap.localUploadState);
+    const by = formatLastUploadedBy(snap.localUploadState);
+    el.hidden = false;
+    el.textContent = by ? `${summary.line} ${by}` : summary.line;
+    el.classList.toggle("conn-prefs-note--error", summary.kind === "error");
+  } catch {
+    if (reqId !== _cloudMirrorStatusRequest) return;
+    el.hidden = false;
+    el.textContent = "Could not read mirror upload status.";
+    el.classList.remove("conn-prefs-note--error");
+  }
+}
+
+async function saveCloudMirrorEnabled(enabled) {
+  const res = await baklogFetch("/api/pro/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cloudMirrorEnabled: !!enabled }),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+  if (!res.ok) {
+    throw new Error(data.error || `Save failed (${res.status})`);
+  }
+  if (data.proSettings) setProSettings(data.proSettings);
+  await refreshAccountPlan();
+  return data;
+}
+
+async function handleCloudMirrorToggle(ev) {
+  const toggle = ev.target;
+  const prev = !toggle.checked;
+  try {
+    toggle.disabled = true;
+    await saveCloudMirrorEnabled(toggle.checked);
+    renderConnPrefs();
+    void refreshCloudMirrorUploadStatus();
+  } catch (err) {
+    toggle.checked = prev;
+    window.alert(err?.message || "Could not save cloud sync setting.");
+  } finally {
+    toggle.disabled = false;
+  }
+}
+
+async function openCloudMirrorImportDialog(artifacts) {
+  const dialog = document.getElementById("cloudMirrorImportDialog");
+  const listEl = document.getElementById("cloudMirrorImportArtifactList");
+  const personalToggle = document.getElementById("cloudMirrorImportPersonal");
+  const intro = document.getElementById("cloudMirrorImportIntro");
+  if (!dialog || !listEl || !personalToggle) return null;
+
+  const paths = listImportableArtifactPaths(artifacts);
+  if (!paths.length) return null;
+
+  const scope = describeImportScope(paths);
+  if (intro) {
+    intro.textContent =
+      `This replaces local mirrorable files with your cloud copy (${scope.join(", ")}). ` +
+      "Store credentials are not copied - reconnect stores afterward.";
+  }
+  listEl.innerHTML = paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("");
+  personalToggle.checked = paths.includes("data/personal.json");
+  personalToggle.disabled = !paths.includes("data/personal.json");
+
+  dialog.returnValue = "cancel";
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      "close",
+      () => {
+        resolve({
+          confirmed: dialog.returnValue === "confirm",
+          includePersonal: personalToggle.checked,
+        });
+      },
+      { once: true },
+    );
+  });
+}
+
+async function handleCloudMirrorImport() {
+  const btn = document.getElementById("cloudMirrorImportBtn");
+  try {
+    if (btn) btn.disabled = true;
+    const snap = await fetchMirrorSnapshot();
+    const choice = await openCloudMirrorImportDialog(snap.artifacts);
+    if (!choice?.confirmed) return;
+
+    const { importFromCloudMirror } = await import("./cloud-mirror-import.js");
+    const result = await importFromCloudMirror({
+      includePersonal: choice.includePersonal,
+    });
+    const count = result?.count ?? 0;
+    const imported = Array.isArray(result?.imported) ? result.imported.join(", ") : "";
+    window.alert(
+      `Cloud sync import complete (${count} file${count === 1 ? "" : "s"}).${imported ? `\n\n${imported}` : ""}\n\nThe app will reload.`,
+    );
+    window.location.reload();
+  } catch (err) {
+    window.alert(err?.message || "Cloud mirror import failed.");
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -620,6 +795,11 @@ function renderConnections() {
 
 function handleLayoutClick(ev) {
   const target = ev.target;
+
+  if (target.id === "cloudMirrorImportBtn") {
+    void handleCloudMirrorImport();
+    return;
+  }
 
   const startSteam = target.closest("[data-conn-start-steam]");
 
@@ -826,6 +1006,8 @@ function wireGridEvents() {
       savePrefs();
       if (ev.target.checked) startMetrics();
       else stopMetrics();
+    } else if (ev.target.id === "cloudMirrorEnabledToggle") {
+      void handleCloudMirrorToggle(ev);
     }
   });
 

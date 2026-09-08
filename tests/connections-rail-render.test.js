@@ -41,6 +41,16 @@ vi.mock('../js/api-client.js', () => ({
 
 vi.mock('../js/auth-gate.js', () => ({
   isAccountAuthMode: vi.fn(() => false),
+  isPro: vi.fn(() => false),
+  getAccessToken: vi.fn(() => null),
+  getProSettings: vi.fn(() => ({ cloudMirrorEnabled: false })),
+  refreshAccountPlan: vi.fn(async () => 'free'),
+}));
+
+vi.mock('../js/pro-capabilities.js', () => ({
+  capabilityStatus: vi.fn(() => 'soon'),
+  getProSettings: vi.fn(() => ({ cloudMirrorEnabled: false })),
+  setProSettings: vi.fn(() => ({ cloudMirrorEnabled: false })),
 }));
 
 vi.mock('../js/filters-ui.js', () => ({
@@ -48,7 +58,7 @@ vi.mock('../js/filters-ui.js', () => ({
 }));
 
 vi.mock('../js/state.js', () => ({
-  state: { activeView: 'connections' },
+  state: { activeView: 'connections', prefs: {} },
   STORAGE_KEY: 'steam-backlog-personal',
   PREFS_KEY: 'steam-backlog-ui-prefs',
   MANUAL_KEY: 'steam-backlog-manual-games',
@@ -269,5 +279,65 @@ describe('connections content groups (Nintendo)', () => {
     expect(note).toMatch(/about two years/i);
     expect(note).toMatch(/not marked stale/i);
     expect(note).toMatch(/bulk Remove/i);
+  });
+});
+
+describe('cloud mirror prefs visibility', () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  function mountCloudPrefsDom() {
+    document.body.innerHTML = `
+      <strong id="connHeroCount"></strong>
+      <span id="connProgressFill"></span>
+      <div id="connOnboard" hidden></div>
+      <nav id="connRail" role="listbox"></nav>
+      <div id="connPane"></div>
+      <label id="cloudMirrorToggleWrap" hidden>
+        <input id="cloudMirrorEnabledToggle" type="checkbox" />
+      </label>
+      <p id="cloudMirrorPlanNote" hidden></p>
+      <p id="cloudMirrorUploadStatus" hidden></p>
+      <button id="cloudMirrorImportBtn" type="button" hidden>Import</button>
+      <p id="bgRefreshPlanNote" hidden></p>
+      <input id="autoFetchOnConnectToggle" type="checkbox" />
+      <input id="autoFetchStale24hToggle" type="checkbox" />
+      <input id="shareAnonStatsToggle" type="checkbox" />
+    `;
+  }
+
+  it('hides cloud sync controls when capability is soon', async () => {
+    mountCloudPrefsDom();
+    const auth = await import('../js/auth-gate.js');
+    const caps = await import('../js/pro-capabilities.js');
+    vi.mocked(auth.isPro).mockReturnValue(true);
+    vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
+    vi.mocked(auth.getAccessToken).mockReturnValue('tok');
+    vi.mocked(caps.capabilityStatus).mockReturnValue('soon');
+
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+
+    expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(true);
+    expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(true);
+    expect(document.getElementById('cloudMirrorPlanNote')?.hidden).toBe(true);
+  });
+
+  it('shows cloud sync controls when capability is live for Pro account', async () => {
+    mountCloudPrefsDom();
+    const auth = await import('../js/auth-gate.js');
+    const caps = await import('../js/pro-capabilities.js');
+    vi.mocked(auth.isPro).mockReturnValue(true);
+    vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
+    vi.mocked(auth.getAccessToken).mockReturnValue('tok');
+    vi.mocked(caps.capabilityStatus).mockReturnValue('live');
+    vi.mocked(caps.getProSettings).mockReturnValue({ cloudMirrorEnabled: false });
+
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+
+    expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(false);
+    expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(false);
   });
 });

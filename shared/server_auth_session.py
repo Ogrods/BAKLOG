@@ -15,6 +15,7 @@ def _srv():
 def handle_auth_session_get(handler: SimpleHTTPRequestHandler) -> None:
     from shared.comp_pro import ensure_comp_pro_on_login
     from shared.entitlement import PLAN_PRO, current_plan, note_authenticated_plan
+    from shared.mirror_session import note_authenticated_mirror_session
     from shared.profile_paths import get_active_profile_id
     from shared.supabase_auth import verify_bearer_user
 
@@ -38,6 +39,11 @@ def handle_auth_session_get(handler: SimpleHTTPRequestHandler) -> None:
             # in this response; forcing refreshSession caused false sign-in failures on
             # v0.8.24 when the follow-up probe missed.
             refresh_session = upgraded
+    if plan == PLAN_PRO and authorization:
+        try:
+            note_authenticated_mirror_session(authorization, user_id=str(user_id or ""))
+        except Exception:
+            pass
     s._send_json(
         handler,
         HTTPStatus.OK,

@@ -51,6 +51,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Hosted cloud library covers fall back to the Steam header art when the portrait library capsule is missing (for example Afterfall InSanity Extended Edition).
 - Hosted cloud library covers load again (CSP allows HTTPS store CDN images on `/mirror`).
 - Hosted cloud library scrolls large catalogs with virtual rows so the page does not freeze when thousands of games load.
 - Cloud mirror page no longer hits "Too many requests" when loading a full library (higher limits for `/api/mirror` and `/api/auth-config`).

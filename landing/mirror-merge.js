@@ -54,19 +54,6 @@ function storeRank(store) {
   return idx === -1 ? order.length : idx;
 }
 
-/** @param {unknown} url */
-export function sanitizeMirrorCoverUrl(url) {
-  if (!url) return '';
-  let u = String(url).trim();
-  if (!u) return '';
-  u = u.replace('://images-eds.xboxlive.com/', '://images-eds-ssl.xboxlive.com/');
-  if (u.includes('${size}') && /cdn\.nintendo\.net/i.test(u)) {
-    u = u.replace(/\$\{size\}/g, '256');
-  }
-  if (!/^https?:\/\//i.test(u)) return '';
-  return u;
-}
-
 /**
  * Prefer library_image, then header_image, then Steam header CDN.
  * @param {Record<string, unknown>} g
@@ -82,6 +69,43 @@ export function mirrorCoverUrlFor(g) {
     return `${STEAM_HEADER_CDN}/${id}/header.jpg`;
   }
   return '';
+}
+
+/**
+ * Secondary cover when primary 404s (common for older Steam titles without
+ * library_600x900 capsules). Distinct from primary only.
+ * @param {Record<string, unknown>} g
+ * @param {string} [primary]
+ */
+export function mirrorCoverFallbackUrlFor(g, primary = '') {
+  const primaryUrl = primary || mirrorCoverUrlFor(g);
+  const candidates = [];
+  const header = sanitizeMirrorCoverUrl(g?.header_image);
+  if (header) candidates.push(header);
+  const store = String(g?.store || '').toLowerCase();
+  const id = g?.id;
+  if (store === 'steam' && id != null && String(id).trim() !== '' && /^\d+$/.test(String(id))) {
+    candidates.push(`${STEAM_HEADER_CDN}/${id}/header.jpg`);
+  }
+  for (const url of candidates) {
+    if (url && url !== primaryUrl) return url;
+  }
+  return '';
+}
+
+/** @param {unknown} url */
+export function sanitizeMirrorCoverUrl(url) {
+  if (!url) return '';
+  let u = String(url).trim();
+  if (!u) return '';
+  u = u.replace('://images-eds.xboxlive.com/', '://images-eds-ssl.xboxlive.com/');
+  // itch occasionally ships a broken "originalb" size token; original works when the asset exists.
+  u = u.replace(/\/originalb\//g, '/original/');
+  if (u.includes('${size}') && /cdn\.nintendo\.net/i.test(u)) {
+    u = u.replace(/\$\{size\}/g, '256');
+  }
+  if (!/^https?:\/\//i.test(u)) return '';
+  return u;
 }
 
 /** @param {Record<string, unknown>} g */
@@ -249,6 +273,7 @@ export function mergeMirrorLibrary(catalogEntries, personalDoc, options = {}) {
         finiteOrNull(g.steam_rating) ??
         finiteOrNull(g.rating);
       const metacritic = finiteOrNull(g.metacritic) ?? finiteOrNull(g.metacritic_score);
+      const coverUrl = mirrorCoverUrlFor(g);
       rows.push({
         key,
         store,
@@ -262,7 +287,8 @@ export function mergeMirrorLibrary(catalogEntries, personalDoc, options = {}) {
         hltbCompletionist: finiteOrNull(g.hltb_completionist_hours ?? g.hltb_completionist),
         notes: String(rec.notes || ''),
         hidden,
-        coverUrl: mirrorCoverUrlFor(g),
+        coverUrl,
+        coverFallbackUrl: mirrorCoverFallbackUrlFor(g, coverUrl),
         steamPercent,
         metacritic,
         released: dateLabel(g.release_date ?? g.released ?? g.release),

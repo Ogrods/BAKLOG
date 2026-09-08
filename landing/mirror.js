@@ -39,23 +39,39 @@ const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 const CATALOG_FETCH_CONCURRENCY = 5;
 const COLSPAN = 10;
 
+/** Dead CDN URLs (403/404) remembered for this page session so virtual scroll does not re-request them. */
+const failedCoverUrls = new Set();
+
+function markCoverUrlFailed(url) {
+  const u = String(url || '').trim();
+  if (u) failedCoverUrls.add(u);
+}
+
 /** Retry header/Steam CDN once, then leave the letter placeholder visible. */
 function mirrorCoverError(img) {
   if (!img || img.classList.contains('mirror-cover--failed')) return;
   const wrap = img.closest('.mirror-cover-wrap');
   const showPlaceholder = () => {
+    markCoverUrlFailed(img.getAttribute('src'));
     img.classList.add('mirror-cover--failed');
     img.removeAttribute('src');
     img.alt = '';
     const letter = wrap?.querySelector('.mirror-cover-fallback');
     if (letter) letter.hidden = false;
   };
+  const current = String(img.getAttribute('src') || '').trim();
+  markCoverUrlFailed(current);
   if (img.dataset.mirrorCoverTried === '1') {
     showPlaceholder();
     return;
   }
   const next = String(img.dataset.fallback || '').trim();
-  if (next && /^https?:\/\//i.test(next) && next !== img.getAttribute('src')) {
+  if (
+    next
+    && /^https?:\/\//i.test(next)
+    && next !== current
+    && !failedCoverUrls.has(next)
+  ) {
     img.dataset.mirrorCoverTried = '1';
     img.src = next;
     return;
@@ -157,12 +173,20 @@ function formatScore(value) {
 
 function coverCellHtml(row) {
   const initial = escapeHtml(String(row.title || '?').trim().charAt(0).toUpperCase() || '?');
-  const url = String(row.coverUrl || '').trim();
-  const fallback = String(row.coverFallbackUrl || '').trim();
+  let url = String(row.coverUrl || '').trim();
+  let fallback = String(row.coverFallbackUrl || '').trim();
   const letter = `<span class="mirror-cover-fallback" aria-hidden="true">${initial}</span>`;
+  if (url && failedCoverUrls.has(url)) {
+    if (fallback && fallback !== url && !failedCoverUrls.has(fallback) && /^https?:\/\//i.test(fallback)) {
+      url = fallback;
+      fallback = '';
+    } else {
+      return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap">${letter}</div></td>`;
+    }
+  }
   if (url && /^https?:\/\//i.test(url)) {
     const fbAttr =
-      fallback && /^https?:\/\//i.test(fallback) && fallback !== url
+      fallback && /^https?:\/\//i.test(fallback) && fallback !== url && !failedCoverUrls.has(fallback)
         ? ` data-fallback="${escapeHtml(fallback)}"`
         : '';
     // Letter sits under the image so any load failure still leaves a placeholder.
@@ -413,6 +437,7 @@ async function loadLibrary(session) {
   if (!token) return;
   const userId = String(session?.user?.id || '').trim();
   showAlert('');
+  failedCoverUrls.clear();
   signInBtn.disabled = true;
   refreshBtn.disabled = true;
   try {

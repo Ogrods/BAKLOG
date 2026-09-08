@@ -61,8 +61,9 @@ function startStaticServer() {
       res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
       fs.createReadStream(filePath).pipe(res);
     } catch (err) {
+      console.error(err);
       res.writeHead(500);
-      res.end(String(err));
+      res.end('internal error');
     }
   });
   return new Promise((resolve) => {

@@ -39,12 +39,19 @@ const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 const CATALOG_FETCH_CONCURRENCY = 5;
 const COLSPAN = 10;
 
-/** Retry header/Steam CDN once, then show letter placeholder. */
+/** Retry header/Steam CDN once, then leave the letter placeholder visible. */
 window.__baklogMirrorCoverError = function mirrorCoverError(img) {
-  if (!img || img.dataset.mirrorCoverTried === '1') {
-    img.style.display = 'none';
-    const fallback = img.nextElementSibling;
-    if (fallback) fallback.hidden = false;
+  if (!img) return;
+  const wrap = img.closest('.mirror-cover-wrap');
+  const showPlaceholder = () => {
+    img.classList.add('mirror-cover--failed');
+    img.removeAttribute('src');
+    img.alt = '';
+    const letter = wrap?.querySelector('.mirror-cover-fallback');
+    if (letter) letter.hidden = false;
+  };
+  if (img.dataset.mirrorCoverTried === '1') {
+    showPlaceholder();
     return;
   }
   const next = String(img.dataset.fallback || '').trim();
@@ -53,9 +60,7 @@ window.__baklogMirrorCoverError = function mirrorCoverError(img) {
     img.src = next;
     return;
   }
-  img.style.display = 'none';
-  const fallback = img.nextElementSibling;
-  if (fallback) fallback.hidden = false;
+  showPlaceholder();
 };
 
 /** @type {ReturnType<typeof mergeMirrorLibrary>} */
@@ -141,14 +146,16 @@ function coverCellHtml(row) {
   const initial = escapeHtml(String(row.title || '?').trim().charAt(0).toUpperCase() || '?');
   const url = String(row.coverUrl || '').trim();
   const fallback = String(row.coverFallbackUrl || '').trim();
+  const letter = `<span class="mirror-cover-fallback" aria-hidden="true">${initial}</span>`;
   if (url && /^https?:\/\//i.test(url)) {
     const fbAttr =
       fallback && /^https?:\/\//i.test(fallback) && fallback !== url
         ? ` data-fallback="${escapeHtml(fallback)}"`
         : '';
-    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"${fbAttr} onerror="window.__baklogMirrorCoverError&&window.__baklogMirrorCoverError(this)" /><span class="mirror-cover-fallback" hidden aria-hidden="true">${initial}</span></div></td>`;
+    // Letter sits under the image so any load failure still leaves a placeholder.
+    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap">${letter}<img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"${fbAttr} onerror="window.__baklogMirrorCoverError&&window.__baklogMirrorCoverError(this)" /></div></td>`;
   }
-  return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><span class="mirror-cover-fallback" aria-hidden="true">${initial}</span></div></td>`;
+  return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap">${letter}</div></td>`;
 }
 
 function gameCellHtml(row) {

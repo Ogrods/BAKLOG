@@ -51,6 +51,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 
+- Hosted cloud library always keeps a letter placeholder under covers, so dead itch/Steam art never leaves an empty hole.
 - Hosted cloud library covers fall back to the Steam header art when the portrait library capsule is missing (for example Afterfall InSanity Extended Edition).
 - Hosted cloud library covers load again (CSP allows HTTPS store CDN images on `/mirror`).
 - Hosted cloud library scrolls large catalogs with virtual rows so the page does not freeze when thousands of games load.

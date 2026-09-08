@@ -290,6 +290,7 @@ a {
 
 .mirror-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-subtle);
   border-radius: 0.5rem;
   background: var(--bg-panel);
@@ -297,6 +298,7 @@ a {
 
 table.mirror-table {
   width: 100%;
+  min-width: 56rem;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
@@ -306,7 +308,7 @@ table.mirror-table {
   padding: 0.5rem 0.65rem;
   border-bottom: 1px solid var(--border-subtle);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .mirror-table th {
@@ -330,10 +332,25 @@ table.mirror-table {
   white-space: nowrap;
 }
 
+.mirror-table .col-date {
+  white-space: nowrap;
+}
+
 .mirror-table .col-cover {
   width: 2.75rem;
   padding-right: 0.35rem;
   vertical-align: middle;
+}
+
+/* Multi-line title + meta stay top-aligned; metrics stay middle. */
+.mirror-table td.col-game {
+  vertical-align: top;
+}
+
+/* Phone-only stats band; keep column present for colspan/spacers. */
+.mirror-table th.col-stats,
+.mirror-table td.col-stats {
+  display: none;
 }
 
 .mirror-cover-wrap {
@@ -547,15 +564,7 @@ table.mirror-table {
     min-width: 0;
   }
 
-  /* Hide Price, MC, Released (cols 8, 7, 9) */
-  .mirror-table th.col-mc,
-  .mirror-table td.col-mc,
-  .mirror-table th:nth-child(8),
-  .mirror-table td.col-price,
-  .mirror-table th:nth-child(9),
-  .mirror-table td.col-released {
-    display: none;
-  }
+  /* All metric columns stay available via horizontal scroll on .mirror-table-wrap. */
 }
 
 /* --- Phone + short landscape sheet --- */
@@ -628,6 +637,7 @@ table.mirror-table {
   .mirror-table tbody {
     display: block;
     width: 100%;
+    min-width: 0;
   }
 
   .mirror-table thead {
@@ -640,11 +650,15 @@ table.mirror-table {
     border: 1px solid var(--border-subtle);
     border-radius: 0.5rem;
     background: var(--bg-panel);
-    min-height: 8.5rem;
+    min-height: 0;
     display: grid;
     grid-template-columns: 3rem minmax(0, 1fr);
+    grid-template-areas:
+      "cover game"
+      "stats stats";
     column-gap: 0.75rem;
-    row-gap: 0.15rem;
+    row-gap: 0.55rem;
+    align-items: start;
   }
 
   .mirror-table tbody tr.mirror-virtual-spacer {
@@ -662,40 +676,23 @@ table.mirror-table {
   }
 
   .mirror-table td {
-    display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr);
-    gap: 0.35rem 0.75rem;
-    align-items: start;
-    padding: 0.28rem 0;
+    display: block;
+    padding: 0;
     border-bottom: none;
     text-align: left;
     width: auto;
+    vertical-align: top;
   }
 
-  .mirror-table td.col-num {
+  .mirror-table td.col-num,
+  .mirror-table td.col-date {
     text-align: left;
     white-space: normal;
   }
 
-  .mirror-table td::before {
-    content: attr(data-label);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-mute);
-    padding-top: 0.15rem;
-  }
-
   .mirror-table td.col-cover {
-    grid-column: 1;
-    grid-row: 1 / span 3;
+    grid-area: cover;
     display: block;
-    padding: 0;
-  }
-
-  .mirror-table td.col-cover::before {
-    display: none;
   }
 
   .mirror-cover-wrap {
@@ -704,35 +701,60 @@ table.mirror-table {
   }
 
   .mirror-table td.col-game {
-    grid-column: 2;
-    grid-row: 1;
-    grid-template-columns: 1fr;
-    padding-bottom: 0.35rem;
-    margin-bottom: 0.15rem;
-    border-bottom: 1px solid var(--border-subtle);
+    grid-area: game;
+    padding: 0;
+    margin: 0;
+    border-bottom: none;
+    vertical-align: top;
   }
 
-  .mirror-table td.col-game::before {
+  /* Desktop metric columns unused on phone - stats band carries them. */
+  .mirror-table td[data-label="Status"],
+  .mirror-table td.col-num,
+  .mirror-table td.col-date {
     display: none;
   }
 
-  .mirror-table td[data-label="Status"] {
-    grid-column: 2;
-    grid-row: 2;
+  .mirror-table td.col-stats {
+    grid-area: stats;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.45rem;
+    align-items: center;
+    padding-top: 0.15rem;
+    border-top: 1px solid var(--border-subtle);
   }
 
-  .mirror-table td[data-label="Played"],
-  .mirror-table td[data-label="HLTB"] {
-    grid-column: 2;
+  .mirror-stat-chip {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 4.5rem;
+    max-width: 100%;
+    padding: 0.28rem 0.45rem;
+    border-radius: 0.35rem;
+    background: color-mix(in srgb, var(--bg-elev) 85%, transparent);
+    border: 1px solid var(--border-subtle);
   }
 
-  /* Hide lower-priority metrics on phone cards */
-  .mirror-table td.col-steam,
-  .mirror-table td.col-mc,
-  .mirror-table td.col-price,
-  .mirror-table td.col-released,
-  .mirror-table td.col-lastplayed {
-    display: none;
+  .mirror-stat-chip-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    line-height: 1.1;
+  }
+
+  .mirror-stat-chip-value {
+    font-size: 0.8rem;
+    color: var(--text);
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .mirror-stat-chip-value .mirror-status {
+    font-size: 0.75rem;
   }
 }
 
@@ -753,9 +775,11 @@ table.mirror-table {
 
   .mirror-table tbody tr {
     padding: 0.55rem 0.65rem;
+    column-gap: 0.55rem;
   }
 
-  .mirror-table td {
-    grid-template-columns: 4.75rem minmax(0, 1fr);
+  .mirror-stat-chip {
+    min-width: 4.1rem;
+    padding: 0.24rem 0.4rem;
   }
 }

@@ -39,6 +39,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- Hosted cloud library metric columns (status, playtime, scores, dates) are vertically centered in the row while the title stays top-aligned.
+- Hosted cloud library keeps every metric column on tablet via horizontal scroll instead of hiding Price / Metacritic / Released.
+- Hosted cloud library phone cards show all metrics in a wrapping stats band under the title (Status through Last played).
 - Hosted cloud library rows show covers (store CDNs) plus playtime, HLTB, Steam %, Metacritic, deal price when synced, release, and last played - closer to the desktop library table without uploading image files.
 - Hosted cloud library About this view explains read-only sync vs desktop Import, that store credentials stay on your PC, and when more than one cloud profile is uploaded it notes that the table is merged.
 - Import from cloud mirror can choose which cloud profile folder to pull into the current local profile.

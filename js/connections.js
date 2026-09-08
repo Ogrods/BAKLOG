@@ -577,6 +577,7 @@ async function refreshCloudMirrorUploadStatus() {
     capabilityStatus("cloud_sync_mirror") === "live";
   const enabled = getProSettings().cloudMirrorEnabled === true;
   if (!showCloudMirror || !enabled) {
+    ++_cloudMirrorStatusRequest;
     el.hidden = true;
     el.textContent = "";
     el.classList.remove("conn-prefs-note--error");
@@ -640,13 +641,19 @@ async function handleCloudMirrorSyncNow() {
     }
     const errors = Array.isArray(data.errors) ? data.errors : [];
     const uploaded = data.uploaded && typeof data.uploaded === "object" ? data.uploaded : {};
-    const okCount = Object.values(uploaded).filter((s) => s === "ok").length;
-    const errCount = Object.values(uploaded).filter((s) => s === "error").length;
+    const statuses = Object.values(uploaded);
+    const okCount = statuses.filter((s) => s === "ok").length;
+    const failCount = statuses.filter((s) => s !== "ok").length;
+    const tooLargeCount = statuses.filter((s) => s === "too_large").length;
     if (statusEl) {
       statusEl.hidden = false;
-      if (errors.length || errCount) {
-        const first = errors[0] ? String(errors[0]) : `${errCount} file(s) failed`;
-        statusEl.textContent = `Mirror sync: ${okCount} ok, ${errCount || errors.length} failed. ${first}`;
+      if (errors.length || failCount) {
+        const first = errors[0]
+          ? String(errors[0])
+          : tooLargeCount
+            ? `${tooLargeCount} file(s) over the size limit`
+            : `${failCount} file(s) failed`;
+        statusEl.textContent = `Mirror sync: ${okCount} ok, ${failCount || errors.length} failed. ${first}`;
         statusEl.classList.add("conn-prefs-note--error");
       } else if (!okCount && !(data.scheduled || []).length) {
         statusEl.textContent = "Nothing to sync yet - connect a store and fetch first.";
@@ -675,6 +682,25 @@ async function handleCloudMirrorToggle(ev) {
   const prev = !toggle.checked;
   try {
     toggle.disabled = true;
+    if (toggle.checked) {
+      const confirmed = window.confirm(
+        [
+          "Enable Cloud sync?",
+          "",
+          "This copies your library catalogs and personal statuses/notes from this PC into your BAKLOG account cloud storage.",
+          "Anyone signed into your account can read that data on baklog.app/mirror.",
+          "Store passwords, cookies, and secrets stay on this PC and are never uploaded.",
+          "",
+          "You can turn Cloud sync off later. New uploads stop, but existing cloud files remain until you delete them in your account storage (Supabase).",
+          "",
+          "Only continue if you understand you are exposing backlog data beyond this machine.",
+        ].join("\n"),
+      );
+      if (!confirmed) {
+        toggle.checked = false;
+        return;
+      }
+    }
     await saveCloudMirrorEnabled(toggle.checked);
     renderConnPrefs();
     void refreshCloudMirrorUploadStatus();

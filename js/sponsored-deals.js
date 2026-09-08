@@ -346,7 +346,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Library on every machine',
     slogan: 'Keep library JSON and personal prefs aligned - no manual exports.',
-    tagline: 'Cloud sync for Pro supporters - coming soon.',
+    tagline: 'Cloud sync for Pro supporters - opt-in upload of catalogs and personal statuses. Credentials stay local.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -802,7 +802,7 @@ export const PRO_PROMO = {
     },
     {
       title: 'Cloud sync',
-      desc: 'Coming soon: keep your library and personal data aligned across machines without manual exports.',
+      desc: 'Opt-in upload of library catalogs and personal statuses to your account. Browse read-only at baklog.app/mirror. Credentials stay on your PC.',
       icon: '☁',
     },
     {
@@ -829,7 +829,7 @@ export const PRO_PROMO = {
     { feature: 'Claimable Now (full games)', free: '✓', pro: '✓ + bonus DLC/bonus feed' },
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
-    { feature: 'Cloud sync', free: '-', pro: 'Coming' },
+    { feature: 'Cloud sync', free: '-', pro: '✓ (opt-in)' },
     { feature: 'Deal/watchlist alerts', free: '-', pro: 'Coming' },
   ],
   trustPoints: [

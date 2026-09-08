@@ -313,7 +313,7 @@ export function proCheckoutUrls() {
   return { ..._proCheckout };
 }
 
-/** Re-read plan from the server (JWT session probe or /api/config). */
+/** Re-read plan + capabilities from the server (session probe then /api/config). */
 export async function refreshAccountPlan() {
   try {
     if (_authRequired && _accessToken) {
@@ -323,10 +323,7 @@ export async function refreshAccountPlan() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (typeof data.plan === "string" && data.plan) {
-          setPlan(data.plan);
-          return _plan;
-        }
+        if (typeof data.plan === "string" && data.plan) setPlan(data.plan);
       }
     }
     const headers = _accessToken
@@ -390,6 +387,17 @@ async function probeServerToken() {
       if (!error && refData.session) applySession(refData.session);
       // Re-probe for updated plan claim; do not fail sign-in on a transient miss.
       await probeServerTokenWithRetry(2);
+    }
+    if (ok) {
+      // Capabilities/settings need Authorization; boot may have applied anonymous /api/config.
+      try {
+        const cfgRes = await fetch("/api/config", {
+          headers: { Authorization: `Bearer ${_accessToken}` },
+        });
+        if (cfgRes.ok) applyConfigEntitlement(await cfgRes.json());
+      } catch {
+        /* keep last known entitlement */
+      }
     }
     return ok;
   } catch {

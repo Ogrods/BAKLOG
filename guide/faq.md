@@ -19,8 +19,9 @@ An optional **$5/mo** paid tier ($50/yr) adds more - see [What's in the paid tie
 - Deep achievement/trophy sync (full on-demand re-pull; free tier shows cached % only)
 - Bonus claimables feed for DLC, add-ons, and in-game bonuses filtered out of the free feed
 - **Queued bulk refresh** (queue every stale store back-to-back from Fetcher health)
+- **Opt-in cloud sync** across machines (catalogs and personal statuses; credentials stay local; browse at baklog.app/mirror)
 
-**Coming soon:** cloud sync across machines and deal/watchlist alerts.
+**Coming soon:** deal/watchlist alerts.
 
 See [baklog.app](https://baklog.app/) for checkout links and the full comparison.
 

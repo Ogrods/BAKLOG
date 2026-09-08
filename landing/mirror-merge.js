@@ -252,16 +252,20 @@ export function mergeItadPrices(rows, itadDoc) {
 }
 
 /**
- * @param {{ path: string, doc: unknown }[]} catalogEntries
- * @param {unknown} personalDoc
+ * @param {{ path: string, doc: unknown, personal?: unknown }[]} catalogEntries
+ * @param {unknown} [personalDoc] fallback when an entry has no `personal`
  * @param {{ includeHidden?: boolean }} [options]
  */
 export function mergeMirrorLibrary(catalogEntries, personalDoc, options = {}) {
-  const personal = personalMap(personalDoc);
+  const fallbackPersonal = personalMap(personalDoc);
   const rows = [];
   for (const entry of catalogEntries || []) {
     const store = storeFromCatalogArtifact(entry.path);
     if (!store) continue;
+    const personal =
+      entry.personal !== undefined && entry.personal !== null
+        ? personalMap(entry.personal)
+        : fallbackPersonal;
     const doc = entry.doc && typeof entry.doc === 'object' ? entry.doc : {};
     const games = Array.isArray(doc.games) ? doc.games : [];
     for (const raw of games) {

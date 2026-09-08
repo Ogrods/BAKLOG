@@ -1,6 +1,6 @@
 # BAKLOG — agent brief
 
-**BAKLOG** is a local-only cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine — nothing is hosted for end users except the public marketing landing (`landing/` on Vercel).
+**BAKLOG** is a local-only cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine by default. The public marketing landing (`landing/` on Vercel) may also host an **opt-in** Pro mirror viewer at baklog.app/mirror: catalogs appear there only after the signed-in Pro user enables Cloud sync. Credentials never sync.
 
 ## Architecture (one screen)
 

@@ -24,15 +24,17 @@ FAQ JSON-LD must match the `#faq` details list via `npm run check:landing-seo`. 
 - `mirror.html` / `mirror.js` / `mirror-merge.js` / `mirror.css` — signed-in Pro viewer for mirrored library backlog (`/mirror`, noindex). Wishlists and prices sync; claimables are not mirrored.
 - `sql/cloud_mirror.sql` — one-time Supabase bucket + RLS for `baklog-mirror` and `cloud_mirror_snapshots` (25 MiB object cap).
 
-### Cloud mirror owner E2E (before capability live)
+### Cloud mirror (live opt-in)
 
-Capability `cloud_sync_mirror` defaults to **soon** (Connections UI hidden). Do not flip marketing or the registry default until this passes:
+Capability `cloud_sync_mirror` is **live**. Connections shows Cloud sync for Pro + signed-in accounts; upload stays off until the user confirms the risk dialog and enables the toggle.
 
-1. Run `sql/cloud_mirror.sql` in the Supabase SQL editor. Confirm bucket `baklog-mirror` is **private**, RLS policies use `mirror_is_pro_jwt()`, and `device_id` exists on `cloud_mirror_snapshots`. Object size limit is **25 MiB** (matches the app).
-2. Vercel Production env: `BAKLOG_SUPABASE_URL` + anon key (or `SUPABASE_*`), optional `BAKLOG_COMP_PRO_EMAILS`, and KV (`KV_REST_API_*` or Upstash). Without KV, prod `GET /api/mirror` returns **503**.
+Postconditions to verify after deploy or regression:
+
+1. `sql/cloud_mirror.sql` applied: bucket `baklog-mirror` is **private**, RLS uses `mirror_is_pro_jwt()`, `device_id` on `cloud_mirror_snapshots`, **25 MiB** object cap.
+2. Vercel Production env: `BAKLOG_SUPABASE_URL` + anon key (or `SUPABASE_*`), optional `BAKLOG_COMP_PRO_EMAILS`, and KV. Without KV, prod `GET /api/mirror` returns **503**.
 3. Non-Pro signed-in user → hosted `GET /api/mirror` returns **403**.
-4. Local app with `BAKLOG_CAP_CLOUD_MIRROR=live`: Pro + account sign-in → enable **Cloud sync** on Connections → fetch stores as needed → **Sync now** → objects under `baklog-mirror/{uid}/{profile}/` → open [baklog.app/mirror](https://baklog.app/mirror) → **Import from cloud mirror** on a second profile/PC. Wrong profile claim → **409**. Comp-Pro: sign out/in once after a grant so Storage RLS sees `plan=pro` on the JWT.
-5. Only then: set capability default / marketing to live and stamp tracker `p6_cloud_sync_mirror` **[DONE]**.
+4. Pro + account sign-in → risk confirm → enable **Cloud sync** → **Sync now** → objects under `baklog-mirror/{uid}/{profile}/` → [baklog.app/mirror](https://baklog.app/mirror) shows catalogs → **Import from cloud mirror** overwrites the active local profile. Wrong profile claim → **409**. Comp-Pro: sign out/in once after a grant so Storage RLS sees `plan=pro` on the JWT (do not weaken Storage RLS to an email allowlist).
+5. Hosted `/mirror` is an **opt-in Pro surface** on the marketing site - not a silent data leak. Credentials never sync.
 
 - `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.

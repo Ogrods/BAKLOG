@@ -268,13 +268,15 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
   Wishlist deal links from IsThereAnyDeal use ITAD's own redirect URLs and are
   left unchanged (ITAD API terms).
 - No automatic sync between machines by default. Pro users can opt in to a
-  read-only **cloud mirror** (Connections → Cloud sync) that uploads catalog
-  JSON and personal statuses to a private bucket under their account - never
-  credentials, browser cache, or claimables feeds. Objects are capped at 25 MiB.
-  Browse at baklog.app/mirror; Import restores into the active profile on
-  another PC. Hosted copies are removed by the project owner in Supabase Storage
-  until an in-app delete control ships. For moving credentials, use the portable
-  secrets bundle (Connections → Export bundle…).
+  read-only **cloud mirror** (Connections → Cloud sync, with a blocking risk
+  confirm) that uploads catalog JSON and personal statuses to a private bucket
+  under their account - never credentials, browser cache, or claimables feeds.
+  Objects are capped at 25 MiB. Browse at baklog.app/mirror while signed in;
+  Import overwrites matching files in the active local profile on another PC.
+  Turning Cloud sync off stops new uploads; existing hosted objects remain until
+  the account owner deletes them in Supabase Storage (in-app delete is planned).
+  For moving credentials, use the portable secrets bundle (Connections → Export
+  bundle…).
 
 ## Removing your data
 

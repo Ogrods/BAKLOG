@@ -16,7 +16,7 @@ def read_pro_settings(*, profile_id=None):
     out = dict(DEFAULT_PRO_SETTINGS)
     try:
         doc = json.loads(pro_settings_path(profile_id=profile_id).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
         return out
     if not isinstance(doc, dict):
         return out
@@ -32,7 +32,9 @@ def write_pro_settings(updates, *, profile_id=None):
         if key not in ALLOWED_KEYS:
             raise ValueError(f"unknown pro setting: {key!r}")
         if key == "cloudMirrorEnabled":
-            current[key] = bool(value)
+            if not isinstance(value, bool):
+                raise ValueError("cloudMirrorEnabled must be boolean")
+            current[key] = value
         else:
             current[key] = value
     path = pro_settings_path(profile_id=profile_id)

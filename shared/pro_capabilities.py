@@ -1,12 +1,10 @@
 """Pro capability registry for GET /api/config.
 
-``cloud_sync_mirror`` defaults to ``soon`` until owner E2E; override with
-``BAKLOG_CAP_CLOUD_MIRROR=live|soon|off``.
+``cloud_sync_mirror`` is live for Pro accounts that opt in on Connections.
 """
 
 from __future__ import annotations
 
-import os
 from typing import Any, Literal
 
 from shared.entitlement import PLAN_PRO
@@ -53,7 +51,7 @@ CAPABILITY_REGISTRY: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "cloud_sync_mirror",
-        "status": "soon",
+        "status": "live",
         "requires_plan": True,
         "requires_auth": True,
         "requires_opt_in": True,
@@ -85,17 +83,6 @@ CAPABILITY_REGISTRY: tuple[dict[str, Any], ...] = (
 CAPABILITY_IDS = frozenset(spec["id"] for spec in CAPABILITY_REGISTRY)
 
 
-def _env_cloud_mirror_status() -> CapabilityStatus | None:
-    raw = (os.environ.get("BAKLOG_CAP_CLOUD_MIRROR") or "").strip().lower()
-    if raw in ("live", "soon", "off"):
-        return raw  # type: ignore[return-value]
-    if raw in ("coming", "false", "0", "no"):
-        return "soon" if raw == "coming" else "off"
-    if raw in ("true", "1", "yes"):
-        return "live"
-    return None
-
-
 def _spec_by_id(capability_id: str) -> dict[str, Any] | None:
     for spec in CAPABILITY_REGISTRY:
         if spec["id"] == capability_id:
@@ -103,28 +90,18 @@ def _spec_by_id(capability_id: str) -> dict[str, Any] | None:
     return None
 
 
-def _effective_spec(spec: dict[str, Any]) -> dict[str, Any]:
-    out = dict(spec)
-    if out.get("id") == "cloud_sync_mirror":
-        override = _env_cloud_mirror_status()
-        if override is not None:
-            out["status"] = override
-    return out
-
-
 def resolve_capability(spec: dict[str, Any], *, plan: str, pro_settings: dict[str, Any]) -> dict[str, Any]:
-    effective = _effective_spec(spec)
-    status = effective.get("status", "soon")
+    status = spec.get("status", "soon")
     if status == "off":
         return {"status": "off", "enabled": False}
     if status != "live":
         return {"status": status, "enabled": False}
-    if effective.get("requires_plan", True) and plan != PLAN_PRO:
+    if spec.get("requires_plan", True) and plan != PLAN_PRO:
         return {"status": status, "enabled": False}
-    if effective.get("requires_auth") and not auth_enabled():
+    if spec.get("requires_auth") and not auth_enabled():
         return {"status": status, "enabled": False}
-    if effective.get("requires_opt_in"):
-        key = effective.get("opt_in_key") or ""
+    if spec.get("requires_opt_in"):
+        key = spec.get("opt_in_key") or ""
         if not pro_settings.get(key):
             return {"status": status, "enabled": False}
     return {"status": status, "enabled": True}
@@ -147,11 +124,11 @@ def capability_enabled(capability_id: str, *, plan: str, pro_settings: dict[str,
 
 
 def capability_registry_status(capability_id: str) -> CapabilityStatus:
-    """Effective registry status (env overrides), ignoring plan and opt-in."""
+    """Registry status for a capability id, ignoring plan and opt-in."""
     spec = _spec_by_id(capability_id)
     if spec is None:
         return "off"
-    status = _effective_spec(spec).get("status", "soon")
+    status = spec.get("status", "soon")
     if status in ("live", "soon", "off"):
         return status  # type: ignore[return-value]
     return "soon"

@@ -33,6 +33,11 @@ def _query(handler):
 def handle_mirror_get(handler) -> None:
     srv = _srv()
     authorization = handler.headers.get("Authorization") or ""
+    from shared.supabase_auth import auth_enabled
+
+    if auth_enabled() and not authorization:
+        srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "Sign in required"})
+        return
     if not mirror_read_allowed(authorization=authorization):
         srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
         return
@@ -100,13 +105,13 @@ def handle_mirror_import_post(handler) -> None:
     if not srv._require_api_auth(handler):
         return
     authorization = handler.headers.get("Authorization") or ""
-    if not mirror_read_allowed(authorization=authorization):
-        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
-        return
     from shared.supabase_auth import auth_enabled
 
     if auth_enabled() and not authorization:
         srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "Sign in required"})
+        return
+    if not mirror_read_allowed(authorization=authorization):
+        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
         return
     payload, err = srv._read_json_body(handler, max_bytes=4096)
     if err:

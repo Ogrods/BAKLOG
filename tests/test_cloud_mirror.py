@@ -249,23 +249,21 @@ def test_import_successful_overwrite(profile_home: Path, monkeypatch: pytest.Mon
     assert personal_doc.get("personal", {}).get("steam:9", {}).get("status") == "playing"
 
 
-def test_mirror_upload_blocked_when_capability_soon(
+def test_mirror_upload_blocked_when_opt_in_off(
     profile_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("BAKLOG_CAP_CLOUD_MIRROR", "soon")
     monkeypatch.setattr(cloud_mirror, "is_pro_background", lambda: True)
     monkeypatch.setattr(
         cloud_mirror,
         "read_pro_settings",
-        lambda **_: {"cloudMirrorEnabled": True},
+        lambda **_: {"cloudMirrorEnabled": False},
     )
     assert cloud_mirror.mirror_upload_allowed(profile_id="default") is False
 
 
-def test_mirror_upload_allowed_when_capability_live(
+def test_mirror_upload_allowed_when_live_pro_opt_in(
     profile_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("BAKLOG_CAP_CLOUD_MIRROR", "live")
     monkeypatch.setattr(cloud_mirror, "is_pro_background", lambda: True)
     monkeypatch.setattr(
         cloud_mirror,
@@ -273,3 +271,19 @@ def test_mirror_upload_allowed_when_capability_live(
         lambda **_: {"cloudMirrorEnabled": True},
     )
     assert cloud_mirror.mirror_upload_allowed(profile_id="default") is True
+
+
+def test_save_mirror_upload_state_is_atomic(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[Path] = []
+
+    def fake_atomic(path, text, **_kw):
+        calls.append(path)
+        path.write_text(text, encoding="utf-8")
+
+    monkeypatch.setattr("shared.safe_write.atomic_write_text", fake_atomic)
+    cloud_mirror._save_mirror_upload_state("default", {"games_steam.json": "ok"})
+    assert calls
+    state = cloud_mirror.read_mirror_upload_state(profile_id="default")
+    assert state["artifacts"]["games_steam.json"]["status"] == "ok"

@@ -22,7 +22,7 @@ from shared.mirror_artifacts import (
 )
 from shared.mirror_session import get_mirror_session
 from shared.pro_settings import read_pro_settings
-from shared.profile_paths import PROFILES_DIR, get_active_profile_id, profile_root
+from shared.profile_paths import PROFILES_DIR, ROOT, get_active_profile_id, profile_root
 from shared.supabase_mirror import mirror_device_id
 
 DEBOUNCE_SEC = 30.0
@@ -228,10 +228,9 @@ def _flush_profile_uploads(profile_id: str, paths: set[str]) -> None:
             )
         return
     from shared.supabase_mirror import upload_mirror_object, upsert_mirror_snapshot_row
-    from shared.profile_paths import ROOT as REPO_ROOT
 
     root = profile_root(profile_id=pid).resolve()
-    allowed = (PROFILES_DIR.resolve(), Path(REPO_ROOT).resolve())
+    allowed = (PROFILES_DIR.resolve(), Path(ROOT).resolve())
     if not any(root == base or root.is_relative_to(base) for base in allowed):
         return
     uploaded: dict[str, str] = {}

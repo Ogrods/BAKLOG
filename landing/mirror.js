@@ -39,6 +39,25 @@ const PHONE_MQ = '(max-width: 639.98px), (max-height: 480px) and (hover: none)';
 const CATALOG_FETCH_CONCURRENCY = 5;
 const COLSPAN = 10;
 
+/** Retry header/Steam CDN once, then show letter placeholder. */
+window.__baklogMirrorCoverError = function mirrorCoverError(img) {
+  if (!img || img.dataset.mirrorCoverTried === '1') {
+    img.style.display = 'none';
+    const fallback = img.nextElementSibling;
+    if (fallback) fallback.hidden = false;
+    return;
+  }
+  const next = String(img.dataset.fallback || '').trim();
+  if (next && /^https?:\/\//i.test(next) && next !== img.getAttribute('src')) {
+    img.dataset.mirrorCoverTried = '1';
+    img.src = next;
+    return;
+  }
+  img.style.display = 'none';
+  const fallback = img.nextElementSibling;
+  if (fallback) fallback.hidden = false;
+};
+
 /** @type {ReturnType<typeof mergeMirrorLibrary>} */
 let allRows = [];
 /** @type {ReturnType<typeof mergeMirrorLibrary>} */
@@ -121,8 +140,13 @@ function formatScore(value) {
 function coverCellHtml(row) {
   const initial = escapeHtml(String(row.title || '?').trim().charAt(0).toUpperCase() || '?');
   const url = String(row.coverUrl || '').trim();
+  const fallback = String(row.coverFallbackUrl || '').trim();
   if (url && /^https?:\/\//i.test(url)) {
-    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none';var f=this.nextElementSibling;if(f)f.hidden=false" /><span class="mirror-cover-fallback" hidden aria-hidden="true">${initial}</span></div></td>`;
+    const fbAttr =
+      fallback && /^https?:\/\//i.test(fallback) && fallback !== url
+        ? ` data-fallback="${escapeHtml(fallback)}"`
+        : '';
+    return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><img class="mirror-cover" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async"${fbAttr} onerror="window.__baklogMirrorCoverError&&window.__baklogMirrorCoverError(this)" /><span class="mirror-cover-fallback" hidden aria-hidden="true">${initial}</span></div></td>`;
   }
   return `<td class="col-cover" data-label="Cover"><div class="mirror-cover-wrap"><span class="mirror-cover-fallback" aria-hidden="true">${initial}</span></div></td>`;
 }

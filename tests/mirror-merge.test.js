@@ -5,7 +5,9 @@ import {
   formatItadPriceLabel,
   mergeItadPrices,
   mergeMirrorLibrary,
+  mirrorCoverFallbackUrlFor,
   mirrorCoverUrlFor,
+  sanitizeMirrorCoverUrl,
   sortMirrorRows,
   summarizeMirrorRows,
 } from '../landing/mirror-merge.js';
@@ -77,6 +79,24 @@ describe('mirror-merge', () => {
       'https://cdn.akamai.steamstatic.com/steam/apps/570/header.jpg',
     );
     expect(mirrorCoverUrlFor({ store: 'gog', id: 'x', library_image: 'ftp://bad' })).toBe('');
+  });
+
+  it('keeps a distinct header fallback when library capsule is primary', () => {
+    const g = {
+      store: 'steam',
+      id: '224420',
+      library_image: 'https://cdn.akamai.steamstatic.com/steam/apps/224420/library_600x900.jpg',
+      header_image: 'https://cdn.akamai.steamstatic.com/steam/apps/224420/header.jpg',
+    };
+    const primary = mirrorCoverUrlFor(g);
+    expect(primary).toContain('library_600x900');
+    expect(mirrorCoverFallbackUrlFor(g, primary)).toContain('header.jpg');
+  });
+
+  it('rewrites itch originalb size token', () => {
+    expect(
+      sanitizeMirrorCoverUrl('https://img.itch.zone/aW1nLzE=/originalb/x.gif'),
+    ).toBe('https://img.itch.zone/aW1nLzE=/original/x.gif');
   });
 
   it('joins ITAD prices by game key', () => {

@@ -81,6 +81,20 @@ def test_refuse_drift_accepts_int_count(tmp_path):
     assert refuse_drift_result(120, label="x", allow_drift=False, output_path=out) is None
 
 
+def test_refuse_drift_reads_items_and_itad_baselines(tmp_path):
+    claims = tmp_path / "free_claims.json"
+    claims.write_text(json.dumps({"items": [{}] * 20}), encoding="utf-8")
+    assert refuse_drift_result(2, label="claims", allow_drift=False, output_path=claims) == 3
+
+    itad = tmp_path / "itad_prices.json"
+    itad.write_text(
+        json.dumps({"count": 40, "by_key": {str(i): {} for i in range(40)}}),
+        encoding="utf-8",
+    )
+    assert refuse_drift_result(5, label="itad", allow_drift=False, output_path=itad) == 3
+    assert refuse_drift_result(30, label="itad", allow_drift=False, output_path=itad) is None
+
+
 def test_pct_partial_and_total():
     assert pct(0, 10) == "0%"
     assert pct(5, 10) == "50%"

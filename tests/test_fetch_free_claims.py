@@ -80,3 +80,19 @@ def test_fetch_error_exits_1(monkeypatch, out_path):
     monkeypatch.setattr(sys, "argv", ["fetchers.fetch_free_claims.py"])
     assert ffc.main() == 1
     assert not out_path.exists()
+
+
+def test_drift_refuses_with_exit_3(monkeypatch, out_path):
+    prior = {"items": [_valid_item(f"g{i}") for i in range(10)]}
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    code = _run(monkeypatch, {"items": [_valid_item("only")]})
+    assert code == 3
+    assert json.loads(out_path.read_text(encoding="utf-8")) == prior
+
+
+def test_drift_allowed_with_flag(monkeypatch, out_path):
+    prior = {"items": [_valid_item(f"g{i}") for i in range(10)]}
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    code = _run(monkeypatch, {"items": [_valid_item("only")]}, "--allow-drift")
+    assert code == 0
+    assert len(json.loads(out_path.read_text(encoding="utf-8"))["items"]) == 1

@@ -10,7 +10,12 @@ from datetime import UTC, datetime
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from fetchers._base import configure_stdout
+from fetchers._base import (
+    add_allow_empty_arg,
+    configure_stdout,
+    refuse_drift_result,
+    refuse_empty_result,
+)
 from fetchers._progress import RunStats, started
 from shared.free_claims_sources import has_valid_claim_links
 from shared.profile_paths import free_claims_path
@@ -42,11 +47,7 @@ def main() -> int:
         help="Hosted feed URL (default: BAKLOG_CLAIMS_URL or baklog.app)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Validate only; do not write")
-    parser.add_argument(
-        "--allow-empty",
-        action="store_true",
-        help="Allow writing an empty claims file (e.g. genuinely no live giveaways).",
-    )
+    add_allow_empty_arg(parser)
     args = parser.parse_args()
 
     stats = RunStats()
@@ -81,13 +82,23 @@ def main() -> int:
             f"(need id, store, and valid claim link(s)): {sample}{more}"
         )
 
-    # Refuse to overwrite the user's claims with nothing unless explicitly allowed.
-    if valid == 0 and not args.allow_empty:
-        stats.error(
-            "feed produced 0 valid claim(s) (need id, store, and valid claim link(s)) — refusing to "
-            "overwrite. Re-run with --allow-empty if there are genuinely no live giveaways."
-        )
-        return stats.finish("fetch_free_claims", t0, exit_code=2)
+    out = free_claims_path()
+    empty_exit = refuse_empty_result(
+        valid_items,
+        label="hosted free-claims feed",
+        allow_empty=args.allow_empty,
+        output_path=out,
+    )
+    if empty_exit is not None:
+        return stats.finish("fetch_free_claims", t0, exit_code=empty_exit)
+    drift_exit = refuse_drift_result(
+        valid_items,
+        label="hosted free-claims feed",
+        allow_drift=args.allow_drift,
+        output_path=out,
+    )
+    if drift_exit is not None:
+        return stats.finish("fetch_free_claims", t0, exit_code=drift_exit)
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
@@ -99,7 +110,6 @@ def main() -> int:
     if isinstance(attribution, list) and attribution:
         payload["attribution"] = attribution
 
-    out = free_claims_path()
     if args.dry_run:
         print(f"dry-run: would write {valid} claim(s) to {out}", flush=True)
     else:

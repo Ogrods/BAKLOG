@@ -821,6 +821,9 @@ export async function refreshAccessToken() {
       if (!data.session) return null;
       applySession(data.session);
       if (await probeServerTokenWithRetry(2)) return _accessToken;
+      // Supabase refresh can succeed while the local server still rejects the
+      // bearer - clear so callers do not keep sending a dead JWT.
+      applySession(null);
       return null;
     } finally {
       _refreshInFlight = null;

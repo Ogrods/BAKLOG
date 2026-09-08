@@ -15,7 +15,12 @@ from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
 from clients.itad_client import ItadClient, ItadError
-from fetchers._base import add_allow_empty_arg, configure_stdout, refuse_empty_result
+from fetchers._base import (
+    add_allow_empty_arg,
+    configure_stdout,
+    refuse_drift_result,
+    refuse_empty_result,
+)
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
 from shared.fx import ensure_fx_rates
 from shared.money import country_to_currency
@@ -189,7 +194,7 @@ def main() -> int:
         # zero resolution means every wishlist title failed to match - refuse the
         # empty overwrite rather than wipe existing prices.
         empty_exit = refuse_empty_result(
-            plain_by_key,
+            len(plain_by_key),
             label="ITAD price resolution",
             allow_empty=args.allow_empty,
             output_path=ITAD_JSON,
@@ -212,6 +217,23 @@ def main() -> int:
             stats.warn(f"no price data for {key}")
 
     out = itad_path()
+    empty_priced = refuse_empty_result(
+        len(by_key),
+        label="ITAD priced rows",
+        allow_empty=args.allow_empty,
+        output_path=out,
+    )
+    if empty_priced is not None:
+        return stats.finish("fetch_itad", t0, exit_code=empty_priced)
+    drift = refuse_drift_result(
+        len(by_key),
+        label="ITAD priced rows",
+        allow_drift=args.allow_drift,
+        output_path=out,
+    )
+    if drift is not None:
+        return stats.finish("fetch_itad", t0, exit_code=drift)
+
     merged_by_key: dict[str, dict] = {}
     if out.exists():
         try:
@@ -240,11 +262,10 @@ def main() -> int:
             flush=True,
         )
     stats.ok = len(by_key)
-    exit_code = 0 if by_key or args.allow_empty else 2
     return stats.finish(
         "fetch_itad",
         t0,
-        exit_code=exit_code,
+        exit_code=0,
         extra=f"{len(by_key)}/{len(titles)} priced",
     )
 

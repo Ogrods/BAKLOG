@@ -785,12 +785,18 @@ html[data-boot-loading] #bootLoadingOverlay {
   display: flex;
   position: fixed;
   inset: 0;
+  /* Prefer dvh so flex centering uses the visible viewport on mobile chrome. */
+  height: 100vh;
+  max-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   z-index: var(--overlay-z-boot);
   align-items: center;
   justify-content: center;
   background: var(--bg);
   padding: 1.5rem;
   margin: 0;
+  box-sizing: border-box;
 }
 .boot-loading-card {
   display: flex;
@@ -3801,7 +3807,12 @@ body.bulk-bar-open {
   top: var(--view-overlay-top, 0);
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: auto;
+  /* Bound to dynamic viewport below the header so the card centers in view. */
+  height: calc(100vh - var(--view-overlay-top, 0px));
+  max-height: calc(100vh - var(--view-overlay-top, 0px));
+  height: calc(100dvh - var(--view-overlay-top, 0px));
+  max-height: calc(100dvh - var(--view-overlay-top, 0px));
   z-index: var(--overlay-z-view);
   display: flex;
   align-items: center;
@@ -3811,6 +3822,7 @@ body.bulk-bar-open {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.18s ease;
+  box-sizing: border-box;
 }
 #viewLoadingOverlay.app-view-overlay.show {
   opacity: 1;
@@ -3953,6 +3965,16 @@ html[data-boot-loading] .view-tab {
   }
 }
 @media (max-width: 639.98px), (max-height: 480px) and (hover: none) {
+  /* Stable gutter reserves an empty right strip on phone/DevTools. */
+  html {
+    scrollbar-gutter: auto;
+  }
+  .boot-loading-card {
+    padding: 1.5rem 1rem;
+  }
+  .app-view-overlay-card {
+    padding: 1rem 1.25rem;
+  }
   .alpha-nav-btn.enabled::before {
     width: max(100%, 36px);
     height: max(100%, 28px);
@@ -3968,7 +3990,9 @@ html[data-boot-loading] .view-tab {
     z-index: 40;
   }
   #alphaNav {
-    max-height: min(48vh, 320px);
+    /* Fit inside the visible viewport; scroll inside the rail if needed. */
+    max-height: min(48dvh, calc(100dvh - 120px));
+    overflow-y: auto;
   }
   #backToTop {
     /* Keep compact (match desktop rail control) - solid so it reads on cards */

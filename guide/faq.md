@@ -97,4 +97,4 @@ BAKLOG automates requests you could make yourself, in your own browser, with you
 
 ## Is it open source?
 
-Yes. BAKLOG is released under the [MIT license](https://github.com/Ogrods/BAKLOG/blob/main/LICENSE). The full app (server, fetchers, auth, and dashboard) lives in the public GitHub repo. Optional paid features are conveniences on top of the same open codebase, not a fork of your data into our cloud.
+Yes. BAKLOG is released under the [MIT license](https://github.com/Ogrods/BAKLOG/blob/main/LICENSE). The full app (server, fetchers, auth, and dashboard) lives in the public GitHub repo. Optional paid features are conveniences on that same open codebase. Library data stays local by default; Pro cloud sync is opt-in and account-scoped.

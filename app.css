@@ -11305,15 +11305,6 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   flex: 1 1 22rem;
   min-width: 0;
 }
-.pro-view-founder--hero-beta {
-  margin-top: 0.85rem;
-  max-width: 42rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid
-    color-mix(in srgb, var(--accent, #38bdf8) 22%, var(--border));
-  font-size: 0.88rem;
-  text-align: left;
-}
 .pro-view-hero .pro-view-pricing {
   flex: 0 1 16rem;
   max-width: min(18rem, 100%);
@@ -11391,6 +11382,16 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   font-size: 0.8rem;
   line-height: 1.45;
   color: var(--text-mute);
+}
+/* After .pro-view-founder so margin:0 does not wipe the top gap above the rule. */
+.pro-view-founder.pro-view-founder--hero-beta {
+  margin-top: 1rem;
+  max-width: 42rem;
+  padding-top: 1rem;
+  border-top: 1px solid
+    color-mix(in srgb, var(--accent, #38bdf8) 22%, var(--border));
+  font-size: 0.88rem;
+  text-align: left;
 }
 .pro-view-perks {
   margin: 0;

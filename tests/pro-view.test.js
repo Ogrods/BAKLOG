@@ -88,6 +88,9 @@ describe('renderProView', () => {
     renderProView();
     const root = document.getElementById('proViewRoot');
     expect(root.querySelector('[data-pro-checkout]')).toBeNull();
+    expect(root.querySelector('.pro-view-pricing')).toBeNull();
+    expect(root.querySelector('.pro-view-hero-main--beta')).toBeTruthy();
+    expect(root.querySelector('.pro-view-hero-copy .pro-view-founder--hero-beta')).toBeTruthy();
     expect(root.innerHTML).toContain('Checkout is closed during beta');
   });
 

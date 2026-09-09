@@ -148,12 +148,12 @@ function proTrustHtml() {
   </div>`;
 }
 
+function proBetaClosedNoteHtml() {
+  // Keep under the pitch copy - not a side "pricing" column (that layout is for live checkout).
+  return `<p class="pro-view-founder pro-view-founder--hero-beta">Checkout is closed during beta. Pro perks will roll out to beta testers before public launch.</p>`;
+}
+
 function proPricingHtml() {
-  if (!proCheckoutEnabled()) {
-    return `<div class="pro-view-pricing pro-view-pricing--beta">
-    <p class="pro-view-founder">Checkout is closed during beta. Pro perks will roll out to beta testers before public launch.</p>
-  </div>`;
-  }
   const monthly = escapeAttr(proCheckoutLink('monthly'));
   const yearly = escapeAttr(proCheckoutLink('yearly'));
   const monthlyPressed = selectedProPlan === 'monthly' ? 'true' : 'false';
@@ -227,16 +227,18 @@ function proActiveHtml() {
 
 function proPitchHtml({ showPending = false } = {}) {
   const planClass = selectedProPlan === 'yearly' ? 'pro-view-funnel--yearly' : 'pro-view-funnel--monthly';
+  const checkoutOpen = proCheckoutEnabled();
   return `${showPending ? waitingActivationBannerHtml() : ''}
     <div class="pro-view-funnel ${planClass}" role="region" aria-label="BAKLOG Pro">
       <header class="pro-view-hero">
         ${proHeroBannerHtml(selectedProPlan)}
-        <div class="pro-view-hero-main">
+        <div class="pro-view-hero-main${checkoutOpen ? '' : ' pro-view-hero-main--beta'}">
           <div class="pro-view-hero-copy">
             <h1 class="pro-view-headline">${escapeHtml(PRO_PROMO.title)}</h1>
             <p class="pro-view-subhead">${escapeHtml(PRO_PROMO.tagline)}</p>
+            ${checkoutOpen ? '' : proBetaClosedNoteHtml()}
           </div>
-          ${proPricingHtml()}
+          ${checkoutOpen ? proPricingHtml() : ''}
         </div>
       </header>
       <section class="pro-view-perks" aria-label="Pro features">

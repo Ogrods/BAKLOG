@@ -115,6 +115,7 @@ scripts/perf-last-run.json
 scripts/drill-geometry-last-run.json
 scripts/modal-geometry-last-run.json
 scripts/library-count-geometry-last-run.json
+scripts/pro-view-hero-geometry-last-run.json
 scripts/responsive-overflow-last-run.json
 scripts/mirror-overflow-last-run.json
 

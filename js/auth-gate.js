@@ -126,6 +126,22 @@ export function isAdminMode() {
   return _adminMode;
 }
 
+/**
+ * Pro feature gates for local testing: real Pro OR BAKLOG_ADMIN.
+ * Does not suppress ads (see suppressSponsoredAds). Local-only; not a hosted entitlement.
+ */
+export function proFeaturesUnlocked() {
+  return isPro() || isAdminMode();
+}
+
+/**
+ * True when sponsored/house creatives should be removed (real Pro, not admin Pro-sim).
+ * Admin keeps ads visible so maintainers can test slots before frozen builds.
+ */
+export function suppressSponsoredAds() {
+  return isPro() && !isAdminMode();
+}
+
 export function getAccessToken() {
   return _accessToken;
 }
@@ -299,6 +315,11 @@ function applyConfigEntitlement(config) {
   };
   setCapabilitiesFromConfig(config.capabilities);
   setProSettingsFromConfig(config.proSettings);
+}
+
+/** Test helper: apply the same entitlement fields GET /api/config would. */
+export function __applyConfigEntitlementForTest(config) {
+  applyConfigEntitlement(config);
 }
 
 export function licenseActivationEnabled() {

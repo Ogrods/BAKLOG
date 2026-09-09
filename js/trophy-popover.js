@@ -1,5 +1,5 @@
 import { escapeHtml } from "./dom-util.js";
-import { isPro } from "./auth-gate.js";
+import { proFeaturesUnlocked } from "./auth-gate.js";
 
 const POP_ID = "trophyPop";
 const DEEP_SYNC_STORES = new Set(["psn", "xbox"]);
@@ -82,7 +82,7 @@ function buildPopHtml(pill) {
 /** Pro-only deep-sync footer for PSN/Xbox pills: cached % is free; a full
  *  achievement/trophy re-pull is a paid-tier action. */
 function buildMeterHtml(pill) {
-  if (!isPro()) return "";
+  if (!proFeaturesUnlocked()) return "";
   const store = (pill.dataset.store || "").toLowerCase();
   if (!DEEP_SYNC_STORES.has(store)) return "";
   const key = pill.dataset.key || "";

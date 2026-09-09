@@ -8,7 +8,7 @@ import { claimsSnapshotStorageKey } from './profiles.js';
 import { dataFetch } from './api-client.js';
 import { syncCoverFits } from './covers.js';
 import { getAdsForLocation, sponsoredClaimCardHtml } from './sponsored-deals.js';
-import { isPro } from './auth-gate.js';
+import { proFeaturesUnlocked } from './auth-gate.js';
 import { affiliateUrl } from './affiliate.js';
 import { hasValidClaimLinks, normalizeClaimUrls } from './claim-links.js';
 import { isDebugEnabled } from './debug-overlay.js';
@@ -227,7 +227,7 @@ export function isClaimOwned(claim) {
 }
 
 /** Debug-only: why a feed row is visible, hidden, or filtered out. */
-export function claimDispositionReason(c, now = Date.now(), pro = isPro()) {
+export function claimDispositionReason(c, now = Date.now(), pro = proFeaturesUnlocked()) {
   if (!isClaimFeedItemValid(c)) return 'invalid';
   if (isClaimExpired(c, now)) return 'expired';
   const owned = claimOwnedReason(c);
@@ -254,7 +254,7 @@ function logClaimsFeedDebug(doc, source) {
 function logClaimsDispositionDebug(items) {
   if (!isDebugEnabled()) return;
   const now = Date.now();
-  const pro = isPro();
+  const pro = proFeaturesUnlocked();
   console.debug('[baklog-claims] dispositions', (items || []).map((c) => ({
     id: c.id,
     store: c.store,
@@ -300,7 +300,7 @@ function isClaimEligible(c, now = Date.now()) {
 
 export function getVisibleClaims(items) {
   const now = Date.now();
-  const pro = isPro();
+  const pro = proFeaturesUnlocked();
   const filtered = (items || []).filter((c) => {
     if (!isClaimEligible(c, now)) return false;
     if (isClaimPurged(c)) return false;
@@ -313,7 +313,7 @@ export function getVisibleClaims(items) {
 
 export function getHiddenClaims(items) {
   const now = Date.now();
-  const pro = isPro();
+  const pro = proFeaturesUnlocked();
   const filtered = (items || []).filter((c) => {
     if (!isClaimEligible(c, now)) return false;
     if (isClaimPurged(c)) return false;

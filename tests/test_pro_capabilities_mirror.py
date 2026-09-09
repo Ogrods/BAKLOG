@@ -32,7 +32,7 @@ def pro_settings_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     server._refresh_personal_paths()
     monkeypatch.setattr("shared.supabase_auth.auth_enabled", lambda: True)
     monkeypatch.setattr(server, "_bind_request_user", lambda _h: {"id": "u", "email": "a@b.c"})
-    monkeypatch.setattr("shared.server_pro_settings.is_pro", lambda *_a, **_k: True)
+    monkeypatch.setattr("shared.server_pro_settings.pro_features_unlocked", lambda *_a, **_k: True)
     monkeypatch.setattr(
         "shared.supabase_auth.verify_bearer_user",
         lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
@@ -120,7 +120,7 @@ def test_pro_settings_enable_ok_when_live(pro_settings_server: str) -> None:
 def test_pro_settings_sign_in_required_before_pro_check(
     pro_settings_server: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("shared.server_pro_settings.is_pro", lambda *_a, **_k: False)
+    monkeypatch.setattr("shared.server_pro_settings.pro_features_unlocked", lambda *_a, **_k: False)
     status, data = _request(
         pro_settings_server,
         "/api/pro/settings",

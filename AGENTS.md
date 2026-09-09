@@ -57,7 +57,7 @@ Refresh bundle budget after intentional growth: `npm run build && node scripts/c
 
 - **CSRF** — mutating requests require `X-BAKLOG-Local: 1` (the app and admin console send it). When Supabase auth is on, a valid bearer may also authorize mutations; Origin/Referer alone is not enough.
 - **Supabase JWT** — when `BAKLOG_SUPABASE_URL` + anon key set; all `/api/*` except `/api/config` require bearer token.
-- **BAKLOG_ADMIN** — exposes `/admin/` and `/api/internal/*` without Supabase.
+- **BAKLOG_ADMIN** — exposes `/admin/` and `/api/internal/*` without Supabase. Also unlocks **Pro feature sim** for local testing (Cloud sync, bulk refresh, etc.) while **keeping ads visible** (unlike real Pro). Restart the server after pulling capability/admin changes. Does not grant hosted Storage RLS / baklog.app/mirror without a real JWT `plan=pro`.
 
 ## Tests & dev
 

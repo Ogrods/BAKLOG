@@ -136,7 +136,7 @@ describe('getEligibleSponsoredDeal', () => {
   });
 
   it('returns null for the paid (pro) entitlement', () => {
-    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    const spy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(true);
     __setSponsorsForTest(v2Doc({ sp1: sponsor() }, { 'wish-deal-hero': ['sp1'] }));
     expect(getEligibleSponsoredDeal()).toBeNull();
     spy.mockRestore();
@@ -259,15 +259,25 @@ describe('getAdsForLocation round-robin', () => {
     expect(getAdsForLocation('claim-cards', { count: 3 }).map(x => x.id)).toEqual(['a', 'b', 'c']);
   });
 
-  it('returns no ads when isPro()', () => {
+  it('returns no ads when suppressSponsoredAds (real Pro)', () => {
     __setSponsorsForTest(v2Doc(
       { a: sponsor({ id: 'a', title: 'A' }) },
       { 'claim-cards': ['a'], 'lib-pick': ['a'] },
     ));
-    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    const spy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(true);
     expect(getAdsForLocation('claim-cards')).toEqual([]);
     expect(getAdsForLocation('lib-pick')).toEqual([]);
     spy.mockRestore();
+  });
+
+  it('keeps ads for admin Pro-sim (Pro plan but admin mode)', () => {
+    __setSponsorsForTest(v2Doc(
+      { a: sponsor({ id: 'a', title: 'A' }) },
+      { 'lib-pick': ['a'] },
+    ));
+    const suppressSpy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(false);
+    expect(getAdsForLocation('lib-pick').map((x) => x.id)).toEqual(['a']);
+    suppressSpy.mockRestore();
   });
 });
 
@@ -680,7 +690,7 @@ describe('getSpotlightHouseAds', () => {
   });
 
   it('returns nothing for Pro subscribers', () => {
-    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    const spy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(true);
     expect(getSpotlightHouseAds()).toEqual([]);
     spy.mockRestore();
   });
@@ -842,7 +852,7 @@ describe('sponsoredDealSlotHtml', () => {
 
   it('returns empty string for Pro subscribers', () => {
     wireWishHouse();
-    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    const spy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(true);
     expect(sponsoredDealSlotHtml()).toBe('');
     spy.mockRestore();
   });
@@ -866,7 +876,7 @@ describe('proPromoBannerHtml', () => {
   });
 
   it('returns empty string for Pro subscribers', () => {
-    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    const spy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(true);
     expect(proPromoBannerHtml(proPromoItem())).toBe('');
     spy.mockRestore();
   });
@@ -881,7 +891,7 @@ describe('proPromoSlotHtml', () => {
   });
 
   it('returns empty string for Pro subscribers', () => {
-    const spy = vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    const spy = vi.spyOn(authGate, 'suppressSponsoredAds').mockReturnValue(true);
     expect(proPromoSlotHtml()).toBe('');
     spy.mockRestore();
   });

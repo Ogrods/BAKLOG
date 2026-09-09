@@ -1,5 +1,5 @@
 /** Fetcher health dashboard renderer. */
-import { isAccountAuthMode, isPro } from '../../auth-gate.js';
+import { isAccountAuthMode, proFeaturesUnlocked } from '../../auth-gate.js';
 import { state } from '../../state.js';
 import { escapeAttr, escapeHtml, formatNum } from '../../dom-util.js';
 import { formatPlatformList } from '../../platform-labels.js';
@@ -342,7 +342,7 @@ export function renderDashboardFetcherHealth() {
   const failedBtnDisabled = !apiReady || !runnableFailed.length || Date.now() < batchRunCooldowns.failedUntil;
   const failedBtnLabel = `Retry failed (${runnableFailed.length})`;
 
-  const staleButtonHtml = isPro()
+  const staleButtonHtml = proFeaturesUnlocked()
     ? `<button type="button" class="fh-run-stale" ${staleBtnDisabled ? 'disabled' : ''} title="Queue every stale store back-to-back (Pro)">${escapeHtml(staleBtnLabel)}</button>`
     : '';
   const failedButtonHtml = runnableFailed.length

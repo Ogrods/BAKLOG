@@ -1,7 +1,7 @@
 import json
 from http import HTTPStatus
 
-from shared.entitlement import is_pro
+from shared.entitlement import pro_features_unlocked
 from shared.pro_settings import write_pro_settings
 from shared.supabase_auth import auth_enabled
 
@@ -22,7 +22,7 @@ def handle_pro_settings_put(handler):
     if auth_enabled() and (not authorization):
         srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "Sign in required"})
         return
-    if not is_pro(authorization):
+    if not pro_features_unlocked(authorization):
         srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
         return
     try:

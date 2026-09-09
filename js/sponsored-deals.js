@@ -3,8 +3,8 @@
  *
  * Honest by design: every sponsored slot carries a visible "Sponsored" (or
  * "House") disclosure, is ownership-aware (a slot whose `match_title` you
- * already own is skipped). The paid (pro) tier removes every slot via the
- * server-resolved entitlement (`isPro()`).
+ * already own is skipped). The paid (pro) tier removes every slot via
+ * suppressSponsoredAds() (real Pro only; local admin Pro-sim keeps ads visible).
  *
  * Closeable vs permanent: paid sponsor cards always carry a dismiss (X), and
  * house promos opt in with `dismissible: true`. Permanent house promos (the
@@ -44,7 +44,7 @@ import { escapeHtml, escapeAttr, isSafeHttpUrl, formatNum } from './dom-util.js'
 import { normalizeNameForDedup, combinedPlaytime } from './game-core.js';
 import { isOwnedByTitle } from './deals.js';
 import { dataFetch } from './api-client.js';
-import { isPro } from './auth-gate.js';
+import { isAdminMode, suppressSponsoredAds } from './auth-gate.js';
 import { noteSponsoredImpression } from './anon-metrics.js';
 import { PRO_CHECKOUT_MONTHLY } from './pro-checkout.js';
 import { affiliateUrl } from './affiliate.js';
@@ -68,6 +68,8 @@ export function __resetHouseProBannersForTest() {
 }
 function houseProBannersLive() {
   if (_houseProBannersForceForTest != null) return _houseProBannersForceForTest;
+  // Local admin Pro-sim: exercise house slots even while the shipping flag is off.
+  if (isAdminMode()) return true;
   return HOUSE_PRO_BANNERS_ENABLED;
 }
 
@@ -403,14 +405,14 @@ export function __resetSpotlightHouseAdsForTest() {
   _spotlightHouseAdsForceForTest = null;
 }
 function spotlightHouseAdsLive() {
-  if (isPro()) return false;
+  if (suppressSponsoredAds()) return false;
   if (_spotlightHouseAdsForceForTest != null) return _spotlightHouseAdsForceForTest;
   return !IN_VITEST;
 }
 
 // The permanent Pro spotlight slides, in display order. The large-logo slide is
 // first so the dashboard opens on the brand/Pro pitch. Always present in the
-// spotlight rotation for free users; removed entirely for Pro (isPro()).
+// spotlight rotation for free users; removed entirely for Pro (suppressSponsoredAds).
 const SPOTLIGHT_PRO_AD_IDS = [
   'house-spotlight-pro-logo',
   'house-spotlight-pro-sync',
@@ -648,7 +650,7 @@ function sponsorBadgeHtml(item, extraClass = '') {
  * @param {{ count?: number }} [opts]
  */
 export function getAdsForLocation(locationKey, { count = 1 } = {}) {
-  if (isPro()) return [];
+  if (suppressSponsoredAds()) return [];
   const key = String(locationKey || '').toLowerCase();
   if (!AD_LOCATION_SET.has(key)) return [];
   const ids = state.adLocations?.[key] || [];
@@ -717,7 +719,7 @@ export function getEligibleSponsoredDeal() {
  */
 export function getVersusColumnAds() {
   const empty = { rated: null, fast: null, ratedReserved: false, fastReserved: false };
-  if (isPro()) return empty;
+  if (suppressSponsoredAds()) return empty;
   const ratedIds = state.adLocations?.['dash-versus-rated'] || [];
   const fastIds = state.adLocations?.['dash-versus-fast'] || [];
   return {
@@ -966,7 +968,7 @@ export function houseDealBannerHtml(item, { accent = 'blue' } = {}) {
  * @param {object | null | undefined} item — dash-deal-rail feed row; title/tagline/cta/url override PRO_PROMO defaults.
  */
 export function proPromoBannerHtml(item) {
-  if (isPro()) return '';
+  if (suppressSponsoredAds()) return '';
   if (!item) return '';
   const discTitle = 'House promotion from BAKLOG - optional paid tier';
   const title = item.title || PRO_PROMO.title;
@@ -1012,7 +1014,7 @@ export function proPromoBannerHtml(item) {
 /** Markup for the dashboard house slot (dash-house — Pro upsell). */
 export function proPromoSlotHtml() {
   if (!houseProBannersLive()) return '';
-  if (isPro()) return '';
+  if (suppressSponsoredAds()) return '';
   const item = getAdsForLocation('dash-house')[0] || PRO_PROMO_ITEM;
   return proPromoBannerHtml(item);
 }

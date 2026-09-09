@@ -154,7 +154,7 @@ If you still have `BAKLOG-Data`, reinstall BAKLOG and launch normally - first bo
 
 **Split dev from frozen (recommended on one PC):** Set `BAKLOG_DATA_DIR=%LOCALAPPDATA%\BAKLOG-Dev` and `PORT=8766` in `.env` before running `python server.py`. Dev library files stay in `BAKLOG-Dev`; the installed app keeps using `BAKLOG-Data` on port 8765. The header shows a **Dev server** chip when `python server.py` is active.
 
-**Admin console vs installed library:** `BAKLOG_ADMIN=1` will not attach to the default installed data folder (`BAKLOG-Data`). Run admin against the repo (or `BAKLOG-Dev`). Only set `BAKLOG_ADMIN_ALLOW_INSTALLED=1` if you intentionally need admin on the installed library.
+**Admin console vs installed library:** `BAKLOG_ADMIN=1` will not attach to the default installed data folder (`BAKLOG-Data`). Run admin against the repo (or `BAKLOG-Dev`). Only set `BAKLOG_ADMIN_ALLOW_INSTALLED=1` if you intentionally need admin on the installed library. Local admin also unlocks Pro feature capabilities for testing (Cloud sync, bulk refresh, bonus claims) while **still showing ads**; restart the server after code pulls so `/api/config` picks up the change. Hosted baklog.app/mirror still needs a real Pro JWT.
 
 **Full clean of the installed library (maintainer / clean SoT):** Quit the tray, `BAKLOG.exe`, and any `server.py` on port 8765. Delete the entire `%LOCALAPPDATA%\BAKLOG-Data` folder. In Edge or Chrome, clear site data for `127.0.0.1` (and `:8766` if you used it). Launch the installed app once, create a new profile, and reconnect only the stores you want as the real library. Keep testing data under `BAKLOG-Dev` or the git checkout - do not copy testing dumps back into `BAKLOG-Data` unless intentional.
 

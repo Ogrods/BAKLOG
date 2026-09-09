@@ -117,3 +117,18 @@ def test_background_plan_free_when_auth_enabled_uncached(monkeypatch):
     ent.license_path().write_text(json.dumps({"plan": "pro"}), encoding="utf-8")
     _enable_auth(monkeypatch)
     assert ent.is_pro_background() is False
+
+
+def test_admin_pro_sim_unlocks_features_without_rewriting_plan(monkeypatch):
+    monkeypatch.setattr(ent, "_admin_enabled", lambda: True)
+    assert ent.current_plan() == "free"
+    assert ent.is_pro() is False
+    assert ent.pro_features_unlocked() is True
+    assert ent.plan_for_capabilities() == "pro"
+    assert ent.is_pro_background() is True
+
+
+def test_admin_pro_sim_off_stays_free(monkeypatch):
+    monkeypatch.setattr(ent, "_admin_enabled", lambda: False)
+    assert ent.pro_features_unlocked() is False
+    assert ent.plan_for_capabilities() == "free"

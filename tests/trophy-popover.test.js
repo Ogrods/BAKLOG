@@ -4,6 +4,7 @@ const isProMock = vi.fn(() => false);
 
 vi.mock('../js/auth-gate.js', () => ({
   isPro: () => isProMock(),
+  proFeaturesUnlocked: () => isProMock(),
 }));
 
 import { initTrophyPopover } from '../js/trophy-popover.js';

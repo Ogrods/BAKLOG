@@ -1632,10 +1632,16 @@ class Handler(SimpleHTTPRequestHandler):
         config = dict(public_auth_config())
         # Entitlement: signed JWT claim (when a bearer is sent) wins, else the
         # local license file / BAKLOG_PLAN override. Defaults to "free".
+        # Admin Pro-sim unlocks capability enabled flags without rewriting plan.
+        from shared.entitlement import plan_for_capabilities
+
         plan = current_plan(self.headers.get("Authorization"))
         pro_settings = read_pro_settings()
         config["plan"] = plan
-        config["capabilities"] = resolve_capabilities(plan=plan, pro_settings=pro_settings)
+        config["capabilities"] = resolve_capabilities(
+            plan=plan_for_capabilities(self.headers.get("Authorization")),
+            pro_settings=pro_settings,
+        )
         config["proSettings"] = pro_settings
         config["licenseActivation"] = polar_configured() and not auth_enabled()
         config["proCheckoutEnabled"] = pro_checkout_enabled()

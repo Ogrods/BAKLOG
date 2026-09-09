@@ -48,14 +48,14 @@ describe('Pro run stale button', () => {
   });
 
   it('omits Run stale for free tier', async () => {
-    vi.spyOn(authGate, 'isPro').mockReturnValue(false);
+    vi.spyOn(authGate, 'proFeaturesUnlocked').mockReturnValue(false);
     await fetcherRunner.probeApi(true);
     renderDashboardFetcherHealth();
     expect(document.querySelector('.fh-run-stale')).toBeNull();
   });
 
   it('renders Run stale for Pro when stale fetchers exist', async () => {
-    vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    vi.spyOn(authGate, 'proFeaturesUnlocked').mockReturnValue(true);
     await fetcherRunner.probeApi(true);
     renderDashboardFetcherHealth();
     const btn = document.querySelector('.fh-run-stale');
@@ -66,7 +66,7 @@ describe('Pro run stale button', () => {
 
   it('disables Run stale for Pro when all fetchers are fresh', async () => {
     state.libraryMeta.steam.fetched_at = new Date().toISOString();
-    vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    vi.spyOn(authGate, 'proFeaturesUnlocked').mockReturnValue(true);
     await fetcherRunner.probeApi(true);
     renderDashboardFetcherHealth();
     const btn = document.querySelector('.fh-run-stale');
@@ -77,7 +77,7 @@ describe('Pro run stale button', () => {
 
   it('disables Run stale when API probe fails (readonly)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })));
-    vi.spyOn(authGate, 'isPro').mockReturnValue(true);
+    vi.spyOn(authGate, 'proFeaturesUnlocked').mockReturnValue(true);
     await fetcherRunner.probeApi(true);
     renderDashboardFetcherHealth();
     const btn = document.querySelector('.fh-run-stale');

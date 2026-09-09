@@ -3,7 +3,7 @@ import {
   getAccessToken,
   getAccountProfileId,
   isAccountAuthMode,
-  isPro,
+  proFeaturesUnlocked,
   refreshAccountPlan,
 } from "./auth-gate.js";
 import {
@@ -530,7 +530,7 @@ function renderConnPrefs() {
   const syncBtn = document.getElementById("cloudMirrorSyncBtn");
   const importBtn = document.getElementById("cloudMirrorImportBtn");
   const showCloudMirror =
-    isPro() &&
+    proFeaturesUnlocked() &&
     isAccountAuthMode() &&
     !!getAccessToken() &&
     capabilityStatus("cloud_sync_mirror") === "live";
@@ -551,7 +551,7 @@ function renderConnPrefs() {
 
   const note = document.getElementById("bgRefreshPlanNote");
   if (note) {
-    if (isPro()) {
+    if (proFeaturesUnlocked()) {
       note.textContent =
         "Pro: background refresh keeps stale stores fresh even when BAKLOG is closed to the tray.";
       note.classList.add("conn-prefs-note--pro");
@@ -571,7 +571,7 @@ async function refreshCloudMirrorUploadStatus() {
   const el = document.getElementById("cloudMirrorUploadStatus");
   if (!el) return;
   const showCloudMirror =
-    isPro() &&
+    proFeaturesUnlocked() &&
     isAccountAuthMode() &&
     !!getAccessToken() &&
     capabilityStatus("cloud_sync_mirror") === "live";

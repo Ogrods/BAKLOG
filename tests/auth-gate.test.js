@@ -272,6 +272,29 @@ describe('auth-gate', () => {
     localStorage.removeItem('baklog-debug-pro');
   });
 
+  it('proFeaturesUnlocked and suppressSponsoredAds honor admin Pro-sim', async () => {
+    const {
+      __applyConfigEntitlementForTest,
+      isAdminMode,
+      isPro,
+      proFeaturesUnlocked,
+      suppressSponsoredAds,
+    } = await import('../js/auth-gate.js');
+    __applyConfigEntitlementForTest({ plan: 'free', admin: true, capabilities: {}, proSettings: {} });
+    expect(isAdminMode()).toBe(true);
+    expect(isPro()).toBe(false);
+    expect(proFeaturesUnlocked()).toBe(true);
+    expect(suppressSponsoredAds()).toBe(false);
+
+    __applyConfigEntitlementForTest({ plan: 'pro', admin: true, capabilities: {}, proSettings: {} });
+    expect(isPro()).toBe(true);
+    expect(proFeaturesUnlocked()).toBe(true);
+    expect(suppressSponsoredAds()).toBe(false);
+
+    __applyConfigEntitlementForTest({ plan: 'pro', admin: false, capabilities: {}, proSettings: {} });
+    expect(suppressSponsoredAds()).toBe(true);
+  });
+
   it('showAuthGatePanel toggles signup form', async () => {
     const { showAuthGatePanel } = await import('../js/auth-gate.js');
     showAuthGatePanel('signup');

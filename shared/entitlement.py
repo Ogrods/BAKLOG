@@ -258,13 +258,37 @@ def is_pro(authorization: str | None = None) -> bool:
     return current_plan(authorization) == PLAN_PRO
 
 
+def _admin_enabled() -> bool:
+    """True when BAKLOG_ADMIN is allowed for the active data root (local Pro-sim)."""
+    try:
+        from shared.admin_gate import resolve_admin_enabled
+        from shared.install_paths import data_root
+
+        ok, _warn = resolve_admin_enabled(data_root())
+        return bool(ok)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def pro_features_unlocked(authorization: str | None = None) -> bool:
+    """Pro feature gates: real plan OR local admin Pro-sim.
+
+    Admin unlocks desktop Pro capabilities for maintainer testing; it does not
+    change hosted Storage RLS / baklog.app/mirror JWT requirements.
+    """
+    return is_pro(authorization) or _admin_enabled()
+
+
 def is_pro_background() -> bool:
     """Best-effort pro check for server-side background work (no request context).
 
     Under hosted auth uses the last JWT-verified plan seen this process (within
     a TTL); in pure-local mode honors ``BAKLOG_PLAN`` then ``license.json``.
     Local overrides are ignored under hosted auth (same as ``current_plan``).
+    Local ``BAKLOG_ADMIN`` Pro-sim also unlocks background Pro work.
     """
+    if _admin_enabled():
+        return True
     if _auth_enabled():
         if _LAST_AUTH_PLAN is not None:
             ts, plan = _LAST_AUTH_PLAN
@@ -277,3 +301,10 @@ def is_pro_background() -> bool:
         return env == PLAN_PRO
 
     return _local_license_plan() == PLAN_PRO
+
+
+def plan_for_capabilities(authorization: str | None = None) -> str:
+    """Plan used to resolve capability enabled flags (admin sims as pro)."""
+    if _admin_enabled():
+        return PLAN_PRO
+    return current_plan(authorization)

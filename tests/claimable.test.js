@@ -13,6 +13,7 @@ vi.mock('../js/auth-gate.js', async (importOriginal) => {
   return {
     ...actual,
     isPro: () => isProMock(),
+    proFeaturesUnlocked: () => isProMock(),
   };
 });
 

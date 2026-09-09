@@ -4,6 +4,8 @@ import { isProPromoSponsorId, proPromoBannerHtml, PRO_PROMO, PRO_PROMO_ITEM } fr
 vi.mock('../js/auth-gate.js', () => ({
   isPro: vi.fn(() => false),
   isAdminMode: vi.fn(() => false),
+  proFeaturesUnlocked: vi.fn(() => false),
+  suppressSponsoredAds: vi.fn(() => false),
   isAccountAuthMode: vi.fn(() => false),
   isLocalProfilesEnabled: vi.fn(() => false),
   licenseActivationEnabled: vi.fn(() => true),

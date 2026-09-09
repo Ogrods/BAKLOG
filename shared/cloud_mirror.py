@@ -86,12 +86,12 @@ def mirror_upload_allowed(*, profile_id: str | None = None) -> bool:
 
 
 def mirror_read_allowed(*, authorization: str | None) -> bool:
-    from shared.entitlement import is_pro
+    from shared.entitlement import pro_features_unlocked
     from shared.supabase_auth import auth_enabled
 
     if not auth_enabled():
         return False
-    return is_pro(authorization)
+    return pro_features_unlocked(authorization)
 
 
 def schedule_mirror_upload(path: Path, *, profile_id: str | None = None) -> None:

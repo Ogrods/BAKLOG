@@ -42,7 +42,10 @@ vi.mock('../js/api-client.js', () => ({
 vi.mock('../js/auth-gate.js', () => ({
   isAccountAuthMode: vi.fn(() => false),
   isPro: vi.fn(() => false),
+  isAdminMode: vi.fn(() => false),
+  proFeaturesUnlocked: vi.fn(() => false),
   getAccessToken: vi.fn(() => null),
+  getAccountProfileId: vi.fn(() => null),
   getProSettings: vi.fn(() => ({ cloudMirrorEnabled: false })),
   refreshAccountPlan: vi.fn(async () => 'free'),
 }));
@@ -317,7 +320,7 @@ describe('cloud mirror prefs visibility', () => {
     mountCloudPrefsDom();
     const auth = await import('../js/auth-gate.js');
     const caps = await import('../js/pro-capabilities.js');
-    vi.mocked(auth.isPro).mockReturnValue(true);
+    vi.mocked(auth.proFeaturesUnlocked).mockReturnValue(true);
     vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
     vi.mocked(auth.getAccessToken).mockReturnValue('tok');
     vi.mocked(caps.capabilityStatus).mockReturnValue('soon');
@@ -335,7 +338,7 @@ describe('cloud mirror prefs visibility', () => {
     mountCloudPrefsDom();
     const auth = await import('../js/auth-gate.js');
     const caps = await import('../js/pro-capabilities.js');
-    vi.mocked(auth.isPro).mockReturnValue(true);
+    vi.mocked(auth.proFeaturesUnlocked).mockReturnValue(true);
     vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
     vi.mocked(auth.getAccessToken).mockReturnValue('tok');
     vi.mocked(caps.capabilityStatus).mockReturnValue('live');
@@ -349,5 +352,23 @@ describe('cloud mirror prefs visibility', () => {
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorSyncBtn')?.disabled).toBe(true);
+  });
+
+  it('shows cloud sync for admin Pro-sim without real Pro plan', async () => {
+    mountCloudPrefsDom();
+    const auth = await import('../js/auth-gate.js');
+    const caps = await import('../js/pro-capabilities.js');
+    vi.mocked(auth.isPro).mockReturnValue(false);
+    vi.mocked(auth.proFeaturesUnlocked).mockReturnValue(true);
+    vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
+    vi.mocked(auth.getAccessToken).mockReturnValue('tok');
+    vi.mocked(caps.capabilityStatus).mockReturnValue('live');
+    vi.mocked(caps.getProSettings).mockReturnValue({ cloudMirrorEnabled: false });
+
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+
+    expect(document.getElementById('connCloudPrefs')?.hidden).toBe(false);
+    expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(false);
   });
 });

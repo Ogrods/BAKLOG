@@ -29,7 +29,7 @@ See [baklog.app](https://baklog.app/) for checkout links and the full comparison
 
 On the free tier, you refresh one store at a time: click a fetcher chip, wait, click the next. Auto-refresh (on by default) quietly updates one stale store every ~30 minutes while the app is open.
 
-Pro adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). **Queued bulk refresh** (one action queues every stale store from Fetcher health) is live on Pro. Your credentials and data still stay on your machine.
+Pro adds scheduled refresh that runs even when the app is closed (tray or OS scheduler). **Queued bulk refresh** (one action queues every stale store from Fetcher health) is live on Pro. Credentials stay on your machine. Catalogs stay local unless you turn on Pro cloud sync.
 
 Details: [Refresh and enrichment](refresh-and-enrichment.md).
 
@@ -37,17 +37,19 @@ Details: [Refresh and enrichment](refresh-and-enrichment.md).
 
 Your credentials stay encrypted on your machine (OS keyring + AES-GCM fallback). Store fetches use your own browser session and your IP. There is no BAKLOG server holding your logins.
 
+Library data stays local by default. If you turn on Pro cloud sync, catalogs and personal statuses upload to your account (browse at baklog.app/mirror); credentials never leave your PC.
+
 The app is [open source (MIT)](https://github.com/Ogrods/BAKLOG). Read [PRIVACY.md](../PRIVACY.md) and [SECURITY.md](../SECURITY.md) for the full data-handling and threat-model story.
 
 ## Do you sell my data?
 
-No. BAKLOG has no business model built on your library. We do not collect, host, or sell personal data - there is no server holding it to sell in the first place.
+No. BAKLOG has no business model built on your library. We do not sell catalog or personal data.
 
-The marketing site at [baklog.app](https://baklog.app) has a separate waitlist and optional bug-report endpoint - see [PRIVACY.md](../PRIVACY.md#hosted-surfaces).
+Library data stays on your machine by default. Optional account login stores email; Pro cloud sync (opt-in) can host catalogs and personal statuses for your account only - still not for sale. See [PRIVACY.md](../PRIVACY.md#hosted-surfaces) for baklog.app marketing surfaces (waitlist, bug reports).
 
 ## Does BAKLOG have telemetry?
 
-No telemetry by default. Optional anonymous aggregate metrics (active sessions, sponsored-slot impressions) stay off unless you turn on **Share anonymous stats** in Connections. No library data or per-game telemetry leaves your machine. See [PRIVACY.md](../PRIVACY.md).
+No telemetry by default. Optional anonymous aggregate metrics (active sessions, sponsored-slot impressions) stay off unless you turn on **Share anonymous stats** in Connections. That metrics path never includes library or per-game data. Pro cloud sync is a separate opt-in. See [PRIVACY.md](../PRIVACY.md).
 
 ## Is BAKLOG open beta?
 
@@ -95,4 +97,4 @@ BAKLOG automates requests you could make yourself, in your own browser, with you
 
 ## Is it open source?
 
-Yes. BAKLOG is released under the [MIT license](https://github.com/Ogrods/BAKLOG/blob/main/LICENSE). The full app (server, fetchers, auth, and dashboard) lives in the public GitHub repo. Optional paid features are conveniences on top of the same open codebase, not a fork of your data into our cloud.
+Yes. BAKLOG is released under the [MIT license](https://github.com/Ogrods/BAKLOG/blob/main/LICENSE). The full app (server, fetchers, auth, and dashboard) lives in the public GitHub repo. Optional paid features are conveniences on that same open codebase. Library data stays local by default; Pro cloud sync is opt-in and account-scoped.

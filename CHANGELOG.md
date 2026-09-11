@@ -33,9 +33,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
-### Added
-
-- Opt-in Playwright modal geometry audit (`npm run test:modal-geometry`) for HLTB confirm, notes, and add-game dialogs on short and phone viewports.
+## [0.9.02] - 2026-09-11
 
 ### Changed
 

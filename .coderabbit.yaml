@@ -1,6 +1,11 @@
 # CodeRabbit config for BAKLOG (public OSS - free PR reviews).
 # Docs: https://docs.coderabbit.ai/configuration/auto-review
 language: en-US
+tone_instructions: >
+  Prioritize security (auth, secrets, localhost binding), profile isolation,
+  fetcher exit-code contracts, and AGENTS.md sync-pair drift. Prefer concrete
+  regressions over style nits. Do not suggest committing personal data or
+  weakening X-BAKLOG-Local / credential handling.
 reviews:
   profile: chill
   request_changes_workflow: false

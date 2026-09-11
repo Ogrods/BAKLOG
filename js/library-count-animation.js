@@ -15,7 +15,7 @@ import { state } from './state.js';
 import { prefersReducedMotion } from './motion.js';
 import { countUpDurationForDelta, heroCountRollMs } from './dashboard-shared.js';
 
-// Match landing mega-hero demo (`landing/demo.js` COUNT_ROLL_MS).
+// Match landing mega-hero demo (`web/demo.js` COUNT_ROLL_MS).
 const COUNT_ROLL_MS = 1000;
 /** Gap between sequential +1 popups — matches runLibraryCountSmallDemo stepMs. */
 const SEQ_POPUP_GAP_MS = 300;

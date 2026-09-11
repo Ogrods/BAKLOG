@@ -1,4 +1,4 @@
-import { createClient } from './vendor/supabase-js.mjs';
+import { createClient } from '../vendor/supabase-js.mjs';
 import {
   STATUS_LABELS,
   STORE_LABELS,

@@ -9,7 +9,7 @@
  * SAFE BY DEFAULT: prints what it would do and sends nothing unless you pass
  * --send. Use --limit N to size a wave and --email you@x.com to test one address.
  *
- * Env (set in your shell, or in landing/.env which this script auto-loads):
+ * Env (set in your shell, or in web/.env which this script auto-loads):
  *   SUPABASE_URL               - same project as the waitlist function
  *   SUPABASE_SERVICE_ROLE_KEY  - service_role key (server-only; never in browser)
  *   RESEND_API_KEY             - Resend API key
@@ -175,7 +175,7 @@ async function sendEmail({ apiKey, from, to, replyTo, subject, text, html }) {
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 async function main() {
-  loadEnvFile(path.join(root, 'landing', '.env'));
+  loadEnvFile(path.join(root, 'web', '.env'));
   loadEnvFile(path.join(root, '.env'));
 
   const args = parseArgs(process.argv.slice(2));
@@ -200,7 +200,7 @@ async function main() {
   }
   if (missing.length) {
     console.error(`Missing env: ${missing.join(', ')}`);
-    console.error('Set them in your shell or landing/.env, then re-run.');
+    console.error('Set them in your shell or web/.env, then re-run.');
     process.exit(1);
   }
 

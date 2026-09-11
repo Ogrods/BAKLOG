@@ -10,7 +10,7 @@ import {
   sanitizeMirrorCoverUrl,
   sortMirrorRows,
   summarizeMirrorRows,
-} from '../landing/mirror-merge.js';
+} from '../web/mirror/mirror-merge.js';
 
 describe('mirror-merge', () => {
   it('merges library catalogs with personal overlays', () => {

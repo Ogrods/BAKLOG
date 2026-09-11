@@ -16,7 +16,7 @@ describe("landing SEO gate", () => {
 
   it("extracts 15 FAQ pairs from index.html", () => {
     const html = fs.readFileSync(
-      path.join(import.meta.dirname, "../landing/index.html"),
+      path.join(import.meta.dirname, "../web/index.html"),
       "utf8",
     );
     expect(extractFaqFromHtml(html)).toHaveLength(15);

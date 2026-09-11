@@ -25,7 +25,7 @@
  *                         A deeplink template WITHOUT {url} stays OFF.
  *
  *  After filling values: `npm test`, then mirror curated/sponsors.json ->
- *  landing/sponsors.json if you also touched sponsor creatives.
+ *  web/sponsors.json if you also touched sponsor creatives.
  * ==========================================================================*/
 
 /** @type {Record<string, string>} */
@@ -55,7 +55,7 @@ export const AFFILIATE_CREDENTIALS = {
 
 /**
  * Enrolled affiliate programs (disclosure copy). Includes sponsor-feed-only shops
- * before their creative is live. Sync: landing/index.html .foot-affiliate (first p).
+ * before their creative is live. Sync: web/index.html .foot-affiliate (first p).
  */
 export const AFFILIATE_ENROLLED_PROGRAMS = [
   'Epic Games Store Support-A-Creator',

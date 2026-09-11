@@ -17,7 +17,7 @@ describe('mirror artifact allowlist', () => {
     const m = py.match(/ALLOWED_ARTIFACT_RE_SOURCE\s*=\s*\(\s*\n?\s*r"([^"]+)"/);
     expect(m?.[1]).toBe(ALLOWED_ARTIFACT_RE_SOURCE);
 
-    const landing = readFileSync(resolve('landing/api/_mirror-helpers.js'), 'utf8');
+    const landing = readFileSync(resolve('web/api/_mirror-helpers.js'), 'utf8');
     const lm = landing.match(/ALLOWED_ARTIFACT_RE_SOURCE\s*=\s*\n?\s*"([^"]+)"/);
     // File source uses JS string escapes (\\.); decode before compare.
     expect(lm?.[1]?.replace(/\\\\/g, '\\')).toBe(ALLOWED_ARTIFACT_RE_SOURCE);

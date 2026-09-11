@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sitewide listener/event inventory for BAKLOG (dashboard + landing).
 
-Read-only audit: scans js/, index.html, landing/ for DOM listeners, custom
+Read-only audit: scans js/, index.html, web/ for DOM listeners, custom
 events, callback registries, and debounce timers. Writes EVENT_AUDIT.json and
 a human-readable EVENT_AUDIT.md at the repo root.
 
@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-JS_GLOB = ["js/**/*.js", "landing/**/*.js"]
-HTML_PATHS = [ROOT / "index.html", ROOT / "landing/index.html"]
+JS_GLOB = ["js/**/*.js", "web/**/*.js"]
+HTML_PATHS = [ROOT / "index.html", ROOT / "web/index.html"]
 
 LISTENER_RE = re.compile(
     r"(?P<target>document|window|globalThis|[\w.$]+)"

@@ -174,7 +174,7 @@ The server sees the new version running and returns `updateAvailable = false`. B
 
 ## Issue 7: Email confirmation page 404
 
-**Root cause:** `auth-gate.js` hardcodes the redirect URL as `https://baklog.app/auth/confirmed` (slash). But the landing file is `landing/auth-confirmed.html` (hyphen). Vercel's `cleanUrls: true` serves `/auth-confirmed` but 404s on `/auth/confirmed`.
+**Root cause:** `auth-gate.js` hardcodes the redirect URL as `https://baklog.app/auth/confirmed` (slash). But the landing file is `web/auth-confirmed.html` (hyphen). Vercel's `cleanUrls: true` serves `/auth-confirmed` but 404s on `/auth/confirmed`.
 
 Same issue affects password reset: `https://baklog.app/auth/reset` → should be `auth-reset`.
 
@@ -192,4 +192,4 @@ return "https://baklog.app/auth-reset";
 
 **Supabase Admin Console:** Update **Authentication → URL Configuration → Redirect URLs** to use `auth-confirmed` and `auth-reset`.
 
-**CSP fix in `landing/vercel.json`:** Add CSP override for `/auth-confirmed` matching the one at lines 69-78 for `/auth-reset` (both need `connect-src ... https://*.supabase.co`).
+**CSP fix in `web/vercel.json`:** Add CSP override for `/auth-confirmed` matching the one at lines 69-78 for `/auth-reset` (both need `connect-src ... https://*.supabase.co`).

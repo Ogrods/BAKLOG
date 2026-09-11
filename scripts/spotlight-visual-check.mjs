@@ -1,6 +1,6 @@
 /**
  * Pixel-diff guard for landing .dash-mega spotlight layouts.
- * Run before editing landing/demo.css or landing/demo.js.
+ * Run before editing web/demo.css or web/demo.js.
  *
  *   npm run check:spotlight:baseline   # capture reference PNGs
  *   npm run check:spotlight            # capture + diff against baseline
@@ -13,7 +13,7 @@ import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 
 const root = path.resolve(import.meta.dirname, "..");
-const landingHtml = path.join(root, "landing", "index.html");
+const landingHtml = path.join(root, "web", "index.html");
 const baselineDir = path.join(root, "tmp", "spotlight-baseline");
 const afterDir = path.join(root, "tmp", "spotlight-after");
 const diffDir = path.join(root, "tmp", "spotlight-diff");

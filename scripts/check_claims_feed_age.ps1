@@ -1,5 +1,5 @@
 # Warn when the free-claims feed is older than MaxAgeDays (default 7).
-# Reads landing/free-claims.json by default, or the live baklog.app URL with -Live.
+# Reads web/free-claims.json by default, or the live baklog.app URL with -Live.
 #
 # Usage (from repo root):
 #   .\scripts\check_claims_feed_age.ps1

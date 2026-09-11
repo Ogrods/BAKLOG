@@ -4,7 +4,7 @@
  * Root cause it protects against: house-promo copy is FEED-DRIVEN. The app
  * resolves sponsors.json in order local profile -> hosted baklog.app -> bundled
  * curated/sponsors.json, so on any online machine the hosted feed (deployed from
- * landing/sponsors.json) shadows js/sponsored-deals.js HOUSE_DEFAULTS. Softening
+ * web/sponsors.json) shadows js/sponsored-deals.js HOUSE_DEFAULTS. Softening
  * copy in js/ alone does nothing until BOTH JSON feeds are updated and they stay
  * mirrored. See AGENTS.md hard rule 6 + .cursor/rules/frontend.mdc "Banners & ads".
  */
@@ -13,11 +13,11 @@ import { describe, expect, it } from 'vitest';
 import { houseDisplayCta } from '../js/sponsored-deals.js';
 
 const curated = JSON.parse(readFileSync('curated/sponsors.json', 'utf8'));
-const landing = JSON.parse(readFileSync('landing/sponsors.json', 'utf8'));
+const landing = JSON.parse(readFileSync('web/sponsors.json', 'utf8'));
 
 const FEEDS = [
   ['curated/sponsors.json', curated],
-  ['landing/sponsors.json', landing],
+  ['web/sponsors.json', landing],
 ];
 
 function houseAds(feed) {

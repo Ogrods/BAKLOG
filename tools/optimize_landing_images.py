@@ -8,9 +8,9 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-SAMPLE = ROOT / "landing" / "assets" / "sample"
+SAMPLE = ROOT / "web" / "assets" / "sample"
 
-# Spotlight art referenced by landing/demo.js SPOTLIGHT_GAMES
+# Spotlight art referenced by web/demo.js SPOTLIGHT_GAMES
 LANDSCAPE_HERO = (
     "hero-emberfall",
     "hero-hollow-crown",

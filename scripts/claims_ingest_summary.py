@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarize claim-source ingest for GitHub Actions (Phase 1 cron).
 
-Compares curated/free_claims.auto.json to landing/free-claims.json and checks
+Compares curated/free_claims.auto.json to web/free-claims.json and checks
 live baklog.app feed age. Soft-warns on stale live feed (exit 0). Hard-fails only
 when required local files are unreadable after a successful fetch.
 
@@ -23,7 +23,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"
-LANDING_PATH = ROOT / "landing" / "free-claims.json"
+LANDING_PATH = ROOT / "web" / "free-claims.json"
 LIVE_URL = "https://baklog.app/free-claims.json"
 USER_AGENT = "BAKLOG-claims-ingest-summary/1.0"
 DEFAULT_MAX_AGE_DAYS = 7
@@ -222,7 +222,7 @@ def build_markdown(
             "### Maintainer next steps",
             "",
             "1. Review new candidates in admin Claims (or local fetch + approved.json).",
-            "2. `build_free_claims.py` → commit `landing/free-claims.json` + `curated/free_claims.fallback.json`.",
+            "2. `build_free_claims.py` → commit `web/free-claims.json` + `curated/free_claims.fallback.json`.",
             "3. Push so Vercel updates baklog.app.",
             "",
             "_Phase 1: notify only. No auto-approve, no PR, no deploy hook._",

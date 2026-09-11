@@ -7,7 +7,7 @@ white email bodies.
 Run from repo root:
   python tools/make_email_logo.py
 Output:
-  landing/assets/email-logo.png   (hosted at https://baklog.app/assets/email-logo.png)
+  web/assets/email-logo.png   (hosted at https://baklog.app/assets/email-logo.png)
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ from fontTools.ttLib.woff2 import decompress as woff2_decompress
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-FONT_WOFF2 = ROOT / "landing" / "assets" / "fonts" / "space-grotesk-latin.woff2"
-OUT = ROOT / "landing" / "assets" / "email-logo.png"
+FONT_WOFF2 = ROOT / "web" / "assets" / "fonts" / "space-grotesk-latin.woff2"
+OUT = ROOT / "web" / "assets" / "email-logo.png"
 
 DISPLAY_W = 640
 DISPLAY_H = 180

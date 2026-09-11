@@ -43,7 +43,7 @@ from shared.profile_paths import (
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"
 APPROVED_PATH = ROOT / "curated" / "free_claims.approved.json"
 INPUT_PATH = ROOT / "free-claims.input.json"
-BUILT_PATH = ROOT / "landing" / "free-claims.json"
+BUILT_PATH = ROOT / "web" / "free-claims.json"
 FALLBACK_PATH = ROOT / "curated" / "free_claims.fallback.json"
 SPONSORS_PATH = ROOT / "curated" / "sponsors.json"
 
@@ -753,7 +753,7 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
             "maintainer-action",
             "approved.json",
             f"Approved id {oid} missing from built feed (no stable-key sibling)",
-            "Game represented in landing/free-claims.json",
+            "Game represented in web/free-claims.json",
             "Re-run build_free_claims.py; verify carry-forward for ids absent from auto",
             row=oid,
             blocks="p4_claim_approved_dropped_on_source_hiccup",
@@ -814,7 +814,7 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
             "landing vs fallback",
             f"built/fallback id sets differ: +{len(bvf.get('ids_only_in_built', []))} / -{len(bvf.get('ids_only_in_fallback', []))}",
             "fallback synced from last build",
-            "Copy landing/free-claims.json to curated/free_claims.fallback.json",
+            "Copy web/free-claims.json to curated/free_claims.fallback.json",
         )
 
     for dup in report.get("feeds", {}).get("auto", {}).get("duplicate_clusters", []):
@@ -914,7 +914,7 @@ def run_audit(profile_id: str, *, check_urls: bool = False, url_limit: int = 30)
         "sponsors": _sponsors_audit(),
         "plan": _plan_audit(),
         "landing_demo": {
-            "note": "landing/demo.js STATS are independent dummy marketing data",
+            "note": "web/demo.js STATS are independent dummy marketing data",
             "demo_wl_deals": 14,
             "demo_stores": 7,
         },

@@ -3,7 +3,7 @@ import {
   MIRROR_VIRTUAL_THRESHOLD,
   computeMirrorVirtualRange,
   usesMirrorVirtualScroll,
-} from '../landing/mirror-virtual.js';
+} from '../web/mirror/mirror-virtual.js';
 
 describe('mirror-virtual', () => {
   it('uses virtual scroll only above the threshold', () => {

@@ -28,7 +28,7 @@ reviews:
     - "!**/.venv/**"
     - "!**/vendor/**"
     - "!**/js/vendor/**"
-    - "!**/landing/vendor/**"
+    - "!**/web/vendor/**"
     - "!**/*.min.js"
     - "!**/*.min.css"
     - "!**/package-lock.json"
@@ -72,10 +72,10 @@ reviews:
         registries over growing monoliths. No em dashes in user-visible strings.
         Keep sync pairs noted in AGENTS.md when touching brand colors, themes, claims,
         or sponsors.
-    - path: "landing/**"
+    - path: "web/**"
       instructions: >
         Marketing site only. No personal data. Sponsors feed edits that should ship
-        online belong in landing/sponsors.json (hosted baklog.app wins over curated/).
+        online belong in web/sponsors.json (hosted baklog.app wins over curated/).
     - path: "tests/**"
       instructions: >
         Prefer focused regression tests. Use .venv Python on Windows guidance; do not

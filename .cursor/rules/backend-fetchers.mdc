@@ -28,7 +28,7 @@ alwaysApply: false
 ## Claim pipeline (maintainer)
 
 - `fetch_claim_sources.py` → `curated/free_claims.auto.json`
-- `build_free_claims.py` → `landing/free-claims.json` (+ optional profile copy)
+- `build_free_claims.py` → `web/free-claims.json` (+ optional profile copy)
 - Manual input: `free-claims.input.json`
 
 ## Groups in manifest

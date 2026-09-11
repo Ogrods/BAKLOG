@@ -11,10 +11,10 @@ const BANNED = [
   /syncs automatically/i,
 ];
 
-// landing/ is the public marketing surface and is always present in CI.
+// web/ is the public marketing surface and is always present in CI.
 // marketing/ is kept local-only (gitignored), so guard those assertions
 // behind a file-existence check to avoid failing in CI.
-const PUBLIC_FILES = ['landing/index.html'];
+const PUBLIC_FILES = ['web/index.html'];
 const LOCAL_FILES = ['marketing/one-pager.html', 'marketing/index.html'];
 
 describe('marketing copy guardrails', () => {
@@ -28,8 +28,8 @@ describe('marketing copy guardrails', () => {
     });
   }
 
-  it('landing/index.html uses canonical magic-moment numbers', () => {
-    const text = readFileSync('landing/index.html', 'utf8');
+  it('web/index.html uses canonical magic-moment numbers', () => {
+    const text = readFileSync('web/index.html', 'utf8');
     expect(text).toMatch(/2,000\+/);
     expect(text).toMatch(/90 sec|~90 seconds|90 seconds/i);
   });
@@ -72,15 +72,15 @@ describe('marketing copy guardrails', () => {
     expect(text).toMatch(/tier-grid[\s\S]*Free forever[\s\S]*<h3>Paid<\/h3>/i);
   });
 
-  it('landing/index.html uses Support BAKLOG framing without visible monthly pricing', () => {
-    const text = readFileSync('landing/index.html', 'utf8');
+  it('web/index.html uses Support BAKLOG framing without visible monthly pricing', () => {
+    const text = readFileSync('web/index.html', 'utf8');
     expect(text).not.toMatch(/\$5\/mo/);
     expect(text).not.toMatch(/\$2\.99|\$4\.99/);
     expect(text).toMatch(/Support BAKLOG/);
   });
 
   it('landing tier table marks cloud sync as opt-in and deal alerts as Coming on paid', () => {
-    const text = readFileSync('landing/index.html', 'utf8');
+    const text = readFileSync('web/index.html', 'utf8');
     const start = text.indexOf('class="tier-compare"');
     expect(start).toBeGreaterThan(-1);
     const end = text.indexOf('</table>', start);
@@ -90,7 +90,7 @@ describe('marketing copy guardrails', () => {
   });
 
   it('landing tier table marks queue-all refresh as live on paid', () => {
-    const text = readFileSync('landing/index.html', 'utf8');
+    const text = readFileSync('web/index.html', 'utf8');
     const start = text.indexOf('class="tier-compare"');
     const table = text.slice(start, text.indexOf('</table>', start));
     const rowMatch = table.match(
@@ -102,7 +102,7 @@ describe('marketing copy guardrails', () => {
   });
 
   it('avoids hard-sell Upgrade / See fewer ads headlines in public Pro copy', () => {
-    const landing = readFileSync('landing/index.html', 'utf8');
+    const landing = readFileSync('web/index.html', 'utf8');
     const promo = readFileSync('js/sponsored-deals.js', 'utf8');
     for (const text of [landing, promo]) {
       expect(text).not.toMatch(/Upgrade to BAKLOG Pro/);
@@ -128,7 +128,7 @@ describe('marketing copy guardrails', () => {
   }
 
   const TELEMETRY_CANONICAL_FILES = [
-    'landing/index.html',
+    'web/index.html',
     'README.md',
     'guide/faq.md',
     'js/sponsored-deals.js',

@@ -26,14 +26,14 @@
  *   loadSponsoredDeals() resolves in strict order and the FIRST non-empty wins:
  *     1. local  GET /sponsors.json    -> active profile's sponsors.json (seeded via
  *                                          admin console; usually absent in dev)
- *     2. hosted https://baklog.app/sponsors.json (deployed from landing/sponsors.json
+ *     2. hosted https://baklog.app/sponsors.json (deployed from web/sponsors.json
  *                                          via Vercel) -- THIS is what most machines use
  *     3. bundled curated/sponsors.json  -- last resort, only when 1 AND 2 are empty/offline
  *   So editing curated/sponsors.json alone changes NOTHING on a machine with internet:
  *   the hosted feed shadows it. To ship a feed-driven banner change you MUST edit
- *   landing/sponsors.json (mirror curated/), commit, push, and let Vercel redeploy
+ *   web/sponsors.json (mirror curated/), commit, push, and let Vercel redeploy
  *   baklog.app. Verify live: GET https://baklog.app/sponsors.json.
- *   Sync pairs: HOUSE_DEFAULTS (below) <-> curated/sponsors.json <-> landing/sponsors.json
+ *   Sync pairs: HOUSE_DEFAULTS (below) <-> curated/sponsors.json <-> web/sponsors.json
  *   <-> scripts/migrate_sponsors_v2.py HOUSE_DEFAULTS <-> admin/admin.js HOUSE_MIGRATION_DEFAULTS.
  *   NOTE: hardcoded banners (proPromoBannerHtml, the wishlist house banner here, and
  *   js/pro-view.js Support tab funnel) are NOT feed-driven -- they update by
@@ -730,7 +730,7 @@ export function getVersusColumnAds() {
   };
 }
 
-// Compact BAKLOG logo mark (mirrors landing/index.html hero mark) for the
+// Compact BAKLOG logo mark (mirrors web/index.html hero mark) for the
 // full-width house promo banner. Inline so the banner needs no extra asset.
 function baklogBannerMarkHtml(maskId) {
   const safeId = String(maskId || 'houseBannerKnobs').replace(/[^\w-]/g, '');
@@ -759,7 +759,7 @@ export function spotlightLogoMarkHtml() {
 // Promo columns for the house banner — info-rich pitch pulled from the landing
 // copy so the in-app message stays in sync with baklog.app. Each fills one of
 // the three feature columns that span the full-width deal-radar row.
-// Sync pair: HOUSE_BANNER_FEATURES ↔ landing/index.html trust + hero pillars.
+// Sync pair: HOUSE_BANNER_FEATURES ↔ web/index.html trust + hero pillars.
 const HOUSE_BANNER_FEATURES = [
   {
     title: 'Local-first',
@@ -775,8 +775,8 @@ const HOUSE_BANNER_FEATURES = [
   },
 ];
 
-// Homepage Pro upsell — pulled from landing/index.html paid-tier copy.
-// Sync pair: PRO_PROMO ↔ landing/index.html paid tier + FAQ pricing answers.
+// Homepage Pro upsell — pulled from web/index.html paid-tier copy.
+// Sync pair: PRO_PROMO ↔ web/index.html paid tier + FAQ pricing answers.
 export const PRO_PROMO = {
   label: 'BAKLOG Pro',
   title: 'Back BAKLOG',

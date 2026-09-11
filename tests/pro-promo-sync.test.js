@@ -1,9 +1,9 @@
-/** PRO_PROMO tier table stays aligned with landing/index.html paid tier rows. */
+/** PRO_PROMO tier table stays aligned with web/index.html paid tier rows. */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PRO_PROMO } from '../js/sponsored-deals.js';
 
-const LANDING_HTML = readFileSync('landing/index.html', 'utf8');
+const LANDING_HTML = readFileSync('web/index.html', 'utf8');
 
 describe('PRO_PROMO sync with landing', () => {
   it('tierCompare covers the landing paid-tier table rows', () => {

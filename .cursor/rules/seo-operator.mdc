@@ -10,7 +10,7 @@ Local OpenSEO + GSC + marketing GA. Not a product feature. Do not vendor [AKCode
 ## What is already done (2026-08-18)
 
 - Landing SEO gates: FAQ JSON-LD, `llms.txt`, robots `/auth/`, meta <=160, heading order. Gate: `npm run check:landing-seo`.
-- GA4 `G-88L32JZQDH` **inline** in `landing/index.html` `<head>` (not `ga.js`). CSP sha256 in `landing/vercel.json`. Auth pages have no gtag.
+- GA4 `G-88L32JZQDH` **inline** in `web/index.html` `<head>` (not `ga.js`). CSP sha256 in `web/vercel.json`. Auth pages have no gtag.
 - OpenSEO Docker gitignored at `.seo-god/`, loopback only (`127.0.0.1:3001`), `AUTH_MODE=local_noauth`.
 - GSC OAuth in gitignored `.seo-god/secrets.env`. Sitemaps submitted in GSC.
 - GA4 Admin → **Product links** → **Search Console links** (only that row) linked to `https://baklog.app/`.

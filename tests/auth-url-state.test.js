@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseConfirmRedirectState, hasRecoveryTokens } from '../landing/auth-url-state.js';
+import { parseConfirmRedirectState, hasRecoveryTokens } from '../web/auth-url-state.js';
 
 describe('parseConfirmRedirectState', () => {
   it('returns success when hash has access_token', () => {

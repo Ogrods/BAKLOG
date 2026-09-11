@@ -59,8 +59,8 @@ if ($hook) {
     }
 } else {
     Write-Host ""
-    Write-Host "Checks passed. Next: publish for real, commit landing/, deploy to Vercel." -ForegroundColor Green
+    Write-Host "Checks passed. Next: publish for real, commit web/, deploy to Vercel." -ForegroundColor Green
     Write-Host "  .\.venv\Scripts\python.exe build_free_claims.py"
-    Write-Host "  git add landing/free-claims.json curated/free_claims.fallback.json"
+    Write-Host "  git add web/free-claims.json curated/free_claims.fallback.json"
     Write-Host "  git commit && git push   # or set BAKLOG_VERCEL_DEPLOY_HOOK and re-run this script"
 }

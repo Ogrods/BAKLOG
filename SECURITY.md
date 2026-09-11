@@ -58,7 +58,7 @@ Supabase auth adds a small hosted login box (credentials stay on your machine).
 Pro users can optionally opt into a **read-only cloud mirror** of catalog JSON
 (`games_*.json`, prices, personal statuses) to a private Supabase Storage bucket
 for browsing at baklog.app/mirror and importing onto another PC. That viewer
-lives on the marketing site under `landing/` as an **opt-in Pro surface**: data
+lives on baklog.app under `web/mirror/` as an **opt-in Pro surface**: data
 appears there only after the signed-in Pro user enables Cloud sync and uploads.
 Credentials, cache/, and secrets never leave the machine. Mirror upload is off
 by default, gated behind Connections → Cloud sync with a blocking risk confirm.

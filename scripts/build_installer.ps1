@@ -55,7 +55,7 @@ if (-not $UsedGitArchive) {
     Write-Warning "git archive unavailable — falling back to denylist copy (verify output before shipping)."
     $Exclude = @(
         '.git', '.venv', 'venv', 'node_modules', 'dist', '__pycache__', 'cache', 'data', '.env',
-        'profiles', 'admin', 'docs', 'marketing', 'audit', 'landing', 'tracker.html',
+        'profiles', 'admin', 'docs', 'marketing', 'audit', 'web', 'tracker.html',
         'IP.md', 'EVENT_AUDIT.md', 'EVENT_AUDIT.json', 'review-handoff.md', 'FREE_SURFACE_REVIEW.md',
         'itad_prices.json', 'free_claims.json', 'refresh.log', '.cursor',
         'build', 'lighthouse', '.pytest_cache', '.ruff_cache', 'steam_backlog.egg-info'

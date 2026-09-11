@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_maintainer_env() -> None:
-    """Load SUPABASE_* from repo root ``.env`` then ``landing/.env`` (skip empty values)."""
-    for rel in (".env", "landing/.env"):
+    """Load SUPABASE_* from repo root ``.env`` then ``web/.env`` (skip empty values)."""
+    for rel in (".env", "web/.env"):
         path = ROOT / rel
         if not path.is_file():
             continue

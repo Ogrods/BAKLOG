@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import authConfigHandler from '../landing/api/auth-config.js';
+import authConfigHandler from '../web/api/auth-config.js';
 
 const { fetch: handleAuthConfig } = authConfigHandler;
 
@@ -23,7 +23,7 @@ function makeRequest({ ip = '10.0.0.1', method = 'GET' } = {}) {
   });
 }
 
-describe('landing/api/auth-config.js', () => {
+describe('web/api/auth-config.js', () => {
   beforeEach(() => {
     delete process.env.BAKLOG_SUPABASE_URL;
     delete process.env.BAKLOG_SUPABASE_ANON_KEY;

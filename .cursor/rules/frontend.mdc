@@ -52,13 +52,13 @@ There are **two completely separate** ad/banner systems. Picking the wrong one i
 **1. Feed-driven banners** (`house-support-baklog`, `house-itch-privacy`, `house-pro-promo`, `house-lib-backlog`, the dash-spotlight Pro slides, every paid `ad-*` sponsor). Source: `sponsors.json`. `loadSponsoredDeals()` (`js/sponsored-deals.js`) resolves in order, first non-empty wins:
 
 1. local `GET /sponsors.json` → active profile's `sponsors.json` (seeded by the admin console; usually **absent in dev**)
-2. hosted `https://baklog.app/sponsors.json` → deployed from `landing/sponsors.json` via Vercel — **this is what almost every real machine uses**
+2. hosted `https://baklog.app/sponsors.json` → deployed from `web/sponsors.json` via Vercel — **this is what almost every real machine uses**
 3. bundled `curated/sponsors.json` → last resort, only when 1 **and** 2 are empty/offline
 
 ⚠️ Editing `curated/sponsors.json` alone does **nothing** on any machine with internet — the hosted feed shadows it. To ship a feed-driven banner change:
 
-- Edit `landing/sponsors.json` **and** mirror `curated/sponsors.json` (keep them identical).
-- Keep the sync pairs aligned: `HOUSE_DEFAULTS` (`js/sponsored-deals.js`) ↔ `curated/sponsors.json` ↔ `landing/sponsors.json` ↔ `scripts/migrate_sponsors_v2.py` `HOUSE_DEFAULTS` ↔ `admin/admin.js` `HOUSE_MIGRATION_DEFAULTS`. If the ad should open the Pro tab instead of a URL, add its id to `PRO_PROMO_SPONSOR_IDS`.
+- Edit `web/sponsors.json` **and** mirror `curated/sponsors.json` (keep them identical).
+- Keep the sync pairs aligned: `HOUSE_DEFAULTS` (`js/sponsored-deals.js`) ↔ `curated/sponsors.json` ↔ `web/sponsors.json` ↔ `scripts/migrate_sponsors_v2.py` `HOUSE_DEFAULTS` ↔ `admin/admin.js` `HOUSE_MIGRATION_DEFAULTS`. If the ad should open the Pro tab instead of a URL, add its id to `PRO_PROMO_SPONSOR_IDS`.
 - Commit, push, let **Vercel redeploy** baklog.app.
 - **Verify live:** `Invoke-WebRequest https://baklog.app/sponsors.json` and confirm your id + copy are present. Do not trust the local repo file — confirm the hosted feed.
 

@@ -21,7 +21,7 @@ FAQ JSON-LD must match the `#faq` details list via `npm run check:landing-seo`. 
 - `supabase-email-templates/` — copy-paste Supabase dashboard email subjects + HTML (BAKLOG-branded).
 - `api/_rate-limit.js` — shared distributed rate limiter (Vercel KV / Upstash) used by `subscribe.js`.
 - `api/mirror.js` + `api/_mirror-helpers.js` — Pro read-only cloud mirror API (`GET /api/mirror`). Requires `BAKLOG_SUPABASE_URL` + `BAKLOG_SUPABASE_ANON_KEY` (or `SUPABASE_*`), optional `BAKLOG_COMP_PRO_EMAILS`, and the same KV vars as other rate-limited routes (`KV_REST_API_URL` / `KV_REST_API_TOKEN` or Upstash aliases). Production without KV returns `503`. Comp-Pro emails pass the Vercel entitlement check, but Supabase Storage RLS still needs `app_metadata.plan=pro` on the JWT (sign out/in after a grant).
-- `mirror.html` / `mirror.js` / `mirror-merge.js` / `mirror.css` — signed-in Pro viewer for mirrored library backlog (`/mirror`, noindex). Wishlists and prices sync; claimables are not mirrored.
+- `mirror/` — signed-in Pro viewer for mirrored library backlog (`/mirror`, noindex): `index.html`, `mirror.js`, `mirror-merge.js`, `mirror-virtual.js`, `mirror.css`. Wishlists and prices sync; claimables are not mirrored.
 - `sql/cloud_mirror.sql` — one-time Supabase bucket + RLS for `baklog-mirror` and `cloud_mirror_snapshots` (25 MiB object cap).
 
 ### Cloud mirror (live opt-in)
@@ -36,7 +36,7 @@ Postconditions to verify after deploy or regression:
 4. Pro + account sign-in → risk confirm → enable **Cloud sync** → **Sync now** → objects under `baklog-mirror/{uid}/{profile}/` → [baklog.app/mirror](https://baklog.app/mirror) shows catalogs → **Import from cloud mirror** overwrites the active local profile. Wrong profile claim → **409**. Comp-Pro: sign out/in once after a grant so Storage RLS sees `plan=pro` on the JWT (do not weaken Storage RLS to an email allowlist).
 5. Hosted `/mirror` is an **opt-in Pro surface** on the marketing site - not a silent data leak. Credentials never sync.
 
-- `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `landing/`).
+- `package.json` — Upstash deps for serverless `api/` functions (`npm install` inside `web/`).
 - `api/report.js` — Vercel serverless function; receives opt-in bug reports from the local app, logs them (optional Supabase), and emails you via Resend. Reuses the same `RESEND_*` / `SUPABASE_*` env vars as `subscribe.js`.
 - `api/metrics.js` — Vercel serverless function; receives opt-in anonymous aggregate metrics from the local app (session counts + sponsored-slot impressions/clicks). Optional Supabase log via `sql/aggregate_metrics.sql`.
 - `sql/waitlist.sql` — one-time Supabase table for durable signup logging.
@@ -53,7 +53,7 @@ Postconditions to verify after deploy or regression:
 ## Deploy to Vercel
 
 1. Import this Git repo in Vercel.
-2. **Set the project Root Directory to `landing`** (Settings → Build & Development → Root Directory).
+2. **Set the project Root Directory to `web`** (Settings → Build & Development → Root Directory).
    - Framework Preset: **Other**. No build command. Output is served as static + `api/` functions.
 3. Add the environment variables below (Settings → Environment Variables), then redeploy.
 4. Point your domain at the project (Settings → Domains).
@@ -81,7 +81,7 @@ Run `sql/waitlist.sql` once in the Supabase SQL editor before enabling these var
 
 `../scripts/send-beta-invites.mjs` (`npm run invite:beta` from the repo root) emails not-yet-invited waitlist signups a beta invite via Resend, linking to the GitHub release page, then stamps `invited_at` so the next wave skips them. It is a local maintainer one-off, not a Vercel function. Re-run `sql/waitlist.sql` once so the `invited_at` column + `update` grant exist.
 
-It reads env from your shell or `landing/.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `BETA_FROM` (or `NOTIFY_FROM`), optional `BETA_REPLY_TO` (or `NOTIFY_TO`), and optional `BETA_RELEASE_URL` (defaults to `https://github.com/Ogrods/BAKLOG/releases/latest`).
+It reads env from your shell or `web/.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `BETA_FROM` (or `NOTIFY_FROM`), optional `BETA_REPLY_TO` (or `NOTIFY_TO`), and optional `BETA_RELEASE_URL` (defaults to `https://github.com/Ogrods/BAKLOG/releases/latest`).
 
 **Safe by default - prints the plan and sends nothing until you add `--send`:**
 
@@ -182,7 +182,7 @@ Supabase sends confirm / reset / invite mail. Branding is configured in the **Su
 
 `/api/subscribe` rate-limits by client IP (5 requests per minute). `/api/auth-config` allows 60/min (public anon config for `/mirror` and `/auth-reset`). `/api/mirror` allows 120/min so one library load does not trip the limit. Production uses a **distributed** store so limits survive Vercel cold starts and scale-out. Without KV credentials in production, `/api/subscribe` and `/api/auth-config` return `503 Server not configured`.
 
-1. Vercel project (root `landing/`) → **Storage** → **Create Database** → **KV** → connect to this project.
+1. Vercel project (root `web/`) → **Storage** → **Create Database** → **KV** → connect to this project.
 2. Redeploy so Production receives the auto-injected credentials below.
 3. Smoke test: POST `/api/subscribe` six times from the same IP — the sixth should return `429 Too many requests`.
 
@@ -193,29 +193,29 @@ Supabase sends confirm / reset / invite mail. Branding is configured in the **Su
 
 Alternatively, set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from a standalone Upstash Redis database.
 
-Local `vercel dev` and Vitest fall back to an in-memory limiter when KV vars are absent (with a one-time console warning). Install landing API deps once: `npm install` inside `landing/`.
+Local `vercel dev` and Vitest fall back to an in-memory limiter when KV vars are absent (with a one-time console warning). Install landing API deps once: `npm install` inside `web/`.
 
 ## Local preview
 
-Static preview (form will fail without the API, which is expected). **Serve from `landing/`** so `demo.css`, `demo.js`, and sample covers load:
+Static preview (form will fail without the API, which is expected). **Serve from `web/`** so `demo.css`, `demo.js`, and sample covers load:
 
 ```sh
 # from the repo root (recommended)
 npm run landing
 # open http://localhost:4000
 
-# or from the landing/ folder
+# or from the web/ folder
 python -m http.server 4000
 # open http://localhost:4000
 ```
 
-If you serve from the repo root without `--directory landing`, open `http://localhost:PORT/landing/` (relative asset paths resolve from that URL).
+If you serve from the repo root without `--directory web`, open `http://localhost:PORT/web/` (relative asset paths resolve from that URL).
 
 Full preview incl. the function:
 
 ```sh
 npm i -g vercel
-vercel dev   # run from landing/  (uses .env / Vercel env)
+vercel dev   # run from web/  (uses .env / Vercel env)
 ```
 
 ## Claimable Now feed (`free-claims.json`)
@@ -235,13 +235,13 @@ $env:PYTHONPATH = (Get-Location).Path
 
 `build_free_claims.py` writes disk only:
 
-- `landing/free-claims.json` (hosted on Vercel - **commit this**)
+- `web/free-claims.json` (hosted on Vercel - **commit this**)
 - `curated/free_claims.fallback.json` (bundled offline fallback - **commit this**)
 - active profile `free_claims.json` (local app; use `--no-profile` to skip)
 
 `curated/free_claims.auto.json` (scrape) and `curated/free_claims.approved.json` (Publish/Hide/Block selection) are **gitignored** maintainer ops files. Keep them on disk locally; do not commit them to the public repo.
 
-**Prod** still needs a commit/push of `landing/free-claims.json` (and usually the fallback) or a Vercel deploy hook - publish alone does not update baklog.app.
+**Prod** still needs a commit/push of `web/free-claims.json` (and usually the fallback) or a Vercel deploy hook - publish alone does not update baklog.app.
 
 **Pre-deploy check** (fetch → dry-run build → audit → optional Vercel hook):
 
@@ -259,7 +259,7 @@ $env:PYTHONPATH = (Get-Location).Path
 
 **Scheduled ingest (Phase 1 + Phase 2)** - GitHub Actions workflow `Claims ingest` (`.github/workflows/claims-ingest.yml`): daily ~15:00 UTC + `workflow_dispatch`.
 
-- **Phase 1 (read-only job):** `fetch_claim_sources.py` → `scripts/claims_ingest_summary.py` (scrape vs committed `landing/free-claims.json`, soft-warn if live baklog.app feed is older than 7 days, landing-vs-live skew line). Job stays green on stale age. No landing writes, no artifacts, no secrets.
+- **Phase 1 (read-only job):** `fetch_claim_sources.py` → `scripts/claims_ingest_summary.py` (scrape vs committed `web/free-claims.json`, soft-warn if live baklog.app feed is older than 7 days, landing-vs-live skew line). Job stays green on stale age. No landing writes, no artifacts, no secrets.
 - **Phase 2 (write job, after Phase 1):** synthesize ephemeral `approved.json` from landing ids (keeps `premium_only`), stub empty `free-claims.input.json`, `build_free_claims.py --no-profile`, re-synth approved from the built landing (so expired drops are not audited as orphans), audit, then open/update sticky PR `chore/claims-feed-refresh` **only** when a lean item fingerprint changes. Never `--allow-empty`. Never auto-approves new scrapes. When the fingerprint has **0 added** ids, the job enables squash auto-merge (`gh pr merge --squash --auto`); any added ids stay human-merge. Repo **Allow auto-merge** must be on (Settings → General).
 
 Does **not** commit or unify gitignored `auto` / `approved` / `input` files. Manual approve + publish remains available via admin/CLI for adding new candidates.
@@ -297,13 +297,13 @@ The local app loads disclosed sponsored/house deal slots from `https://baklog.ap
 ### Maintainer workflow
 
 1. Edit campaigns in `curated/sponsors.json` at the repo root, or via the admin console (`BAKLOG_ADMIN=1` → `/api/internal/sponsors`).
-2. Copy the same file to `landing/sponsors.json` (keep them in sync before deploy):
+2. Copy the same file to `web/sponsors.json` (keep them in sync before deploy):
 
    ```sh
-   cp curated/sponsors.json landing/sponsors.json
+   cp curated/sponsors.json web/sponsors.json
    ```
 
-3. Commit and deploy `landing/` so Vercel serves the updated feed (~10 min CDN TTL via `vercel.json`).
+3. Commit and deploy `web/` so Vercel serves the updated feed (~10 min CDN TTL via `vercel.json`).
 
 Feed schema:
 
@@ -362,7 +362,7 @@ Feed schema:
 }
 ```
 
-Copy `curated/sponsors.json` → `landing/sponsors.json` and deploy.
+Copy `curated/sponsors.json` → `web/sponsors.json` and deploy.
 
 **2. Store-page links (`js/affiliate.js`)** — When you open a game on its *library store* (GOG, Epic, Humble rows), BAKLOG builds the URL in `storeUrlForGame` and may append your tag. Edit `AFFILIATE_RULES` in `js/affiliate.js`: fill `value` (param mode) or `template` (deeplink mode with `{url}`), set `enabled: true`. Rules ship disabled so links are untouched until you enroll.
 
@@ -395,8 +395,8 @@ Users can optionally enable **Share anonymous usage counts** in the app (Connect
 ## Regenerate share / touch icons
 
 ```sh
-python tools/make_og_image.py          # run from the repo root; writes landing/assets/og.png
-python tools/make_apple_touch_icon.py  # writes landing/apple-touch-icon.png
+python tools/make_og_image.py          # run from the repo root; writes web/assets/og.png
+python tools/make_apple_touch_icon.py  # writes web/apple-touch-icon.png
 ```
 
 Gate after landing HTML/JSON-LD edits: `npm run check:landing-seo` from the repo root (does not start a server).

@@ -4371,7 +4371,7 @@ html[data-init-view="pro"] header.app-header {
 .app-shell {
   padding-top: 0;
 }
-/* Thin in-app social footer (icons, URLs, order sync with landing/index.html .foot-social) */
+/* Thin in-app social footer (icons, URLs, order sync with web/index.html .foot-social) */
 .app-footer {
   margin-top: 1.25rem;
   padding: 0.5rem 0 0.25rem;
@@ -4531,7 +4531,7 @@ html[data-theme="ember"] .app-header-brand h1 {
   color: transparent;
 }
 /* Header logo mark — inline SVG with transparent knob cutouts (same mask
-   technique as landing/index.html hero mark). CSS mask-image on the old white
+   technique as web/index.html hero mark). CSS mask-image on the old white
    SVG dropped the inner circles and rendered solid pills. */
 .brand-logo-mark {
   display: inline-flex;

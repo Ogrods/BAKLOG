@@ -33,7 +33,7 @@ from shared.steam_match import appid_from_steam_url, pick_appid, strip_giveaway_
 INPUT_PATH = Path("free-claims.input.json")
 AUTO_PATH = Path("curated/free_claims.auto.json")
 APPROVED_PATH = Path("curated/free_claims.approved.json")
-OUTPUT_PATH = Path("landing/free-claims.json")
+OUTPUT_PATH = Path("web/free-claims.json")
 FALLBACK_PATH = Path("curated/free_claims.fallback.json")
 STORE_DELAY_SEC = 1.5
 STEAM_STORESEARCH_URL = "https://store.steampowered.com/api/storesearch/"

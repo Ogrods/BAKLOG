@@ -3,7 +3,7 @@
 param(
     [switch]$SkipBuild,
     [string]$AppUrl = 'http://127.0.0.1:8765',
-    [string]$LandingUrl = 'http://127.0.0.1:4000/landing/index.html'
+    [string]$LandingUrl = 'http://127.0.0.1:4000/web/index.html'
 )
 
 $ErrorActionPreference = 'Stop'

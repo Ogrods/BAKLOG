@@ -1,8 +1,8 @@
-/** Load landing/index.html into happy-dom for axe scans. */
+/** Load web/index.html into happy-dom for axe scans. */
 import fs from 'node:fs';
 import path from 'node:path';
 
-const LANDING_PATH = path.resolve(import.meta.dirname, '../../landing/index.html');
+const LANDING_PATH = path.resolve(import.meta.dirname, '../../web/index.html');
 
 export function hydrateLandingDocument() {
   const html = fs.readFileSync(LANDING_PATH, 'utf8');

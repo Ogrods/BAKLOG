@@ -55,8 +55,8 @@ describe('sync pairs (AGENTS.md rule 6)', () => {
     }
   });
 
-  it('landing/marquee-speed.js MARQUEE_PX_PER_SEC matches js/marquee-speed.js', () => {
-    const landing = read('landing/marquee-speed.js');
+  it('web/marquee-speed.js MARQUEE_PX_PER_SEC matches js/marquee-speed.js', () => {
+    const landing = read('web/marquee-speed.js');
     const app = read('js/marquee-speed.js');
     const landingVal = landing.match(/MARQUEE_PX_PER_SEC\s*=\s*(\d+)/)?.[1];
     const appVal = app.match(/MARQUEE_PX_PER_SEC\s*=\s*(\d+)/)?.[1];

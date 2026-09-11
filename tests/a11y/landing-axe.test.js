@@ -1,4 +1,4 @@
-/** axe-core accessibility scan of landing/index.html. */
+/** axe-core accessibility scan of web/index.html. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -27,7 +27,7 @@ function runAxe() {
   });
 }
 
-describe('landing/index.html axe accessibility', () => {
+describe('web/index.html axe accessibility', () => {
   beforeEach(() => {
     hydrateLandingDocument();
   });

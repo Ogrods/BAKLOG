@@ -13,7 +13,7 @@
 //
 // Buyer matching: the Polar customer's external_id (when passed as a checkout
 // query param) is treated as the Supabase user id; otherwise we match the buyer
-// by email via the get_user_id_by_email RPC (see landing/sql/polar_entitlement.sql).
+// by email via the get_user_id_by_email RPC (see web/sql/polar_entitlement.sql).
 
 const TIMESTAMP_TOLERANCE_SEC = 5 * 60;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

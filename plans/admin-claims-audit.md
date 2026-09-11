@@ -18,7 +18,7 @@ flowchart TD
     C -->|PUT| D
     C -->|Preview| E[build_free_claims.py --dry-run]
 
-    F[build_free_claims.py] -->|reads B + D| G[landing/free-claims.json]
+    F[build_free_claims.py] -->|reads B + D| G[web/free-claims.json]
     G -->|served| H[Dashboard - Free tab]
 
     subgraph Python Pipeline
@@ -41,7 +41,7 @@ flowchart TD
 | `curated/free_claims.auto.json`     | Raw claim items from source feeds (GamerPower, ITAD, Epic)                                                             |
 | `curated/free_claims.approved.json` | Admin state: `ids`, `field_overrides`, `store_overrides`, `dismissed`, `dismissed_keys`, `blocked`, `premium_only_ids` |
 | `free-claims.input.json`            | Optional manual claim entries                                                                                          |
-| `landing/free-claims.json`          | Published feed served to dashboard                                                                                     |
+| `web/free-claims.json`          | Published feed served to dashboard                                                                                     |
 | `profiles/<id>/free_claims.json`    | Per-profile copy (populated by fetcher auto-publish)                                                                   |
 
 ### Key Functions

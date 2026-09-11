@@ -216,7 +216,7 @@ export default {
 
     const signupTime = new Date().toISOString();
     console.log(`waitlist_signup\t${signupTime}\t${await emailLogTag(email)}`);
-    // Without Supabase, the Vercel function log above is the durable capture path (see landing/README.md).
+    // Without Supabase, the Vercel function log above is the durable capture path (see web/README.md).
 
     // Track the durable-write outcome so the founder notification is self-verifying:
     // a glance at the email tells you whether the row reached Supabase, instead of

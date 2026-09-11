@@ -23,7 +23,7 @@ export default [
       'vendor/**',
       'js/vendor/**',
       'profiles/**',
-      'landing/**',
+      'web/**',
       'admin/**',
       'curated/**',
       'scripts/**',

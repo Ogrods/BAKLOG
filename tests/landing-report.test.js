@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import reportHandler from "../landing/api/report.js";
+import reportHandler from "../web/api/report.js";
 
 const { fetch: handleReport } = reportHandler;
 
@@ -36,7 +36,7 @@ function makeRequest(body, { ip = "10.0.0.1", method = "POST", contentLength, or
   };
 }
 
-describe("landing/api/report.js", () => {
+describe("web/api/report.js", () => {
   /** @type {import('vitest').Mock} */
   let fetchMock;
 

@@ -154,7 +154,7 @@ FREE_CLAIMS_INPUT_PATH = Path(
 )
 FREE_CLAIMS_AUTO_PATH = Path("curated/free_claims.auto.json")
 FREE_CLAIMS_APPROVED_PATH = Path("curated/free_claims.approved.json")
-FREE_CLAIMS_BUILT_PATH = Path("landing/free-claims.json")
+FREE_CLAIMS_BUILT_PATH = Path("web/free-claims.json")
 SPONSORS_PATH = Path(os.environ.get("BAKLOG_SPONSORS_INPUT", "curated/sponsors.json"))
 INTERNAL_JOBS_OVERLAY = bundle_root() / "admin" / "admin-jobs.json"
 MAX_ADMIN_CLAIM_ITEMS = int(os.environ.get("BAKLOG_MAX_ADMIN_CLAIM_ITEMS", "500"))

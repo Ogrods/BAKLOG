@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import authSignupNotifyHandler from "../landing/api/auth-signup-notify.js";
+import authSignupNotifyHandler from "../web/api/auth-signup-notify.js";
 
 const { fetch: handleAuthSignupNotify } = authSignupNotifyHandler;
 
@@ -36,7 +36,7 @@ const INSERT_PAYLOAD = {
   },
 };
 
-describe("landing/api/auth-signup-notify.js", () => {
+describe("web/api/auth-signup-notify.js", () => {
   /** @type {import('vitest').Mock} */
   let fetchMock;
 

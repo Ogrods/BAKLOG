@@ -8,7 +8,7 @@ Requires: Pillow
 Run:
   python tools/make_og_image.py
 Output:
-  landing/assets/og.png
+  web/assets/og.png
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "landing" / "assets" / "og.png"
+OUT = ROOT / "web" / "assets" / "og.png"
 
 # Final dimensions and supersample factor (for crisp, anti-aliased edges).
 OUT_W, OUT_H = 1200, 630

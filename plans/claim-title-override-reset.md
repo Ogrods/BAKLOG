@@ -13,7 +13,7 @@ flowchart LR
     A[fetch_claim_sources.py] -->|writes| B[curated/free_claims.auto.json]
     B --> C[build_free_claims.py]
     D[curated/free_claims.approved.json] -->|ids + field_overrides| C
-    C -->|merge| E[landing/free-claims.json]
+    C -->|merge| E[web/free-claims.json]
 ```
 
 ### How Title Overrides Work
@@ -155,7 +155,7 @@ def _apply_field_overrides(items, field_overrides, field_overrides_by_key=None):
 1. Edit a claim title in admin workspace (e.g., remove parenthetical like "(Stove)" from a title)
 2. Run `python fetchers/fetch_claim_sources.py` (generates new auto IDs)
 3. Run `python fetchers/build_free_claims.py`
-4. Verify the edited title survives in `landing/free-claims.json`
+4. Verify the edited title survives in `web/free-claims.json`
 5. Check the dashboard "Free" tab shows the edited title
 
 ## Broader Impact

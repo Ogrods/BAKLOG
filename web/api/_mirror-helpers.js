@@ -1,4 +1,4 @@
-/** Shared Pro entitlement + mirror path helpers for landing/api/mirror.js */
+/** Shared Pro entitlement + mirror path helpers for web/api/mirror.js */
 
 export const MIRROR_BUCKET = "baklog-mirror";
 

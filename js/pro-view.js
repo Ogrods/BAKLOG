@@ -1,7 +1,7 @@
 /**
  * BAKLOG Pro purchase splash — dedicated view tab (#pro).
  * Checkout URLs sync with shared/pro_checkout.py + js/pro-checkout.js.
- * Copy sync pair: PRO_PROMO in js/sponsored-deals.js ↔ landing/index.html paid tier.
+ * Copy sync pair: PRO_PROMO in js/sponsored-deals.js ↔ web/index.html paid tier.
  */
 
 import { baklogFetch } from './api-client.js';

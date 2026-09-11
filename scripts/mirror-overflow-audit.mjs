@@ -4,7 +4,7 @@
  * Usage:
  *   node scripts/mirror-overflow-audit.mjs [baseUrl]
  *
- * Serves landing/ on an ephemeral port when baseUrl is omitted.
+ * Serves web/ on an ephemeral port when baseUrl is omitted.
  * Injects 2000 synthetic rows via window.__baklogMirrorTest (no auth).
  *
  * Matrix: 1024×800, 768×900, 390×844, 360×740, 844×390
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const landingRoot = path.join(root, 'landing');
+const landingRoot = path.join(root, 'web');
 const OUT = path.join(root, 'scripts', 'mirror-overflow-last-run.json');
 
 const VIEWPORTS = [
@@ -45,7 +45,7 @@ function startStaticServer() {
     try {
       const url = new URL(req.url || '/', 'http://127.0.0.1');
       let rel = decodeURIComponent(url.pathname);
-      if (rel === '/' || rel === '/mirror') rel = '/mirror.html';
+      if (rel === '/' || rel === '/mirror' || rel === '/mirror/') rel = '/mirror/index.html';
       if (rel.includes('..')) {
         res.writeHead(400);
         res.end('bad path');
@@ -151,7 +151,7 @@ async function main() {
   let failed = false;
 
   try {
-    await page.goto(`${baseUrl.replace(/\/$/, '')}/mirror.html`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.goto(`${baseUrl.replace(/\/$/, '')}/mirror`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForFunction(() => typeof window.__baklogMirrorTest?.setRows === 'function', null, {
       timeout: 15_000,
     });

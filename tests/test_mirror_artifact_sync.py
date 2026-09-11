@@ -28,7 +28,7 @@ def _js_source_string() -> str:
 
 def test_allowlist_source_matches_js() -> None:
     assert _js_source_string() == ALLOWED_ARTIFACT_RE_SOURCE
-    landing = (ROOT / "landing" / "api" / "_mirror-helpers.js").read_text(encoding="utf-8")
+    landing = (ROOT / "web" / "api" / "_mirror-helpers.js").read_text(encoding="utf-8")
     m = re.search(
         r'ALLOWED_ARTIFACT_RE_SOURCE\s*=\s*\n?\s*["\']([^"\']+)["\']',
         landing,

@@ -29,8 +29,8 @@ from fontTools.ttLib.woff2 import decompress as woff2_decompress
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-FONT_GROTESK = ROOT / "landing" / "assets" / "fonts" / "space-grotesk-latin.woff2"
-FONT_DMSANS = ROOT / "landing" / "assets" / "fonts" / "dm-sans-latin.woff2"
+FONT_GROTESK = ROOT / "web" / "assets" / "fonts" / "space-grotesk-latin.woff2"
+FONT_DMSANS = ROOT / "web" / "assets" / "fonts" / "dm-sans-latin.woff2"
 OUT_MONTHLY = ROOT / "assets" / "baklog-pro-polar.png"
 OUT_YEARLY = ROOT / "assets" / "baklog-pro-polar-yearly.png"
 OUT_STRIP_MONTHLY = ROOT / "assets" / "baklog-pro-strip.png"

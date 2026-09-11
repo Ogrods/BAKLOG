@@ -144,7 +144,11 @@
       ]
     },
     {
-      "source": "/(auth-confirmed|auth-reset|auth-url-state|mirror|mirror-merge)\\.js|mirror\\.css",
+      "source": "/(auth-confirmed|auth-reset|auth-url-state)\\.js",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+    },
+    {
+      "source": "/mirror/(mirror|mirror-merge|mirror-virtual)\\.js|/mirror/mirror\\.css",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
     }
   ]

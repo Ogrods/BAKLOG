@@ -10,7 +10,7 @@
  *   Insight — startInsightRotation/rotateInsight toggles .is-visible.
  *   Resize — installResizeQuiet toggles html.ui-resizing; syncDonutChartSizes on quiet end.
  *
- * Run `npm run check:spotlight` before editing this file or landing/demo.css.
+ * Run `npm run check:spotlight` before editing this file or web/demo.css.
  */
 (function () {
   "use strict";

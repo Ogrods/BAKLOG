@@ -1,6 +1,6 @@
 /**
  * Hide Polar checkout CTAs on baklog.app when BAKLOG_PRO_CHECKOUT is not set on Vercel.
- * Fetches GET /api/pro-config (landing/api/pro-config.js).
+ * Fetches GET /api/pro-config (web/api/pro-config.js).
  */
 (function proCheckoutGate() {
   const BETA_NOTE =

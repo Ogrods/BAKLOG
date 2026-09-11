@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAllowedOrigin,
   mergeProfileListRows,
-} from "../landing/api/_mirror-helpers.js";
+} from "../web/api/_mirror-helpers.js";
 
 describe("landing mirror CORS + list helpers", () => {
   it("allows baklog.app and local app ports only", () => {

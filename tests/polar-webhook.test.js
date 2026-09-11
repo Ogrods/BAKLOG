@@ -41,7 +41,7 @@ async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {} } = {}) {
     throw new Error(`unexpected fetch ${url} ${init?.method || ''}`);
   });
   vi.stubGlobal('fetch', fetchMock);
-  const mod = await import('../landing/api/polar-webhook.js');
+  const mod = await import('../web/api/polar-webhook.js');
   const req = new Request('https://baklog.app/api/polar-webhook', {
     method: 'POST',
     headers: {
@@ -93,7 +93,7 @@ describe('polar-webhook', () => {
       data: { product: {}, customer: { email: 'a@b.c' } },
     });
     const sig = signBody(body, 'different-signing-secret');
-    const mod = await import('../landing/api/polar-webhook.js');
+    const mod = await import('../web/api/polar-webhook.js');
     const res = await mod.default.fetch(new Request('https://baklog.app/api/polar-webhook', {
       method: 'POST',
       headers: {
@@ -112,7 +112,7 @@ describe('polar-webhook', () => {
     delete process.env.POLAR_WEBHOOK_SECRET;
     process.env.SUPABASE_URL = SUPABASE_URL;
     process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
-    const mod = await import('../landing/api/polar-webhook.js');
+    const mod = await import('../web/api/polar-webhook.js');
     const res = await mod.default.fetch(new Request('https://baklog.app/api/polar-webhook', { method: 'POST', body: '{}' }));
     expect(res.status).toBe(500);
   });
@@ -174,7 +174,7 @@ describe('polar-webhook', () => {
       throw new Error(`unexpected fetch ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
-    const mod = await import('../landing/api/polar-webhook.js');
+    const mod = await import('../web/api/polar-webhook.js');
     const res = await mod.default.fetch(new Request('https://baklog.app/api/polar-webhook', {
       method: 'POST',
       headers: {
@@ -218,7 +218,7 @@ describe('polar-webhook', () => {
       throw new Error(`unexpected fetch ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
-    const mod = await import('../landing/api/polar-webhook.js');
+    const mod = await import('../web/api/polar-webhook.js');
     const res = await mod.default.fetch(new Request('https://baklog.app/api/polar-webhook', {
       method: 'POST',
       headers: {

@@ -1,10 +1,10 @@
 /* @vitest-environment node */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import proConfigHandler from "../landing/api/pro-config.js";
+import proConfigHandler from "../web/api/pro-config.js";
 
 const { fetch: handleProConfig } = proConfigHandler;
 
-describe("landing/api/pro-config.js", () => {
+describe("web/api/pro-config.js", () => {
   beforeEach(() => {
     delete process.env.BAKLOG_PRO_CHECKOUT;
   });

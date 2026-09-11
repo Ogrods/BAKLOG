@@ -24,7 +24,7 @@ runs without them.
 | `js/` | Dashboard ESM modules (`app.js` bootstraps) |
 | `profiles/<id>/` | Per-profile catalogs, personal data, auth CDP profiles (gitignored at runtime) |
 | `packaging/` | PyInstaller spec, Inno Setup, apply-update scripts |
-| `landing/` | Static marketing site (Vercel); separate from the local app |
+| `web/` | Static marketing site (Vercel); separate from the local app |
 | `guide/` | End-user documentation |
 
 ## Runtime (one machine)

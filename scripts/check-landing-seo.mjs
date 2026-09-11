@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(import.meta.dirname, "..");
-const landing = path.join(root, "landing");
+const landing = path.join(root, "web");
 const EM_DASH = "\u2014";
 
 /** Strip HTML tags until stable, then drop leftover `<` (FAQ text only). */
@@ -194,7 +194,7 @@ export function checkLandingSeo() {
   }
 
   const llms = path.join(landing, "llms.txt");
-  if (!fs.existsSync(llms)) errors.push("landing/llms.txt missing");
+  if (!fs.existsSync(llms)) errors.push("web/llms.txt missing");
   else scanEmDash(llms, errors);
 
   for (const name of fs.readdirSync(landing)) {

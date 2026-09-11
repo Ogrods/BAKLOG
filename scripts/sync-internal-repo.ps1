@@ -233,7 +233,7 @@ if (-not (Test-Path -LiteralPath $readmePath)) {
 This repository holds gitignored internal documents synced from the public
 steam-backlog repo (marketing, licensing leads, audits, etc.).
 
-- Not deployed: only landing/ is public on Vercel (baklog.app).
+- Not deployed: only web/ is public on Vercel (baklog.app).
 - Do not publish this repo or its contents.
 
 ## Sync from your machine

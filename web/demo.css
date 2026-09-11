@@ -1,5 +1,5 @@
 /* BAKLOG landing: mega hero demo + funnel sections
- * Run `npm run check:spotlight` before editing this file or landing/demo.js. */
+ * Run `npm run check:spotlight` before editing this file or web/demo.js. */
 
 :root {
   --marquee-px-per-sec: 48;
@@ -181,7 +181,7 @@
 
 /*
  * SPOTLIGHT LAYOUT INVARIANTS (landing demo)
- * Run `npm run check:spotlight` before editing this block or landing/demo.js.
+ * Run `npm run check:spotlight` before editing this block or web/demo.js.
  *
  * Three layout modes (single positioning parent = .dash-mega-hero):
  *   Desktop  min-width:901px — stage position:static; host bleeds top:-28 right:-32 width:66%;

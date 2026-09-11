@@ -1,6 +1,6 @@
 ---
 description: Marketing landing page (static Vercel deploy)
-globs: landing/**
+globs: web/**
 alwaysApply: false
 ---
 
@@ -8,17 +8,18 @@ alwaysApply: false
 
 ## Deploy
 
-- Root for Vercel: `landing/` (see `landing/vercel.json`, `landing/README.md`)
+- Root for Vercel: `web/` (see `web/vercel.json`, `web/README.md`)
 - Static HTML/CSS/JS — no frontend build step
-- Local preview: `npm run landing` or `python -m http.server 4000 --directory landing`
+- Local preview: `npm run landing` or `python -m http.server 4000 --directory web`
 
 ## Key files
 
-- `landing/index.html` — hero, waitlist, `#demo` interactive section, inline JSON-LD `@graph`, inline GA4 gtag (`G-88L32JZQDH`; CSP hash in `landing/vercel.json`)
-- `landing/demo.js` — IIFE with dummy data (`STATS`, `SPOTLIGHT_GAMES`); mirrors app UX, no app imports
-- `landing/demo.css` — demo dashboard chrome
-- `landing/main.js` — waitlist POST to `/api/subscribe`
-- `landing/free-claims.json` — built by `build_free_claims.py` at repo root
+- `web/index.html` — hero, waitlist, `#demo` interactive section, inline JSON-LD `@graph`, inline GA4 gtag (`G-88L32JZQDH`; CSP hash in `web/vercel.json`)
+- `web/demo.js` — IIFE with dummy data (`STATS`, `SPOTLIGHT_GAMES`); mirrors app UX, no app imports
+- `web/demo.css` — demo dashboard chrome
+- `web/main.js` — waitlist POST to `/api/subscribe`
+- `web/free-claims.json` — built by `build_free_claims.py` at repo root
+- `web/mirror/` — Pro cloud library viewer (`/mirror`); separate from marketing page chrome
 
 FAQ JSON-LD must match the `#faq` details list: `npm run check:landing-seo`.
 
@@ -26,17 +27,17 @@ Attended OpenSEO / GSC / GA playbook: `.cursor/rules/seo-operator.mdc`.
 
 ## Serverless
 
-- `landing/api/subscribe.js` — waitlist (Resend + optional Supabase)
-- `landing/api/report.js` — opt-in bug reports from local app
+- `web/api/subscribe.js` — waitlist (Resend + optional Supabase)
+- `web/api/report.js` — opt-in bug reports from local app
 
 ## Keep in sync
 
 See **AGENTS.md hard rule 6** for the canonical full sync-pair list. Landing-specific:
 
-- `landing/marquee-speed.js` ↔ `js/marquee-speed.js` (duplicate IIFE vs ESM)
-- Sample covers: `landing/assets/sample/*.{webp,png}` (fictional games)
+- `web/marquee-speed.js` ↔ `js/marquee-speed.js` (duplicate IIFE vs ESM)
+- Sample covers: `web/assets/sample/*.{webp,png}` (fictional games)
 - Demo stats in `demo.js` are independent from app state — update both if changing marketing numbers
 
 ## Copy conventions
 
-- **No em dashes or AI tells in marketing copy.** Never use `—` (em dash, U+2014) in any front-facing string in `landing/` (hero, demo text, `sponsors.json`, email copy in `api/subscribe.js`). Use a spaced hyphen (` - `) or rephrase. Also avoid LLM-flavored marketing (contrast frames, hype verbs, empty intensifiers, abstract positioning, verbatim claim repetition across sections). Code comments are exempt. See AGENTS.md hard rule 8.
+- **No em dashes or AI tells in marketing copy.** Never use `—` (em dash, U+2014) in any front-facing string in `web/` (hero, demo text, `sponsors.json`, email copy in `api/subscribe.js`). Use a spaced hyphen (` - `) or rephrase. Also avoid LLM-flavored marketing (contrast frames, hype verbs, empty intensifiers, abstract positioning, verbatim claim repetition across sections). Code comments are exempt. See AGENTS.md hard rule 8.

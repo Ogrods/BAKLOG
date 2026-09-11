@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LANDING_PATH = ROOT / "landing" / "free-claims.json"
+LANDING_PATH = ROOT / "web" / "free-claims.json"
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"
 APPROVED_OUT = ROOT / "curated" / "free_claims.approved.json"
 

@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import subscribeHandler from "../landing/api/subscribe.js";
+import subscribeHandler from "../web/api/subscribe.js";
 
 const { fetch: handleSubscribe } = subscribeHandler;
 
@@ -30,7 +30,7 @@ function makeRequest(body, { ip = "10.0.0.1", method = "POST", contentLength } =
   };
 }
 
-describe("landing/api/subscribe.js", () => {
+describe("web/api/subscribe.js", () => {
   /** @type {import('vitest').Mock} */
   let fetchMock;
 

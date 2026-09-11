@@ -5,7 +5,7 @@ Render a 180x180 apple-touch-icon from the canonical favicon.svg geometry.
 Run from repo root:
   python tools/make_apple_touch_icon.py
 Output:
-  landing/apple-touch-icon.png
+  web/apple-touch-icon.png
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "landing" / "apple-touch-icon.png"
+OUT = ROOT / "web" / "apple-touch-icon.png"
 SIZE = 180
 
 PILLS = ((2, 52, 46, 24), (52, 52, 46, 24), (27, 24, 46, 24))

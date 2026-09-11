@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10T18:17:24.737135+00:00",
+  "generated_at": "2026-09-11T18:21:35.254029+00:00",
   "items": [
     {
       "id": "gamerpower-3324",
@@ -9,11 +9,11 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262060/header.jpg?t=1779411066",
       "genres": [],
       "blurb": "Become the battle lamb you were born to be! Battle Ram is free this week on IndieGala, download it now! Battle Ram is a 2d action-packed game with lambs and battling robots.",
-      "ends_at": "2026-09-24T18:17:09Z",
+      "ends_at": "2026-09-25T18:21:19Z",
       "steam_appid": 1262060,
       "review_percent": 84,
       "source": "gamerpower",
-      "first_seen": "2026-09-10T18:17:09Z"
+      "first_seen": "2026-09-11T18:21:19Z"
     },
     {
       "id": "gamerpower-3313",
@@ -23,11 +23,11 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1532580/header.jpg?t=1654494842",
       "genres": [],
       "blurb": "Dreaming about Wordle? What a coincidence, it’s on IndieGala for free! Download it now and make your dreams come true.",
-      "ends_at": "2026-09-24T18:17:09Z",
+      "ends_at": "2026-09-25T18:21:19Z",
       "steam_appid": 1532580,
       "review_percent": 62,
       "source": "gamerpower",
-      "first_seen": "2026-09-10T18:17:09Z"
+      "first_seen": "2026-09-11T18:21:19Z"
     },
     {
       "id": "gamerpower-3498",
@@ -39,7 +39,7 @@
       "blurb": "Download Primal Slideee Deluxe for free via Stove until July 31!",
       "ends_at": "2026-09-12T23:59:59Z",
       "source": "gamerpower",
-      "first_seen": "2026-09-10T18:17:09Z",
+      "first_seen": "2026-09-11T18:21:19Z",
       "premium_only": true
     },
     {
@@ -50,11 +50,11 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3218690/header.jpg?t=1730801171",
       "genres": [],
       "blurb": "Scamster Kombat",
-      "ends_at": "2026-09-24T18:17:09Z",
+      "ends_at": "2026-09-25T18:21:19Z",
       "steam_appid": 3218690,
       "review_percent": 96,
       "source": "itad",
-      "first_seen": "2026-09-10T18:17:09Z"
+      "first_seen": "2026-09-11T18:21:19Z"
     },
     {
       "id": "itad-3444e73720bf",
@@ -66,20 +66,6 @@
       "blurb": "Evan&#039;s Remains",
       "ends_at": "2026-09-21T21:47:23Z",
       "source": "itad",
-      "first_seen": "2026-09-07T21:47:23Z"
-    },
-    {
-      "id": "gamerpower-3767",
-      "store": "gog",
-      "title": "State of Mind (GOG) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/state-of-mind-gog-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/437630/header.jpg?t=1770913197",
-      "genres": [],
-      "blurb": "Experience the future today! Grab State of Mind for free via GOG and keep it forever. State of Mind is a 3d Sci-fi thriller game delving into transhumanism.",
-      "ends_at": "2026-09-10T23:59:00Z",
-      "steam_appid": 437630,
-      "review_percent": 78,
-      "source": "gamerpower",
       "first_seen": "2026-09-07T21:47:23Z"
     }
   ],

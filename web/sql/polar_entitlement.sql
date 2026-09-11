@@ -1,5 +1,5 @@
 -- BAKLOG Pro entitlement helper (run once in the Supabase SQL editor).
--- Used by landing/api/polar-webhook.js to map a Polar buyer's email to their
+-- Used by web/api/polar-webhook.js to map a Polar buyer's email to their
 -- Supabase user id, after which the webhook writes app_metadata.plan via the
 -- GoTrue admin API. The auth schema is not exposed over PostgREST, so a
 -- SECURITY DEFINER function is the supported way to read it with service_role.

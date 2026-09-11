@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BAKLOG - cloud library</title>
+  <meta name="robots" content="noindex" />
+  <meta name="description" content="Read-only view of your BAKLOG cloud mirror (Pro)." />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="baklog-version" content="0.9.01" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/mirror/mirror.css" />
+</head>
+<body>
+  <div class="mirror-shell">
+    <header class="mirror-header">
+      <div class="mirror-header-row">
+        <div
+          class="app-header-brand"
+          title="BAKLOG cloud library - read-only Pro mirror"
+        >
+          <span class="brand-logo-mark" aria-hidden="true">
+            <svg
+              viewBox="2 24 96 52"
+              role="img"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <defs>
+                <linearGradient
+                  id="mirrorBrandMarkGrad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
+                >
+                  <stop offset="0%" stop-color="#fbbf24" />
+                  <stop offset="55%" stop-color="#f97316" />
+                  <stop offset="100%" stop-color="#e2502a" />
+                </linearGradient>
+                <mask
+                  id="mirrorBrandKnobs"
+                  maskUnits="userSpaceOnUse"
+                  x="0"
+                  y="0"
+                  width="100"
+                  height="100"
+                >
+                  <rect width="100" height="100" fill="#fff" />
+                  <circle cx="14" cy="64" r="8" fill="#000" />
+                  <circle cx="64" cy="64" r="8" fill="#000" />
+                  <circle cx="39" cy="36" r="8" fill="#000" />
+                </mask>
+              </defs>
+              <g class="brand-logo-pills" mask="url(#mirrorBrandKnobs)">
+                <rect x="2" y="52" width="46" height="24" rx="12" ry="12" />
+                <rect x="52" y="52" width="46" height="24" rx="12" ry="12" />
+                <rect x="27" y="24" width="46" height="24" rx="12" ry="12" />
+              </g>
+            </svg>
+          </span>
+          <h1 class="brand-wordmark">BAKLOG</h1>
+          <span class="mirror-cloud-chip" aria-label="Read-only cloud mirror">
+            <span class="brand-beta-label">Cloud</span>
+          </span>
+        </div>
+        <div class="mirror-header-actions mirror-actions hidden" id="mirrorSignedInActions">
+          <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorRefreshBtn">Refresh</button>
+          <button type="button" class="mirror-btn mirror-btn--ghost" id="mirrorSignOutBtn">Sign out</button>
+        </div>
+      </div>
+      <p class="mirror-lead" id="mirrorLead">Browse your cloud library from any browser.</p>
+    </header>
+
+    <div id="mirrorAlert" class="mirror-alert hidden" role="alert"></div>
+
+    <section class="mirror-panel mirror-panel--narrow" id="mirrorSignInPanel">
+      <h2 class="mirror-panel-title">Sign in</h2>
+      <p class="mirror-empty mirror-signin-hint">Use the same BAKLOG account as your desktop app. Pro plan required.</p>
+      <form id="mirrorSignInForm">
+        <label for="mirrorEmail">Email</label>
+        <input type="email" id="mirrorEmail" name="email" autocomplete="username" required />
+        <label for="mirrorPassword">Password</label>
+        <input type="password" id="mirrorPassword" name="password" autocomplete="current-password" required />
+        <button type="submit" class="mirror-btn mirror-btn--primary" id="mirrorSignInBtn">Sign in</button>
+      </form>
+      <p class="mirror-back-link">
+        <a href="/">Back to baklog.app</a>
+      </p>
+    </section>
+
+    <section class="hidden" id="mirrorLibraryPanel">
+      <details class="mirror-scope-note">
+        <summary>About this view</summary>
+        <div class="mirror-scope-note-body">
+          <p>Read-only library from your home PC after you enable <strong>Cloud sync</strong> and run <strong>Sync now</strong> in BAKLOG. You see store catalogs, covers from store CDNs, statuses and notes, and deal prices when those files were synced.</p>
+          <p><strong>Risk:</strong> enabling Cloud sync uploads library catalogs and personal statuses to your account cloud storage. Anyone with your signed-in session can read them here. Store passwords, cookies, and secrets stay encrypted on your PC and never upload.</p>
+          <p>Wishlists and claimables are not listed here. Claimables stay on the public feed. Wishlists may still upload for desktop restore.</p>
+          <p><strong>Import from cloud mirror</strong> is a desktop Connections action that overwrites local files. It does not fill this page.</p>
+        </div>
+      </details>
+      <p class="mirror-merge-hint hidden" id="mirrorMergeHint" hidden></p>
+      <div class="mirror-stats" id="mirrorStats" aria-live="polite"></div>
+      <div class="mirror-toolbar">
+        <input type="search" id="mirrorSearch" placeholder="Search title or notes" aria-label="Search library" />
+        <select id="mirrorStatusFilter" aria-label="Filter by status">
+          <option value="">All statuses</option>
+        </select>
+        <select id="mirrorStoreFilter" aria-label="Filter by store">
+          <option value="">All stores</option>
+        </select>
+      </div>
+      <div class="mirror-table-wrap">
+        <table class="mirror-table">
+          <thead>
+            <tr>
+              <th scope="col" class="col-cover"><span class="sr-only">Cover</span></th>
+              <th scope="col">Game</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="col-num">Played</th>
+              <th scope="col" class="col-num">HLTB</th>
+              <th scope="col" class="col-num">Steam %</th>
+              <th scope="col" class="col-num">MC</th>
+              <th scope="col" class="col-num">Price</th>
+              <th scope="col">Released</th>
+              <th scope="col">Last played</th>
+              <th scope="col" class="col-stats"><span class="sr-only">Stats</span></th>
+            </tr>
+          </thead>
+          <tbody id="mirrorTableBody"></tbody>
+        </table>
+      </div>
+      <p class="mirror-empty hidden" id="mirrorEmptyFiltered">No games match your filters.</p>
+    </section>
+
+    <section class="mirror-panel hidden" id="mirrorSetupPanel">
+      <div class="mirror-empty">
+        <p><strong>No cloud mirror yet.</strong> Your account is signed in, but nothing has been uploaded.</p>
+        <ol>
+          <li>Open BAKLOG on your home PC and sign in with this account.</li>
+          <li>Enable <strong>Cloud sync to your account</strong> in Connections on your home PC.</li>
+          <li>Run a store refresh or edit your library so catalog JSON uploads.</li>
+        </ol>
+        <p class="mirror-back-link"><a href="/">Back to baklog.app</a></p>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/mirror/mirror.js"></script>
+</body>
+</html>

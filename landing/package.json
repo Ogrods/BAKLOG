@@ -1,0 +1,9 @@
+{
+  "name": "baklog-web",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@upstash/ratelimit": "^2.0.5",
+    "@upstash/redis": "^1.34.9"
+  }
+}

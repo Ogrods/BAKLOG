@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BAKLOG - email confirmed</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      text-align: center;
+    }
+    main { max-width: 32rem; }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: clamp(1.75rem, 4vw, 2.25rem);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    p { margin: 0 0 1rem; color: #94a3b8; line-height: 1.6; }
+    .error { color: #fca5a5; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 1.25rem; }
+    a, button {
+      display: inline-block;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+    }
+    .primary { background: #38bdf8; color: #0f172a; }
+    .primary:hover { background: #7dd3fc; }
+    .ghost { background: transparent; color: #38bdf8; border: 1px solid #38bdf8; }
+    .ghost:hover { background: rgba(56, 189, 248, 0.12); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>BAKLOG</h1>
+    <p id="lead">Checking your confirmation link…</p>
+    <p id="bodySuccess" class="hidden">Your BAKLOG account is ready. Open BAKLOG on the computer where you installed it, then sign in with your email and password.</p>
+    <p id="bodyLocal" class="hidden">BAKLOG runs locally on your PC. This page only confirms your email; your library never leaves your machine.</p>
+    <p id="bodyError" class="error hidden" role="alert"></p>
+    <p id="bodyUnknown" class="hidden">If you just confirmed your email, return to BAKLOG on your PC and sign in. Need the link again? Use <strong>Resend confirmation email</strong> on the sign-in screen.</p>
+    <div class="actions" id="actionsSuccess" hidden>
+      <a class="primary" href="http://127.0.0.1:8765/">Open BAKLOG</a>
+      <a class="ghost" href="/">Back to baklog.app</a>
+    </div>
+    <div class="actions hidden" id="actionsError">
+      <a class="ghost" href="/">Back to baklog.app</a>
+    </div>
+  </main>
+  <script type="module" src="/auth-confirmed.js"></script>
+</body>
+</html>

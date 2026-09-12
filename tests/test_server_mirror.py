@@ -229,6 +229,23 @@ def test_sync_ok_calls_sync_mirror_now(mirror_server: str, monkeypatch: pytest.M
     assert data.get("uploaded", {}).get("games_steam.json") == "ok"
 
 
+def test_import_rejects_bad_mode(mirror_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shared.server_mirror.mirror_read_allowed", lambda **_: True)
+    status, data = _request(
+        mirror_server,
+        "/api/mirror/import",
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer tok",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
+        body=json.dumps({"mode": "squash"}).encode(),
+    )
+    assert status == 400, data
+    assert "mode" in str(data.get("error") or "").lower()
+
+
 def test_clear_requires_local_header(mirror_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("shared.server_mirror.mirror_read_allowed", lambda **_: True)
     status, _ = _request(

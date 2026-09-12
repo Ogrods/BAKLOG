@@ -36,6 +36,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Added
 
 - Connections **Clear cloud library** deletes synced catalog and personal files from your account cloud storage (with confirm). Local files and store credentials stay on this PC.
+- Import from cloud mirror offers **Replace** or **Merge**: merge keeps local-only games and statuses while cloud wins on overlapping keys.
 
 ## [0.9.02] - 2026-09-11
 

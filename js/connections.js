@@ -779,6 +779,8 @@ async function openCloudMirrorImportDialog(initialSnap) {
   const intro = document.getElementById("cloudMirrorImportIntro");
   const sourceWrap = document.getElementById("cloudMirrorImportSourceWrap");
   const sourceSelect = document.getElementById("cloudMirrorImportSourceProfile");
+  const modeOverwrite = document.getElementById("cloudMirrorImportModeOverwrite");
+  const modeMerge = document.getElementById("cloudMirrorImportModeMerge");
   if (!dialog || !listEl || !personalToggle) return null;
 
   const accountId = getAccountProfileId() || "";
@@ -791,18 +793,32 @@ async function openCloudMirrorImportDialog(initialSnap) {
     initialSnap?.profile ||
     activeProfileId();
   let importableCount = 0;
+  let lastScope = [];
+
+  const selectedMode = () =>
+    modeMerge?.checked ? "merge" : "overwrite";
+
+  const updateIntro = () => {
+    if (!intro) return;
+    const sourceLabel = labelMirrorSourceProfile(sourceProfile, { accountId });
+    const scopeText = lastScope.length ? ` (${lastScope.join(", ")})` : "";
+    if (selectedMode() === "merge") {
+      intro.textContent =
+        `Merges cloud folder "${sourceLabel}" into the current local profile${scopeText}. ` +
+        "Remote wins on overlapping game/status keys; local-only rows stay. " +
+        "Store credentials are not copied - reconnect stores afterward.";
+    } else {
+      intro.textContent =
+        `Replaces matching files in the current local profile from cloud folder "${sourceLabel}"${scopeText}. ` +
+        "Store credentials are not copied - reconnect stores afterward.";
+    }
+  };
 
   const fillPaths = (artifacts) => {
     const paths = listImportableArtifactPaths(artifacts);
     importableCount = paths.length;
-    const scope = describeImportScope(paths);
-    if (intro) {
-      const sourceLabel = labelMirrorSourceProfile(sourceProfile, { accountId });
-      intro.textContent =
-        `Replaces matching files in the current local profile from cloud folder "${sourceLabel}"` +
-        `${scope.length ? ` (${scope.join(", ")})` : ""}. ` +
-        "Store credentials are not copied - reconnect stores afterward.";
-    }
+    lastScope = describeImportScope(paths);
+    updateIntro();
     listEl.innerHTML = paths.length
       ? paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")
       : "<li>No importable files in this cloud profile.</li>";
@@ -822,6 +838,9 @@ async function openCloudMirrorImportDialog(initialSnap) {
   }
   fillPaths(artifacts);
   if (!importableCount && profiles.length <= 1) return null;
+
+  if (modeOverwrite) modeOverwrite.onchange = updateIntro;
+  if (modeMerge) modeMerge.onchange = updateIntro;
 
   if (sourceWrap && sourceSelect) {
     if (profiles.length > 1) {
@@ -862,10 +881,13 @@ async function openCloudMirrorImportDialog(initialSnap) {
       "close",
       () => {
         if (sourceSelect) sourceSelect.onchange = null;
+        if (modeOverwrite) modeOverwrite.onchange = null;
+        if (modeMerge) modeMerge.onchange = null;
         resolve({
           confirmed: dialog.returnValue === "confirm" && importableCount > 0,
           includePersonal: personalToggle.checked,
           sourceProfile,
+          mode: selectedMode(),
         });
       },
       { once: true },
@@ -885,11 +907,13 @@ async function handleCloudMirrorImport() {
     const result = await importFromCloudMirror({
       includePersonal: choice.includePersonal,
       sourceProfile: choice.sourceProfile || undefined,
+      mode: choice.mode === "merge" ? "merge" : "overwrite",
     });
     const count = result?.count ?? 0;
     const imported = Array.isArray(result?.imported) ? result.imported.join(", ") : "";
+    const modeLabel = result?.mode === "merge" ? "Merge" : "Replace";
     window.alert(
-      `Cloud sync import complete (${count} file${count === 1 ? "" : "s"}).${imported ? `\n\n${imported}` : ""}\n\nThe app will reload.`,
+      `Cloud sync import complete (${modeLabel}, ${count} file${count === 1 ? "" : "s"}).${imported ? `\n\n${imported}` : ""}\n\nThe app will reload.`,
     );
     window.location.reload();
   } catch (err) {

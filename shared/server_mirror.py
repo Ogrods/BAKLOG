@@ -127,6 +127,16 @@ def handle_mirror_import_post(handler) -> None:
     if not isinstance(allow_empty_catalogs, bool):
         srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "allowEmptyCatalogs must be boolean"})
         return
+    mode_raw = body.get("mode", "overwrite")
+    if mode_raw is None:
+        mode_raw = "overwrite"
+    if not isinstance(mode_raw, str):
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": 'mode must be "overwrite" or "merge"'})
+        return
+    mode = mode_raw.strip().lower()
+    if mode not in {"overwrite", "merge"}:
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": 'mode must be "overwrite" or "merge"'})
+        return
     paths_raw = body.get("paths")
     paths = None
     if paths_raw is not None:
@@ -149,6 +159,7 @@ def handle_mirror_import_post(handler) -> None:
             paths=paths,
             include_personal=include_personal,
             allow_empty_catalogs=allow_empty_catalogs,
+            mode=mode,
         )
     except MirrorProfileMismatch as exc:
         srv._send_json(handler, HTTPStatus.CONFLICT, {"error": str(exc)})

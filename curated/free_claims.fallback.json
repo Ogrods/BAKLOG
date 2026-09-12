@@ -1,33 +1,74 @@
 {
-  "generated_at": "2026-09-11T18:21:35.254029+00:00",
+  "generated_at": "2026-09-11T19:26:08.571393+00:00",
   "items": [
+    {
+      "id": "epic-luftrausers-51e5e9",
+      "store": "epic",
+      "title": "Luftrausers",
+      "claim_url": "https://store.epicgames.com/en-US/p/luftrausers-51e5e9",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/233150/header.jpg?t=1769028660",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-09-17T15:00:00Z",
+      "steam_appid": 233150,
+      "review_percent": 91,
+      "source": "epic",
+      "first_seen": "2026-09-11T19:24:03Z"
+    },
+    {
+      "id": "epic-astral-ascent-b33bc2",
+      "store": "epic",
+      "title": "Astral Ascent",
+      "claim_url": "https://store.epicgames.com/en-US/p/astral-ascent-b33bc2",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1280930/eb8e8de59f6bf274924d290ff321c4206cfce875/header.jpg?t=1788164581",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-09-17T15:00:00Z",
+      "steam_appid": 1280930,
+      "review_percent": 95,
+      "source": "epic",
+      "first_seen": "2026-09-11T19:24:03Z"
+    },
+    {
+      "id": "gamerpower-3772",
+      "store": "itch",
+      "title": "MANDATO (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/mandato-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4897340/fbcc90bb338af124c4c62d3483fc3d530e09a6c0/header.jpg?t=1789009548",
+      "genres": [],
+      "blurb": "Download MANDATO for free via Itch.io! MANDATO is a short story-driven first-person game inspired by Filipino culture.",
+      "ends_at": "2026-09-11T23:59:00Z",
+      "steam_appid": 4897340,
+      "source": "gamerpower",
+      "first_seen": "2026-09-11T19:24:03Z"
+    },
+    {
+      "id": "gamerpower-3771",
+      "store": "itch",
+      "title": "Liminal Space Holiday (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/liminal-space-holiday-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5041880/91fc5202614cb6341914401faba328a4d1597596/header.jpg?t=1787328036",
+      "genres": [],
+      "blurb": "Enjoy a Liminal Space Holiday! Score Liminal Space Holiday for free via Itch.io! Liminal Space Holiday is a retro nostalgic adventure game with 3d graphics.",
+      "ends_at": "2026-09-13T23:59:00Z",
+      "steam_appid": 5041880,
+      "review_percent": 100,
+      "source": "gamerpower",
+      "first_seen": "2026-09-11T19:24:03Z"
+    },
     {
       "id": "gamerpower-3324",
       "store": "indiegala",
       "title": "Battle Ram (IndieGala) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/battle-ram-pc-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262060/header.jpg?t=1779411066",
+      "header_image": "https://www.gamerpower.com/offers/1b/68efabd65f913.jpg",
       "genres": [],
       "blurb": "Become the battle lamb you were born to be! Battle Ram is free this week on IndieGala, download it now! Battle Ram is a 2d action-packed game with lambs and battling robots.",
-      "ends_at": "2026-09-25T18:21:19Z",
+      "ends_at": "2026-09-21T21:47:23Z",
       "steam_appid": 1262060,
       "review_percent": 84,
       "source": "gamerpower",
-      "first_seen": "2026-09-11T18:21:19Z"
-    },
-    {
-      "id": "gamerpower-3313",
-      "store": "indiegala",
-      "title": "Wordle (IndieGala) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/wordle-pc-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1532580/header.jpg?t=1654494842",
-      "genres": [],
-      "blurb": "Dreaming about Wordle? What a coincidence, it’s on IndieGala for free! Download it now and make your dreams come true.",
-      "ends_at": "2026-09-25T18:21:19Z",
-      "steam_appid": 1532580,
-      "review_percent": 62,
-      "source": "gamerpower",
-      "first_seen": "2026-09-11T18:21:19Z"
+      "first_seen": "2026-09-07T21:47:23Z"
     },
     {
       "id": "gamerpower-3498",
@@ -39,22 +80,8 @@
       "blurb": "Download Primal Slideee Deluxe for free via Stove until July 31!",
       "ends_at": "2026-09-12T23:59:59Z",
       "source": "gamerpower",
-      "first_seen": "2026-09-11T18:21:19Z",
+      "first_seen": "2026-09-07T21:47:23Z",
       "premium_only": true
-    },
-    {
-      "id": "itad-4617ce1ab23a",
-      "store": "indiegala",
-      "title": "Scamster Kombat - FREE on IndieGala on IndieGala Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/15424/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3218690/header.jpg?t=1730801171",
-      "genres": [],
-      "blurb": "Scamster Kombat",
-      "ends_at": "2026-09-25T18:21:19Z",
-      "steam_appid": 3218690,
-      "review_percent": 96,
-      "source": "itad",
-      "first_seen": "2026-09-11T18:21:19Z"
     },
     {
       "id": "itad-3444e73720bf",
@@ -67,6 +94,34 @@
       "ends_at": "2026-09-21T21:47:23Z",
       "source": "itad",
       "first_seen": "2026-09-07T21:47:23Z"
+    },
+    {
+      "id": "gamerpower-3313",
+      "store": "indiegala",
+      "title": "Wordle (IndieGala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/wordle-pc-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1532580/header.jpg?t=1654494842",
+      "genres": [],
+      "blurb": "Dreaming about Wordle? What a coincidence, it’s on IndieGala for free! Download it now and make your dreams come true.",
+      "ends_at": "2026-09-24T18:17:09Z",
+      "steam_appid": 1532580,
+      "review_percent": 62,
+      "source": "gamerpower",
+      "first_seen": "2026-09-10T18:17:09Z"
+    },
+    {
+      "id": "itad-4617ce1ab23a",
+      "store": "indiegala",
+      "title": "Scamster Kombat - FREE on IndieGala on IndieGala Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/15424/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3218690/header.jpg?t=1730801171",
+      "genres": [],
+      "blurb": "Scamster Kombat",
+      "ends_at": "2026-09-24T18:17:09Z",
+      "steam_appid": 3218690,
+      "review_percent": 96,
+      "source": "itad",
+      "first_seen": "2026-09-10T18:17:09Z"
     }
   ],
   "attribution": [

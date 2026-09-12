@@ -216,6 +216,15 @@ describe('Scenario 5 — Profile switch mid-fetch', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const src = readFileSync(join(root, 'js', 'profiles.js'), 'utf8');
     expect(src).toMatch(/prepareForProfileSwitch\(\)[\s\S]*location\.reload\(\)/);
+    expect(src).toMatch(/abortProfileSwitchSaveBlock/);
+  });
+
+  it('abortProfileSwitchSaveBlock re-enables saves after a failed switch', async () => {
+    const { personalStore } = await import('../js/personal-store.js');
+    await personalStore.prepareForProfileSwitch();
+    expect(personalStore.isProfileSwitchSaveBlocked()).toBe(true);
+    personalStore.abortProfileSwitchSaveBlock();
+    expect(personalStore.isProfileSwitchSaveBlocked()).toBe(false);
   });
 });
 

@@ -207,7 +207,7 @@ export function renderDashboardFetcherHealth() {
         ].filter(Boolean);
     const queueFullElsewhere = fetcherRunner.isQueueFullForKey(src.key) && !runState;
     if (queueFullElsewhere) {
-      titleLines.push('Queue full - a fetch is already running. Wait for it to finish.');
+      titleLines.push(fetcherRunner.queueFullMessageForKey(src.key));
     }
     if (needsReconnect) {
       titleLines.push('Session expired - reconnect to refresh credentials, or dismiss to hide this hint.');

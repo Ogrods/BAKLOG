@@ -96,6 +96,10 @@ export const fetcherRunner = (() => {
   let lastServerInFlight = false;
   let lastFetcherLaneInFlight = false;
   let lastEnrichLaneInFlight = false;
+  /** Active/queued owner key for the fetcher lane (server snap preferred). */
+  let lastFetcherLaneOwnerKey = null;
+  /** Active/queued owner key for the enrich lane (server snap preferred). */
+  let lastEnrichLaneOwnerKey = null;
   /** Signature (active run id + line count + queue depth) of the last in-flight snapshot. */
   let lastInFlightSig = '';
   /**
@@ -183,6 +187,12 @@ export const fetcherRunner = (() => {
     lastFetcherLaneInFlight = !!(blockingActive || blockingQueue.length);
     lastEnrichLaneInFlight = !!(enrichActive || enrichQueue.length);
     lastServerInFlight = lastFetcherLaneInFlight || lastEnrichLaneInFlight;
+    lastFetcherLaneOwnerKey = blockingActive?.key
+      || blockingQueue[0]?.key
+      || null;
+    lastEnrichLaneOwnerKey = enrichActive?.key
+      || enrichQueue[0]?.key
+      || null;
     const queueLen = blockingQueue.length + enrichQueue.length;
     const blockingRun = blockingActive || enrichActive;
     // line_count grows on every emitted line (heartbeats included), so the
@@ -774,6 +784,25 @@ export const fetcherRunner = (() => {
   function isEnrichKey(key) {
     return source(key)?.group === 'enrich';
   }
+
+  /** Label of the run holding this key's lane (server snap, else client chip state). */
+  function queueOwnerLabelForKey(key) {
+    const enrich = isEnrichKey(key);
+    const snapKey = enrich ? lastEnrichLaneOwnerKey : lastFetcherLaneOwnerKey;
+    if (snapKey) return labelForKey(snapKey);
+    for (const [k, st] of runStateByKey) {
+      if (!CANCELLABLE_CHIP_STATES.has(st)) continue;
+      if (isEnrichKey(k) === enrich) return labelForKey(k);
+    }
+    return null;
+  }
+
+  function queueFullMessageForKey(key) {
+    const owner = queueOwnerLabelForKey(key);
+    if (owner) return `Queue full - ${owner} is running. Wait for it to finish.`;
+    return 'Queue full - a fetch is already running. Wait for it to finish.';
+  }
+
   function isQueueFullForKey(key) {
     const enrich = isEnrichKey(key);
     const laneBusy = enrich ? lastEnrichLaneInFlight : lastFetcherLaneInFlight;
@@ -947,11 +976,11 @@ export const fetcherRunner = (() => {
     if (cancelInFlight) {
       btn.disabled = true;
       btn.textContent = 'Cancelling…';
-      btn.title = 'Stopping queued and running fetchers…';
+      btn.title = 'Stopping queued and running fetchers and enrichers…';
     } else {
       btn.disabled = !show;
       btn.textContent = 'Cancel';
-      btn.title = 'Stop all queued and running fetchers and enrichers (Shift+click: force reset queue)';
+      btn.title = 'Stop all queued and running fetchers and enrichers (Shift+click: force-reset both lanes)';
     }
   }
 
@@ -1461,7 +1490,7 @@ export const fetcherRunner = (() => {
         ensurePanel(src);
         logEvent(
           'info',
-          `[${src.label}: queue full - a fetch is already running]`,
+          `[${src.label}: ${queueFullMessageForKey(key)}]`,
         );
         scrollPopoverModule('console');
       }
@@ -1993,6 +2022,8 @@ export const fetcherRunner = (() => {
     cancellableCount,
     isQueueFull,
     isQueueFullForKey,
+    queueOwnerLabelForKey,
+    queueFullMessageForKey,
     waitForQueueSlot,
     run,
     runAllStale,

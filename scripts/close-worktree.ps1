@@ -33,18 +33,18 @@ if ($Branch -notmatch '^(feat|fix|chore)/[a-z0-9][a-z0-9._-]*$') {
 function Invoke-GitStep {
     param(
         [string]$Desc,
-        [string[]]$Args
+        [string[]]$GitArgs
     )
-    $cmd = "git $($Args -join ' ')"
+    $cmd = "git $($GitArgs -join ' ')"
     if ($DryRun) {
         Write-Host "[dry-run] $Desc" -ForegroundColor Yellow
         Write-Host "          $cmd" -ForegroundColor DarkGray
         return
     }
     Write-Host "--- $Desc ---" -ForegroundColor Cyan
-    & git @Args
+    & git @GitArgs
     if ($LASTEXITCODE -ne 0) {
-        throw "git $($Args[0]) failed (exit $LASTEXITCODE): $Desc"
+        throw "git $($GitArgs[0]) failed (exit $LASTEXITCODE): $Desc"
     }
 }
 

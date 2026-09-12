@@ -850,11 +850,16 @@ def import_remote_mirror_to_profile(
             backups[path] = None
     imported: list[str] = []
     personal_saved = False
+    from shared.profile_paths import reset_request_profile_id, set_request_profile_id
+
+    # Pin active profile for the write phase so a concurrent profile switch cannot
+    # divert save_personal_doc() (no profile_id arg) into another profile root.
+    # Reset the ContextVar token so any outer request pin is restored.
+    pin_token = set_request_profile_id(pid)
     try:
         catalogs: dict[str, Any] = {}
         for rel, doc in staged.items():
             if rel == "data/personal.json":
-                # save_personal_doc always writes the active profile (no profile_id arg).
                 save_personal_doc(doc, allow_empty=False)
                 imported.append(rel)
                 personal_saved = True
@@ -875,6 +880,8 @@ def import_remote_mirror_to_profile(
             except OSError:
                 pass
         raise
+    finally:
+        reset_request_profile_id(pin_token)
     seen: set[str] = set()
     ordered: list[str] = []
     for name in imported:

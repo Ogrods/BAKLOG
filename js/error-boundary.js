@@ -510,8 +510,8 @@ export function buildBugBundle(extra = {}) {
     errors: {
       session_count: _errors.length,
       persisted_count: _persistedRing.length,
-      session: _errors.slice(),
-      persisted: _persistedRing.slice(),
+      session: _errors.map((e) => entryForStorage(e)),
+      persisted: _persistedRing.map((e) => entryForStorage(e)),
     },
     notice: 'This bundle was assembled locally. Nothing was sent anywhere. Paste it into a GitHub issue if you want to share it.',
   };

@@ -418,12 +418,19 @@ export const personalStore = (() => {
     } catch (_) { /* ignore */ }
   }
 
+  /** Undo prepareForProfileSwitch when the active-profile POST fails (PIN / 409 / network). */
+  function abortProfileSwitchSaveBlock() {
+    profileSwitchSaveBlock = false;
+    initComplete = true;
+  }
+
   return {
     init,
     notify,
     flush,
     flushSync,
     prepareForProfileSwitch,
+    abortProfileSwitchSaveBlock,
     uploadLocalToServer,
     dismissMigration,
     isProfileSwitchSaveBlocked,

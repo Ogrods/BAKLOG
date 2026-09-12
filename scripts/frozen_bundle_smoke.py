@@ -41,7 +41,17 @@ def _manifest_fetcher_count(bundle_dir):
     return 0
 
 
+_FORBIDDEN_BUNDLE_ENV_KEYS = frozenset(
+    {
+        "BAKLOG_SUPABASE_JWT_SECRET",
+        "BAKLOG_SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+    }
+)
+
+
 def _env_has_auth_keys(env_path):
+    """Require anon auth keys and refuse JWT/service-role secrets in the bundle .env."""
     required = ("BAKLOG_SUPABASE_URL", "BAKLOG_SUPABASE_ANON_KEY")
     found = {}
     if env_path.is_file():
@@ -54,6 +64,9 @@ def _env_has_auth_keys(env_path):
             val = val.strip().strip('"').strip("'")
             if key and val:
                 found[key] = val
+    forbidden = sorted(k for k in _FORBIDDEN_BUNDLE_ENV_KEYS if found.get(k))
+    if forbidden:
+        return (False, [f"must not ship {k}" for k in forbidden])
     missing = [k for k in required if not found.get(k)]
     return (not missing, missing)
 
@@ -96,7 +109,7 @@ def run_smoke(bundle_dir, *, expected_version=None, port=BUNDLE_SMOKE_PORT):
         report["error"] = "fetchers/manifest.json missing or empty in bundle"
         return report
     if not env_ok:
-        report["error"] = f"bundled .env missing keys: {', '.join(env_missing)}"
+        report["error"] = f"bundled .env invalid: {', '.join(env_missing)}"
         return report
     config = None
     with tempfile.TemporaryDirectory(prefix="baklog-bundle-smoke-") as td:

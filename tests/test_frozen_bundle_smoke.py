@@ -45,6 +45,31 @@ def test_env_has_auth_keys_detects_missing(tmp_path: Path) -> None:
     assert "BAKLOG_SUPABASE_ANON_KEY" in missing
 
 
+def test_env_has_auth_keys_rejects_jwt_secret(tmp_path: Path) -> None:
+    bundle = _stub_bundle(tmp_path, with_env=True)
+    env_path = bundle / ".env"
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8") + "\nBAKLOG_SUPABASE_JWT_SECRET=must-not-ship\n",
+        encoding="utf-8",
+    )
+    ok, problems = smoke._env_has_auth_keys(env_path)
+    assert not ok
+    assert any("BAKLOG_SUPABASE_JWT_SECRET" in p for p in problems)
+
+
+def test_run_smoke_fails_with_jwt_secret_in_env(tmp_path: Path, monkeypatch) -> None:
+    bundle = _stub_bundle(tmp_path, with_env=True)
+    env_path = bundle / ".env"
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8") + "\nBAKLOG_SUPABASE_JWT_SECRET=must-not-ship\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(smoke, "_read_expected_version", lambda: "0.8.20")
+    report = smoke.run_smoke(bundle, expected_version="0.8.20")
+    assert not report["ok"]
+    assert "must not ship BAKLOG_SUPABASE_JWT_SECRET" in (report.get("error") or "")
+
+
 def test_manifest_fetcher_count(tmp_path: Path) -> None:
     bundle = _stub_bundle(tmp_path)
     assert smoke._manifest_fetcher_count(bundle) == 2

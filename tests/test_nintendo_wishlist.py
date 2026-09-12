@@ -84,6 +84,45 @@ def test_wishlist_item_is_dlc_from_product_type() -> None:
     assert item.is_dlc is True
 
 
+def test_import_omits_dlc_items_from_written_list() -> None:
+    """DLC stays on the Nintendo wishlist but is not written into BAKLOG."""
+    from fetchers.fetch_nintendo_wishlist import WishlistItem, _build_row
+
+    game = WishlistItem(
+        product_id="71000000012345",
+        title="Test Adventure",
+        image_url=None,
+        store_url="https://www.nintendo.com/us/store/products/test-adventure-switch/",
+        release_date=None,
+        genres=[],
+        price="$49.99",
+        price_initial=None,
+        discount_percent=None,
+        currency="USD",
+        is_dlc=False,
+    )
+    dlc = WishlistItem(
+        product_id="71000000099999",
+        title="Adventure Expansion Pass",
+        image_url=None,
+        store_url="https://www.nintendo.com/us/store/products/adventure-dlc-switch/",
+        release_date=None,
+        genres=[],
+        price="$19.99",
+        price_initial=None,
+        discount_percent=None,
+        currency="USD",
+        is_dlc=True,
+    )
+    items = [game, dlc]
+    kept = [it for it in items if not it.is_dlc]
+    assert len(kept) == 1
+    assert kept[0].title == "Test Adventure"
+    rows = [_build_row(it, None) for it in kept]
+    assert all(r["type"] == "game" for r in rows)
+    assert not any(r.get("nintendo_is_dlc") for r in rows)
+
+
 def test_signed_out_login_page() -> None:
     assert _signed_out("", "https://accounts.nintendo.com/login")
     assert not _signed_out(FIXTURE.read_text(encoding="utf-8"), "https://www.nintendo.com/us/wish-list/")

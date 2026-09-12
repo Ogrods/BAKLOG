@@ -107,6 +107,8 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 **Expected:** Wishlist JSON files are optional per store until you run the matching script. See [Connecting stores](connecting-stores.md#wishlist-and-deal-prices).
 
+**Nintendo DLC on wishlist:** BAKLOG skips wishlisted Nintendo DLC on import so expansion passes do not clutter the Wishlist tab. They stay on your Nintendo wish list. Rows already saved from an older fetch can be Hidden in BAKLOG until the next refresh replaces the file.
+
 ## Stall watchdog messages
 
 **Symptom:** Log shows `[server] no output for Ns - still running`.

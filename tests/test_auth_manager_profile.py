@@ -173,6 +173,50 @@ def test_cancel_browser_auth_finishes_session(
     release.set()
 
 
+def test_cancel_after_extract_does_not_mark_connected(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Late cancel must not persist credentials even if extract already returned."""
+    started = threading.Event()
+    connected: list[str] = []
+    done = threading.Event()
+
+    def extract_then_wait(_provider: str, session: object) -> dict[str, str]:
+        started.set()
+        deadline = time.time() + 3.0
+        while time.time() < deadline:
+            if getattr(session, "is_cancelled", lambda: False)():
+                break
+            time.sleep(0.02)
+        return {"token": "should-not-persist"}
+
+    monkeypatch.setattr(auth_manager, "run_browser_auth", extract_then_wait)
+    monkeypatch.setattr(
+        auth_manager, "mark_connected", lambda p, _c: connected.append(p)
+    )
+    monkeypatch.setattr(auth_manager, "mark_invalid", lambda _p, error=None: None)
+
+    real_finish = None
+
+    def _track_finish(self: object) -> None:
+        assert real_finish is not None
+        real_finish(self)
+        done.set()
+
+    from auth.runner import AuthSession
+
+    real_finish = AuthSession.finish
+    monkeypatch.setattr(AuthSession, "finish", _track_finish)
+
+    auth_manager.start_browser_auth("epic")
+    assert started.wait(timeout=3.0)
+    assert auth_manager.cancel_browser_auth("epic") is True
+    assert done.wait(timeout=3.0)
+    # Give the worker a beat past the cancelled return path.
+    time.sleep(0.1)
+    assert connected == []
+
+
 def test_stale_session_taken_over_by_plain_connect(
     profile_env: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

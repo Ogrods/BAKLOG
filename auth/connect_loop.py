@@ -38,6 +38,9 @@ def run_connect_poll(
 
     while time.time() < deadline:
         abort_if_browser_closed(context)
+        # Cancel is cooperative: most Connect providers only poll via this loop.
+        if session is not None and getattr(session, "is_cancelled", lambda: False)():
+            raise ConnectBrowserClosed()
         try:
             creds = check()
         except ConnectBrowserClosed:

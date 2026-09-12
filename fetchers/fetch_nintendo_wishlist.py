@@ -1228,6 +1228,14 @@ def main() -> int:
     if args.dump:
         return stats.finish("fetch_nintendo_wishlist", t0, exit_code=0, extra="dump only")
 
+    dlc_skipped = sum(1 for it in items if it.is_dlc)
+    if dlc_skipped:
+        items = [it for it in items if not it.is_dlc]
+        print(
+            f"  skipped {dlc_skipped} wishlisted DLC (not imported into BAKLOG wishlist)",
+            flush=True,
+        )
+
     empty_exit = refuse_empty_result(
         items,
         label="Nintendo wishlist",

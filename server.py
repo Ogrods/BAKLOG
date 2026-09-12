@@ -2379,8 +2379,6 @@ class Handler(SimpleHTTPRequestHandler):
         if session is None:
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown auth session")
             return
-        if not _commit_auth_stream_ticket(self):
-            return
 
         with _sse_lock:
             if _sse_connections >= MAX_SSE_CONNECTIONS:
@@ -2390,7 +2388,14 @@ class Handler(SimpleHTTPRequestHandler):
                     {"error": f"too many stream connections (max {MAX_SSE_CONNECTIONS})"},
                 )
                 return
+            # Reserve the slot before committing the one-shot ticket so a 503
+            # does not burn a valid ticket.
             _sse_connections += 1
+
+        if not _commit_auth_stream_ticket(self):
+            with _sse_lock:
+                _sse_connections = max(0, _sse_connections - 1)
+            return
 
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream")

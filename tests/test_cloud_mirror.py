@@ -344,6 +344,75 @@ def test_import_merge_unions_catalog_and_personal(
     assert personal_doc["prefs"]["dismissedClaims"] == {"a": True, "b": True}
 
 
+def test_merge_catalog_unkeyed_rows_dedupe_by_fingerprint() -> None:
+    local = {
+        "games": [{"title": "No Id Game", "store": "steam", "note": "local"}],
+        "game_count": 1,
+    }
+    remote = {
+        "games": [{"title": "No Id Game", "store": "steam", "note": "remote"}],
+        "game_count": 1,
+    }
+    once = cloud_mirror._merge_catalog_docs(local, remote, filename="games_steam.json")
+    twice = cloud_mirror._merge_catalog_docs(once, remote, filename="games_steam.json")
+    assert len(once["games"]) == 1
+    assert once["games"][0]["note"] == "remote"
+    assert len(twice["games"]) == 1
+
+
+def test_merge_manual_rows_dedupe_without_id() -> None:
+    local = {
+        "personal": {},
+        "prefs": {},
+        "manual": [{"title": "Homebrew", "platform": "pc"}],
+        "libraryFirstSeen": {},
+    }
+    remote = {
+        "personal": {},
+        "prefs": {},
+        "manual": [{"title": "Homebrew", "platform": "pc", "notes": "from cloud"}],
+        "libraryFirstSeen": {},
+    }
+    once = cloud_mirror._merge_personal_docs(local, remote)
+    twice = cloud_mirror._merge_personal_docs(once, remote)
+    assert len(once["manual"]) == 1
+    assert once["manual"][0]["notes"] == "from cloud"
+    assert len(twice["manual"]) == 1
+
+
+def test_merge_revalidates_empty_catalog_refusal(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    catalog = profile_home / "games_steam.json"
+    # Local games is not a list → merge treats it as empty; remote omits games.
+    catalog.write_text(
+        json.dumps({"games": "corrupt", "store": "steam"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "list_remote_mirror_artifacts",
+        lambda **_: [{"path": "games_steam.json"}],
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "download_remote_mirror_artifact",
+        lambda **_: json.dumps({"store": "steam"}).encode(),
+    )
+    with pytest.raises(ValueError, match="empty games"):
+        import_remote_mirror_to_profile(
+            authorization="Bearer x",
+            source_profile_id="default",
+            include_personal=False,
+            mode="merge",
+            allow_empty_catalogs=False,
+        )
+
+
 def test_clear_remote_mirror_profile_deletes_allowlisted(
     profile_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

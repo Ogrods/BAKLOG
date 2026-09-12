@@ -66,3 +66,24 @@ def test_run_connect_poll_raises_on_deadline(monkeypatch: pytest.MonkeyPatch) ->
             check=lambda: None,
             timeout_message="no session",
         )
+
+
+def test_run_connect_poll_aborts_when_session_cancelled(monkeypatch: pytest.MonkeyPatch) -> None:
+    from auth.cdp_browser import ConnectBrowserClosed
+    from auth.runner import AuthSession
+
+    clock = _FakeTime(step_s=1.0)
+    monkeypatch.setattr("auth.connect_loop.time", clock)
+    monkeypatch.setattr("auth.connect_loop.abort_if_browser_closed", lambda _ctx: None)
+    session = AuthSession("cancel-poll", "epic")
+    session.cancel()
+
+    with pytest.raises(ConnectBrowserClosed):
+        run_connect_poll(
+            context=_FakeContext(),
+            session=session,
+            deadline=clock.time() + 60,
+            poll_sec=0.1,
+            check=lambda: {"TOKEN": "should-not-win"},
+            timeout_message="timed out",
+        )

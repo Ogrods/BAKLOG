@@ -816,6 +816,9 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
             ensure_chromium_executable(on_progress=_on_chromium_progress)
 
             creds = run_browser_auth(provider, session)
+            if session.is_cancelled():
+                # Cancel raced a successful extract: never persist credentials.
+                return
             if not creds:
                 # Window closed without a completed sign-in. Reset to a clean,
                 # current state so the chip never keeps a stale error from a
@@ -838,11 +841,15 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 # up to ~50s, so an immediate WL Xbox run collides and Chrome
                 # exits with "profile in use" (code 21). Trust the headed
                 # sign-in and do NOT launch a competing background browser.
+                if session.is_cancelled():
+                    return
                 mark_connected(provider, creds)
                 session.emit("extracted", {"status": "connected"})
                 return
 
             probe_err = probe_browser_session(provider, creds)
+            if session.is_cancelled():
+                return
             if probe_err:
                 mark_invalid(provider, error=probe_err)
                 session.emit("error", {"message": probe_err})
@@ -850,6 +857,8 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 mark_connected(provider, creds)
                 session.emit("extracted", {"status": "connected"})
         except Exception as exc:  # noqa: BLE001
+            if session.is_cancelled():
+                return
             # Unexpected failure: clear stale state with a current message.
             mark_invalid(provider, error=f"Sign-in did not complete: {exc}")
             session.emit("error", {"message": str(exc)})

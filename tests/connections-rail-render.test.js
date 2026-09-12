@@ -43,6 +43,7 @@ vi.mock('../js/auth-gate.js', () => ({
   isAccountAuthMode: vi.fn(() => false),
   isPro: vi.fn(() => false),
   isAdminMode: vi.fn(() => false),
+  isLocalProfilesEnabled: vi.fn(() => true),
   proFeaturesUnlocked: vi.fn(() => false),
   getAccessToken: vi.fn(() => null),
   getAccountProfileId: vi.fn(() => null),
@@ -416,5 +417,76 @@ describe('cloud mirror prefs visibility', () => {
         (c) => c[0] === '/api/mirror/clear' && c[1]?.method === 'POST',
       ),
     ).toBe(true);
+  });
+
+  it('resets Import mode to overwrite when dialog reopens after Merge cancel', async () => {
+    document.body.innerHTML = `
+      <dialog id="cloudMirrorImportDialog">
+        <form method="dialog">
+          <p id="cloudMirrorImportIntro"></p>
+          <fieldset>
+            <input type="radio" name="cloudMirrorImportMode" id="cloudMirrorImportModeOverwrite" value="overwrite" checked />
+            <input type="radio" name="cloudMirrorImportMode" id="cloudMirrorImportModeMerge" value="merge" />
+          </fieldset>
+          <ul id="cloudMirrorImportArtifactList"></ul>
+          <input id="cloudMirrorImportPersonal" type="checkbox" />
+          <button type="submit" value="cancel" id="importCancel">Cancel</button>
+          <button type="submit" value="confirm" id="importConfirm">Import</button>
+        </form>
+      </dialog>
+    `;
+    // happy-dom may lack HTMLDialogElement.showModal
+    const dialog = document.getElementById('cloudMirrorImportDialog');
+    if (dialog && typeof dialog.showModal !== 'function') {
+      dialog.showModal = function showModal() {
+        this.open = true;
+      };
+      dialog.close = function close(returnValue) {
+        if (returnValue !== undefined) this.returnValue = returnValue;
+        this.open = false;
+        this.dispatchEvent(new Event('close'));
+      };
+    }
+
+    const auth = await import('../js/auth-gate.js');
+    vi.mocked(auth.getAccountProfileId).mockReturnValue(null);
+
+    const api = await import('../js/api-client.js');
+    vi.mocked(api.baklogFetch).mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/mirror')) {
+        return new Response(
+          JSON.stringify({
+            artifacts: [{ path: 'games_steam.json' }],
+            profiles: ['default'],
+            profile: 'default',
+            localUploadState: { artifacts: {}, last_upload_at: null },
+          }),
+          { status: 200 },
+        );
+      }
+      return mockBaklogFetchDefault(url);
+    });
+
+    const { openCloudMirrorImportDialog } = await import('../js/connections.js');
+    const snap = {
+      artifacts: [{ path: 'games_steam.json' }],
+      profiles: ['default'],
+      profile: 'default',
+    };
+
+    const first = openCloudMirrorImportDialog(snap);
+    await Promise.resolve();
+    document.getElementById('cloudMirrorImportModeMerge').checked = true;
+    document.getElementById('cloudMirrorImportModeOverwrite').checked = false;
+    dialog.close('cancel');
+    const choice1 = await first;
+    expect(choice1.confirmed).toBe(false);
+
+    const second = openCloudMirrorImportDialog(snap);
+    await Promise.resolve();
+    expect(document.getElementById('cloudMirrorImportModeOverwrite')?.checked).toBe(true);
+    expect(document.getElementById('cloudMirrorImportModeMerge')?.checked).toBe(false);
+    dialog.close('cancel');
+    await second;
   });
 });

@@ -772,7 +772,7 @@ async function handleCloudMirrorClear() {
   }
 }
 
-async function openCloudMirrorImportDialog(initialSnap) {
+export async function openCloudMirrorImportDialog(initialSnap) {
   const dialog = document.getElementById("cloudMirrorImportDialog");
   const listEl = document.getElementById("cloudMirrorImportArtifactList");
   const personalToggle = document.getElementById("cloudMirrorImportPersonal");
@@ -873,6 +873,17 @@ async function openCloudMirrorImportDialog(initialSnap) {
   }
 
   if (!importableCount && profiles.length <= 1) return null;
+
+  // Default mode is overwrite each open (canceling with Merge selected must not stick).
+  if (modeOverwrite) {
+    modeOverwrite.checked = true;
+    modeOverwrite.onchange = updateIntro;
+  }
+  if (modeMerge) {
+    modeMerge.checked = false;
+    modeMerge.onchange = updateIntro;
+  }
+  updateIntro();
 
   dialog.returnValue = "cancel";
   dialog.showModal();

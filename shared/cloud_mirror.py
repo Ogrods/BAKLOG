@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -619,6 +620,15 @@ def _catalog_row_key(game: dict[str, Any]) -> str | None:
     return None
 
 
+def _stable_row_fingerprint(row: Any) -> str:
+    """Content hash for rows lacking store/id keys (stable across merge sides)."""
+    try:
+        payload = json.dumps(row, sort_keys=True, separators=(",", ":"), default=str)
+    except (TypeError, ValueError):
+        payload = repr(row)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def _merge_map_remote_wins(local: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
     """Union dict maps. Remote replaces overlapping keys; nested dicts merge field-wise."""
     out = dict(local)
@@ -656,7 +666,7 @@ def _merge_personal_docs(local: dict[str, Any], remote: dict[str, Any]) -> dict[
     manual_by_key: dict[str, Any] = {}
     manual_order: list[str] = []
 
-    def _manual_key(row: Any, *, fallback: str) -> str:
+    def _manual_key(row: Any) -> str:
         if isinstance(row, dict):
             mid = row.get("id")
             if mid is not None and str(mid).strip():
@@ -664,15 +674,16 @@ def _merge_personal_docs(local: dict[str, Any], remote: dict[str, Any]) -> dict[
             title = row.get("title") or row.get("name")
             if title is not None and str(title).strip():
                 return f"title:{str(title).strip().lower()}"
-        return fallback
+            return f"row:{_stable_row_fingerprint(row)}"
+        return f"row:{_stable_row_fingerprint(row)}"
 
-    for idx, row in enumerate(local_manual):
-        key = _manual_key(row, fallback=f"local:{idx}")
+    for row in local_manual:
+        key = _manual_key(row)
         if key not in manual_by_key:
             manual_order.append(key)
         manual_by_key[key] = row
-    for idx, row in enumerate(remote_manual):
-        key = _manual_key(row, fallback=f"remote:{idx}")
+    for row in remote_manual:
+        key = _manual_key(row)
         if key not in manual_by_key:
             manual_order.append(key)
         if isinstance(manual_by_key.get(key), dict) and isinstance(row, dict):
@@ -708,16 +719,19 @@ def _merge_catalog_docs(local: Any, remote: Any, *, filename: str) -> dict[str, 
     remote_games = remote.get("games") if isinstance(remote.get("games"), list) else []
     by_key: dict[str, dict[str, Any]] = {}
     order: list[str] = []
-    unkeyed: list[dict[str, Any]] = []
 
     def _ingest(rows: list[Any], *, remote_side: bool) -> None:
-        for idx, row in enumerate(rows):
+        for row in rows:
             if not isinstance(row, dict):
                 continue
             key = _catalog_row_key(row)
             if key is None:
-                unkeyed.append(dict(row))
-                continue
+                title = str(row.get("title") or row.get("name") or "").strip().lower()
+                store = str(row.get("store") or "steam").strip() or "steam"
+                if title:
+                    key = f"unkeyed:{store}:{title}"
+                else:
+                    key = f"unkeyed:{_stable_row_fingerprint(row)}"
             if key not in by_key:
                 order.append(key)
                 by_key[key] = dict(row)
@@ -729,7 +743,7 @@ def _merge_catalog_docs(local: Any, remote: Any, *, filename: str) -> dict[str, 
 
     _ingest(local_games, remote_side=False)
     _ingest(remote_games, remote_side=True)
-    out["games"] = [by_key[k] for k in order] + unkeyed
+    out["games"] = [by_key[k] for k in order]
     if "game_count" in out or "game_count" in remote or "game_count" in local_doc:
         out["game_count"] = len(out["games"])
     return out
@@ -824,6 +838,8 @@ def import_remote_mirror_to_profile(
                     doc = _merge_personal_docs(local_doc, doc)
                 else:
                     doc = _merge_catalog_docs(local_doc, doc, filename=rel)
+                # Refuse empty catalogs produced by merge when empty is not allowed.
+                _validate_mirror_staged_doc(rel, doc, allow_empty_catalogs=allow_empty_catalogs)
         staged[rel] = doc
     write_paths = [_mirror_artifact_write_path(rel, profile_id=pid) for rel in staged]
     backups: dict[Path, bytes | None] = {}

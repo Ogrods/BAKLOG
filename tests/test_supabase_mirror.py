@@ -103,10 +103,12 @@ def test_delete_mirror_objects_builds_keys(monkeypatch: pytest.MonkeyPatch) -> N
     )
     assert deleted == ["games_steam.json", "data/personal.json"]
     assert seen["method"] == "DELETE"
-    assert seen["body"] == [
-        "user-1/default/games_steam.json",
-        "user-1/default/data/personal.json",
-    ]
+    assert seen["body"] == {
+        "prefixes": [
+            "user-1/default/games_steam.json",
+            "user-1/default/data/personal.json",
+        ]
+    }
 
 
 def test_delete_mirror_snapshot_rows_scoped(monkeypatch: pytest.MonkeyPatch) -> None:

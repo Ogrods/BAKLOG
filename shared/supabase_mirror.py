@@ -143,7 +143,7 @@ def delete_mirror_objects(
     if not keys:
         return []
     url = f"{_base_url()}/storage/v1/object/{MIRROR_BUCKET}"
-    body = json.dumps(keys).encode("utf-8")
+    body = json.dumps({"prefixes": keys}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,

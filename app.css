@@ -11236,6 +11236,14 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   margin: 0;
   align-self: center;
 }
+.conn-prefs-import--danger {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+.conn-prefs-import--danger:hover {
+  border-color: rgba(248, 113, 113, 0.8);
+  background: rgba(127, 29, 29, 0.25);
+}
 .conn-prefs-note {
   flex-basis: 100%;
   margin: 0.15rem 0 0;
@@ -14719,6 +14727,28 @@ body {
   font-size: 0.78rem;
   line-height: 1.45;
   color: var(--text-mute, #94a3b8);
+}
+.conn-mirror-import-mode {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.conn-mirror-import-mode-legend {
+  padding: 0;
+  margin: 0 0 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim, #cbd5e1);
+}
+.conn-mirror-import-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text, #e2e8f0);
 }
 .conn-mirror-import-source {
   display: flex;

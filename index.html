@@ -1056,9 +1056,17 @@
                   type="button"
                   id="cloudMirrorImportBtn"
                   class="conn-prefs-import hidden"
-                  title="Overwrite matching files in the current local profile from your cloud mirror"
+                  title="Import cloud mirror files into the current local profile (Replace or Merge)"
                 >
                   Import from cloud mirror
+                </button>
+                <button
+                  type="button"
+                  id="cloudMirrorClearBtn"
+                  class="conn-prefs-import conn-prefs-import--danger hidden"
+                  title="Delete synced library files from your account cloud storage. Store credentials stay on this PC."
+                >
+                  Clear cloud library
                 </button>
               </div>
               <p
@@ -1074,11 +1082,31 @@
                 <form method="dialog" class="conn-mirror-import-form">
                   <h3 id="cloudMirrorImportDialogTitle">Import from cloud mirror</h3>
                   <p id="cloudMirrorImportIntro" class="conn-mirror-import-intro">
-                    This <strong>overwrites</strong> matching files in the
-                    <strong>current local profile</strong> with copies from the selected cloud
-                    folder. Store credentials are not copied. Existing local catalog and personal
-                    data for those paths will be replaced.
+                    Choose Replace or Merge for the
+                    <strong>current local profile</strong>. Store credentials are not copied.
                   </p>
+                  <fieldset class="conn-mirror-import-mode" id="cloudMirrorImportModeWrap">
+                    <legend class="conn-mirror-import-mode-legend">Import mode</legend>
+                    <label class="conn-mirror-import-mode-option">
+                      <input
+                        type="radio"
+                        name="cloudMirrorImportMode"
+                        id="cloudMirrorImportModeOverwrite"
+                        value="overwrite"
+                        checked
+                      />
+                      Replace matching files
+                    </label>
+                    <label class="conn-mirror-import-mode-option">
+                      <input
+                        type="radio"
+                        name="cloudMirrorImportMode"
+                        id="cloudMirrorImportModeMerge"
+                        value="merge"
+                      />
+                      Merge with local library
+                    </label>
+                  </fieldset>
                   <label class="conn-mirror-import-source hidden" id="cloudMirrorImportSourceWrap" hidden>
                     <span class="conn-mirror-import-source-label">Cloud profile</span>
                     <select id="cloudMirrorImportSourceProfile" aria-label="Cloud profile to import from"></select>

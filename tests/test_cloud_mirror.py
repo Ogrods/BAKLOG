@@ -13,6 +13,7 @@ from shared.cloud_mirror import (
     MirrorProfileMismatch,
     _mirror_artifact_write_path,
     _validate_mirror_staged_doc,
+    clear_remote_mirror_profile,
     import_remote_mirror_to_profile,
     schedule_mirror_upload,
 )
@@ -243,10 +244,144 @@ def test_import_successful_overwrite(profile_home: Path, monkeypatch: pytest.Mon
     )
     assert "games_steam.json" in (result.get("imported") or [])
     assert result.get("personal") is True
+    assert result.get("mode") == "overwrite"
     rewritten = json.loads(catalog.read_text(encoding="utf-8"))
     assert rewritten["games"][0]["id"] == "9"
     personal_doc = json.loads(personal.read_text(encoding="utf-8"))
     assert personal_doc.get("personal", {}).get("steam:9", {}).get("status") == "playing"
+
+
+def test_import_merge_unions_catalog_and_personal(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    catalog = profile_home / "games_steam.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "games": [
+                    {"id": "1", "title": "Local Only", "store": "steam"},
+                    {"id": "2", "title": "Shared Local", "store": "steam", "playtime": 10},
+                ],
+                "store": "steam",
+                "game_count": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
+    personal = profile_home / "data" / "personal.json"
+    personal.write_text(
+        json.dumps(
+            {
+                "personal": {
+                    "steam:1": {"status": "backlog"},
+                    "steam:2": {"status": "playing", "notes": "local note"},
+                },
+                "prefs": {"dismissedClaims": {"a": True}},
+                "manual": [],
+                "libraryFirstSeen": {"steam:1": 1},
+                "schema_version": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "list_remote_mirror_artifacts",
+        lambda **_: [{"path": "games_steam.json"}, {"path": "data/personal.json"}],
+    )
+
+    def _download(*, authorization: str, artifact_path: str, profile_id: str | None = None) -> bytes:
+        if artifact_path == "games_steam.json":
+            return json.dumps(
+                {
+                    "games": [
+                        {"id": "2", "title": "Shared Remote", "store": "steam", "playtime": 99},
+                        {"id": "3", "title": "Remote Only", "store": "steam"},
+                    ],
+                    "store": "steam",
+                    "game_count": 2,
+                }
+            ).encode()
+        return json.dumps(
+            {
+                "personal": {
+                    "steam:2": {"status": "done", "notes": "cloud note"},
+                    "steam:3": {"status": "wishlist"},
+                },
+                "prefs": {"dismissedClaims": {"b": True}},
+                "manual": [],
+                "libraryFirstSeen": {"steam:3": 3},
+                "schema_version": 1,
+            }
+        ).encode()
+
+    monkeypatch.setattr(cloud_mirror, "download_remote_mirror_artifact", _download)
+    monkeypatch.setattr("shared.server_personal._rebind_after_save", lambda: None)
+
+    result = import_remote_mirror_to_profile(
+        authorization="Bearer x",
+        source_profile_id="default",
+        include_personal=True,
+        mode="merge",
+    )
+    assert result.get("mode") == "merge"
+    rewritten = json.loads(catalog.read_text(encoding="utf-8"))
+    by_id = {str(g["id"]): g for g in rewritten["games"]}
+    assert set(by_id) == {"1", "2", "3"}
+    assert by_id["1"]["title"] == "Local Only"
+    assert by_id["2"]["title"] == "Shared Remote"
+    assert by_id["2"]["playtime"] == 99
+    personal_doc = json.loads(personal.read_text(encoding="utf-8"))
+    assert personal_doc["personal"]["steam:1"]["status"] == "backlog"
+    assert personal_doc["personal"]["steam:2"]["status"] == "done"
+    assert personal_doc["personal"]["steam:2"]["notes"] == "cloud note"
+    assert personal_doc["personal"]["steam:3"]["status"] == "wishlist"
+    assert personal_doc["prefs"]["dismissedClaims"] == {"a": True, "b": True}
+
+
+def test_clear_remote_mirror_profile_deletes_allowlisted(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    deleted: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "user-1", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        "shared.supabase_mirror.list_mirror_artifacts",
+        lambda **_: [
+            {"name": "games_steam.json", "id": "1"},
+            {"name": "data/personal.json", "id": "2"},
+            {"name": "cache/auth/secrets.bin", "id": "3"},
+        ],
+    )
+
+    def _delete_objects(**kwargs):
+        deleted["objects"] = list(kwargs.get("artifact_paths") or [])
+        return list(kwargs.get("artifact_paths") or [])
+
+    def _delete_rows(**kwargs):
+        deleted["rows"] = kwargs
+
+    monkeypatch.setattr("shared.supabase_mirror.delete_mirror_objects", _delete_objects)
+    monkeypatch.setattr("shared.supabase_mirror.delete_mirror_snapshot_rows", _delete_rows)
+    cloud_mirror._save_mirror_upload_state("default", {"games_steam.json": "ok"})
+
+    result = clear_remote_mirror_profile(authorization="Bearer x")
+    assert result["ok"] is True
+    assert result["count"] == 2
+    assert deleted["objects"] == ["data/personal.json", "games_steam.json"] or set(
+        deleted["objects"]
+    ) == {"games_steam.json", "data/personal.json"}
+    assert "secrets.bin" not in str(deleted["objects"])
+    state = cloud_mirror.read_mirror_upload_state(profile_id="default")
+    assert state.get("artifacts") == {}
 
 
 def test_mirror_upload_blocked_when_opt_in_off(

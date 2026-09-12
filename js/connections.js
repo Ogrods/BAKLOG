@@ -529,6 +529,7 @@ function renderConnPrefs() {
   const cloudToggle = document.getElementById("cloudMirrorEnabledToggle");
   const syncBtn = document.getElementById("cloudMirrorSyncBtn");
   const importBtn = document.getElementById("cloudMirrorImportBtn");
+  const clearBtn = document.getElementById("cloudMirrorClearBtn");
   const showCloudMirror =
     proFeaturesUnlocked() &&
     isAccountAuthMode() &&
@@ -544,6 +545,10 @@ function renderConnPrefs() {
   if (importBtn) {
     importBtn.classList.toggle("hidden", !showCloudMirror);
     importBtn.hidden = !showCloudMirror;
+  }
+  if (clearBtn) {
+    clearBtn.classList.toggle("hidden", !showCloudMirror);
+    clearBtn.hidden = !showCloudMirror;
   }
   if (cloudToggle && showCloudMirror) {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
@@ -691,7 +696,7 @@ async function handleCloudMirrorToggle(ev) {
           "Anyone signed into your account can read that data on baklog.app/mirror.",
           "Store passwords, cookies, and secrets stay on this PC and are never uploaded.",
           "",
-          "You can turn Cloud sync off later. New uploads stop, but existing cloud files remain until you delete them in your account storage (Supabase).",
+          "You can turn Cloud sync off later. New uploads stop, but existing cloud files remain until you use Clear cloud library (or delete them in account storage).",
           "",
           "Only continue if you understand you are exposing backlog data beyond this machine.",
         ].join("\n"),
@@ -712,6 +717,61 @@ async function handleCloudMirrorToggle(ev) {
   }
 }
 
+async function handleCloudMirrorClear() {
+  const btn = document.getElementById("cloudMirrorClearBtn");
+  const statusEl = document.getElementById("cloudMirrorUploadStatus");
+  const confirmed = window.confirm(
+    [
+      "Clear cloud library?",
+      "",
+      "This permanently deletes synced catalog and personal files from your BAKLOG account cloud storage for the current profile folder.",
+      "Local library files on this PC are not deleted. Store passwords, cookies, and secrets stay on this PC.",
+      "baklog.app/mirror will show an empty library until you Sync now again.",
+      "",
+      "This cannot be undone from BAKLOG.",
+    ].join("\n"),
+  );
+  if (!confirmed) return;
+  try {
+    if (btn) btn.disabled = true;
+    const res = await baklogFetch("/api/mirror/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `Clear failed (${res.status})`);
+    }
+    const count = Number(data.count || 0);
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent =
+        count > 0
+          ? `Cloud library cleared (${count} file${count === 1 ? "" : "s"} deleted). Credentials stayed local.`
+          : "Cloud library already empty.";
+      statusEl.classList.remove("conn-prefs-note--error");
+    }
+    void refreshCloudMirrorUploadStatus();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent = err?.message || "Could not clear cloud library.";
+      statusEl.classList.add("conn-prefs-note--error");
+    } else {
+      window.alert(err?.message || "Could not clear cloud library.");
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+    renderConnPrefs();
+  }
+}
+
 async function openCloudMirrorImportDialog(initialSnap) {
   const dialog = document.getElementById("cloudMirrorImportDialog");
   const listEl = document.getElementById("cloudMirrorImportArtifactList");
@@ -719,6 +779,8 @@ async function openCloudMirrorImportDialog(initialSnap) {
   const intro = document.getElementById("cloudMirrorImportIntro");
   const sourceWrap = document.getElementById("cloudMirrorImportSourceWrap");
   const sourceSelect = document.getElementById("cloudMirrorImportSourceProfile");
+  const modeOverwrite = document.getElementById("cloudMirrorImportModeOverwrite");
+  const modeMerge = document.getElementById("cloudMirrorImportModeMerge");
   if (!dialog || !listEl || !personalToggle) return null;
 
   const accountId = getAccountProfileId() || "";
@@ -731,18 +793,32 @@ async function openCloudMirrorImportDialog(initialSnap) {
     initialSnap?.profile ||
     activeProfileId();
   let importableCount = 0;
+  let lastScope = [];
+
+  const selectedMode = () =>
+    modeMerge?.checked ? "merge" : "overwrite";
+
+  const updateIntro = () => {
+    if (!intro) return;
+    const sourceLabel = labelMirrorSourceProfile(sourceProfile, { accountId });
+    const scopeText = lastScope.length ? ` (${lastScope.join(", ")})` : "";
+    if (selectedMode() === "merge") {
+      intro.textContent =
+        `Merges cloud folder "${sourceLabel}" into the current local profile${scopeText}. ` +
+        "Remote wins on overlapping game/status keys; local-only rows stay. " +
+        "Store credentials are not copied - reconnect stores afterward.";
+    } else {
+      intro.textContent =
+        `Replaces matching files in the current local profile from cloud folder "${sourceLabel}"${scopeText}. ` +
+        "Store credentials are not copied - reconnect stores afterward.";
+    }
+  };
 
   const fillPaths = (artifacts) => {
     const paths = listImportableArtifactPaths(artifacts);
     importableCount = paths.length;
-    const scope = describeImportScope(paths);
-    if (intro) {
-      const sourceLabel = labelMirrorSourceProfile(sourceProfile, { accountId });
-      intro.textContent =
-        `Replaces matching files in the current local profile from cloud folder "${sourceLabel}"` +
-        `${scope.length ? ` (${scope.join(", ")})` : ""}. ` +
-        "Store credentials are not copied - reconnect stores afterward.";
-    }
+    lastScope = describeImportScope(paths);
+    updateIntro();
     listEl.innerHTML = paths.length
       ? paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")
       : "<li>No importable files in this cloud profile.</li>";
@@ -762,6 +838,9 @@ async function openCloudMirrorImportDialog(initialSnap) {
   }
   fillPaths(artifacts);
   if (!importableCount && profiles.length <= 1) return null;
+
+  if (modeOverwrite) modeOverwrite.onchange = updateIntro;
+  if (modeMerge) modeMerge.onchange = updateIntro;
 
   if (sourceWrap && sourceSelect) {
     if (profiles.length > 1) {
@@ -802,10 +881,13 @@ async function openCloudMirrorImportDialog(initialSnap) {
       "close",
       () => {
         if (sourceSelect) sourceSelect.onchange = null;
+        if (modeOverwrite) modeOverwrite.onchange = null;
+        if (modeMerge) modeMerge.onchange = null;
         resolve({
           confirmed: dialog.returnValue === "confirm" && importableCount > 0,
           includePersonal: personalToggle.checked,
           sourceProfile,
+          mode: selectedMode(),
         });
       },
       { once: true },
@@ -825,11 +907,13 @@ async function handleCloudMirrorImport() {
     const result = await importFromCloudMirror({
       includePersonal: choice.includePersonal,
       sourceProfile: choice.sourceProfile || undefined,
+      mode: choice.mode === "merge" ? "merge" : "overwrite",
     });
     const count = result?.count ?? 0;
     const imported = Array.isArray(result?.imported) ? result.imported.join(", ") : "";
+    const modeLabel = result?.mode === "merge" ? "Merge" : "Replace";
     window.alert(
-      `Cloud sync import complete (${count} file${count === 1 ? "" : "s"}).${imported ? `\n\n${imported}` : ""}\n\nThe app will reload.`,
+      `Cloud sync import complete (${modeLabel}, ${count} file${count === 1 ? "" : "s"}).${imported ? `\n\n${imported}` : ""}\n\nThe app will reload.`,
     );
     window.location.reload();
   } catch (err) {
@@ -953,6 +1037,11 @@ function handleLayoutClick(ev) {
 
   if (target.id === "cloudMirrorImportBtn") {
     void handleCloudMirrorImport();
+    return;
+  }
+
+  if (target.id === "cloudMirrorClearBtn") {
+    void handleCloudMirrorClear();
     return;
   }
 

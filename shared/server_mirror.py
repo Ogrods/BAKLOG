@@ -1,4 +1,4 @@
-﻿"""Localhost HTTP handlers for GET /api/mirror and POST /api/mirror/import."""
+﻿"""Localhost HTTP handlers for GET /api/mirror and POST /api/mirror/{import,sync,clear}."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 
 from shared.cloud_mirror import (
     MirrorProfileMismatch,
+    clear_remote_mirror_profile,
     download_remote_mirror_artifact,
     import_remote_mirror_to_profile,
     list_remote_mirror_artifacts,
@@ -126,6 +127,16 @@ def handle_mirror_import_post(handler) -> None:
     if not isinstance(allow_empty_catalogs, bool):
         srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "allowEmptyCatalogs must be boolean"})
         return
+    mode_raw = body.get("mode", "overwrite")
+    if mode_raw is None:
+        mode_raw = "overwrite"
+    if not isinstance(mode_raw, str):
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": 'mode must be "overwrite" or "merge"'})
+        return
+    mode = mode_raw.strip().lower()
+    if mode not in {"overwrite", "merge"}:
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": 'mode must be "overwrite" or "merge"'})
+        return
     paths_raw = body.get("paths")
     paths = None
     if paths_raw is not None:
@@ -148,6 +159,7 @@ def handle_mirror_import_post(handler) -> None:
             paths=paths,
             include_personal=include_personal,
             allow_empty_catalogs=allow_empty_catalogs,
+            mode=mode,
         )
     except MirrorProfileMismatch as exc:
         srv._send_json(handler, HTTPStatus.CONFLICT, {"error": str(exc)})
@@ -160,6 +172,46 @@ def handle_mirror_import_post(handler) -> None:
         return
     except Exception as exc:  # noqa: BLE001
         srv._api_error(handler, HTTPStatus.BAD_GATEWAY, "mirror_import_failed", exc)
+        return
+    srv._send_json(handler, HTTPStatus.OK, result)
+
+
+def handle_mirror_clear_post(handler) -> None:
+    """POST /api/mirror/clear — delete remote Storage objects + snapshot rows for one profile."""
+    srv = _srv()
+    if handler._reject_if_csrf_strict():
+        return
+    if not srv._require_api_auth(handler):
+        return
+    authorization = handler.headers.get("Authorization") or ""
+    from shared.supabase_auth import auth_enabled
+
+    if auth_enabled() and not authorization:
+        srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": "Sign in required"})
+        return
+    if not mirror_read_allowed(authorization=authorization):
+        srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": "Pro plan required"})
+        return
+    payload, err = srv._read_json_body(handler, max_bytes=4096)
+    if err:
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": err})
+        return
+    body = payload if isinstance(payload, dict) else {}
+    claimed_profile = body.get("profile")
+    profile_id = str(claimed_profile).strip() if claimed_profile is not None else None
+    if claimed_profile is not None and not profile_id:
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "profile must be a non-empty string"})
+        return
+    try:
+        result = clear_remote_mirror_profile(authorization=authorization, profile_id=profile_id)
+    except PermissionError as exc:
+        srv._send_json(handler, HTTPStatus.UNAUTHORIZED, {"error": str(exc)})
+        return
+    except ValueError as exc:
+        srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        return
+    except Exception as exc:  # noqa: BLE001
+        srv._api_error(handler, HTTPStatus.BAD_GATEWAY, "mirror_clear_failed", exc)
         return
     srv._send_json(handler, HTTPStatus.OK, result)
 

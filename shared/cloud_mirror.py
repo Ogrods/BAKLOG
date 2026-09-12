@@ -268,6 +268,23 @@ def _save_mirror_upload_state(profile_id: str, uploaded: dict[str, str]) -> None
             pass
 
 
+def _clear_mirror_upload_state(profile_id: str) -> None:
+    """Wipe local upload-status cache after remote clear (does not touch catalogs)."""
+    from shared.safe_write import atomic_write_text
+
+    try:
+        pid = _safe_profile_segment(profile_id)
+    except ValueError:
+        return
+    path = _mirror_state_path(pid)
+    doc = {"artifacts": {}, "last_upload_at": None, "device_id": None}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(path, json.dumps(doc, indent=2) + "\n")
+    except OSError:
+        pass
+
+
 def _looks_like_account_profile_id(profile_id: str) -> bool:
     try:
         uuid.UUID(str(profile_id))
@@ -443,6 +460,79 @@ def download_remote_mirror_artifact(
     return download_mirror_object(user_id=user_id, profile_id=pid, artifact_path=rel, bearer_token=token)
 
 
+def clear_remote_mirror_profile(
+    *,
+    authorization: str,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
+    """Delete Storage objects + snapshot rows for one cloud profile folder.
+
+    Credentials and local profile files are never touched. Defaults to the
+    active local profile id when ``profile_id`` is omitted.
+    """
+    from shared.supabase_auth import verify_bearer_user
+    from shared.supabase_mirror import (
+        delete_mirror_objects,
+        delete_mirror_snapshot_rows,
+        list_mirror_artifacts,
+    )
+
+    user = verify_bearer_user(authorization)
+    if not user:
+        raise PermissionError("invalid session")
+    user_id = str(user.get("id") or "")
+    if profile_id is not None:
+        from shared.profile_paths import normalize_profile_id
+
+        pid = normalize_profile_id(profile_id)
+    else:
+        pid = get_active_profile_id()
+    token = _bearer_token(authorization)
+    rows = list_mirror_artifacts(user_id=user_id, profile_id=pid, bearer_token=token)
+    paths: list[str] = []
+    for row in rows:
+        name = str(row.get("name") or "").strip().lstrip("/")
+        if not name:
+            continue
+        # Only delete allowlisted mirror artifacts (never secrets / stray keys).
+        if not is_allowed_relative(name):
+            continue
+        paths.append(name)
+    deleted: list[str] = []
+    if paths:
+        # Batch deletes to keep request bodies modest.
+        batch_size = 50
+        for i in range(0, len(paths), batch_size):
+            chunk = paths[i : i + batch_size]
+            deleted.extend(
+                delete_mirror_objects(
+                    user_id=user_id,
+                    profile_id=pid,
+                    artifact_paths=chunk,
+                    bearer_token=token,
+                )
+            )
+        delete_mirror_snapshot_rows(
+            user_id=user_id,
+            profile_id=pid,
+            bearer_token=token,
+            artifact_paths=deleted or paths,
+        )
+    else:
+        # Still wipe snapshot metadata for the folder if Storage was already empty.
+        delete_mirror_snapshot_rows(user_id=user_id, profile_id=pid, bearer_token=token)
+
+    if pid == get_active_profile_id():
+        _clear_mirror_upload_state(pid)
+
+    return {
+        "ok": True,
+        "profile": pid,
+        "deleted": deleted,
+        "count": len(deleted),
+    }
+
+
 def _bearer_token(authorization: str) -> str:
     parts = authorization.strip().split(None, 1)
     if len(parts) != 2 or parts[0].lower() != "bearer":
@@ -499,6 +589,162 @@ def _mirror_artifact_write_path(rel: str, *, profile_id: str) -> Path:
     return path
 
 
+_GAME_ID_FIELDS = (
+    "id",
+    "appid",
+    "gog_id",
+    "psn_id",
+    "epic_catalog_id",
+    "amazon_id",
+    "application_id",
+    "nintendo_id",
+    "itch_id",
+    "xbox_title_id",
+    "battlenet_id",
+    "ubisoft_id",
+    "humble_id",
+    "ea_id",
+)
+
+
+def _catalog_row_key(game: dict[str, Any]) -> str | None:
+    store = str(game.get("store") or "steam").strip() or "steam"
+    for field in _GAME_ID_FIELDS:
+        val = game.get(field)
+        if val is None:
+            continue
+        text = str(val).strip()
+        if text:
+            return f"{store}:{text}"
+    return None
+
+
+def _merge_map_remote_wins(local: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
+    """Union dict maps. Remote replaces overlapping keys; nested dicts merge field-wise."""
+    out = dict(local)
+    for key, remote_val in remote.items():
+        local_val = out.get(key)
+        if isinstance(local_val, dict) and isinstance(remote_val, dict):
+            merged = dict(local_val)
+            merged.update(remote_val)
+            out[key] = merged
+        else:
+            out[key] = remote_val
+    return out
+
+
+def _merge_personal_docs(local: dict[str, Any], remote: dict[str, Any]) -> dict[str, Any]:
+    """Union personal statuses / prefs / first-seen; remote wins overlapping keys."""
+    out = dict(local)
+    for key in ("personal", "libraryFirstSeen"):
+        local_map = local.get(key) if isinstance(local.get(key), dict) else {}
+        remote_map = remote.get(key) if isinstance(remote.get(key), dict) else {}
+        out[key] = _merge_map_remote_wins(local_map, remote_map)
+    local_prefs = local.get("prefs") if isinstance(local.get("prefs"), dict) else {}
+    remote_prefs = remote.get("prefs") if isinstance(remote.get("prefs"), dict) else {}
+    merged_prefs = dict(local_prefs)
+    for key, remote_val in remote_prefs.items():
+        local_val = merged_prefs.get(key)
+        if isinstance(local_val, dict) and isinstance(remote_val, dict):
+            merged_prefs[key] = _merge_map_remote_wins(local_val, remote_val)
+        else:
+            merged_prefs[key] = remote_val
+    out["prefs"] = merged_prefs
+
+    local_manual = local.get("manual") if isinstance(local.get("manual"), list) else []
+    remote_manual = remote.get("manual") if isinstance(remote.get("manual"), list) else []
+    manual_by_key: dict[str, Any] = {}
+    manual_order: list[str] = []
+
+    def _manual_key(row: Any, *, fallback: str) -> str:
+        if isinstance(row, dict):
+            mid = row.get("id")
+            if mid is not None and str(mid).strip():
+                return f"id:{str(mid).strip()}"
+            title = row.get("title") or row.get("name")
+            if title is not None and str(title).strip():
+                return f"title:{str(title).strip().lower()}"
+        return fallback
+
+    for idx, row in enumerate(local_manual):
+        key = _manual_key(row, fallback=f"local:{idx}")
+        if key not in manual_by_key:
+            manual_order.append(key)
+        manual_by_key[key] = row
+    for idx, row in enumerate(remote_manual):
+        key = _manual_key(row, fallback=f"remote:{idx}")
+        if key not in manual_by_key:
+            manual_order.append(key)
+        if isinstance(manual_by_key.get(key), dict) and isinstance(row, dict):
+            merged = dict(manual_by_key[key])
+            merged.update(row)
+            manual_by_key[key] = merged
+        else:
+            manual_by_key[key] = row
+    out["manual"] = [manual_by_key[k] for k in manual_order]
+
+    for key, value in remote.items():
+        if key in {"personal", "prefs", "manual", "libraryFirstSeen", "updated_at"}:
+            continue
+        out[key] = value
+    return out
+
+
+def _merge_catalog_docs(local: Any, remote: Any, *, filename: str) -> dict[str, Any]:
+    if not isinstance(remote, dict):
+        raise ValueError(f"{filename}: remote must be a JSON object")
+    local_doc = local if isinstance(local, dict) else {}
+    if filename == "itad_prices.json":
+        out = dict(local_doc)
+        out.update({k: v for k, v in remote.items() if k != "by_key"})
+        local_bk = local_doc.get("by_key") if isinstance(local_doc.get("by_key"), dict) else {}
+        remote_bk = remote.get("by_key") if isinstance(remote.get("by_key"), dict) else {}
+        out["by_key"] = _merge_map_remote_wins(local_bk, remote_bk)
+        return out
+
+    out = dict(local_doc)
+    out.update({k: v for k, v in remote.items() if k != "games"})
+    local_games = local_doc.get("games") if isinstance(local_doc.get("games"), list) else []
+    remote_games = remote.get("games") if isinstance(remote.get("games"), list) else []
+    by_key: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    unkeyed: list[dict[str, Any]] = []
+
+    def _ingest(rows: list[Any], *, remote_side: bool) -> None:
+        for idx, row in enumerate(rows):
+            if not isinstance(row, dict):
+                continue
+            key = _catalog_row_key(row)
+            if key is None:
+                unkeyed.append(dict(row))
+                continue
+            if key not in by_key:
+                order.append(key)
+                by_key[key] = dict(row)
+                continue
+            if remote_side:
+                merged = dict(by_key[key])
+                merged.update(row)
+                by_key[key] = merged
+
+    _ingest(local_games, remote_side=False)
+    _ingest(remote_games, remote_side=True)
+    out["games"] = [by_key[k] for k in order] + unkeyed
+    if "game_count" in out or "game_count" in remote or "game_count" in local_doc:
+        out["game_count"] = len(out["games"])
+    return out
+
+
+def _load_local_json_object(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
 def import_remote_mirror_to_profile(
     *,
     authorization: str,
@@ -507,15 +753,22 @@ def import_remote_mirror_to_profile(
     paths: list[str] | None = None,
     include_personal: bool = True,
     allow_empty_catalogs: bool = False,
+    mode: str = "overwrite",
 ) -> dict[str, Any]:
     """Import mirrored artifacts into the **active** profile only.
 
     Naming a different destination ``profile_id`` raises :class:`MirrorProfileMismatch`
     (HTTP 409). ``source_profile_id`` selects which cloud folder to pull from.
+    ``mode`` is ``overwrite`` (replace matching files) or ``merge`` (union catalogs /
+    personal maps; remote wins overlapping keys).
     """
     from shared.server_catalog_import import import_catalog_payload, is_allowed_catalog_filename
     from shared.server_personal import save_personal_doc
     from shared.supabase_auth import verify_bearer_user
+
+    import_mode = str(mode or "overwrite").strip().lower()
+    if import_mode not in {"overwrite", "merge"}:
+        raise ValueError('mode must be "overwrite" or "merge"')
 
     active = get_active_profile_id()
     if profile_id is not None and str(profile_id) != active:
@@ -563,6 +816,14 @@ def import_remote_mirror_to_profile(
         )
         doc = _parse_mirror_json(body, rel)
         _validate_mirror_staged_doc(rel, doc, allow_empty_catalogs=allow_empty_catalogs)
+        if import_mode == "merge":
+            local_path = _mirror_artifact_write_path(rel, profile_id=pid)
+            local_doc = _load_local_json_object(local_path)
+            if local_doc is not None:
+                if rel == "data/personal.json":
+                    doc = _merge_personal_docs(local_doc, doc)
+                else:
+                    doc = _merge_catalog_docs(local_doc, doc, filename=rel)
         staged[rel] = doc
     write_paths = [_mirror_artifact_write_path(rel, profile_id=pid) for rel in staged]
     backups: dict[Path, bytes | None] = {}
@@ -612,4 +873,5 @@ def import_remote_mirror_to_profile(
         "personal": personal_saved,
         "sourceProfile": source_pid,
         "profile": pid,
+        "mode": import_mode,
     }

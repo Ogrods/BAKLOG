@@ -91,22 +91,108 @@ def download_mirror_object(*, user_id: str, profile_id: str, artifact_path: str,
 
 
 def _list_prefix(*, prefix: str, bearer_token: str, limit: int = 200) -> list[dict[str, Any]]:
+    """List Storage objects under ``prefix``, paginating until a short page (SEC-007)."""
     url = f"{_base_url()}/storage/v1/object/list/{MIRROR_BUCKET}"
-    body = json.dumps({"prefix": prefix, "limit": limit, "offset": 0}).encode("utf-8")
+    page_size = max(1, int(limit))
+    offset = 0
+    out: list[dict[str, Any]] = []
+    while True:
+        body = json.dumps({"prefix": prefix, "limit": page_size, "offset": offset}).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "apikey": _anon_key(),
+                "Authorization": f"Bearer {bearer_token}",
+                "Content-Type": "application/json",
+            },
+        )
+        result = _json_request(req)
+        page = [row for row in result if isinstance(row, dict)] if isinstance(result, list) else []
+        out.extend(page)
+        if len(page) < page_size:
+            break
+        offset += page_size
+        # Hard cap so a runaway list cannot loop forever.
+        if offset >= 10_000:
+            break
+    return out
+
+
+def delete_mirror_objects(
+    *,
+    user_id: str,
+    profile_id: str,
+    artifact_paths: list[str],
+    bearer_token: str,
+) -> list[str]:
+    """Delete Storage objects under ``{uid}/{pid}/``. Returns deleted relative paths."""
+    uid = (user_id or "").strip()
+    pid = (profile_id or "").strip()
+    if not uid or not pid:
+        raise ValueError("invalid mirror delete scope")
+    keys: list[str] = []
+    rels: list[str] = []
+    for raw in artifact_paths:
+        rel = str(raw or "").strip().lstrip("/")
+        if not rel or ".." in rel.split("/"):
+            continue
+        keys.append(mirror_object_key(uid, pid, rel))
+        rels.append(rel)
+    if not keys:
+        return []
+    url = f"{_base_url()}/storage/v1/object/{MIRROR_BUCKET}"
+    body = json.dumps(keys).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,
-        method="POST",
+        method="DELETE",
         headers={
             "apikey": _anon_key(),
             "Authorization": f"Bearer {bearer_token}",
             "Content-Type": "application/json",
         },
     )
-    result = _json_request(req)
-    if isinstance(result, list):
-        return [row for row in result if isinstance(row, dict)]
-    return []
+    _json_request(req)
+    return rels
+
+
+def delete_mirror_snapshot_rows(
+    *,
+    user_id: str,
+    profile_id: str,
+    bearer_token: str,
+    artifact_paths: list[str] | None = None,
+) -> None:
+    """Delete ``cloud_mirror_snapshots`` rows for a profile (optional path filter)."""
+    uid = (user_id or "").strip()
+    pid = (profile_id or "").strip()
+    if not uid or not pid:
+        raise ValueError("invalid mirror snapshot delete scope")
+    params = [
+        ("user_id", f"eq.{uid}"),
+        ("profile_id", f"eq.{pid}"),
+    ]
+    if artifact_paths is not None:
+        cleaned = [str(p).strip().lstrip("/") for p in artifact_paths if str(p).strip()]
+        if not cleaned:
+            return
+        # PostgREST `in.(a,b)` — paths are allowlisted filenames, no commas.
+        joined = ",".join(cleaned)
+        params.append(("artifact_path", f"in.({joined})"))
+    query = urllib.parse.urlencode(params)
+    url = f"{_base_url()}/rest/v1/cloud_mirror_snapshots?{query}"
+    req = urllib.request.Request(
+        url,
+        method="DELETE",
+        headers={
+            "apikey": _anon_key(),
+            "Authorization": f"Bearer {bearer_token}",
+            "Prefer": "return=minimal",
+        },
+    )
+    _json_request(req)
 
 
 def list_mirror_objects(*, user_id: str, profile_id: str, bearer_token: str, limit: int = 200) -> list[dict[str, Any]]:

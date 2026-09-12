@@ -42,7 +42,7 @@ alter table public.cloud_mirror_snapshots enable row level security;
 
 -- Table privileges (RLS alone is not enough; PostgREST needs GRANT for authenticated).
 -- Owner E2E 2026-09-08: without this, upserts return 42501 permission denied.
-grant select, insert, update on public.cloud_mirror_snapshots to authenticated;
+grant select, insert, update, delete on public.cloud_mirror_snapshots to authenticated;
 
 -- JWT plan helper (Pro / paid / premium aliases).
 create or replace function public.mirror_is_pro_jwt()
@@ -78,6 +78,13 @@ create policy "Users update own mirror metadata"
   to authenticated
   using (auth.uid() = user_id and public.mirror_is_pro_jwt())
   with check (auth.uid() = user_id and public.mirror_is_pro_jwt());
+
+drop policy if exists "Users delete own mirror metadata" on public.cloud_mirror_snapshots;
+create policy "Users delete own mirror metadata"
+  on public.cloud_mirror_snapshots
+  for delete
+  to authenticated
+  using (auth.uid() = user_id and public.mirror_is_pro_jwt());
 
 -- Storage RLS: objects live at {user_id}/{profile_id}/{artifact_path}
 drop policy if exists "Users read own mirror objects" on storage.objects;

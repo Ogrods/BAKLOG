@@ -292,6 +292,7 @@ describe('cloud mirror prefs visibility', () => {
 
   function mountCloudPrefsDom() {
     document.body.innerHTML = `
+      <div id="connectionsContainer">
       <strong id="connHeroCount"></strong>
       <span id="connProgressFill"></span>
       <div id="connOnboard" hidden></div>
@@ -310,8 +311,11 @@ describe('cloud mirror prefs visibility', () => {
           </label>
           <button id="cloudMirrorSyncBtn" type="button" class="hidden" hidden>Sync now</button>
           <button id="cloudMirrorImportBtn" type="button" class="hidden" hidden>Import</button>
+          <button id="cloudMirrorClearBtn" type="button" class="hidden" hidden>Clear cloud library</button>
         </div>
         <p id="cloudMirrorUploadStatus" hidden></p>
+      </div>
+      <div id="connLayout"></div>
       </div>
     `;
   }
@@ -332,6 +336,7 @@ describe('cloud mirror prefs visibility', () => {
     expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(true);
     expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(true);
+    expect(document.getElementById('cloudMirrorClearBtn')?.hidden).toBe(true);
   });
 
   it('shows cloud sync controls when capability is live for Pro account', async () => {
@@ -352,6 +357,7 @@ describe('cloud mirror prefs visibility', () => {
     expect(document.getElementById('cloudMirrorImportBtn')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorSyncBtn')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorSyncBtn')?.disabled).toBe(true);
+    expect(document.getElementById('cloudMirrorClearBtn')?.hidden).toBe(false);
   });
 
   it('shows cloud sync for admin Pro-sim without real Pro plan', async () => {
@@ -370,5 +376,45 @@ describe('cloud mirror prefs visibility', () => {
 
     expect(document.getElementById('connCloudPrefs')?.hidden).toBe(false);
     expect(document.getElementById('cloudMirrorToggleWrap')?.hidden).toBe(false);
+  });
+
+  it('Clear cloud library confirms before POSTing /api/mirror/clear', async () => {
+    mountCloudPrefsDom();
+    const auth = await import('../js/auth-gate.js');
+    const caps = await import('../js/pro-capabilities.js');
+    const api = await import('../js/api-client.js');
+    vi.mocked(auth.proFeaturesUnlocked).mockReturnValue(true);
+    vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
+    vi.mocked(auth.getAccessToken).mockReturnValue('tok');
+    vi.mocked(caps.capabilityStatus).mockReturnValue('live');
+    vi.mocked(caps.getProSettings).mockReturnValue({ cloudMirrorEnabled: true });
+
+    window.confirm = vi.fn(() => false);
+    const fetchSpy = vi.mocked(api.baklogFetch);
+    fetchSpy.mockClear();
+
+    const mod = await import('../js/connections.js');
+    mod.wireConnectionsUi();
+    await mod.refreshConnections();
+    document.getElementById('cloudMirrorClearBtn')?.click();
+    await Promise.resolve();
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(
+      fetchSpy.mock.calls.some((c) => c[0] === '/api/mirror/clear'),
+    ).toBe(false);
+
+    window.confirm = vi.fn(() => true);
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, count: 2, deleted: ['games_steam.json', 'data/personal.json'] }),
+    });
+    document.getElementById('cloudMirrorClearBtn')?.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(
+      fetchSpy.mock.calls.some(
+        (c) => c[0] === '/api/mirror/clear' && c[1]?.method === 'POST',
+      ),
+    ).toBe(true);
   });
 });

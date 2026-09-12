@@ -33,6 +33,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Connections **Clear cloud library** deletes synced catalog and personal files from your account cloud storage (with confirm). Local files and store credentials stay on this PC.
+
 ## [0.9.02] - 2026-09-11
 
 ### Changed

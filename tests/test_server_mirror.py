@@ -227,3 +227,41 @@ def test_sync_ok_calls_sync_mirror_now(mirror_server: str, monkeypatch: pytest.M
     assert status == 200, data
     assert data.get("ok") is True
     assert data.get("uploaded", {}).get("games_steam.json") == "ok"
+
+
+def test_clear_requires_local_header(mirror_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shared.server_mirror.mirror_read_allowed", lambda **_: True)
+    status, _ = _request(
+        mirror_server,
+        "/api/mirror/clear",
+        method="POST",
+        headers={"Content-Type": "application/json", "Authorization": "Bearer tok"},
+        body=b"{}",
+    )
+    assert status == 403
+
+
+def test_clear_ok_calls_clear_remote(mirror_server: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shared.server_mirror.mirror_read_allowed", lambda **_: True)
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        "shared.server_mirror.clear_remote_mirror_profile",
+        lambda **_: {"ok": True, "profile": "default", "deleted": ["games_steam.json"], "count": 1},
+    )
+    status, data = _request(
+        mirror_server,
+        "/api/mirror/clear",
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer tok",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
+        body=b"{}",
+    )
+    assert status == 200, data
+    assert data.get("ok") is True
+    assert data.get("count") == 1

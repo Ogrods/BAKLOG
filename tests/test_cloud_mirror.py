@@ -13,6 +13,7 @@ from shared.cloud_mirror import (
     MirrorProfileMismatch,
     _mirror_artifact_write_path,
     _validate_mirror_staged_doc,
+    clear_remote_mirror_profile,
     import_remote_mirror_to_profile,
     schedule_mirror_upload,
 )
@@ -247,6 +248,46 @@ def test_import_successful_overwrite(profile_home: Path, monkeypatch: pytest.Mon
     assert rewritten["games"][0]["id"] == "9"
     personal_doc = json.loads(personal.read_text(encoding="utf-8"))
     assert personal_doc.get("personal", {}).get("steam:9", {}).get("status") == "playing"
+
+
+def test_clear_remote_mirror_profile_deletes_allowlisted(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    deleted: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "user-1", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        "shared.supabase_mirror.list_mirror_artifacts",
+        lambda **_: [
+            {"name": "games_steam.json", "id": "1"},
+            {"name": "data/personal.json", "id": "2"},
+            {"name": "cache/auth/secrets.bin", "id": "3"},
+        ],
+    )
+
+    def _delete_objects(**kwargs):
+        deleted["objects"] = list(kwargs.get("artifact_paths") or [])
+        return list(kwargs.get("artifact_paths") or [])
+
+    def _delete_rows(**kwargs):
+        deleted["rows"] = kwargs
+
+    monkeypatch.setattr("shared.supabase_mirror.delete_mirror_objects", _delete_objects)
+    monkeypatch.setattr("shared.supabase_mirror.delete_mirror_snapshot_rows", _delete_rows)
+    cloud_mirror._save_mirror_upload_state("default", {"games_steam.json": "ok"})
+
+    result = clear_remote_mirror_profile(authorization="Bearer x")
+    assert result["ok"] is True
+    assert result["count"] == 2
+    assert deleted["objects"] == ["data/personal.json", "games_steam.json"] or set(
+        deleted["objects"]
+    ) == {"games_steam.json", "data/personal.json"}
+    assert "secrets.bin" not in str(deleted["objects"])
+    state = cloud_mirror.read_mirror_upload_state(profile_id="default")
+    assert state.get("artifacts") == {}
 
 
 def test_mirror_upload_blocked_when_opt_in_off(

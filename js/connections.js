@@ -529,6 +529,7 @@ function renderConnPrefs() {
   const cloudToggle = document.getElementById("cloudMirrorEnabledToggle");
   const syncBtn = document.getElementById("cloudMirrorSyncBtn");
   const importBtn = document.getElementById("cloudMirrorImportBtn");
+  const clearBtn = document.getElementById("cloudMirrorClearBtn");
   const showCloudMirror =
     proFeaturesUnlocked() &&
     isAccountAuthMode() &&
@@ -544,6 +545,10 @@ function renderConnPrefs() {
   if (importBtn) {
     importBtn.classList.toggle("hidden", !showCloudMirror);
     importBtn.hidden = !showCloudMirror;
+  }
+  if (clearBtn) {
+    clearBtn.classList.toggle("hidden", !showCloudMirror);
+    clearBtn.hidden = !showCloudMirror;
   }
   if (cloudToggle && showCloudMirror) {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
@@ -691,7 +696,7 @@ async function handleCloudMirrorToggle(ev) {
           "Anyone signed into your account can read that data on baklog.app/mirror.",
           "Store passwords, cookies, and secrets stay on this PC and are never uploaded.",
           "",
-          "You can turn Cloud sync off later. New uploads stop, but existing cloud files remain until you delete them in your account storage (Supabase).",
+          "You can turn Cloud sync off later. New uploads stop, but existing cloud files remain until you use Clear cloud library (or delete them in account storage).",
           "",
           "Only continue if you understand you are exposing backlog data beyond this machine.",
         ].join("\n"),
@@ -709,6 +714,61 @@ async function handleCloudMirrorToggle(ev) {
     window.alert(err?.message || "Could not save cloud sync setting.");
   } finally {
     toggle.disabled = false;
+  }
+}
+
+async function handleCloudMirrorClear() {
+  const btn = document.getElementById("cloudMirrorClearBtn");
+  const statusEl = document.getElementById("cloudMirrorUploadStatus");
+  const confirmed = window.confirm(
+    [
+      "Clear cloud library?",
+      "",
+      "This permanently deletes synced catalog and personal files from your BAKLOG account cloud storage for the current profile folder.",
+      "Local library files on this PC are not deleted. Store passwords, cookies, and secrets stay on this PC.",
+      "baklog.app/mirror will show an empty library until you Sync now again.",
+      "",
+      "This cannot be undone from BAKLOG.",
+    ].join("\n"),
+  );
+  if (!confirmed) return;
+  try {
+    if (btn) btn.disabled = true;
+    const res = await baklogFetch("/api/mirror/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `Clear failed (${res.status})`);
+    }
+    const count = Number(data.count || 0);
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent =
+        count > 0
+          ? `Cloud library cleared (${count} file${count === 1 ? "" : "s"} deleted). Credentials stayed local.`
+          : "Cloud library already empty.";
+      statusEl.classList.remove("conn-prefs-note--error");
+    }
+    void refreshCloudMirrorUploadStatus();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent = err?.message || "Could not clear cloud library.";
+      statusEl.classList.add("conn-prefs-note--error");
+    } else {
+      window.alert(err?.message || "Could not clear cloud library.");
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+    renderConnPrefs();
   }
 }
 
@@ -953,6 +1013,11 @@ function handleLayoutClick(ev) {
 
   if (target.id === "cloudMirrorImportBtn") {
     void handleCloudMirrorImport();
+    return;
+  }
+
+  if (target.id === "cloudMirrorClearBtn") {
+    void handleCloudMirrorClear();
     return;
   }
 

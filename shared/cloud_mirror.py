@@ -268,6 +268,23 @@ def _save_mirror_upload_state(profile_id: str, uploaded: dict[str, str]) -> None
             pass
 
 
+def _clear_mirror_upload_state(profile_id: str) -> None:
+    """Wipe local upload-status cache after remote clear (does not touch catalogs)."""
+    from shared.safe_write import atomic_write_text
+
+    try:
+        pid = _safe_profile_segment(profile_id)
+    except ValueError:
+        return
+    path = _mirror_state_path(pid)
+    doc = {"artifacts": {}, "last_upload_at": None, "device_id": None}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(path, json.dumps(doc, indent=2) + "\n")
+    except OSError:
+        pass
+
+
 def _looks_like_account_profile_id(profile_id: str) -> bool:
     try:
         uuid.UUID(str(profile_id))
@@ -441,6 +458,79 @@ def download_remote_mirror_artifact(
     user_id = str(user.get("id") or "")
     token = _bearer_token(authorization)
     return download_mirror_object(user_id=user_id, profile_id=pid, artifact_path=rel, bearer_token=token)
+
+
+def clear_remote_mirror_profile(
+    *,
+    authorization: str,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
+    """Delete Storage objects + snapshot rows for one cloud profile folder.
+
+    Credentials and local profile files are never touched. Defaults to the
+    active local profile id when ``profile_id`` is omitted.
+    """
+    from shared.supabase_auth import verify_bearer_user
+    from shared.supabase_mirror import (
+        delete_mirror_objects,
+        delete_mirror_snapshot_rows,
+        list_mirror_artifacts,
+    )
+
+    user = verify_bearer_user(authorization)
+    if not user:
+        raise PermissionError("invalid session")
+    user_id = str(user.get("id") or "")
+    if profile_id is not None:
+        from shared.profile_paths import normalize_profile_id
+
+        pid = normalize_profile_id(profile_id)
+    else:
+        pid = get_active_profile_id()
+    token = _bearer_token(authorization)
+    rows = list_mirror_artifacts(user_id=user_id, profile_id=pid, bearer_token=token)
+    paths: list[str] = []
+    for row in rows:
+        name = str(row.get("name") or "").strip().lstrip("/")
+        if not name:
+            continue
+        # Only delete allowlisted mirror artifacts (never secrets / stray keys).
+        if not is_allowed_relative(name):
+            continue
+        paths.append(name)
+    deleted: list[str] = []
+    if paths:
+        # Batch deletes to keep request bodies modest.
+        batch_size = 50
+        for i in range(0, len(paths), batch_size):
+            chunk = paths[i : i + batch_size]
+            deleted.extend(
+                delete_mirror_objects(
+                    user_id=user_id,
+                    profile_id=pid,
+                    artifact_paths=chunk,
+                    bearer_token=token,
+                )
+            )
+        delete_mirror_snapshot_rows(
+            user_id=user_id,
+            profile_id=pid,
+            bearer_token=token,
+            artifact_paths=deleted or paths,
+        )
+    else:
+        # Still wipe snapshot metadata for the folder if Storage was already empty.
+        delete_mirror_snapshot_rows(user_id=user_id, profile_id=pid, bearer_token=token)
+
+    if pid == get_active_profile_id():
+        _clear_mirror_upload_state(pid)
+
+    return {
+        "ok": True,
+        "profile": pid,
+        "deleted": deleted,
+        "count": len(deleted),
+    }
 
 
 def _bearer_token(authorization: str) -> str:

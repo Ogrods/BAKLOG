@@ -11236,6 +11236,14 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   margin: 0;
   align-self: center;
 }
+.conn-prefs-import--danger {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+.conn-prefs-import--danger:hover {
+  border-color: rgba(248, 113, 113, 0.8);
+  background: rgba(127, 29, 29, 0.25);
+}
 .conn-prefs-note {
   flex-basis: 100%;
   margin: 0.15rem 0 0;

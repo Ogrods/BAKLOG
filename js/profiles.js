@@ -418,9 +418,14 @@ async function switchProfile(id, pin) {
   closeMenu();
   const { personalStore } = await import('./personal-store.js');
   await personalStore.prepareForProfileSwitch();
-  const body = { id };
-  if (pin) body.pin = pin;
-  await api('POST', '/api/profiles/active', body);
+  try {
+    const body = { id };
+    if (pin) body.pin = pin;
+    await api('POST', '/api/profiles/active', body);
+  } catch (err) {
+    personalStore.abortProfileSwitchSaveBlock();
+    throw err;
+  }
   localStorage.setItem(ACTIVE_PROFILE_LS, id);
   resetTabMemoryForProfile(id);
   location.reload();

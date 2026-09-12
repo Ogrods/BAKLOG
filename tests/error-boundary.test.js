@@ -344,6 +344,14 @@ describe("buildBugBundle shape", () => {
     expect(serialized).not.toMatch(/gamesBySource/);
   });
 
+  it("scrubs Bearer tokens from session errors in the bug bundle", () => {
+    reportError(new Error("upstream failed Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc.def"));
+    const bundle = buildBugBundle();
+    const serialized = JSON.stringify(bundle.errors.session);
+    expect(serialized).toContain("Bearer [redacted]");
+    expect(serialized).not.toContain("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+  });
+
   it("PARANOIA: bundle keys are exactly the documented whitelist", () => {
     const bundle = buildBugBundle();
     const topLevel = Object.keys(bundle).sort();

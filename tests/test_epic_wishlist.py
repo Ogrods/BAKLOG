@@ -5,12 +5,12 @@ import json
 import sys
 from pathlib import Path
 
+from auth.epic_wishlist_session import storefront_auth_error_message
 from fetchers._progress import EXIT_CODE_AUTH
 from fetchers.fetch_epic_wishlist import (
     _build_row,
     parse_wishlist_sources,
 )
-from auth.epic_wishlist_session import storefront_auth_error_message
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "epic_wishlist_graphql.json"
 

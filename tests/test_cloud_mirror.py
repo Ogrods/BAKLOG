@@ -491,3 +491,86 @@ def test_save_mirror_upload_state_is_atomic(
     assert calls
     state = cloud_mirror.read_mirror_upload_state(profile_id="default")
     assert state["artifacts"]["games_steam.json"]["status"] == "ok"
+
+
+def test_import_pins_request_profile_across_index_switch(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Concurrent index switch must not divert personal import to another profile."""
+    other = tmp_path / "profiles" / "other"
+    (other / "data").mkdir(parents=True)
+    (other / ".migration_complete").write_text("1\n", encoding="utf-8")
+    (other / "data" / "personal.json").write_text(
+        json.dumps(
+            {
+                "personal": {"steam:keep": {"status": "backlog"}},
+                "prefs": {},
+                "manual": [],
+                "libraryFirstSeen": {},
+                "schema_version": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "list_remote_mirror_artifacts",
+        lambda **_: [{"path": "data/personal.json"}],
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "download_remote_mirror_artifact",
+        lambda **_: json.dumps(
+            {
+                "personal": {"steam:imported": {"status": "playing"}},
+                "prefs": {},
+                "manual": [],
+                "libraryFirstSeen": {},
+                "schema_version": 1,
+            }
+        ).encode(),
+    )
+    monkeypatch.setattr("shared.server_personal._rebind_after_save", lambda: None)
+
+    from shared import server_personal
+
+    real_save = server_personal.save_personal_doc
+
+    def _switch_active_during_save(payload, *, allow_empty=False):
+        # Simulate a profile switch mid-import before personal write.
+        profile_paths.INDEX_FILE.write_text(
+            json.dumps(
+                {
+                    "active": "other",
+                    "profiles": [
+                        {"id": "default", "label": "Default"},
+                        {"id": "other", "label": "Other"},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return real_save(payload, allow_empty=allow_empty)
+
+    monkeypatch.setattr(server_personal, "save_personal_doc", _switch_active_during_save)
+
+    result = import_remote_mirror_to_profile(
+        authorization="Bearer x",
+        source_profile_id="default",
+        include_personal=True,
+    )
+    assert result.get("personal") is True
+    default_personal = json.loads(
+        (profile_home / "data" / "personal.json").read_text(encoding="utf-8")
+    )
+    other_personal = json.loads((other / "data" / "personal.json").read_text(encoding="utf-8"))
+    assert default_personal["personal"]["steam:imported"]["status"] == "playing"
+    assert "steam:imported" not in other_personal.get("personal", {})
+    assert other_personal["personal"]["steam:keep"]["status"] == "backlog"
+    # Pin must be cleared after import.
+    assert profile_paths._request_profile_id.get() is None

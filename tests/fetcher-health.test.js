@@ -957,6 +957,8 @@ describe('lane-aware queue slots', () => {
     expect(fetcherRunner.isQueueFullForKey('steam')).toBe(true);
     expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(false);
     expect(fetcherRunner.getLastServerInFlight()).toBe(true);
+    expect(fetcherRunner.queueOwnerLabelForKey('amazon')).toMatch(/Steam/i);
+    expect(fetcherRunner.queueFullMessageForKey('amazon')).toMatch(/Steam/i);
   });
 
   it('enrich lane busy blocks enrich keys only', () => {
@@ -965,6 +967,8 @@ describe('lane-aware queue slots', () => {
     });
     expect(fetcherRunner.isQueueFullForKey('hltb')).toBe(true);
     expect(fetcherRunner.isQueueFullForKey('steam')).toBe(false);
+    expect(fetcherRunner.queueOwnerLabelForKey('hltb')).toBe('HLTB');
+    expect(fetcherRunner.queueFullMessageForKey('hltb')).toMatch(/HLTB is running/);
   });
 
   it('both lanes busy block both key types', () => {

@@ -15,7 +15,7 @@ export const LOG_PANEL_CHROME_HTML = `
           <span class="fh-log-title" data-role="title">Fetcher log</span>
           <span class="fh-log-status" data-role="status" aria-live="polite">idle</span>
         </div>
-        <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel" title="Stop all queued and running fetchers (Shift+click: force reset queue)">Cancel</button>
+        <button type="button" class="fh-log-btn fh-log-btn-cancel hidden" data-role="cancel" title="Stop all queued and running fetchers and enrichers (Shift+click: force-reset both lanes)">Cancel</button>
         <button type="button" class="fh-log-btn" data-role="clear" title="Clear log output (does not stop running fetchers)">Clear</button>
         <button type="button" class="fh-log-btn fh-log-toggle" data-role="close" aria-expanded="true" aria-label="Collapse log panel" title="Collapse log panel"><span class="fh-log-toggle-icon" aria-hidden="true">&#9662;</span></button>
       </div>

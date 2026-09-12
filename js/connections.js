@@ -2073,6 +2073,12 @@ async function enableLocalProvider(provider) {
   renderReconnectBanner();
 
   await refreshConnections();
+
+  if (log && provider === "amazon") {
+    log.classList.remove("hidden");
+    log.textContent =
+      "Amazon launcher connected. Refresh the Amazon chip manually - launcher sources do not auto-fetch.";
+  }
 }
 
 async function cancelBrowserConnect(provider) {

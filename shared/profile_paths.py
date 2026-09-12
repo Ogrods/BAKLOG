@@ -22,13 +22,22 @@ _request_profile_id: contextvars.ContextVar[str | None] = contextvars.ContextVar
 )
 
 
-def set_request_profile_id(profile_id: str | None) -> None:
-    """Pin active profile for the current HTTP request (Supabase auth)."""
-    _request_profile_id.set(profile_id)
+def set_request_profile_id(profile_id: str | None) -> contextvars.Token[str | None]:
+    """Pin active profile for the current HTTP request (Supabase auth).
+
+    Returns the ``ContextVar`` token so callers can ``token.reset()`` and restore
+    any prior pin instead of unconditionally clearing to ``None``.
+    """
+    return _request_profile_id.set(profile_id)
 
 
 def clear_request_profile_id() -> None:
     _request_profile_id.set(None)
+
+
+def reset_request_profile_id(token: contextvars.Token[str | None]) -> None:
+    """Restore the pin that was active before ``set_request_profile_id``."""
+    _request_profile_id.reset(token)
 
 
 # Bound at import; shared.install_paths.data_root() runs legacy migration on first call.

@@ -572,5 +572,46 @@ def test_import_pins_request_profile_across_index_switch(
     assert default_personal["personal"]["steam:imported"]["status"] == "playing"
     assert "steam:imported" not in other_personal.get("personal", {})
     assert other_personal["personal"]["steam:keep"]["status"] == "backlog"
-    # Pin must be cleared after import.
+    # No outer pin: reset restores the ContextVar default (None).
     assert profile_paths._request_profile_id.get() is None
+
+
+def test_import_restores_outer_request_profile_pin(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Import must not wipe a caller-owned request profile pin on exit."""
+    monkeypatch.setattr(
+        "shared.supabase_auth.verify_bearer_user",
+        lambda *_a, **_k: {"id": "u", "email": "a@b.c"},
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "list_remote_mirror_artifacts",
+        lambda **_: [{"path": "data/personal.json"}],
+    )
+    monkeypatch.setattr(
+        cloud_mirror,
+        "download_remote_mirror_artifact",
+        lambda **_: json.dumps(
+            {
+                "personal": {"steam:imported": {"status": "playing"}},
+                "prefs": {},
+                "manual": [],
+                "libraryFirstSeen": {},
+                "schema_version": 1,
+            }
+        ).encode(),
+    )
+    monkeypatch.setattr("shared.server_personal._rebind_after_save", lambda: None)
+
+    outer = profile_paths.set_request_profile_id("outer-caller-pin")
+    try:
+        result = import_remote_mirror_to_profile(
+            authorization="Bearer x",
+            source_profile_id="default",
+            include_personal=True,
+        )
+        assert result.get("personal") is True
+        assert profile_paths._request_profile_id.get() == "outer-caller-pin"
+    finally:
+        profile_paths.reset_request_profile_id(outer)

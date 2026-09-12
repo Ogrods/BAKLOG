@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
+from fetchers._progress import EXIT_CODE_AUTH
 from fetchers.fetch_epic_wishlist import (
     _build_row,
     parse_wishlist_sources,
 )
+from auth.epic_wishlist_session import storefront_auth_error_message
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "epic_wishlist_graphql.json"
 
@@ -45,3 +48,57 @@ def test_build_row_schema() -> None:
     assert row["epic_offer_id"] == "offer-aaa"
     assert "epicgames.com" in row["store_url"]
     assert row["price"] == "$19.99"
+
+
+def test_main_auth_abort_cf_page_exit_4(monkeypatch) -> None:
+    import fetchers.fetch_epic_wishlist as fetch_mod
+
+    cf_html = (
+        "<html><head><title>Just a moment...</title></head>"
+        "<body><div class='cf_challenge_container'>Checking your browser</div></body></html>"
+    )
+    wishlist_url = "https://store.epicgames.com/en-US/wishlist"
+    marked: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        fetch_mod,
+        "run_with_heartbeat",
+        lambda fn, _label: (cf_html, wishlist_url, []),
+    )
+    monkeypatch.setattr(
+        fetch_mod,
+        "mark_invalid",
+        lambda provider, *, error="": marked.append((provider, error)),
+    )
+    monkeypatch.setattr(sys, "argv", ["fetch_epic_wishlist"])
+    assert fetch_mod.main() == EXIT_CODE_AUTH
+    assert marked and marked[0][0] == "epic_wishlist"
+    assert "Cloudflare" in marked[0][1]
+    assert "Cloudflare" in storefront_auth_error_message(cf_html, wishlist_url)
+
+
+def test_main_auth_abort_signed_out_exit_4(monkeypatch) -> None:
+    import fetchers.fetch_epic_wishlist as fetch_mod
+
+    html = (
+        "<html><body><a href='/login'>Sign in</a>"
+        "<button>Continue</button></body></html>"
+    )
+    home_url = "https://store.epicgames.com/?lang=en-US"
+    marked: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        fetch_mod,
+        "run_with_heartbeat",
+        lambda fn, _label: (html, home_url, []),
+    )
+    monkeypatch.setattr(
+        fetch_mod,
+        "mark_invalid",
+        lambda provider, *, error="": marked.append((provider, error)),
+    )
+    monkeypatch.setattr(sys, "argv", ["fetch_epic_wishlist"])
+    assert fetch_mod.main() == EXIT_CODE_AUTH
+    assert marked and marked[0][0] == "epic_wishlist"
+    assert "Cloudflare" not in marked[0][1]
+    assert "session" in marked[0][1].lower() or "bounced" in marked[0][1].lower()

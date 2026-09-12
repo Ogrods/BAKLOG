@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Epic Games Store</title>
+</head>
+<body>
+  <!-- Sanitized storefront home fixture for CF false-positive guard (signed-out / bounced home). -->
+  <header>
+    <a href="/login">Sign in</a>
+    <button type="button">Wishlist</button>
+  </header>
+  <main>
+    <h1>Epic Games Store</h1>
+    <p>Discover your next favorite game.</p>
+    <script>
+      // Bundles often reference cdn-cgi challenge-platform scripts without an active challenge page.
+      a.src = "/cdn-cgi/challenge-platform/scripts/jsd/main.js";
+    </script>
+  </main>
+</body>
+</html>

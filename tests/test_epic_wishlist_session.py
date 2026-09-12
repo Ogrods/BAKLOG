@@ -19,7 +19,9 @@ from auth.epic_wishlist_session import (
     wishlist_graphql_ok,
 )
 
-DUMP_HTML = Path(__file__).resolve().parents[1] / "cache" / "epic" / "wishlist_dump.html"
+DUMP_HTML = (
+    Path(__file__).resolve().parent / "fixtures" / "epic" / "store_home_signed_out.html"
+)
 
 
 def test_wishlist_graphql_ok_ignores_toast_only_graphql() -> None:
@@ -120,6 +122,20 @@ def test_cloudflare_interstitial_not_normal_epic_login_html() -> None:
     assert not cloudflare_interstitial(login_html, "https://www.epicgames.com/id/login")
 
 
+def test_cloudflare_interstitial_not_login_with_embedded_cf_chl_opt() -> None:
+    """Login SPA can dump _cf_chl_opt into a form error without being a challenge page."""
+    login_html = (
+        "<html><head><title>Sign in to your Epic Games account</title></head>"
+        "<body><form><input name='email'/><button>Continue</button></form>"
+        "<div class='form-error'>Enable JavaScript and cookies to continue"
+        "<script>window._cf_chl_opt={cType: 'managed'};</script></div>"
+        "</body></html>"
+    )
+    login_url = "https://www.epicgames.com/id/login"
+    assert not cloudflare_interstitial(login_html, login_url)
+    assert cloudflare_embedded_challenge(login_html)
+
+
 def test_cloudflare_interstitial_not_store_home_js_bundle() -> None:
     snippet = (
         "<html><body><script>"
@@ -133,8 +149,7 @@ def test_cloudflare_interstitial_not_store_home_js_bundle() -> None:
 
 
 def test_store_home_dump_html_not_cloudflare_false_positive() -> None:
-    if not DUMP_HTML.exists():
-        return
+    assert DUMP_HTML.is_file(), f"missing committed fixture: {DUMP_HTML}"
     html = DUMP_HTML.read_text(encoding="utf-8", errors="replace")
     url = "https://store.epicgames.com/?lang=en-US"
     assert not cloudflare_interstitial(html, url)

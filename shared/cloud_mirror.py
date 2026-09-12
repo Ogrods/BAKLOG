@@ -850,11 +850,12 @@ def import_remote_mirror_to_profile(
             backups[path] = None
     imported: list[str] = []
     personal_saved = False
-    from shared.profile_paths import clear_request_profile_id, set_request_profile_id
+    from shared.profile_paths import reset_request_profile_id, set_request_profile_id
 
     # Pin active profile for the write phase so a concurrent profile switch cannot
     # divert save_personal_doc() (no profile_id arg) into another profile root.
-    set_request_profile_id(pid)
+    # Reset the ContextVar token so any outer request pin is restored.
+    pin_token = set_request_profile_id(pid)
     try:
         catalogs: dict[str, Any] = {}
         for rel, doc in staged.items():
@@ -880,7 +881,7 @@ def import_remote_mirror_to_profile(
                 pass
         raise
     finally:
-        clear_request_profile_id()
+        reset_request_profile_id(pin_token)
     seen: set[str] = set()
     ordered: list[str] = []
     for name in imported:

@@ -13,13 +13,16 @@ import {
   dupeStampIdSet,
   filterClaimsItems,
   groupDuplicates,
+  isApprovedItem,
   isStaleAutoClaim,
   AUTO_HIDE_AGE_MS,
   looksLikeBonusClaim,
+  materializeApprovedIds,
   missingPublishFields,
   normTitleKey,
   pendingNeedsPublishEnrichment,
   reindexToFeedOrder,
+  resolveApprovedKeys,
   slugManualId,
   sortClaimsItems,
   stripClaimTitleDecorations,
@@ -139,6 +142,52 @@ describe('claimRowStatus', () => {
       { now, approvedIds: new Set(['itad-old']), approvedKeys, isAuto: true },
     );
     expect(st.publishState).toBe('will_publish');
+  });
+});
+
+describe('materializeApprovedIds', () => {
+  it('adds current feed ids that match approved selection by title key', () => {
+    const items = [
+      { id: 'itad-old', title: 'Rogue Waters', steam_appid: 123 },
+      { id: 'gp-new', title: 'Rogue Waters (Steam) Giveaway', steam_appid: 123 },
+      { id: 'other', title: 'Unrelated Game' },
+    ];
+    const { ids, added } = materializeApprovedIds(new Set(['itad-old']), items);
+    expect(added).toEqual(['gp-new']);
+    expect(ids.has('itad-old')).toBe(true);
+    expect(ids.has('gp-new')).toBe(true);
+    expect(ids.has('other')).toBe(false);
+  });
+
+  it('adds by steam appid when titles differ', () => {
+    const items = [
+      { id: 'a', title: 'Alpha', steam_appid: 42 },
+      { id: 'b', title: 'Alpha Deluxe Edition', steam_appid: 42 },
+    ];
+    const { ids, added } = materializeApprovedIds(new Set(['a']), items);
+    expect(added).toEqual(['b']);
+    expect([...ids].sort()).toEqual(['a', 'b']);
+  });
+
+  it('does not approve unrelated scrape rows', () => {
+    const items = [
+      { id: 'keep', title: 'Keep Me' },
+      { id: 'noise', title: 'Brand New Scrape' },
+    ];
+    const { ids, added } = materializeApprovedIds(new Set(['keep']), items);
+    expect(added).toEqual([]);
+    expect([...ids]).toEqual(['keep']);
+  });
+
+  it('aligns isApprovedItem with materialized ids', () => {
+    const items = [
+      { id: 'old', title: 'Control' },
+      { id: 'rekeyed', title: 'Control' },
+    ];
+    const { ids } = materializeApprovedIds(new Set(['old']), items);
+    const keys = resolveApprovedKeys(ids, items);
+    expect(isApprovedItem(items[1], ids, keys)).toBe(true);
+    expect(ids.has('rekeyed')).toBe(true);
   });
 });
 

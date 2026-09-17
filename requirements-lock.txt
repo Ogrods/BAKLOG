@@ -57,7 +57,7 @@ soupsieve==2.9.2
 termcolor==3.3.0
 typing_extensions==4.16.0
 urllib3==2.7.0
-websocket-client==1.9.0
+websocket-client==1.9.2
 WMI==1.5.1
 wrapt==2.2.1
 yarl==1.24.5

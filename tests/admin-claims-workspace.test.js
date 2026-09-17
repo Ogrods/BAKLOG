@@ -148,8 +148,8 @@ describe('claimRowStatus', () => {
 describe('materializeApprovedIds', () => {
   it('adds current feed ids that match approved selection by title key', () => {
     const items = [
-      { id: 'itad-old', title: 'Rogue Waters', steam_appid: 123 },
-      { id: 'gp-new', title: 'Rogue Waters (Steam) Giveaway', steam_appid: 123 },
+      { id: 'itad-old', title: 'Rogue Waters' },
+      { id: 'gp-new', title: 'Rogue Waters (Steam) Giveaway' },
       { id: 'other', title: 'Unrelated Game' },
     ];
     const { ids, added } = materializeApprovedIds(new Set(['itad-old']), items);

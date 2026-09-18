@@ -912,15 +912,16 @@ def _apply_field_overrides(
         if not overrides:
             # Fallback: match by normalized title when ID/key lookup failed.
             item_title = str(item.get("title") or "").strip()
+            item_norm = ""
             if item_title:
                 item_norm = norm_title(item_title)
                 overrides = override_by_norm.get(item_norm)
             # Substring fallback: if the override title is a cleaned-up
             # version of the source title (e.g. edit removed "(Stove)"),
             # the exact norms won't match. Check containment both ways.
-            if not overrides:
+            if not overrides and item_norm:
                 for ov_norm, ov_val in override_by_norm.items():
-                    if ov_norm and item_norm and (ov_norm in item_norm or item_norm in ov_norm):
+                    if ov_norm and (ov_norm in item_norm or item_norm in ov_norm):
                         overrides = ov_val
                         break
         if not overrides:
@@ -1632,6 +1633,13 @@ def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
         doc["field_overrides"] = {
             k: v for k, v in field_overrides.items() if str(k).strip() not in expired_ids
         }
+    premium_only = doc.get("premium_only_ids")
+    if isinstance(premium_only, list):
+        doc["premium_only_ids"] = [
+            str(item_id).strip()
+            for item_id in premium_only
+            if str(item_id).strip() and str(item_id).strip() not in expired_ids
+        ]
     safe_write_text(path, json.dumps(doc, indent=2, ensure_ascii=False))
     return len(ids) - len(kept_ids)
 

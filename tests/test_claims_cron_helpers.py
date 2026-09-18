@@ -27,6 +27,37 @@ def test_synthesize_store_overrides_when_auto_differs() -> None:
     assert payload["store_overrides"] == {"m1": "epic_mobile"}
 
 
+def test_synthesize_field_overrides_when_auto_differs() -> None:
+    landing = [
+        {
+            "id": "m1",
+            "store": "epic",
+            "title": "Edited Title",
+            "claim_url": "https://edited.example/claim",
+            "ends_at": "2026-10-01T00:00:00Z",
+            "claim_urls": {"ios": "https://apps.apple.com/x"},
+        }
+    ]
+    auto = [
+        {
+            "id": "m1",
+            "store": "epic",
+            "title": "Original",
+            "claim_url": "https://auto.example/claim",
+            "ends_at": "2026-09-01T00:00:00Z",
+        }
+    ]
+    payload = synth.synthesize_approved(landing, auto_items=auto)
+    assert payload["field_overrides"] == {
+        "m1": {
+            "title": "Edited Title",
+            "claim_url": "https://edited.example/claim",
+            "ends_at": "2026-10-01T00:00:00Z",
+            "claim_urls": {"ios": "https://apps.apple.com/x"},
+        }
+    }
+
+
 def test_synthesize_cli_writes_file(tmp_path: Path) -> None:
     landing = tmp_path / "landing.json"
     out = tmp_path / "approved.json"

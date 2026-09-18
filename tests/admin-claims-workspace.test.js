@@ -12,6 +12,7 @@ import {
   dupeBadgeHtml,
   dupeStampIdSet,
   filterClaimsItems,
+  gameMatchKeys,
   groupDuplicates,
   isApprovedItem,
   isStaleAutoClaim,
@@ -712,6 +713,29 @@ describe('missingPublishFields', () => {
       title: 'Northgard',
       claim_urls: { ios: 'https://apps.apple.com/app/id123' },
     })).toEqual([]);
+  });
+});
+
+describe('gameMatchKeys', () => {
+  it('adds :mobile suffix for epic_mobile', () => {
+    const keys = gameMatchKeys({
+      store: 'epic_mobile',
+      title: 'Northgard',
+      steam_appid: 466560,
+    });
+    expect(keys.has('title:northgard:mobile')).toBe(true);
+    expect(keys.has('appid:466560:mobile')).toBe(true);
+  });
+
+  it('omits :mobile for desktop stores', () => {
+    const keys = gameMatchKeys({
+      store: 'epic',
+      title: 'Northgard',
+      steam_appid: 466560,
+    });
+    expect(keys.has('title:northgard')).toBe(true);
+    expect(keys.has('appid:466560')).toBe(true);
+    expect([...keys].some((k) => k.endsWith(':mobile'))).toBe(false);
   });
 });
 

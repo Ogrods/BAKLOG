@@ -189,6 +189,38 @@ describe('materializeApprovedIds', () => {
     expect(isApprovedItem(items[1], ids, keys)).toBe(true);
     expect(ids.has('rekeyed')).toBe(true);
   });
+
+  it('rematches via prior live/built rows when approved id left the scrape table', () => {
+    const priorItems = [
+      { id: 'orphan-approved', title: 'Mindcop', steam_appid: 999 },
+    ];
+    const items = [
+      { id: 'gp-new', title: 'Mindcop (Epic) Giveaway', steam_appid: 999 },
+      { id: 'noise', title: 'Unrelated' },
+    ];
+    const { ids, added } = materializeApprovedIds(
+      new Set(['orphan-approved']),
+      items,
+      {},
+      priorItems,
+    );
+    expect(added).toEqual(['gp-new']);
+    expect(ids.has('orphan-approved')).toBe(true);
+    expect(ids.has('gp-new')).toBe(true);
+    expect(ids.has('noise')).toBe(false);
+  });
+
+  it('does not rematch without prior rows when approved id is absent from items', () => {
+    const items = [
+      { id: 'gp-new', title: 'Mindcop', steam_appid: 999 },
+    ];
+    const { ids, added } = materializeApprovedIds(
+      new Set(['orphan-approved']),
+      items,
+    );
+    expect(added).toEqual([]);
+    expect([...ids]).toEqual(['orphan-approved']);
+  });
 });
 
 describe('normTitleKey', () => {

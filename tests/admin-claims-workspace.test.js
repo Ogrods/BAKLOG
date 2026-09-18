@@ -18,9 +18,11 @@ import {
   AUTO_HIDE_AGE_MS,
   looksLikeBonusClaim,
   materializeApprovedIds,
+  mergeCarriedApprovedRows,
   missingPublishFields,
   normTitleKey,
   pendingNeedsPublishEnrichment,
+  pruneDeadOrphanApprovals,
   reindexToFeedOrder,
   resolveApprovedKeys,
   slugManualId,
@@ -220,6 +222,45 @@ describe('materializeApprovedIds', () => {
     );
     expect(added).toEqual([]);
     expect([...ids]).toEqual(['orphan-approved']);
+  });
+});
+
+describe('pruneDeadOrphanApprovals', () => {
+  it('keeps approvals present in auto or live; drops inert orphans', () => {
+    const auto = [{ id: 'auto-1', title: 'A' }];
+    const live = [{ id: 'live-1', title: 'L' }];
+    const { ids, removed } = pruneDeadOrphanApprovals(
+      new Set(['auto-1', 'live-1', 'dead-orphan']),
+      auto,
+      live,
+    );
+    expect([...ids].sort()).toEqual(['auto-1', 'live-1']);
+    expect(removed).toEqual(['dead-orphan']);
+  });
+});
+
+describe('mergeCarriedApprovedRows', () => {
+  it('injects live rows for approved ids missing from auto', () => {
+    const auto = [{ id: 'auto-1', title: 'A' }];
+    const live = [
+      { id: 'carried-1', title: "Evan's Remains", claim_url: 'https://x' },
+    ];
+    const merged = mergeCarriedApprovedRows(
+      auto,
+      new Set(['auto-1', 'carried-1']),
+      live,
+    );
+    expect(merged).toHaveLength(2);
+    expect(merged[1].id).toBe('carried-1');
+    expect(merged[1]._carriedFromLive).toBe(true);
+  });
+
+  it('does not inject live rows that are not approved', () => {
+    const auto = [{ id: 'auto-1', title: 'A' }];
+    const live = [{ id: 'noise', title: 'Noise' }];
+    const merged = mergeCarriedApprovedRows(auto, new Set(['auto-1']), live);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].id).toBe('auto-1');
   });
 });
 

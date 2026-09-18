@@ -104,23 +104,24 @@ def norm_title(title: str) -> str:
 def claim_match_keys(item: dict) -> set[str]:
     """Stable dedup keys for matching a claim across feed id churn.
 
-    Sync pair: ``js/claimable.js`` ``claimDedupKey`` — the frontend picks one
-    key (appid first, else title); here we return a set so maintainer approval
-    can match when one row carries a ``steam_appid`` and the surviving row only
-    has a normalized title after a source flip.
+    Sync pair: ``js/claim-card.js`` ``claimDedupKey`` and admin
+    ``gameMatchKeys`` — appid/title, with ``:mobile`` suffix for epic_mobile
+    so desktop and mobile Epic rows do not collapse into each other.
     """
     keys: set[str] = set()
+    mobile = is_epic_mobile_store(item.get("store"))
+    suffix = ":mobile" if mobile else ""
     appid = item.get("steam_appid")
     if appid is not None:
         try:
             appid_int = int(appid)
             if appid_int:
-                keys.add(f"appid:{appid_int}")
+                keys.add(f"appid:{appid_int}{suffix}")
         except (TypeError, ValueError):
             pass
     title_norm = norm_title(str(item.get("title") or ""))
     if title_norm:
-        keys.add(f"title:{title_norm}")
+        keys.add(f"title:{title_norm}{suffix}")
     return keys
 
 

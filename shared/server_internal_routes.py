@@ -714,6 +714,20 @@ def handle_internal_discord_notify(handler: SimpleHTTPRequestHandler) -> None:
             continue
         title = str(claim.get("title") or "").strip() or "Unknown"
         url = str(claim.get("claim_url") or "").strip()
+        if not url:
+            urls = claim.get("claim_urls")
+            if isinstance(urls, dict):
+                for key in ("ios", "android", "pc"):
+                    candidate = str(urls.get(key) or "").strip()
+                    if candidate:
+                        url = candidate
+                        break
+                if not url:
+                    for candidate in urls.values():
+                        candidate = str(candidate or "").strip()
+                        if candidate:
+                            url = candidate
+                            break
         if url and not _is_safe_http_url(url):
             failures.append({"title": title, "error": "invalid_claim_url"})
             continue

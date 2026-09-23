@@ -1,33 +1,66 @@
 {
-  "generated_at": "2026-09-18T22:03:07.251855+00:00",
+  "generated_at": "2026-09-23T18:58:42.943203+00:00",
   "items": [
     {
       "id": "epic-mindcop-78e6c1",
       "store": "epic",
       "title": "Mindcop",
       "claim_url": "https://store.epicgames.com/en-US/p/mindcop-78e6c1",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/984cdc148ea6423e866ca6e04a1b429f/mindcop-kplp1.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1517180/header.jpg?t=1744981735",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-09-24T15:00:00Z",
       "steam_appid": 1517180,
       "review_percent": 94,
       "source": "epic",
-      "first_seen": "2026-09-17T19:18:10Z"
+      "first_seen": "2026-09-23T18:58:27Z"
     },
     {
       "id": "epic-shogun-showdown-61832d",
       "store": "epic",
       "title": "Shogun Showdown",
       "claim_url": "https://store.epicgames.com/en-US/p/shogun-showdown-61832d",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/450bcfdb9c00453394d7ccc2948ba5db/shogun-showdown-hz1yh.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2084000/header.jpg?t=1763395118",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-09-24T15:00:00Z",
       "steam_appid": 2084000,
       "review_percent": 95,
       "source": "epic",
-      "first_seen": "2026-09-17T19:18:10Z"
+      "first_seen": "2026-09-23T18:58:27Z"
+    },
+    {
+      "id": "gamerpower-3778",
+      "store": "ubisoft",
+      "title": "FOR HONOR (Ubisoft) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/for-honor-ubisoft-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/304390/65a6661529025663339f27c352d2b2223ad21083/header_alt_assets_11.jpg?t=1790099226",
+      "genres": [],
+      "blurb": "Ubisoft is back with another amazing giveaway! Claim FOR HONOR for free via Ubisoft Store! For Honor is a popular team-based PvP melee fighting game with endless battles. Don´t miss it!",
+      "ends_at": "2026-09-28T23:59:00Z",
+      "steam_appid": 304390,
+      "review_percent": 69,
+      "source": "gamerpower",
+      "first_seen": "2026-09-23T18:58:27Z"
+    },
+    {
+      "id": "itad-9b5ab8407e1d",
+      "store": "steam",
+      "title": "Dying Light: The Beast - Discharge Weapon Pack on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16587/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4355480/4f140de54ebd2306321005daaab93a2ba8fc9457/header.jpg?t=1789400832",
+      "genres": [
+        "Action",
+        "Adventure",
+        "RPG"
+      ],
+      "blurb": "Dying Light: The Beast - Discharge Weapon Pack",
+      "ends_at": "2026-10-01T19:18:10Z",
+      "steam_appid": 4355480,
+      "review_percent": 82,
+      "source": "itad",
+      "first_seen": "2026-09-23T18:58:27Z",
+      "premium_only": true
     },
     {
       "id": "gamerpower-3784",
@@ -47,6 +80,20 @@
       "first_seen": "2026-09-18T18:25:38Z"
     },
     {
+      "id": "itad-3258e18ac3e8",
+      "store": "itch",
+      "title": "Gamers Club Repeat free on Itch.io",
+      "claim_url": "https://isthereanydeal.com/giveaways/16560/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4127870/a6f7b156c9b41b1375eb79223a793685a5697472/header.jpg?t=1784136478",
+      "genres": [],
+      "blurb": "Gamers Club Repeat",
+      "ends_at": "2026-10-01T19:18:10Z",
+      "steam_appid": 4127870,
+      "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-09-17T19:18:10Z"
+    },
+    {
       "id": "gamerpower-3779",
       "store": "steam",
       "title": "Space Menace (Steam) Giveaway",
@@ -63,84 +110,6 @@
       "steam_appid": 2000040,
       "review_percent": 54,
       "source": "gamerpower",
-      "first_seen": "2026-09-17T19:18:10Z"
-    },
-    {
-      "id": "gamerpower-3778",
-      "store": "ubisoft",
-      "title": "FOR HONOR (Ubisoft) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/for-honor-ubisoft-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aa94d05ac575.jpg",
-      "genres": [],
-      "blurb": "Ubisoft is back with another amazing giveaway! Claim FOR HONOR for free via Ubisoft Store! For Honor is a popular team-based PvP melee fighting game with endless battles. Don´t miss it!",
-      "ends_at": "2026-09-28T23:59:00Z",
-      "steam_appid": 304390,
-      "review_percent": 69,
-      "source": "gamerpower",
-      "first_seen": "2026-09-17T19:18:10Z"
-    },
-    {
-      "id": "gamerpower-3776",
-      "store": "steam",
-      "title": "Crystal Crisis (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/crystal-crisis-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aa7d795dadd3.jpg",
-      "genres": [
-        "Action",
-        "Casual"
-      ],
-      "blurb": "Score Crystal Crisis for free via Steam! Crystal Crisis is a fun puzzle game with an all-star cast of heroes! Don´t miss this amazing game!",
-      "ends_at": "2026-09-22T23:59:00Z",
-      "steam_appid": 447700,
-      "review_percent": 72,
-      "source": "gamerpower",
-      "first_seen": "2026-09-17T19:18:10Z"
-    },
-    {
-      "id": "gamerpower-3324",
-      "store": "indiegala",
-      "title": "Battle Ram (IndieGala) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/battle-ram-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68efabd65f913.jpg",
-      "genres": [],
-      "blurb": "Become the battle lamb you were born to be! Battle Ram is free this week on IndieGala, download it now! Battle Ram is a 2d action-packed game with lambs and battling robots.",
-      "ends_at": "2026-09-21T21:47:23Z",
-      "steam_appid": 1262060,
-      "review_percent": 84,
-      "source": "gamerpower",
-      "first_seen": "2026-09-17T18:55:46Z"
-    },
-    {
-      "id": "itad-9b5ab8407e1d",
-      "store": "steam",
-      "title": "Dying Light: The Beast - Discharge Weapon Pack on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16587/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4355480/4f140de54ebd2306321005daaab93a2ba8fc9457/header.jpg?t=1789400832",
-      "genres": [
-        "Action",
-        "Adventure",
-        "RPG"
-      ],
-      "blurb": "Dying Light: The Beast - Discharge Weapon Pack",
-      "ends_at": "2026-10-01T19:18:10Z",
-      "steam_appid": 4355480,
-      "review_percent": 91,
-      "source": "itad",
-      "first_seen": "2026-09-17T19:18:10Z",
-      "premium_only": true
-    },
-    {
-      "id": "itad-3258e18ac3e8",
-      "store": "itch",
-      "title": "Gamers Club Repeat free on Itch.io",
-      "claim_url": "https://isthereanydeal.com/giveaways/16560/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4127870/a6f7b156c9b41b1375eb79223a793685a5697472/header.jpg?t=1784136478",
-      "genres": [],
-      "blurb": "Gamers Club Repeat",
-      "ends_at": "2026-10-01T19:18:10Z",
-      "steam_appid": 4127870,
-      "review_percent": 100,
-      "source": "itad",
       "first_seen": "2026-09-17T19:18:10Z"
     }
   ],

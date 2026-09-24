@@ -31,7 +31,7 @@ packaging==26.3
 pefile==2024.8.26
 pillow==12.3.0
 pluggy==1.6.0
-propcache==0.5.2
+propcache==0.5.4
 psnawp==3.0.3
 pycountry==26.2.16
 pycparser==3.0

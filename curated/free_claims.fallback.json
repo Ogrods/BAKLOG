@@ -1,69 +1,75 @@
 {
-  "generated_at": "2026-09-18T22:03:07.251855+00:00",
+  "generated_at": "2026-09-24T18:09:29.584173+00:00",
   "items": [
     {
-      "id": "epic-mindcop-78e6c1",
+      "id": "epic-astrea-six-sided-oracles-33c949",
       "store": "epic",
-      "title": "Mindcop",
-      "claim_url": "https://store.epicgames.com/en-US/p/mindcop-78e6c1",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/984cdc148ea6423e866ca6e04a1b429f/mindcop-kplp1.jpg",
+      "title": "Astrea Six Sided Oracles",
+      "claim_url": "https://store.epicgames.com/en-US/p/astrea-six-sided-oracles-33c949",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/4515173972ae4444a2582bc690c150bd/astrea-six-sided-oracles-offer-bvy0n.png",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-09-24T15:00:00Z",
-      "steam_appid": 1517180,
-      "review_percent": 94,
+      "ends_at": "2026-10-01T15:00:00Z",
+      "steam_appid": 1755830,
       "source": "epic",
-      "first_seen": "2026-09-17T19:18:10Z"
+      "first_seen": "2026-09-24T18:07:35Z"
     },
     {
-      "id": "epic-shogun-showdown-61832d",
+      "id": "epic-mechabellum-88a843",
       "store": "epic",
-      "title": "Shogun Showdown",
-      "claim_url": "https://store.epicgames.com/en-US/p/shogun-showdown-61832d",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/450bcfdb9c00453394d7ccc2948ba5db/shogun-showdown-hz1yh.jpg",
+      "title": "Mechabellum",
+      "claim_url": "https://store.epicgames.com/en-US/p/mechabellum-88a843",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/131adc2288294d74aaff6a2f02b51d59/mechabellum-95319.jpg",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-09-24T15:00:00Z",
-      "steam_appid": 2084000,
+      "ends_at": "2026-10-01T15:00:00Z",
+      "steam_appid": 669330,
+      "source": "epic",
+      "first_seen": "2026-09-24T18:07:35Z"
+    },
+    {
+      "id": "gamerpower-3788",
+      "store": "other",
+      "title": "Hamster Talk (Stove) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/hamster-talk-stove-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3985130/6c45ee8e034f6f78c3dac577626174b02d798c10/header.jpg?t=1789548719",
+      "genres": [],
+      "blurb": "Always wanted to have hamsters? Don’t miss out on this amazing giveaway! Score Hamster Talk for free on Stove! Hamster Talk is a 2d idle game where adorable hamsters live and move right on your screen. Don´t miss it!",
+      "ends_at": "2026-09-29T23:59:00Z",
+      "steam_appid": 3985130,
       "review_percent": 95,
-      "source": "epic",
-      "first_seen": "2026-09-17T19:18:10Z"
+      "source": "gamerpower",
+      "first_seen": "2026-09-24T18:07:35Z",
+      "premium_only": true
     },
     {
-      "id": "gamerpower-3784",
-      "store": "steam",
-      "title": "Deadshot (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/deadshot-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/bbb.jpg",
-      "genres": [
-        "Action",
-        "Indie"
-      ],
-      "blurb": "Score Deadshot for free via Steam! Deadshot is a 3d retro styled first-person shooter game inspired from classics like Doom and Quake.",
-      "ends_at": "2026-09-23T23:59:00Z",
-      "steam_appid": 2484180,
+      "id": "gamerpower-3787",
+      "store": "other",
+      "title": "Rush Rush Red Shoes (Stove) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/rush-rush-red-shoes-stove-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3660140/457121024dce32ff2ab90c9d411f96d502bdcfbb/header.jpg?t=1745998520",
+      "genres": [],
+      "blurb": "Claim Rush Rush Red Shoes for free via Stove! Rush Rush Red Shoes is a 2d rogue-lite shooting racing game where you attack enemies by increasing your movement speed.",
+      "ends_at": "2026-10-09T23:59:00Z",
+      "steam_appid": 3660140,
       "review_percent": 100,
       "source": "gamerpower",
-      "first_seen": "2026-09-18T18:25:38Z"
+      "first_seen": "2026-09-24T18:07:35Z",
+      "premium_only": true
     },
     {
-      "id": "gamerpower-3779",
-      "store": "steam",
-      "title": "Space Menace (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/space-menace-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aaad50c2b7d4.jpg",
-      "genres": [
-        "Action",
-        "Indie",
-        "Simulation",
-        "Strategy"
-      ],
-      "blurb": "New Steam giveaway to improve your day! Claim Space Menace for FREE via Steam! Space Menace is a 2d Sci-Fi space RTS game with multiple paths to progress. Check it out!",
-      "ends_at": "2026-09-23T23:59:00Z",
-      "steam_appid": 2000040,
-      "review_percent": 54,
+      "id": "gamerpower-3322",
+      "store": "indiegala",
+      "title": "Sausage Hunter (Indiegala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/sausage-hunter-pc-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1296880/f5a9d4ef70e56a884922b29906aa3df96285bbb6/header.jpg?t=1780037913",
+      "genres": [],
+      "blurb": "The hunt for the magic sausage starts now! Download Sausage Hunter for free on IndieGala. Sausage Hunter is a 2D platformer with hand-drawn graphics and intriguing puzzles... plus a kitten and sausages, for some reason.",
+      "ends_at": "2026-10-08T18:07:35Z",
+      "steam_appid": 1296880,
+      "review_percent": 80,
       "source": "gamerpower",
-      "first_seen": "2026-09-17T19:18:10Z"
+      "first_seen": "2026-09-24T18:07:35Z"
     },
     {
       "id": "gamerpower-3778",
@@ -80,35 +86,18 @@
       "first_seen": "2026-09-17T19:18:10Z"
     },
     {
-      "id": "gamerpower-3776",
-      "store": "steam",
-      "title": "Crystal Crisis (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/crystal-crisis-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aa7d795dadd3.jpg",
-      "genres": [
-        "Action",
-        "Casual"
-      ],
-      "blurb": "Score Crystal Crisis for free via Steam! Crystal Crisis is a fun puzzle game with an all-star cast of heroes! Don´t miss this amazing game!",
-      "ends_at": "2026-09-22T23:59:00Z",
-      "steam_appid": 447700,
-      "review_percent": 72,
-      "source": "gamerpower",
-      "first_seen": "2026-09-17T19:18:10Z"
-    },
-    {
-      "id": "gamerpower-3324",
-      "store": "indiegala",
-      "title": "Battle Ram (IndieGala) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/battle-ram-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68efabd65f913.jpg",
+      "id": "itad-3258e18ac3e8",
+      "store": "itch",
+      "title": "Gamers Club Repeat free on Itch.io",
+      "claim_url": "https://isthereanydeal.com/giveaways/16560/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4127870/a6f7b156c9b41b1375eb79223a793685a5697472/header.jpg?t=1784136478",
       "genres": [],
-      "blurb": "Become the battle lamb you were born to be! Battle Ram is free this week on IndieGala, download it now! Battle Ram is a 2d action-packed game with lambs and battling robots.",
-      "ends_at": "2026-09-21T21:47:23Z",
-      "steam_appid": 1262060,
-      "review_percent": 84,
-      "source": "gamerpower",
-      "first_seen": "2026-09-17T18:55:46Z"
+      "blurb": "Gamers Club Repeat",
+      "ends_at": "2026-10-01T19:18:10Z",
+      "steam_appid": 4127870,
+      "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-09-17T19:18:10Z"
     },
     {
       "id": "itad-9b5ab8407e1d",
@@ -128,20 +117,6 @@
       "source": "itad",
       "first_seen": "2026-09-17T19:18:10Z",
       "premium_only": true
-    },
-    {
-      "id": "itad-3258e18ac3e8",
-      "store": "itch",
-      "title": "Gamers Club Repeat free on Itch.io",
-      "claim_url": "https://isthereanydeal.com/giveaways/16560/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4127870/a6f7b156c9b41b1375eb79223a793685a5697472/header.jpg?t=1784136478",
-      "genres": [],
-      "blurb": "Gamers Club Repeat",
-      "ends_at": "2026-10-01T19:18:10Z",
-      "steam_appid": 4127870,
-      "review_percent": 100,
-      "source": "itad",
-      "first_seen": "2026-09-17T19:18:10Z"
     }
   ],
   "attribution": [

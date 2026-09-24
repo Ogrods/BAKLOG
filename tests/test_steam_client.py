@@ -74,8 +74,13 @@ def test_get_app_details_uses_retry(tmp_path) -> None:
     ok.status_code = 200
     ok.json.return_value = {"70": {"success": True, "data": {"type": "game", "name": "Half-Life"}}}
     ok.raise_for_status = MagicMock()
-    with patch("clients.steam_client._get_with_retry", return_value=ok):
-        result = client.get_app_details(70, refresh=True)
+    # Patch the globals SteamClient actually resolves: other tests pop
+    # clients.steam_client from sys.modules, so a dotted-path patch can miss.
+    fake_get = MagicMock(return_value=ok)
+    with patch.dict(SteamClient.get_app_details.__globals__, {"_get_with_retry": fake_get}):
+        with patch.object(SteamClient, "_throttle_store"):
+            result = client.get_app_details(70, refresh=True)
+    fake_get.assert_called_once()
     assert result is not None
     assert result["success"] is True
     assert result["data"]["name"] == "Half-Life"

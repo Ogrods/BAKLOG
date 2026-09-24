@@ -60,4 +60,4 @@ urllib3==2.7.0
 websocket-client==1.9.2
 WMI==1.5.1
 wrapt==2.4.1
-yarl==1.24.5
+yarl==1.25.1

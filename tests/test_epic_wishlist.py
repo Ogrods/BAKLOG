@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from auth.epic_wishlist_session import storefront_auth_error_message
 from fetchers._progress import EXIT_CODE_AUTH
@@ -46,7 +47,8 @@ def test_build_row_schema() -> None:
     assert row["id"] == "epic-fn:offer-aaa"
     assert row["epic_namespace"] == "fn"
     assert row["epic_offer_id"] == "offer-aaa"
-    assert "epicgames.com" in row["store_url"]
+    host = urlparse(row["store_url"]).hostname or ""
+    assert host == "epicgames.com" or host.endswith(".epicgames.com")
     assert row["price"] == "$19.99"
 
 

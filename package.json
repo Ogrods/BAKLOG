@@ -54,6 +54,6 @@
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.1"
   }
 }

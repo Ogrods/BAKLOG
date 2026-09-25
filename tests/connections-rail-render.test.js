@@ -316,10 +316,74 @@ describe('cloud mirror prefs visibility', () => {
         </div>
         <p id="cloudMirrorUploadStatus" hidden></p>
       </div>
+      <div id="connDealAlertPrefs" hidden>
+        <input id="dealAlertsEnabledToggle" type="checkbox" />
+      </div>
       <div id="connLayout"></div>
       </div>
     `;
   }
+
+  async function mockProAccount(status, settings) {
+    const auth = await import('../js/auth-gate.js');
+    const caps = await import('../js/pro-capabilities.js');
+    vi.mocked(auth.proFeaturesUnlocked).mockReturnValue(true);
+    vi.mocked(auth.isAccountAuthMode).mockReturnValue(true);
+    vi.mocked(auth.getAccessToken).mockReturnValue('tok');
+    vi.mocked(caps.capabilityStatus).mockImplementation((id) => status[id] ?? 'soon');
+    vi.mocked(caps.getProSettings).mockReturnValue(settings);
+    return caps;
+  }
+
+  it('hides the deal alerts toggle unless the capability is live', async () => {
+    mountCloudPrefsDom();
+    await mockProAccount({ cloud_sync_mirror: 'live' }, { cloudMirrorEnabled: false });
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+    expect(document.getElementById('connDealAlertPrefs')?.hidden).toBe(true);
+  });
+
+  it('hides the deal alerts toggle for free accounts', async () => {
+    mountCloudPrefsDom();
+    await mockProAccount({ deal_watchlist_alerts: 'live' }, { dealAlertsEnabled: true });
+    const auth = await import('../js/auth-gate.js');
+    vi.mocked(auth.proFeaturesUnlocked).mockReturnValue(false);
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+    expect(document.getElementById('connDealAlertPrefs')?.hidden).toBe(true);
+  });
+
+  it('shows the deal alerts toggle reflecting the saved setting', async () => {
+    mountCloudPrefsDom();
+    await mockProAccount({ deal_watchlist_alerts: 'live' }, { dealAlertsEnabled: true });
+    const { refreshConnections } = await import('../js/connections.js');
+    await refreshConnections();
+    expect(document.getElementById('connDealAlertPrefs')?.hidden).toBe(false);
+    expect(document.getElementById('dealAlertsEnabledToggle')?.checked).toBe(true);
+  });
+
+  it('toggling deal alerts PUTs dealAlertsEnabled and stores the response', async () => {
+    mountCloudPrefsDom();
+    const caps = await mockProAccount({ deal_watchlist_alerts: 'live' }, { dealAlertsEnabled: false });
+    const api = await import('../js/api-client.js');
+    const fetchSpy = vi.mocked(api.baklogFetch);
+    fetchSpy.mockClear();
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ proSettings: { cloudMirrorEnabled: false, dealAlertsEnabled: true } }),
+    });
+    const mod = await import('../js/connections.js');
+    mod.wireConnectionsUi();
+    await mod.refreshConnections();
+    const toggle = document.getElementById('dealAlertsEnabledToggle');
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    const put = fetchSpy.mock.calls.find((c) => c[0] === '/api/pro/settings');
+    expect(put?.[1]?.method).toBe('PUT');
+    expect(JSON.parse(put[1].body)).toEqual({ dealAlertsEnabled: true });
+    expect(caps.setProSettings).toHaveBeenCalledWith({ cloudMirrorEnabled: false, dealAlertsEnabled: true });
+  });
 
   it('hides cloud sync controls when capability is soon', async () => {
     mountCloudPrefsDom();

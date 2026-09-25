@@ -23,6 +23,7 @@ def files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Path]:
     monkeypatch.setattr(da, "state_path", lambda profile_id=None: paths["state"])
     monkeypatch.setattr(da, "itad_path", lambda profile_id=None: paths["itad"])
     monkeypatch.setattr(da, "free_claims_path", lambda profile_id=None: paths["claims"])
+    monkeypatch.setattr(da, "alerts_enabled", lambda profile_id=None: True)
     return paths
 
 
@@ -200,6 +201,31 @@ def test_entry_points_never_raise(files, monkeypatch: pytest.MonkeyPatch):
     assert da.scan(pro=True) == 0
     assert da.take_pending() == []
     assert da.ack(["x"]) == 0
+
+
+def test_disabled_refreshes_snapshot_without_queueing(files):
+    _itad(files, **{"wishlist:1": _row(10.0)})
+    _claims(files, _claim("Seed"))
+    da.scan(pro=True, enabled=False, now=NOW)
+    _itad(files, **{"wishlist:1": _row(5.0)})
+    _claims(files, _claim("Seed"), _claim("New"))
+    assert da.scan(pro=True, enabled=False, now=NOW) == 0
+    assert da.load_state()["price_snapshot"]["wishlist:1"]["price"] == 5.0
+    assert da.scan(pro=True, enabled=True, now=NOW) == 0
+    assert da.take_pending() == []
+
+
+def test_alerts_enabled_requires_opt_in_and_pro(monkeypatch: pytest.MonkeyPatch):
+    import shared.pro_settings as ps
+
+    monkeypatch.setattr(ps, "read_pro_settings", lambda **_k: {"dealAlertsEnabled": True})
+    monkeypatch.setattr(da, "_default_pro", lambda: True)
+    assert da.alerts_enabled() is True
+    monkeypatch.setattr(da, "_default_pro", lambda: False)
+    assert da.alerts_enabled() is False
+    monkeypatch.setattr(da, "_default_pro", lambda: True)
+    monkeypatch.setattr(ps, "read_pro_settings", lambda **_k: {"cloudMirrorEnabled": True})
+    assert da.alerts_enabled() is False
 
 
 def test_missing_sources_are_a_noop(files):

@@ -258,22 +258,45 @@ def _default_pro() -> bool:
         return False
 
 
-def scan(profile_id: str | None = None, *, pro: bool | None = None, now: datetime | None = None) -> int:
-    """Scan both sources and persist; returns the number of newly queued events."""
+def alerts_enabled(profile_id: str | None = None) -> bool:
+    """Pro plan and the ``dealAlertsEnabled`` opt-in (off by default)."""
+    try:
+        from shared.pro_settings import read_pro_settings
+
+        if read_pro_settings(profile_id=profile_id).get("dealAlertsEnabled") is not True:
+            return False
+    except Exception:
+        return False
+    return _default_pro()
+
+
+def scan(
+    profile_id: str | None = None,
+    *,
+    pro: bool | None = None,
+    enabled: bool | None = None,
+    now: datetime | None = None,
+) -> int:
+    """Scan both sources and persist; returns the number of newly queued events.
+
+    While alerts are off the snapshot still refreshes but nothing is queued, so
+    turning alerts on later never replays drops that happened in the meantime.
+    """
     try:
         now = now or _now()
         itad_doc = _read_json(itad_path(profile_id=profile_id))
         claims_doc = _read_json(free_claims_path(profile_id=profile_id))
         is_pro = _default_pro() if pro is None else pro
+        emit = alerts_enabled(profile_id) if enabled is None else enabled
         with _LOCK:
             state = load_state(profile_id)
             seeded: dict = state["seeded"]
             queued = 0
             if itad_doc is not None:
-                queued += len(scan_prices(state, itad_doc, emit="prices" in seeded, now=now))
+                queued += len(scan_prices(state, itad_doc, emit=emit and "prices" in seeded, now=now))
                 seeded.setdefault("prices", _iso(now))
             if claims_doc is not None:
-                queued += len(scan_claims(state, claims_doc, pro=is_pro, emit="claims" in seeded, now=now))
+                queued += len(scan_claims(state, claims_doc, pro=is_pro, emit=emit and "claims" in seeded, now=now))
                 seeded.setdefault("claims", _iso(now))
             if seeded and not state["seeded_at"]:
                 state["seeded_at"] = _iso(now)

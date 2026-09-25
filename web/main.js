@@ -42,7 +42,7 @@
       form.querySelector(".form-reassure").remove();
       msg.className = "form-msg ok";
       msg.textContent =
-        "Check your inbox for the download link. The open beta is ready now.";
+        "Check your inbox for the download link.";
     } catch {
       btn.disabled = false;
       btn.textContent = original;

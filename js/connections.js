@@ -554,6 +554,18 @@ function renderConnPrefs() {
     cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
   }
 
+  const alertStrip = document.getElementById("connDealAlertPrefs");
+  const alertToggle = document.getElementById("dealAlertsEnabledToggle");
+  const showDealAlerts =
+    proFeaturesUnlocked() &&
+    isAccountAuthMode() &&
+    !!getAccessToken() &&
+    capabilityStatus("deal_watchlist_alerts") === "live";
+  if (alertStrip) alertStrip.hidden = !showDealAlerts;
+  if (alertToggle && showDealAlerts) {
+    alertToggle.checked = getProSettings().dealAlertsEnabled === true;
+  }
+
   const note = document.getElementById("bgRefreshPlanNote");
   if (note) {
     if (proFeaturesUnlocked()) {
@@ -605,11 +617,15 @@ async function refreshCloudMirrorUploadStatus() {
   }
 }
 
-async function saveCloudMirrorEnabled(enabled) {
+function saveCloudMirrorEnabled(enabled) {
+  return saveProSetting("cloudMirrorEnabled", enabled);
+}
+
+async function saveProSetting(key, enabled) {
   const res = await baklogFetch("/api/pro/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cloudMirrorEnabled: !!enabled }),
+    body: JSON.stringify({ [key]: !!enabled }),
   });
   let data;
   try {
@@ -712,6 +728,21 @@ async function handleCloudMirrorToggle(ev) {
   } catch (err) {
     toggle.checked = prev;
     window.alert(err?.message || "Could not save cloud sync setting.");
+  } finally {
+    toggle.disabled = false;
+  }
+}
+
+async function handleDealAlertsToggle(ev) {
+  const toggle = ev.target;
+  const prev = !toggle.checked;
+  try {
+    toggle.disabled = true;
+    await saveProSetting("dealAlertsEnabled", toggle.checked);
+    renderConnPrefs();
+  } catch (err) {
+    toggle.checked = prev;
+    window.alert(err?.message || "Could not save the deal alerts setting.");
   } finally {
     toggle.disabled = false;
   }
@@ -1274,6 +1305,8 @@ function wireGridEvents() {
       else stopMetrics();
     } else if (ev.target.id === "cloudMirrorEnabledToggle") {
       void handleCloudMirrorToggle(ev);
+    } else if (ev.target.id === "dealAlertsEnabledToggle") {
+      void handleDealAlertsToggle(ev);
     }
   });
 

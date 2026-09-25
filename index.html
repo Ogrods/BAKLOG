@@ -1029,6 +1029,24 @@
               <p id="bgRefreshPlanNote" class="conn-prefs-note" hidden></p>
             </div>
             <div
+              id="connDealAlertPrefs"
+              class="conn-prefs conn-cloud-prefs"
+              role="group"
+              aria-label="Deal alerts"
+              hidden
+            >
+              <label class="fh-toggle" for="dealAlertsEnabledToggle">
+                <input id="dealAlertsEnabledToggle" type="checkbox" class="rounded" />
+                Deal alerts in the tray
+              </label>
+              <p class="conn-prefs-note">
+                Checks wishlist prices and the free games feed in the background. The tray tells you when a
+                wishlist game drops in price or a new free game appears. BAKLOG has to be running (the tray is
+                enough). Price alerts cover Steam wishlist games and other wishlist games matched to a Steam app.
+                After a restart, open BAKLOG once so it can confirm your plan.
+              </p>
+            </div>
+            <div
               id="connCloudPrefs"
               class="conn-prefs conn-cloud-prefs"
               role="group"

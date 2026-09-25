@@ -126,6 +126,13 @@ def test_sign_action_inputs() -> None:
             assert f"exclude-{cred}-credential: true" in step, cred
 
 
+def test_hyphenated_tags_publish_as_prerelease_not_latest() -> None:
+    steps = _steps(_windows_job())
+    publish = steps[_index(steps, "Publish GitHub Release")]
+    assert '$pre = $tag.Contains("-")' in publish
+    assert publish.count("--prerelease --latest=false") == 2
+
+
 def test_no_hardcoded_signing_endpoint() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "codesigning.azure.net" not in text

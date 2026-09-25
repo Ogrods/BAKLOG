@@ -300,10 +300,19 @@ jobs:
             "release/BAKLOG-win64.sbom.spdx.json",
             "release/BAKLOG-Setup.exe"
           )
+          # Hyphenated tags (v1.2.3-rc1) are dry runs: prerelease, never "latest",
+          # so releases/latest/download URLs keep pointing at the stable build.
+          $pre = $tag.Contains("-")
           if (gh release view $tag 2>$null) {
             Write-Host "Release $tag exists; uploading replacement assets (--clobber)."
             gh release upload $tag @assets --clobber
-            gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --latest
+            if ($pre) {
+              gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --prerelease --latest=false
+            } else {
+              gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --latest
+            }
+          } elseif ($pre) {
+            gh release create $tag @assets --title "BAKLOG $tag" --notes-file release-notes.md --prerelease --latest=false
           } else {
             gh release create $tag @assets --title "BAKLOG $tag" --notes-file release-notes.md
           }

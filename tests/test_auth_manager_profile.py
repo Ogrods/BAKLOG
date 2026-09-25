@@ -238,3 +238,34 @@ def test_stale_session_taken_over_by_plain_connect(
     assert done.wait(timeout=3.0)
     assert stale._finished.is_set()
     assert auth_manager._unfinished_session_for("xbox_wishlist") is not None or done.is_set()
+
+
+def test_cancel_during_browser_download_skips_sign_in_window(
+    profile_env: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancel while the one-time browser downloads must not open the sign-in window."""
+    downloading = threading.Event()
+    download_returned = threading.Event()
+    launched: list[str] = []
+
+    def slow_download(on_progress=None) -> Path:
+        downloading.set()
+        deadline = time.time() + 3.0
+        while time.time() < deadline and auth_manager._unfinished_session_for("epic"):
+            time.sleep(0.02)
+        download_returned.set()
+        return Path("chrome.exe")
+
+    monkeypatch.setattr("auth.cdp_browser.ensure_chromium_executable", slow_download)
+    monkeypatch.setattr(
+        auth_manager, "run_browser_auth", lambda p, _s: launched.append(p) or {"token": "x"}
+    )
+    monkeypatch.setattr(auth_manager, "mark_connected", lambda _p, _c: None)
+    monkeypatch.setattr(auth_manager, "mark_invalid", lambda _p, error=None: None)
+
+    auth_manager.start_browser_auth("epic")
+    assert downloading.wait(timeout=3.0)
+    assert auth_manager.cancel_browser_auth("epic") is True
+    assert download_returned.wait(timeout=3.0)
+    time.sleep(0.1)
+    assert launched == []

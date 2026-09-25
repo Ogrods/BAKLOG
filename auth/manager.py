@@ -814,6 +814,9 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 )
 
             ensure_chromium_executable(on_progress=_on_chromium_progress)
+            if session.is_cancelled():
+                # Cancel during the one-time download: never open the sign-in window.
+                return
 
             creds = run_browser_auth(provider, session)
             if session.is_cancelled():

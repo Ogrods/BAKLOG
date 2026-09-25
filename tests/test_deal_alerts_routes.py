@@ -115,9 +115,7 @@ def test_hosted_auth_without_recent_pro_plan_is_disabled(alerts_server, monkeypa
 
 
 def test_ack_empties_pending(alerts_server):
-    status, body = _call(
-        alerts_server, "/api/deal-alerts/ack", method="POST", body={"ids": ["drop:wishlist:1:500"]}
-    )
+    status, body = _call(alerts_server, "/api/deal-alerts/ack", method="POST", body={"ids": ["drop:wishlist:1:500"]})
     assert status == 200, body
     assert body == {"acked": 1}
     _, body = _call(alerts_server, "/api/deal-alerts/pending")

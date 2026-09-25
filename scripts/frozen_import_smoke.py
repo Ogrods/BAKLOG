@@ -62,6 +62,11 @@ CRITICAL_IMPORTS = [
     "shared.supabase_auth",
     "shared.server_support",
     "shared.profiles",
+    # Deal alerts: lazy-imported by run_manager, scheduler, server routes, and the tray
+    "shared.deal_alerts",
+    "shared.server_deal_alerts",
+    "shared.deal_alert_tray",
+    "shared.wishlist_keys",
 ]
 
 

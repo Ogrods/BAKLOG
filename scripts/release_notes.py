@@ -11,21 +11,21 @@ import argparse
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 HTML_VERSION_STAMPS = ("index.html", "web/mirror/index.html")
 _META_RE = re.compile(r'name="baklog-version"\s+content="([^"]+)"')
-_PYPROJECT_RE = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
-
 
 def read_version_stamps(root: Path = ROOT) -> dict[str, str]:
     stamps: dict[str, str] = {}
-    py = _PYPROJECT_RE.search((root / "pyproject.toml").read_text(encoding="utf-8"))
-    if not py:
-        raise ValueError("pyproject.toml has no version")
-    stamps["pyproject.toml"] = py.group(1)
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    version = pyproject.get("project", {}).get("version")
+    if not isinstance(version, str) or not version:
+        raise ValueError("pyproject.toml has no [project] version")
+    stamps["pyproject.toml"] = version
     pkg = json.loads((root / "package.json").read_text(encoding="utf-8"))
     stamps["package.json"] = str(pkg.get("version", ""))
     for rel in HTML_VERSION_STAMPS:
@@ -48,6 +48,11 @@ def changelog_section(version: str, root: Path = ROOT) -> str:
     return (rest[: nxt.start()] if nxt else rest).strip()
 
 
+def section_has_content(body: str) -> bool:
+    """True when the section has at least one line that is not a heading."""
+    return any(line.strip() and not line.lstrip().startswith("#") for line in body.splitlines())
+
+
 def _cmd_versions() -> int:
     stamps = read_version_stamps()
     if len(set(stamps.values())) != 1:
@@ -58,10 +63,10 @@ def _cmd_versions() -> int:
     return 0
 
 
-def _cmd_notes(version: str, out: str | None) -> int:
-    body = changelog_section(version.lstrip("v"))
-    if not body:
-        print(f"CHANGELOG.md has no non-empty [{version.lstrip('v')}] section", file=sys.stderr)
+def _cmd_notes(version: str, out: str | None, root: Path = ROOT) -> int:
+    body = changelog_section(version.lstrip("v"), root)
+    if not section_has_content(body):
+        print(f"CHANGELOG.md has no [{version.lstrip('v')}] section with notes under it", file=sys.stderr)
         return 1
     if out:
         Path(out).write_text(body + "\n", encoding="utf-8")

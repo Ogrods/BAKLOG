@@ -70,6 +70,18 @@ def _active_profile_id() -> str:
     return get_active_profile_id()
 
 
+DEAL_ALERT_SOURCES = frozenset({"itad", "claims"})
+
+
+def _scan_deal_alerts(profile_id: str | None) -> None:
+    try:
+        from shared.deal_alerts import scan
+
+        scan(profile_id)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[runs] deal alert scan failed: {exc!r}", file=sys.stderr, flush=True)
+
+
 def _popen_fetcher(*args: Any, **kwargs: Any):
     pop = getattr(_server(), "popen_fetcher", None)
     if pop is not None:
@@ -1427,6 +1439,8 @@ class RunManager:
         self._append_history(run.to_summary(), profile_id=run.profile_id)
         self._persist_queue()
         self._prune_runs_by_id()
+        if run.key in DEAL_ALERT_SOURCES and run.exit_code == 0:
+            _scan_deal_alerts(run.profile_id)
 
     def _worker_loop(self, lane: str = "fetcher") -> None:
         lane_queue = self._lane_queue(lane)

@@ -290,6 +290,7 @@ def scan(
         emit = alerts_enabled(profile_id) if enabled is None else enabled
         with _LOCK:
             state = load_state(profile_id)
+            before = json.dumps(state, sort_keys=True)
             seeded: dict = state["seeded"]
             queued = 0
             if itad_doc is not None:
@@ -301,7 +302,8 @@ def scan(
             if seeded and not state["seeded_at"]:
                 state["seeded_at"] = _iso(now)
             trim(state, now)
-            save_state(state, profile_id)
+            if json.dumps(state, sort_keys=True) != before:
+                save_state(state, profile_id)
             return queued
     except Exception as exc:
         _log(f"scan failed: {exc}")

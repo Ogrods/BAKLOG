@@ -8,6 +8,12 @@ coordinating with the existing single-slot :class:`RunManager` queue.
 Unlike the browser loop (which needs an open dashboard tab), this keeps running
 as long as the server process is alive, so a pro user gets background refresh
 even when the app sits in the tray with no browser open.
+
+Deal alerts: when the user opted in (``dealAlertsEnabled``), idle ticks that
+found no stale library also refresh ITAD prices and the free games feed on
+their own ``alert_stale_hours`` clock. With the opt-in off, no extra fetch is
+ever queued. Every Pro tick ends with a cheap ``deal_alerts.scan()`` backstop
+so CLI-started fetches still produce alerts.
 """
 
 from __future__ import annotations
@@ -37,6 +43,21 @@ DEFAULT_PROBE_INTERVAL_SEC = 3600.0
 # After an auth failure (exit 4) the scheduler can't re-auth headless, so back
 # off this fetcher for a while and let the UI surface "reconnect needed".
 AUTH_COOLDOWN_SEC = 60 * 60
+DEFAULT_ALERT_STALE_SEC = 12 * 60 * 60
+# Fetcher key -> the profile file whose ``fetched_at`` marks freshness.
+ALERT_SOURCES = {"itad": "itad_prices.json", "claims": "free_claims.json"}
+
+
+def _alerts_enabled(profile_id: str) -> bool:
+    from shared.deal_alerts import alerts_enabled
+
+    return alerts_enabled(profile_id)
+
+
+def _scan_alerts(profile_id: str) -> None:
+    from shared.deal_alerts import scan
+
+    scan(profile_id)
 
 
 def _as_epoch(value: Any) -> float | None:
@@ -57,7 +78,11 @@ def _as_epoch(value: Any) -> float | None:
 
 def _catalog_age_sec(meta_key: str, profile_id: str, now: float) -> float | None:
     """Seconds since the store catalog was fetched; None when never fetched."""
-    path = catalog_path(f"games_{meta_key}.json", profile_id=profile_id)
+    return _file_age_sec(f"games_{meta_key}.json", profile_id, now)
+
+
+def _file_age_sec(filename: str, profile_id: str, now: float) -> float | None:
+    path = catalog_path(filename, profile_id=profile_id)
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -95,9 +120,7 @@ class BackgroundScheduler:
         if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
-        self._thread = threading.Thread(
-            target=self._loop, name="bg-scheduler", daemon=True
-        )
+        self._thread = threading.Thread(target=self._loop, name="bg-scheduler", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -118,6 +141,15 @@ class BackgroundScheduler:
             return None
         now = time.time() if now is None else now
         profile_id = get_active_profile_id()
+        try:
+            return self._schedule(profile_id, now)
+        finally:
+            try:
+                _scan_alerts(profile_id)
+            except Exception as exc:  # noqa: BLE001 - alerts must not kill the scheduler
+                print(f"[scheduler] deal alert scan error: {exc!r}", file=sys.stderr, flush=True)
+
+    def _schedule(self, profile_id: str, now: float) -> str | None:
         cfg = self._load_config(profile_id)
         if not cfg["enabled"]:
             return None
@@ -127,27 +159,65 @@ class BackgroundScheduler:
         self._maybe_probe_connections(profile_id, cfg, now)
 
         # One fetch per stagger window (mirrors the browser loop's 30 min stagger).
-        if now - self._load_last_run(profile_id) < cfg["stagger_sec"]:
+        library_due = now - self._load_state(profile_id, "last_run") >= cfg["stagger_sec"]
+        alert_due = now - self._load_state(profile_id, "last_alert_run") >= cfg["stagger_sec"]
+        if not library_due and not alert_due:
             return None
 
         # Single-slot queue: never pile onto an in-flight or queued run.
         snap = self._manager.snapshot()
         if snap.get("active") or snap.get("queue"):
             return None
+        history = snap.get("history") or []
 
-        key = self._pick_stalest(profile_id, cfg, now, snap.get("history") or [])
-        if key is None:
-            return None
+        if library_due:
+            key = self._pick_stalest(profile_id, cfg, now, history)
+            if key is not None:
+                return self._submit(key, profile_id, now, "last_run", "background refresh")
+        if alert_due:
+            key = self._pick_stale_alert_source(profile_id, cfg, now, history)
+            if key is not None:
+                return self._submit(key, profile_id, now, "last_alert_run", "deal alert refresh")
+        return None
 
+    def _submit(self, key: str, profile_id: str, now: float, state_field: str, label: str) -> str | None:
         spec = self._fetchers[key]
         refresh = bool(spec.get("refreshArgs"))
         try:
             self._manager.submit(key, refresh=refresh)
         except (ValueError, KeyError):
             return None
-        self._save_last_run(profile_id, now)
-        print(f"[scheduler] background refresh queued: {key}", file=sys.stderr, flush=True)
+        self._save_state(profile_id, state_field, now)
+        print(f"[scheduler] {label} queued: {key}", file=sys.stderr, flush=True)
         return key
+
+    def _pick_stale_alert_source(
+        self,
+        profile_id: str,
+        cfg: dict[str, Any],
+        now: float,
+        history: list[dict[str, Any]],
+    ) -> str | None:
+        """Stalest of itad / claims when deal alerts are opted in, else None."""
+        if not _alerts_enabled(profile_id):
+            return None
+        cooldown = self._auth_cooldown_keys(history, now)
+        best_key: str | None = None
+        best_age = -1.0
+        for key, filename in ALERT_SOURCES.items():
+            spec = self._fetchers.get(key)
+            if spec is None or key in cooldown:
+                continue
+            if self._missing_requirements(spec.get("requires") or []):
+                continue
+            age = _file_age_sec(filename, profile_id, now)
+            eff_age = float("inf") if age is None else age
+            if eff_age < cfg["alert_stale_sec"]:
+                continue
+            if eff_age > best_age:
+                best_age = eff_age
+                best_key = key
+        return best_key
 
     def _pick_stalest(
         self,
@@ -179,9 +249,7 @@ class BackgroundScheduler:
                 best_key = key
         return best_key
 
-    def _maybe_probe_connections(
-        self, profile_id: str, cfg: dict[str, Any], now: float
-    ) -> None:
+    def _maybe_probe_connections(self, profile_id: str, cfg: dict[str, Any], now: float) -> None:
         """Hourly silent connection health check (Pro only; never enqueues a fetch)."""
         from auth.connection_probe import probe_due, run_connection_probe
 
@@ -199,9 +267,7 @@ class BackgroundScheduler:
                 flush=True,
             )
 
-    def _auth_cooldown_keys(
-        self, history: list[dict[str, Any]], now: float
-    ) -> set[str]:
+    def _auth_cooldown_keys(self, history: list[dict[str, Any]], now: float) -> set[str]:
         out: set[str] = set()
         for h in history:
             if h.get("failure_kind") != "auth":
@@ -235,6 +301,7 @@ class BackgroundScheduler:
             "stale_age_sec": DEFAULT_STALE_AGE_SEC,
             "stagger_sec": DEFAULT_STAGGER_SEC,
             "probe_interval_sec": DEFAULT_PROBE_INTERVAL_SEC,
+            "alert_stale_sec": DEFAULT_ALERT_STALE_SEC,
             "quiet_start_hour": None,
             "quiet_end_hour": None,
         }
@@ -255,6 +322,9 @@ class BackgroundScheduler:
         probe_mins = doc.get("probe_interval_minutes")
         if isinstance(probe_mins, (int, float)) and probe_mins > 0:
             cfg["probe_interval_sec"] = float(probe_mins) * 60
+        alert_hours = doc.get("alert_stale_hours")
+        if isinstance(alert_hours, (int, float)) and alert_hours > 0:
+            cfg["alert_stale_sec"] = float(alert_hours) * 3600
         for field in ("quiet_start_hour", "quiet_end_hour"):
             val = doc.get(field)
             if isinstance(val, int) and 0 <= val <= 23:
@@ -265,17 +335,25 @@ class BackgroundScheduler:
     def _state_path(profile_id: str) -> Path:
         return runs_dir(profile_id=profile_id) / "scheduler_state.json"
 
-    def _load_last_run(self, profile_id: str) -> float:
+    def _read_state_doc(self, profile_id: str) -> dict[str, Any]:
         try:
             doc = json.loads(self._state_path(profile_id).read_text(encoding="utf-8"))
-            return float(doc.get("last_run", 0))
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return doc if isinstance(doc, dict) else {}
+
+    def _load_state(self, profile_id: str, field: str) -> float:
+        try:
+            return float(self._read_state_doc(profile_id).get(field, 0))
+        except (TypeError, ValueError):
             return 0.0
 
-    def _save_last_run(self, profile_id: str, ts: float) -> None:
+    def _save_state(self, profile_id: str, field: str, ts: float) -> None:
         path = self._state_path(profile_id)
+        doc = self._read_state_doc(profile_id)
+        doc[field] = ts
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({"last_run": ts}), encoding="utf-8")
+            path.write_text(json.dumps(doc), encoding="utf-8")
         except OSError:
             pass

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from unittest.mock import patch
 
@@ -30,9 +31,15 @@ FETCHERS = {
         "requires": [],
         "platforms": [],
     },
-    "itad": {  # prices, never eligible
+    "itad": {  # prices: only via the deal alerts opt-in
         "group": "prices",
         "metaKey": "itad",
+        "requires": [],
+        "platforms": [],
+    },
+    "claims": {
+        "group": "prices",
+        "metaKey": "claims",
         "requires": [],
         "platforms": [],
     },
@@ -64,6 +71,8 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(
         sched, "personal_dir", lambda *, profile_id=None: tmp_path / "data"
     )
+    monkeypatch.setattr(sched, "_alerts_enabled", lambda _pid: False)
+    monkeypatch.setattr(sched, "_scan_alerts", lambda _pid: None)
 
 
 def _make(manager, *, is_pro=True, missing=lambda reqs: list(reqs)):
@@ -245,6 +254,118 @@ def test_probe_skipped_when_not_pro(monkeypatch):
     probe.assert_not_called()
 
 
+def _alerts_on(monkeypatch, ages):
+    monkeypatch.setattr(sched, "_alerts_enabled", lambda _pid: True)
+    monkeypatch.setattr(sched, "_file_age_sec", lambda fn, pid, now: ages.get(fn, 0.0))
+
+
+STALE_ALERT = sched.DEFAULT_ALERT_STALE_SEC + 1
+
+
+def test_alert_sources_enqueued_when_opted_in_and_stale(monkeypatch):
+    _set_ages(monkeypatch, {"steam": 10})
+    _alerts_on(monkeypatch, {"itad_prices.json": STALE_ALERT, "free_claims.json": STALE_ALERT + 50})
+    mgr = FakeManager()
+    assert _make(mgr).tick(now=time.time()) == "claims"
+    assert mgr.submitted == [("claims", False)]
+
+
+def test_alert_sources_never_enqueued_when_opt_in_off(monkeypatch):
+    _set_ages(monkeypatch, {"steam": 10})
+    monkeypatch.setattr(sched, "_file_age_sec", lambda fn, pid, now: STALE_ALERT)
+    mgr = FakeManager()
+    assert _make(mgr).tick(now=time.time()) is None
+    assert mgr.submitted == []
+
+
+def test_alert_sources_skip_when_fresh(monkeypatch):
+    _set_ages(monkeypatch, {"steam": 10})
+    _alerts_on(monkeypatch, {"itad_prices.json": 60.0, "free_claims.json": 60.0})
+    mgr = FakeManager()
+    assert _make(mgr).tick(now=time.time()) is None
+
+
+def test_library_refresh_wins_over_alert_sources(monkeypatch):
+    _set_ages(monkeypatch, {"steam": sched.DEFAULT_STALE_AGE_SEC + 100})
+    _alerts_on(monkeypatch, {"itad_prices.json": None, "free_claims.json": None})
+    mgr = FakeManager()
+    assert _make(mgr).tick(now=time.time()) == "steam"
+    assert mgr.submitted == [("steam", True)]
+
+
+def test_alert_stagger_is_independent_of_library(monkeypatch):
+    _set_ages(monkeypatch, {"steam": sched.DEFAULT_STALE_AGE_SEC + 100})
+    _alerts_on(monkeypatch, {"itad_prices.json": STALE_ALERT})
+    mgr = FakeManager()
+    s = _make(mgr)
+    now = time.time()
+    assert s.tick(now=now) == "steam"
+    assert s.tick(now=now + 60) == "itad"
+    assert s.tick(now=now + 120) is None
+    assert mgr.submitted == [("steam", True), ("itad", False)]
+
+
+def test_alert_sources_respect_quiet_hours(monkeypatch):
+    _set_ages(monkeypatch, {"steam": 10})
+    _alerts_on(monkeypatch, {"itad_prices.json": STALE_ALERT})
+    monkeypatch.setattr(sched.BackgroundScheduler, "_in_quiet_hours", staticmethod(lambda cfg, now: True))
+    mgr = FakeManager()
+    assert _make(mgr).tick(now=time.time()) is None
+    assert mgr.submitted == []
+
+
+def test_alert_sources_skip_missing_itad_key(monkeypatch):
+    _set_ages(monkeypatch, {"steam": 10})
+    _alerts_on(monkeypatch, {"itad_prices.json": STALE_ALERT})
+    fetchers = {**FETCHERS, "itad": {**FETCHERS["itad"], "requires": [{"env": "ITAD_API_KEY"}]}}
+    mgr = FakeManager()
+    s = sched.BackgroundScheduler(
+        manager=mgr,
+        fetchers=fetchers,
+        missing_requirements=lambda reqs: list(reqs),
+        is_pro_fn=lambda: True,
+    )
+    assert s.tick(now=time.time()) is None
+
+
+def test_alert_stale_hours_config(monkeypatch, tmp_path):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "scheduler.json").write_text('{"alert_stale_hours": 1}', encoding="utf-8")
+    _set_ages(monkeypatch, {"steam": 10})
+    _alerts_on(monkeypatch, {"itad_prices.json": 3601.0})
+    mgr = FakeManager()
+    assert _make(mgr).tick(now=time.time()) == "itad"
+
+
+def test_scan_backstop_runs_each_pro_tick(monkeypatch):
+    scans: list[str] = []
+    monkeypatch.setattr(sched, "_scan_alerts", scans.append)
+    _set_ages(monkeypatch, {"steam": 10})
+    _make(FakeManager()).tick(now=time.time())
+    _make(FakeManager(), is_pro=False).tick(now=time.time())
+    assert scans == ["testprof"]
+
+
+def test_scan_backstop_errors_are_swallowed(monkeypatch):
+    def boom(_pid):
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(sched, "_scan_alerts", boom)
+    _set_ages(monkeypatch, {"steam": sched.DEFAULT_STALE_AGE_SEC + 100})
+    assert _make(FakeManager()).tick(now=time.time()) == "steam"
+
+
+def test_state_file_keeps_both_clocks(monkeypatch, tmp_path):
+    _set_ages(monkeypatch, {"steam": sched.DEFAULT_STALE_AGE_SEC + 100})
+    _alerts_on(monkeypatch, {"itad_prices.json": STALE_ALERT})
+    s = _make(FakeManager())
+    now = time.time()
+    s.tick(now=now)
+    s.tick(now=now + 60)
+    doc = json.loads((tmp_path / "runs" / "scheduler_state.json").read_text(encoding="utf-8"))
+    assert doc == {"last_run": now, "last_alert_run": now + 60}
+
+
 def test_probe_skipped_when_scheduler_disabled(monkeypatch):
     mgr = FakeManager()
     s = _make(mgr)
@@ -256,6 +377,7 @@ def test_probe_skipped_when_scheduler_disabled(monkeypatch):
             "stale_age_sec": sched.DEFAULT_STALE_AGE_SEC,
             "stagger_sec": sched.DEFAULT_STAGGER_SEC,
             "probe_interval_sec": sched.DEFAULT_PROBE_INTERVAL_SEC,
+            "alert_stale_sec": sched.DEFAULT_ALERT_STALE_SEC,
             "quiet_start_hour": None,
             "quiet_end_hour": None,
         },

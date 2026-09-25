@@ -150,7 +150,7 @@ function proTrustHtml() {
 
 function proBetaClosedNoteHtml() {
   // Keep under the pitch copy - not a side "pricing" column (that layout is for live checkout).
-  return `<p class="pro-view-founder pro-view-founder--hero-beta">Checkout is closed during beta. Pro perks will roll out to beta testers before public launch.</p>`;
+  return `<p class="pro-view-founder pro-view-founder--hero-beta">Checkout is not open yet. Pro perks are enabled per account in the meantime.</p>`;
 }
 
 function proPricingHtml() {
@@ -179,7 +179,7 @@ function proActivationHtml() {
       : 'Use the same email as your BAKLOG account at checkout.';
     const checkoutNote = proCheckoutEnabled()
       ? 'After payment, click refresh - or sign out and back in.'
-      : 'During beta, Pro is granted on the server side. Use refresh after perks are enabled for your account.';
+      : 'Until checkout opens, Pro is granted on the server side. Use refresh after perks are enabled for your account.';
     return `
       <div class="pro-view-activate">
         <h3 class="pro-view-section-title">After checkout</h3>

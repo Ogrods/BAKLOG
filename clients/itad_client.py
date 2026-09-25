@@ -81,10 +81,16 @@ class ItadClient:
         resp.raise_for_status()
         return resp.json()
 
+    def _lookup_cache_path(self, title: str, appid: int | None) -> Path:
+        cache_key = f"{appid}:{title}" if appid else title
+        return self.cache_dir / "lookup" / f"{quote(cache_key, safe='')[:120]}.json"
+
+    def is_lookup_cached(self, title: str, appid: int | None = None) -> bool:
+        return self._lookup_cache_path(title, appid).exists()
+
     def lookup_title(self, title: str, appid: int | None = None) -> str | None:
         """Return ITAD game id (UUID) for a title, or None."""
-        cache_key = f"{appid}:{title}" if appid else title
-        cache_path = self.cache_dir / "lookup" / f"{quote(cache_key, safe='')[:120]}.json"
+        cache_path = self._lookup_cache_path(title, appid)
         if cache_path.exists():
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             return cached.get("id")

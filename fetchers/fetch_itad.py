@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Fetch current prices from IsThereAnyDeal for the wishlist.
+"""Fetch current prices from IsThereAnyDeal for every connected wishlist.
 
 By default we only look up wishlist titles - those are the ones where a price
 drop matters. Pass ``--include-library`` to also look up every owned game.
+
+Each priced row records ``match``: ``"appid"`` when ITAD resolved it from a
+Steam app id (exact) or ``"title"`` for a fuzzy title lookup. Deal alerts only
+fire on ``appid`` matches.
 """
 
 import argparse
@@ -22,11 +26,13 @@ from fetchers._base import (
     refuse_empty_result,
 )
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, started
+from fetchers.registry import WISHLIST_JSON_BY_KEY
 from shared.fx import ensure_fx_rates
 from shared.money import country_to_currency
 from shared.profile_paths import catalog_path, itad_path
 from shared.safe_write import safe_write_text
 from shared.wishlist_fx import refresh_wishlist_fx_after_itad
+from shared.wishlist_keys import steam_appid_for, wishlist_lookup_key
 
 ITAD_JSON = Path("itad_prices.json")
 LIBRARY_FILES = [
@@ -37,7 +43,19 @@ LIBRARY_FILES = [
     "games_amazon.json",
     "games_nintendo.json",
 ]
-WISHLIST_FILE = "games_wishlist.json"
+# Uncached ITAD title lookups per run (1.5s each). Cached lookups are free and
+# never count, so a large first-time wishlist resolves across a few runs
+# instead of stalling the queue.
+ITAD_LOOKUP_BUDGET = 200
+
+
+def _load_games(path: Path) -> list[dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    games = data.get("games") if isinstance(data, dict) else None
+    return [g for g in games if isinstance(g, dict)] if isinstance(games, list) else []
 
 
 def _collect_titles(
@@ -45,24 +63,29 @@ def _collect_titles(
     *,
     library_stores: set[str] | None = None,
     include_wishlist: bool = True,
-) -> list[tuple[str, str]]:
-    """(lookup_key, title) - lookup_key is store:id or wishlist:appid."""
+) -> list[tuple[str, str, int | None]]:
+    """(lookup_key, title, steam_appid) for every title to price."""
     seen: set[str] = set()
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, int | None]] = []
 
-    def add(key: str, title: str) -> None:
-        if not title or key in seen:
+    def add(key: str | None, title: str, appid: int | None) -> None:
+        title = (title or "").strip()
+        if not key or not title or key in seen:
             return
         seen.add(key)
-        out.append((key, title.strip()))
+        out.append((key, title, appid))
 
     if include_wishlist:
-        wp = catalog_path(WISHLIST_FILE)
-        if wp.exists():
-            data = json.loads(wp.read_text(encoding="utf-8"))
-            for g in data.get("games", []):
-                appid = g.get("appid") or g.get("id")
-                add(f"wishlist:{appid}", g.get("name") or "")
+        for fetcher_key, filename in WISHLIST_JSON_BY_KEY.items():
+            wp = catalog_path(filename)
+            if not wp.exists():
+                continue
+            for g in _load_games(wp):
+                add(
+                    wishlist_lookup_key(fetcher_key, g),
+                    g.get("name") or "",
+                    steam_appid_for(fetcher_key, g),
+                )
 
     if include_library:
         for path in LIBRARY_FILES:
@@ -78,7 +101,12 @@ def _collect_titles(
                 gid = g.get("id") or g.get("appid")
                 if gid is None:
                     continue
-                add(f"{store}:{gid}", g.get("name") or "")
+                appid = None
+                if store == "steam":
+                    appid = steam_appid_for("wishlistSteam", {"appid": gid})
+                elif g.get("steam_appid") is not None:
+                    appid = steam_appid_for("", g)
+                add(f"{store}:{gid}", g.get("name") or "", appid)
 
     return out
 
@@ -106,7 +134,7 @@ def main() -> int:
     parser.add_argument(
         "--skip-wishlist",
         action="store_true",
-        help="Skip Steam wishlist titles (library-only ITAD run).",
+        help="Skip wishlist titles (library-only ITAD run).",
     )
     add_allow_empty_arg(parser)
     args = parser.parse_args()
@@ -170,25 +198,35 @@ def main() -> int:
         return stats.finish("fetch_itad", t0, exit_code=EXIT_CODE_AUTH)
 
     plain_by_key: dict[str, str] = {}
+    match_by_key: dict[str, str] = {}
+    is_cached = getattr(client, "is_lookup_cached", None)
+    uncached_used = 0
+    deferred = 0
     lookup_hb = HeartbeatTimer(interval=25.0)
     try:
-        for i, (key, title) in enumerate(titles, 1):
+        for i, (key, title, appid) in enumerate(titles, 1):
             lookup_hb.tick_progress(i, len(titles), "ITAD lookup", title[:40])
             if i % 10 == 0 or i == 1:
                 print(f"[{i}/{len(titles)}] {title[:50]}", flush=True)
                 lookup_hb.reset()
-            appid = None
-            if key.startswith("steam:") or key.startswith("wishlist:"):
-                try:
-                    appid = int(key.split(":", 1)[1])
-                except ValueError:
-                    appid = None
+            if is_cached is not None and not is_cached(title, appid=appid):
+                if uncached_used >= ITAD_LOOKUP_BUDGET:
+                    deferred += 1
+                    continue
+                uncached_used += 1
             game_id = client.lookup_title(title, appid=appid)
             if game_id:
                 plain_by_key[key] = game_id
+                match_by_key[key] = "appid" if appid else "title"
             else:
                 stats.warn(f"no ITAD match for {title!r}")
 
+        if deferred:
+            print(
+                f"Deferred {deferred} new title lookup(s) to the next run "
+                f"(limit {ITAD_LOOKUP_BUDGET} new lookups per run).",
+                flush=True,
+            )
         print(f"Resolved {len(plain_by_key)}/{len(titles)} ITAD ids. Fetching prices...", flush=True)
         # Titles is non-empty here (the empty-input case returns early above), so a
         # zero resolution means every wishlist title failed to match - refuse the
@@ -212,7 +250,7 @@ def main() -> int:
     by_key: dict[str, dict] = {}
     for key, plain in plain_by_key.items():
         if plain in prices_by_plain:
-            by_key[key] = prices_by_plain[plain]
+            by_key[key] = {**prices_by_plain[plain], "match": match_by_key.get(key, "title")}
         else:
             stats.warn(f"no price data for {key}")
 

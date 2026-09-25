@@ -36,6 +36,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+from shared.deal_alert_tray import compose_notifications, is_snoozed, set_snoozed
 from shared.install_paths import bundle_root, data_root, frozen_server_exe, is_frozen
 from shared.startup import (
     is_startup_enabled,
@@ -51,6 +52,9 @@ PORT = int(os.environ.get("PORT", "8765"))
 _BAKLOG_LOCAL_HEADER = "X-BAKLOG-Local"
 _GRACEFUL_SHUTDOWN_WAIT_SEC = 8.0
 _TERMINATE_WAIT_SEC = 5.0
+DEAL_ALERT_POLL_SEC = 300.0
+# Set by the poll loop once the server reports alerts on; shows the snooze item.
+_deal_alerts_enabled = False
 
 
 def server_url() -> str:
@@ -390,6 +394,59 @@ def _start_update_notify(icon) -> None:
     threading.Thread(target=_poll, name="tray-update-notify", daemon=True).start()
 
 
+def _deal_alerts_request(path: str, body: dict | None = None) -> dict | None:
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    headers = {_BAKLOG_LOCAL_HEADER: "1", "Accept": "application/json"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(
+        f"http://{HOST}:{PORT}{path}",
+        method="POST" if data is not None else "GET",
+        headers=headers,
+        data=data,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001 - server down, 5xx, bad JSON: try next cycle
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _deal_alerts_cycle(icon) -> int:
+    """One poll: notify once per kind, then ack. Returns alerts delivered."""
+    global _deal_alerts_enabled
+    if is_snoozed(data_root()):
+        return 0
+    payload = _deal_alerts_request("/api/deal-alerts/pending")
+    if payload is None:
+        return 0
+    _deal_alerts_enabled = payload.get("enabled") is True
+    alerts = payload.get("alerts") if _deal_alerts_enabled else None
+    if not isinstance(alerts, list) or not alerts:
+        return 0
+    for title, body in compose_notifications(alerts):
+        _tray_notify(icon, title, body)
+    # Ack even if notify failed, or a backend without toasts would loop forever.
+    ids = [a["id"] for a in alerts if isinstance(a, dict) and isinstance(a.get("id"), str)]
+    _deal_alerts_request("/api/deal-alerts/ack", {"ids": ids})
+    return len(ids)
+
+
+def _start_deal_alerts(icon) -> None:
+    """Frozen-only poll. In dev a 5 min poll would keep the idle watchdog awake."""
+
+    def _loop() -> None:
+        if not is_frozen():
+            return
+        while True:
+            if _port_open():
+                _deal_alerts_cycle(icon)
+            time.sleep(DEAL_ALERT_POLL_SEC)
+
+    threading.Thread(target=_loop, name="tray-deal-alerts", daemon=True).start()
+
+
 def _start_server_watchdog(icon, controller: ServerController) -> threading.Thread:
     """Notify when our owned server child dies and nothing is listening.
     Auto-restarts once on unexpected death; if it crashes again within 30 s,
@@ -488,10 +545,19 @@ def run_tray() -> int:
     def _toggle_startup(icon, _item) -> None:  # noqa: ANN001
         toggle_startup()
 
+    def _toggle_snooze(icon, _item) -> None:  # noqa: ANN001
+        set_snoozed(data_root(), not is_snoozed(data_root()))
+
     menu_items = [
         pystray.MenuItem("Open BAKLOG", _on_open, default=True),
         pystray.MenuItem("Open data folder", _on_open_data_folder),
         pystray.MenuItem("Restart server", _on_restart),
+        pystray.MenuItem(
+            "Snooze alerts today",
+            _toggle_snooze,
+            checked=lambda item: is_snoozed(data_root()),
+            visible=lambda item: _deal_alerts_enabled,
+        ),
     ]
     if startup_supported():
         menu_items.append(
@@ -507,6 +573,7 @@ def run_tray() -> int:
     _start_server_watchdog(icon, controller)
     if started:
         _start_update_notify(icon)
+    _start_deal_alerts(icon)
     try:
         icon.run()
     finally:

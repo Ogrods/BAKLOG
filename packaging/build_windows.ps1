@@ -8,8 +8,20 @@
 #   https://github.com/Ogrods/BAKLOG/releases/latest/download/BAKLOG-Setup.exe
 # The real version lives INSIDE the bundle (pyproject.toml + index.html meta).
 #
+# Stages (default All = local unsigned build, what release_preflight runs):
+#   -Stage Bundle   PyInstaller onedir + frozen smokes -> release\BAKLOG\
+#   -Stage Package  zip + sha256 + Inno Setup from an existing release\BAKLOG\
+# release.yml runs Bundle, signs the bundle exes, then runs Package and signs
+# BAKLOG-Setup.exe (scripts/sign_windows_artifacts.ps1 lists + verifies).
+#
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
+#   powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1 -Stage Bundle
+
+param(
+    [ValidateSet("All", "Bundle", "Package")]
+    [string]$Stage = "All"
+)
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -22,104 +34,106 @@ if (Test-Path $VenvPython) {
     $Python = "python"
 }
 
-Write-Host "Installing Python dependencies..."
-& $Python -m pip install -r requirements.txt
-& $Python -m pip install pyinstaller
-
-Write-Host "Building production frontend (esbuild dist/)..."
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Write-Error "npm not found - install Node.js 22+ before building the frozen bundle"
-}
-npm ci
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run vendor:supabase
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run build
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run check:dist-integrity
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "Generating installer branding assets..."
-& $Python (Join-Path $Root "packaging\generate_installer_assets.py")
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
 $ReleaseDir = Join-Path $Root "release"
-if (-not (Test-Path $ReleaseDir)) {
-    New-Item -ItemType Directory -Path $ReleaseDir | Out-Null
-}
-
-Write-Host "Building BAKLOG.exe + BAKLOG Tray.exe (onedir)..."
-& $Python -m PyInstaller packaging/baklog.spec --noconfirm --distpath $ReleaseDir
-
 $OutDir = Join-Path $ReleaseDir "BAKLOG"
 $ServerExe = Join-Path $OutDir "BAKLOG.exe"
 $TrayExe = Join-Path $OutDir "BAKLOG Tray.exe"
-if (-not (Test-Path $ServerExe)) {
-    Write-Error "Build failed: $ServerExe not found"
-}
-if (-not (Test-Path $TrayExe)) {
-    Write-Error "Build failed: $TrayExe not found"
-}
 
-$InternalDir = Join-Path $OutDir "_internal"
-$FallbackJson = Join-Path $InternalDir "curated\free_claims.fallback.json"
-if (-not (Test-Path $FallbackJson)) {
-    Write-Error "Build failed: bundled curated feed missing at $FallbackJson (PyInstaller must ship curated/ for offline claims fallback)"
-}
+if ($Stage -ne "Package") {
+    Write-Host "Installing Python dependencies..."
+    & $Python -m pip install -r requirements.txt
+    & $Python -m pip install pyinstaller
 
-# pyproject.toml must be at bundle root for frozen version detection
-Copy-Item -Force (Join-Path $Root "pyproject.toml") (Join-Path $OutDir "pyproject.toml")
-Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
-Copy-Item -Force (Join-Path $Root "packaging\BAKLOG.ico") (Join-Path $OutDir "BAKLOG.ico")
-Copy-Item -Force (Join-Path $Root "packaging\apply_update.ps1") (Join-Path $OutDir "apply_update.ps1")
-Copy-Item -Force (Join-Path $Root "packaging\Uninstall BAKLOG.bat") (Join-Path $OutDir "Uninstall BAKLOG.bat")
+    Write-Host "Building production frontend (esbuild dist/)..."
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Error "npm not found - install Node.js 22+ before building the frozen bundle"
+    }
+    npm ci
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    npm run vendor:supabase
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    npm run check:dist-integrity
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "Writing bundled account-auth .env..."
-$urlSet = [bool]$env:BAKLOG_SUPABASE_URL
-$anonSet = [bool]$env:BAKLOG_SUPABASE_ANON_KEY
-Write-Host "  Auth env: BAKLOG_SUPABASE_URL=$(if ($urlSet) { 'set' } else { 'MISSING' }), BAKLOG_SUPABASE_ANON_KEY=$(if ($anonSet) { 'set' } else { 'MISSING' })"
-& $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Write-Host "Generating installer branding assets..."
+    & $Python (Join-Path $Root "packaging\generate_installer_assets.py")
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-# Full stop (not --dedupe): frozen smoke needs 8765 free. --dedupe keeps any
-# live listener, which then fails frozen_bundle_smoke with port_collision.
-Write-Host "Stopping stray BAKLOG servers on port 8765..."
-& $Python scripts/stop_baklog.py
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if (-not (Test-Path $ReleaseDir)) {
+        New-Item -ItemType Directory -Path $ReleaseDir | Out-Null
+    }
 
-# One server session per smoke, each on its own port (8766 / 8765 / 8767).
-Write-Host "Smoke: frozen import chain (PyInstaller hidden imports)..."
-& $Python scripts/frozen_import_smoke.py --exe $ServerExe
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_import_smoke failed (exit $LASTEXITCODE)"
-}
+    Write-Host "Building BAKLOG.exe + BAKLOG Tray.exe (onedir)..."
+    & $Python -m PyInstaller packaging/baklog.spec --noconfirm --distpath $ReleaseDir
 
-Write-Host "Smoke: frozen data-dir migration (legacy co-located data)..."
-& $Python scripts/frozen_data_dir_migration_smoke.py --bundle-dir $OutDir --port 8766
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_data_dir_migration_smoke failed (exit $LASTEXITCODE)"
-}
+    if (-not (Test-Path $ServerExe)) {
+        Write-Error "Build failed: $ServerExe not found"
+    }
+    if (-not (Test-Path $TrayExe)) {
+        Write-Error "Build failed: $TrayExe not found"
+    }
 
-Write-Host "Smoke: frozen bundle (/api/config + mirror gate + fetcher dispatch)..."
-& $Python scripts/frozen_bundle_smoke.py $OutDir --port 8765
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
-}
+    $InternalDir = Join-Path $OutDir "_internal"
+    $FallbackJson = Join-Path $InternalDir "curated\free_claims.fallback.json"
+    if (-not (Test-Path $FallbackJson)) {
+        Write-Error "Build failed: bundled curated feed missing at $FallbackJson (PyInstaller must ship curated/ for offline claims fallback)"
+    }
 
-Write-Host "Smoke: frozen connect-flow (/api/config + auth endpoints)..."
-& $Python scripts/frozen_connect_smoke.py --exe $ServerExe --port 8767
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "frozen_connect_smoke failed (exit $LASTEXITCODE)"
-}
+    # pyproject.toml must be at bundle root for frozen version detection
+    Copy-Item -Force (Join-Path $Root "pyproject.toml") (Join-Path $OutDir "pyproject.toml")
+    Copy-Item -Force (Join-Path $Root "packaging\BETA-README.txt") (Join-Path $OutDir "BETA-README.txt")
+    Copy-Item -Force (Join-Path $Root "packaging\BAKLOG.ico") (Join-Path $OutDir "BAKLOG.ico")
+    Copy-Item -Force (Join-Path $Root "packaging\apply_update.ps1") (Join-Path $OutDir "apply_update.ps1")
+    Copy-Item -Force (Join-Path $Root "packaging\Uninstall BAKLOG.bat") (Join-Path $OutDir "Uninstall BAKLOG.bat")
 
-# Belt and braces: the bundled .env must survive every smoke before zipping.
-Write-Host "Verifying bundled account-auth .env after smokes..."
-& $Python -c "import sys; sys.path.insert(0, r'$Root'); from pathlib import Path; from scripts.frozen_bundle_smoke import _env_has_auth_keys; ok, missing = _env_has_auth_keys(Path(r'$OutDir') / '.env'); sys.exit(0 if ok else f'bundled .env missing keys: {missing}')"
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "bundled .env verification failed (exit $LASTEXITCODE)"
-}
+    Write-Host "Writing bundled account-auth .env..."
+    $urlSet = [bool]$env:BAKLOG_SUPABASE_URL
+    $anonSet = [bool]$env:BAKLOG_SUPABASE_ANON_KEY
+    Write-Host "  Auth env: BAKLOG_SUPABASE_URL=$(if ($urlSet) { 'set' } else { 'MISSING' }), BAKLOG_SUPABASE_ANON_KEY=$(if ($anonSet) { 'set' } else { 'MISSING' })"
+    & $Python (Join-Path $Root "scripts\write_bundle_auth_env.py") $OutDir
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-@"
+    # Full stop (not --dedupe): frozen smoke needs 8765 free. --dedupe keeps any
+    # live listener, which then fails frozen_bundle_smoke with port_collision.
+    Write-Host "Stopping stray BAKLOG servers on port 8765..."
+    & $Python scripts/stop_baklog.py
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    # One server session per smoke, each on its own port (8766 / 8765 / 8767).
+    Write-Host "Smoke: frozen import chain (PyInstaller hidden imports)..."
+    & $Python scripts/frozen_import_smoke.py --exe $ServerExe
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "frozen_import_smoke failed (exit $LASTEXITCODE)"
+    }
+
+    Write-Host "Smoke: frozen data-dir migration (legacy co-located data)..."
+    & $Python scripts/frozen_data_dir_migration_smoke.py --bundle-dir $OutDir --port 8766
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "frozen_data_dir_migration_smoke failed (exit $LASTEXITCODE)"
+    }
+
+    Write-Host "Smoke: frozen bundle (/api/config + mirror gate + fetcher dispatch)..."
+    & $Python scripts/frozen_bundle_smoke.py $OutDir --port 8765
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "frozen_bundle_smoke failed (exit $LASTEXITCODE)"
+    }
+
+    Write-Host "Smoke: frozen connect-flow (/api/config + auth endpoints)..."
+    & $Python scripts/frozen_connect_smoke.py --exe $ServerExe --port 8767
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "frozen_connect_smoke failed (exit $LASTEXITCODE)"
+    }
+
+    # Belt and braces: the bundled .env must survive every smoke before zipping.
+    Write-Host "Verifying bundled account-auth .env after smokes..."
+    & $Python -c "import sys; sys.path.insert(0, r'$Root'); from pathlib import Path; from scripts.frozen_bundle_smoke import _env_has_auth_keys; ok, missing = _env_has_auth_keys(Path(r'$OutDir') / '.env'); sys.exit(0 if ok else f'bundled .env missing keys: {missing}')"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "bundled .env verification failed (exit $LASTEXITCODE)"
+    }
+
+    @"
 @echo off
 cd /d "%~dp0"
 echo Starting BAKLOG (tray) on http://127.0.0.1:8765
@@ -127,7 +141,7 @@ echo Connections sign-in prefers Chrome or Edge. If neither is installed, BAKLOG
 start "" "%~dp0BAKLOG Tray.exe"
 "@ | Set-Content -Encoding ASCII (Join-Path $OutDir "Start BAKLOG.bat")
 
-@"
+    @"
 @echo off
 cd /d "%~dp0"
 echo Starting BAKLOG server (console) on http://127.0.0.1:8765
@@ -135,6 +149,17 @@ echo Connections sign-in prefers Chrome or Edge. If neither is installed, BAKLOG
 "%~dp0BAKLOG.exe"
 pause
 "@ | Set-Content -Encoding ASCII (Join-Path $OutDir "Start BAKLOG (server console).bat")
+
+    if ($Stage -eq "Bundle") {
+        Write-Host ""
+        Write-Host "Bundle ready (not zipped): $OutDir"
+        exit 0
+    }
+}
+
+if (-not (Test-Path $ServerExe) -or -not (Test-Path $TrayExe)) {
+    Write-Error "Package stage needs an existing bundle at $OutDir (run -Stage Bundle first)."
+}
 
 # Version label (from pyproject.toml) - embedded inside the bundle and passed to
 # Inno Setup as the installer version. Release filenames stay STABLE (un-versioned)
@@ -147,12 +172,6 @@ if (Test-Path $PyProject) {
     }
 }
 
-# Optional Authenticode (no-op unless BAKLOG_SIGN_WINDOWS=1). See
-# baklog-internal/docs/CODE_SIGNING.md and scripts/sign_windows_artifacts.ps1.
-Write-Host "Optional code signing (bundle exes)..."
-& powershell -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\sign_windows_artifacts.ps1")
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
 $ZipName = "BAKLOG-win64.zip"
 $ZipPath = Join-Path $ReleaseDir $ZipName
 if (Test-Path $ZipPath) { Remove-Item -Force $ZipPath }
@@ -163,6 +182,7 @@ $HashFile = Join-Path $ReleaseDir "BAKLOG-win64.sha256"
 "$Hash  $ZipName" | Set-Content -Encoding ASCII -NoNewline $HashFile
 
 $SetupExe = Join-Path $ReleaseDir "BAKLOG-Setup.exe"
+if (Test-Path $SetupExe) { Remove-Item -Force $SetupExe }
 $Iscc = $null
 if (Get-Command ISCC.exe -ErrorAction SilentlyContinue) {
     $Iscc = "ISCC.exe"
@@ -202,12 +222,6 @@ if ($Iscc) {
 
 if ($env:BAKLOG_REQUIRE_INSTALLER -eq "1" -and -not (Test-Path $SetupExe)) {
     Write-Error "BAKLOG-Setup.exe missing and BAKLOG_REQUIRE_INSTALLER=1."
-}
-
-if (Test-Path $SetupExe) {
-    Write-Host "Optional code signing (Setup.exe)..."
-    & powershell -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\sign_windows_artifacts.ps1") -SetupOnly
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 Write-Host ""

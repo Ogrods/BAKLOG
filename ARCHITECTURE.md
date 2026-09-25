@@ -111,4 +111,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for running locally.
 | Dev vs frozen localStorage | Mitigated | Prefer `PORT=8766` + `BAKLOG_DATA_DIR` for dev; error log is partitioned per runtime (`baklog-error-log:dev` / `:installed`); admin refuses default installed data root unless `BAKLOG_ADMIN_ALLOW_INSTALLED=1` |
 | macOS frozen zip | Deferred | Notify-only until `BAKLOG-macos.zip` ships; checklist in `packaging/build_macos.sh` |
 | Windows ARP version drift | Visible | Diagnostics + update install footnote when Setup + zip apply diverge |
-| Code signing | Out of scope | Unsigned beta builds (Windows Inno + portable zip) |
+| Code signing | Windows: gated | `release.yml` signs bundle exes + `BAKLOG-Setup.exe` with Azure Artifact Signing when `SIGNING_ENABLED=true` (`scripts/sign_windows_artifacts.ps1` lists/verifies); local builds and macOS/Linux stay unsigned |

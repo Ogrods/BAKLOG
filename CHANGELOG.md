@@ -44,6 +44,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- The Windows app and installer are code-signed, so SmartScreen shows the publisher name instead of "Unknown publisher".
 - ITAD prices now cover every connected wishlist (GOG, Epic, PlayStation, Ubisoft, Xbox, Nintendo, Humble), not only Steam. Very large wishlists fill in over a few runs.
 
 ## [0.9.02] - 2026-09-11

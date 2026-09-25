@@ -3,6 +3,10 @@
 # publishes the GitHub Release. Artifacts are built from the tagged commit by
 # CI (not hand-uploaded), so anyone can verify with `gh attestation verify`.
 #
+# Windows Authenticode: when vars.SIGNING_ENABLED == 'true', the build job signs
+# the PyInstaller exes before zip/Inno and BAKLOG-Setup.exe after Inno, via Azure
+# Artifact Signing (OIDC, `release` environment). Otherwise it warns and ships unsigned.
+#
 # Policy: prefer not to move tags. If a published installer is broken for
 # strangers/beta, replace the SAME version: fix on main, run
 # scripts/replace_release_tag.ps1 -Version X.Y.Z -Force (deletes tag + release,
@@ -30,8 +34,34 @@ jobs:
     name: Build and publish Windows release
     runs-on: windows-latest
     timeout-minutes: 45
+    # Environment secrets AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_SUBSCRIPTION_ID
+    # back the Entra federated credential (subject ...:environment:release).
+    environment: release
+    permissions:
+      contents: write       # publish the GitHub Release from this job
+      id-token: write       # OIDC for azure/login + build provenance
+      attestations: write
+    env:
+      SIGNING_ENABLED: ${{ vars.SIGNING_ENABLED }}
     steps:
       - uses: actions/checkout@v6
+
+      # Signing is off until the owner sets SIGNING_ENABLED=true (repo or
+      # release-environment variable). Unsigned builds still publish, with a warning.
+      - name: Check code signing config
+        shell: pwsh
+        env:
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+        run: |
+          if ($env:SIGNING_ENABLED -ne 'true') {
+            Write-Host "::warning title=Unsigned Windows build::SIGNING_ENABLED is not 'true', so BAKLOG.exe, BAKLOG Tray.exe and BAKLOG-Setup.exe will be published UNSIGNED."
+            exit 0
+          }
+          if (-not $env:AZURE_SIGNING_ENDPOINT) {
+            Write-Host "::error title=Signing misconfigured::SIGNING_ENABLED=true but variable AZURE_SIGNING_ENDPOINT is empty. Set it to the signing account endpoint URI (region-specific) or set SIGNING_ENABLED to false."
+            exit 1
+          }
+          Write-Host "Code signing enabled (Azure Artifact Signing)."
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -119,8 +149,110 @@ jobs:
         env:
           BAKLOG_SUPABASE_URL: ${{ secrets.BAKLOG_SUPABASE_URL }}
           BAKLOG_SUPABASE_ANON_KEY: ${{ secrets.BAKLOG_SUPABASE_ANON_KEY }}
+        run: powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1 -Stage Bundle
+
+      - name: Azure login (bundle signing)
+        if: env.SIGNING_ENABLED == 'true'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: List bundle executables to sign
+        id: bundle_files
+        if: env.SIGNING_ENABLED == 'true'
+        shell: pwsh
+        run: |
+          $list = Join-Path $env:RUNNER_TEMP "sign-bundle.txt"
+          & ./scripts/sign_windows_artifacts.ps1 -List -Root release/BAKLOG -OutFile $list
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $delim = "EOF_$([guid]::NewGuid().ToString('N'))"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "files<<$delim"
+          Get-Content $list | Add-Content -Path $env:GITHUB_OUTPUT
+          Add-Content -Path $env:GITHUB_OUTPUT -Value $delim
+
+      - name: Sign bundle executables
+        if: env.SIGNING_ENABLED == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT || 'baklog-signing' }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE || 'baklog-release' }}
+          files: ${{ steps.bundle_files.outputs.files }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+
+      - name: Verify bundle signatures
+        if: env.SIGNING_ENABLED == 'true'
+        shell: pwsh
+        env:
+          EXPECTED_SUBJECT: ${{ vars.AZURE_SIGNING_EXPECTED_SUBJECT }}
+        run: |
+          $opts = @{ Verify = $true; Root = "release/BAKLOG" }
+          if ($env:EXPECTED_SUBJECT) { $opts.ExpectedSubject = $env:EXPECTED_SUBJECT }
+          & ./scripts/sign_windows_artifacts.ps1 @opts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build installer and zip
+        shell: pwsh
+        env:
           BAKLOG_REQUIRE_INSTALLER: "1"
-        run: powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1
+        run: powershell -ExecutionPolicy Bypass -File packaging/build_windows.ps1 -Stage Package
+
+      # Re-login: the GitHub OIDC assertion azure/login cached can expire during
+      # the Inno Setup compress, which would fail the second signing call.
+      - name: Azure login (installer signing)
+        if: env.SIGNING_ENABLED == 'true'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign installer
+        if: env.SIGNING_ENABLED == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT || 'baklog-signing' }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE || 'baklog-release' }}
+          files: ${{ github.workspace }}\release\BAKLOG-Setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+
+      - name: Verify installer signature
+        if: env.SIGNING_ENABLED == 'true'
+        shell: pwsh
+        env:
+          EXPECTED_SUBJECT: ${{ vars.AZURE_SIGNING_EXPECTED_SUBJECT }}
+        run: |
+          $opts = @{ Verify = $true; Path = "release/BAKLOG-Setup.exe" }
+          if ($env:EXPECTED_SUBJECT) { $opts.ExpectedSubject = $env:EXPECTED_SUBJECT }
+          & ./scripts/sign_windows_artifacts.ps1 @opts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify build artifacts exist
         shell: pwsh
@@ -168,10 +300,19 @@ jobs:
             "release/BAKLOG-win64.sbom.spdx.json",
             "release/BAKLOG-Setup.exe"
           )
+          # Hyphenated tags (v1.2.3-rc1) are dry runs: prerelease, never "latest",
+          # so releases/latest/download URLs keep pointing at the stable build.
+          $pre = $tag.Contains("-")
           if (gh release view $tag 2>$null) {
             Write-Host "Release $tag exists; uploading replacement assets (--clobber)."
             gh release upload $tag @assets --clobber
-            gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --latest
+            if ($pre) {
+              gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --prerelease --latest=false
+            } else {
+              gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --latest
+            }
+          } elseif ($pre) {
+            gh release create $tag @assets --title "BAKLOG $tag" --notes-file release-notes.md --prerelease --latest=false
           } else {
             gh release create $tag @assets --title "BAKLOG $tag" --notes-file release-notes.md
           }

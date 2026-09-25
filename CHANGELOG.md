@@ -41,6 +41,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - Connections **Clear cloud library** deletes synced catalog and personal files from your account cloud storage (with confirm). Local files and store credentials stay on this PC.
 - Import from cloud mirror offers **Replace** or **Merge**: merge keeps local-only games and statuses while cloud wins on overlapping keys.
+- Pro: optional **Deal alerts** (off by default, turn on in Connections). BAKLOG refreshes wishlist prices and the free games feed in the background, and the tray tells you when a wishlist game drops in price or a new free game appears. **Snooze alerts today** in the tray menu mutes them until tomorrow.
 
 ### Changed
 

@@ -70,6 +70,7 @@ def test_prices_all_wishlist_stores_with_frontend_keys(catalogs: Path):
     assert by_key["wishlist:epic-ns:off"]["match"] == "appid"
     assert by_key["wishlist:gog-111"]["match"] == "title"
     assert by_key["wishlist:xbox-9N"]["match"] == "title"
+    assert by_key["wishlist:570"]["title"] == "Dota 2"
     assert ("Epic Game", 1091500) in _Client.lookups
     assert ("Gog Game", None) in _Client.lookups
 

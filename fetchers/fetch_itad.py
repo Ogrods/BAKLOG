@@ -4,7 +4,7 @@
 By default we only look up wishlist titles - those are the ones where a price
 drop matters. Pass ``--include-library`` to also look up every owned game.
 
-Each priced row records ``match``: ``"appid"`` when ITAD resolved it from a
+Each priced row records ``title`` (for tray alerts) and ``match``: ``"appid"`` when ITAD resolved it from a
 Steam app id (exact) or ``"title"`` for a fuzzy title lookup. Deal alerts only
 fire on ``appid`` matches.
 """
@@ -199,6 +199,7 @@ def main() -> int:
 
     plain_by_key: dict[str, str] = {}
     match_by_key: dict[str, str] = {}
+    title_by_key = {key: title for key, title, _appid in titles}
     is_cached = getattr(client, "is_lookup_cached", None)
     uncached_used = 0
     deferred = 0
@@ -250,7 +251,11 @@ def main() -> int:
     by_key: dict[str, dict] = {}
     for key, plain in plain_by_key.items():
         if plain in prices_by_plain:
-            by_key[key] = {**prices_by_plain[plain], "match": match_by_key.get(key, "title")}
+            by_key[key] = {
+                **prices_by_plain[plain],
+                "match": match_by_key.get(key, "title"),
+                "title": title_by_key.get(key, ""),
+            }
         else:
             stats.warn(f"no price data for {key}")
 

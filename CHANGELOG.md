@@ -26,7 +26,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
    also compile `baklog.iss`. Tag push rebuilds on GitHub Actions; local
    artifacts are for testing only.
 5. **Gates (tagging only):** working tree must be clean and GitHub CI must be green on the release commit on `main` before tagging, not before merge. Never tag WIP or a red/pending CI commit.
-6. **Broken public installer:** do not bump version for a bad build alone. Fix
+6. **Version numbers:** from 1.0 on, use plain SemVer with no zero padding:
+   `1.0.0`, then `1.0.1`, `1.0.2`, `1.1.0`. The `0.9.0X` history stays as published.
+   The CHANGELOG `[X.Y.Z]` section becomes the GitHub Release body, so it must
+   exist and be user-facing before tagging (`scripts/release_notes.py`).
+7. **Broken public installer:** do not bump version for a bad build alone. Fix
    on `main`, keep `pyproject.toml` on the same version, run
    `.\scripts\replace_release_tag.ps1 -Version X.Y.Z -Force` to replace the tag
    and re-publish assets at the same version.

@@ -17,31 +17,18 @@ if (Test-Path $VenvPython) {
     $Python = "python"
 }
 
-function Read-PyProjectVersion {
-    $text = Get-Content -Raw (Join-Path $Root "pyproject.toml")
-    if ($text -match 'version\s*=\s*"([^"]+)"') { return $Matches[1] }
-    throw "Could not read version from pyproject.toml"
+Write-Host "==> Working tree clean"
+$dirty = @(git status --porcelain)
+if ($dirty.Count -gt 0) {
+    $dirty | Select-Object -First 20 | ForEach-Object { Write-Host "    $_" }
+    throw "Working tree is dirty. Commit or stash before a release preflight."
 }
+Write-Host "    clean"
 
-function Read-PackageJsonVersion {
-    $pkg = Get-Content -Raw (Join-Path $Root "package.json") | ConvertFrom-Json
-    return [string]$pkg.version
-}
-
-function Read-IndexHtmlVersion {
-    $html = Get-Content -Raw (Join-Path $Root "index.html")
-    if ($html -match 'name="baklog-version"\s+content="([^"]+)"') { return $Matches[1] }
-    throw 'Could not read baklog-version from index.html'
-}
-
-Write-Host "==> Version sync (pyproject.toml, package.json, index.html)"
-$pyVer = Read-PyProjectVersion
-$pkgVer = Read-PackageJsonVersion
-$htmlVer = Read-IndexHtmlVersion
-if ($pyVer -ne $pkgVer -or $pyVer -ne $htmlVer) {
-    throw "Version mismatch: pyproject=$pyVer package.json=$pkgVer index.html=$htmlVer"
-}
-Write-Host "    $pyVer (all three match)"
+Write-Host "==> Version sync (pyproject.toml, package.json, index.html, web/mirror/index.html)"
+$pyVer = (& $Python (Join-Path $Root "scripts\release_notes.py") versions)
+if ($LASTEXITCODE -ne 0) { throw "Version stamps disagree (see above)" }
+Write-Host "    $pyVer (all stamps match)"
 
 if ($TagVersion) {
     $tag = $TagVersion.TrimStart("v")
@@ -50,6 +37,11 @@ if ($TagVersion) {
     }
     Write-Host "    Tag v$tag matches pyproject"
 }
+
+Write-Host "==> CHANGELOG [$pyVer] section"
+& $Python (Join-Path $Root "scripts\release_notes.py") notes $pyVer | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "CHANGELOG.md needs a non-empty [$pyVer] section (it becomes the GitHub Release body)" }
+Write-Host "    present"
 
 Write-Host "==> GitHub Actions secrets (repository)"
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {

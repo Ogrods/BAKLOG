@@ -58,6 +58,15 @@ jobs:
           }
           Write-Host "Tag matches pyproject version: $proj"
 
+      - name: Verify version stamps and CHANGELOG section
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          python scripts/release_notes.py versions
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          python scripts/release_notes.py notes $tag --out release-notes.md
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       # Gate: never publish a release from a commit whose tests do not pass.
       - name: Install Python deps
         run: python -m pip install -e ".[dev]"
@@ -162,9 +171,9 @@ jobs:
           if (gh release view $tag 2>$null) {
             Write-Host "Release $tag exists; uploading replacement assets (--clobber)."
             gh release upload $tag @assets --clobber
-            gh release edit $tag --title "BAKLOG $tag" --draft=false --latest
+            gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --latest
           } else {
-            gh release create $tag @assets --title "BAKLOG $tag" --generate-notes
+            gh release create $tag @assets --title "BAKLOG $tag" --notes-file release-notes.md
           }
 
   build-macos:

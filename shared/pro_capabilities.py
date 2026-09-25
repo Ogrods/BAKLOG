@@ -1,6 +1,7 @@
 """Pro capability registry for GET /api/config.
 
-``cloud_sync_mirror`` is live for Pro accounts that opt in on Connections.
+``cloud_sync_mirror`` and ``deal_watchlist_alerts`` are live for Pro accounts
+that opt in on Connections.
 """
 
 from __future__ import annotations
@@ -59,10 +60,11 @@ CAPABILITY_REGISTRY: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "deal_watchlist_alerts",
-        "status": "soon",
+        "status": "live",
         "requires_plan": True,
         "requires_auth": True,
-        "requires_opt_in": False,
+        "requires_opt_in": True,
+        "opt_in_key": "dealAlertsEnabled",
     },
     {
         "id": "remote_access_tunnel",

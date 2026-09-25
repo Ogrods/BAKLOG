@@ -3,8 +3,10 @@ import json
 from shared.profile_paths import get_active_profile_id, personal_dir
 from shared.safe_write import safe_write_text
 
-DEFAULT_PRO_SETTINGS = {"cloudMirrorEnabled": False}
+# Sync pair: js/pro-capabilities.js _proSettings / setProSettings.
+DEFAULT_PRO_SETTINGS = {"cloudMirrorEnabled": False, "dealAlertsEnabled": False}
 ALLOWED_KEYS = frozenset(DEFAULT_PRO_SETTINGS.keys())
+BOOLEAN_KEYS = frozenset({"cloudMirrorEnabled", "dealAlertsEnabled"})
 
 
 def pro_settings_path(*, profile_id=None):
@@ -22,7 +24,7 @@ def read_pro_settings(*, profile_id=None):
         return out
     for key in ALLOWED_KEYS:
         if key in doc:
-            out[key] = bool(doc[key]) if key == "cloudMirrorEnabled" else doc[key]
+            out[key] = bool(doc[key]) if key in BOOLEAN_KEYS else doc[key]
     return out
 
 
@@ -31,12 +33,9 @@ def write_pro_settings(updates, *, profile_id=None):
     for key, value in updates.items():
         if key not in ALLOWED_KEYS:
             raise ValueError(f"unknown pro setting: {key!r}")
-        if key == "cloudMirrorEnabled":
-            if not isinstance(value, bool):
-                raise ValueError("cloudMirrorEnabled must be boolean")
-            current[key] = value
-        else:
-            current[key] = value
+        if key in BOOLEAN_KEYS and not isinstance(value, bool):
+            raise ValueError(f"{key} must be boolean")
+        current[key] = value
     path = pro_settings_path(profile_id=profile_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     safe_write_text(path, json.dumps(current, indent=2) + "\n")

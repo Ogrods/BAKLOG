@@ -2,8 +2,13 @@ import json
 from http import HTTPStatus
 
 from shared.entitlement import pro_features_unlocked
-from shared.pro_settings import write_pro_settings
+from shared.pro_settings import BOOLEAN_KEYS, write_pro_settings
 from shared.supabase_auth import auth_enabled
+
+_OPT_IN_CAPABILITIES = (
+    ("cloudMirrorEnabled", "cloud_sync_mirror", "Cloud sync"),
+    ("dealAlertsEnabled", "deal_watchlist_alerts", "Deal alerts"),
+)
 
 
 def _srv():
@@ -45,22 +50,15 @@ def handle_pro_settings_put(handler):
     if not isinstance(payload, dict):
         srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "expected JSON object"})
         return
-    if "cloudMirrorEnabled" in payload and not isinstance(payload.get("cloudMirrorEnabled"), bool):
-        srv._send_json(
-            handler,
-            HTTPStatus.BAD_REQUEST,
-            {"error": "cloudMirrorEnabled must be boolean"},
-        )
-        return
-    if payload.get("cloudMirrorEnabled") is True:
-        from shared.pro_capabilities import capability_registry_status
+    for key in sorted(BOOLEAN_KEYS):
+        if key in payload and not isinstance(payload.get(key), bool):
+            srv._send_json(handler, HTTPStatus.BAD_REQUEST, {"error": f"{key} must be boolean"})
+            return
+    from shared.pro_capabilities import capability_registry_status
 
-        if capability_registry_status("cloud_sync_mirror") != "live":
-            srv._send_json(
-                handler,
-                HTTPStatus.FORBIDDEN,
-                {"error": "Cloud sync is not available yet"},
-            )
+    for key, capability_id, label in _OPT_IN_CAPABILITIES:
+        if payload.get(key) is True and capability_registry_status(capability_id) != "live":
+            srv._send_json(handler, HTTPStatus.FORBIDDEN, {"error": f"{label} is not available yet"})
             return
     try:
         doc = write_pro_settings(payload)

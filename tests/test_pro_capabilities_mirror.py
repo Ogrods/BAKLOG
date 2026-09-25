@@ -117,6 +117,71 @@ def test_pro_settings_enable_ok_when_live(pro_settings_server: str) -> None:
     assert data.get("proSettings", {}).get("cloudMirrorEnabled") is True
 
 
+def _put_settings(base: str, payload: dict) -> tuple[int, Any]:
+    return _request(
+        base,
+        "/api/pro/settings",
+        method="PUT",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer tok",
+            server._BAKLOG_LOCAL_HEADER: "1",
+        },
+        body=json.dumps(payload).encode(),
+    )
+
+
+def test_deal_alerts_capability_live_with_opt_in() -> None:
+    from shared.entitlement import PLAN_PRO
+    from shared.pro_capabilities import capability_enabled
+
+    assert capability_registry_status("deal_watchlist_alerts") == "live"
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("shared.pro_capabilities.auth_enabled", lambda: True)
+        on = {"dealAlertsEnabled": True}
+        assert capability_enabled("deal_watchlist_alerts", plan=PLAN_PRO, pro_settings=on)
+        assert not capability_enabled("deal_watchlist_alerts", plan=PLAN_PRO, pro_settings={})
+        assert not capability_enabled("deal_watchlist_alerts", plan="free", pro_settings=on)
+        mp.setattr("shared.pro_capabilities.auth_enabled", lambda: False)
+        assert not capability_enabled("deal_watchlist_alerts", plan=PLAN_PRO, pro_settings=on)
+
+
+def test_pro_settings_defaults_deal_alerts_off(pro_settings_server: str) -> None:
+    from shared.pro_settings import read_pro_settings
+
+    assert read_pro_settings()["dealAlertsEnabled"] is False
+
+
+def test_pro_settings_deal_alerts_round_trip(pro_settings_server: str) -> None:
+    from shared.pro_settings import read_pro_settings
+
+    status, data = _put_settings(pro_settings_server, {"dealAlertsEnabled": True})
+    assert status == 200, data
+    assert data["proSettings"] == {"cloudMirrorEnabled": False, "dealAlertsEnabled": True}
+    assert read_pro_settings()["dealAlertsEnabled"] is True
+    status, data = _put_settings(pro_settings_server, {"dealAlertsEnabled": False})
+    assert status == 200, data
+    assert data["proSettings"]["dealAlertsEnabled"] is False
+
+
+def test_pro_settings_rejects_non_boolean_deal_alerts(pro_settings_server: str) -> None:
+    status, data = _put_settings(pro_settings_server, {"dealAlertsEnabled": 1})
+    assert status == 400, data
+    assert "dealAlertsEnabled must be boolean" in str(data.get("error"))
+
+
+def test_pro_settings_deal_alerts_blocked_when_not_live(
+    pro_settings_server: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "shared.pro_capabilities.capability_registry_status",
+        lambda cid: "soon" if cid == "deal_watchlist_alerts" else "live",
+    )
+    status, data = _put_settings(pro_settings_server, {"dealAlertsEnabled": True})
+    assert status == 403, data
+    assert "Deal alerts" in str(data.get("error"))
+
+
 def test_pro_settings_sign_in_required_before_pro_check(
     pro_settings_server: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

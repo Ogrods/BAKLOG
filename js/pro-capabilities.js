@@ -13,8 +13,11 @@ export const CAPABILITY_MARKETING = {
   deal_watchlist_alerts: 'Deal/watchlist alerts',
 };
 
+/** Sync pair: shared/pro_settings.py DEFAULT_PRO_SETTINGS / BOOLEAN_KEYS. */
+const PRO_SETTING_KEYS = ['cloudMirrorEnabled', 'dealAlertsEnabled'];
+
 let _capabilities = {};
-let _proSettings = { cloudMirrorEnabled: false };
+let _proSettings = { cloudMirrorEnabled: false, dealAlertsEnabled: false };
 
 /** @param {Record<string, { status?: string, enabled?: boolean }>} caps */
 export function setCapabilitiesFromConfig(caps) {
@@ -24,9 +27,7 @@ export function setCapabilitiesFromConfig(caps) {
 /** @param {Record<string, unknown>} settings */
 export function setProSettingsFromConfig(settings) {
   if (settings && typeof settings === 'object') {
-    _proSettings = {
-      cloudMirrorEnabled: settings.cloudMirrorEnabled === true,
-    };
+    _proSettings = Object.fromEntries(PRO_SETTING_KEYS.map((k) => [k, settings[k] === true]));
   }
 }
 
@@ -38,11 +39,11 @@ export function getProSettings() {
   return { ..._proSettings };
 }
 
-/** @param {Partial<{ cloudMirrorEnabled: boolean }>} next */
+/** @param {Partial<{ cloudMirrorEnabled: boolean, dealAlertsEnabled: boolean }>} next */
 export function setProSettings(next) {
   if (!next || typeof next !== 'object') return getProSettings();
-  if ('cloudMirrorEnabled' in next) {
-    _proSettings.cloudMirrorEnabled = next.cloudMirrorEnabled === true;
+  for (const key of PRO_SETTING_KEYS) {
+    if (key in next) _proSettings[key] = next[key] === true;
   }
   return getProSettings();
 }

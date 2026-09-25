@@ -1223,6 +1223,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._handle_support_get(path)
             return
+        if path == "/api/deal-alerts/pending":
+            from shared.server_deal_alerts import handle_deal_alerts_pending_get
+
+            handle_deal_alerts_pending_get(self)
+            return
         if path.startswith("/oauth/epic/callback"):
             self._handle_epic_oauth_callback()
             return
@@ -1321,6 +1326,11 @@ class Handler(SimpleHTTPRequestHandler):
             if self._reject_if_csrf_strict():
                 return
             self._handle_shutdown()
+            return
+        if path == "/api/deal-alerts/ack":
+            from shared.server_deal_alerts import handle_deal_alerts_ack_post
+
+            handle_deal_alerts_ack_post(self)
             return
         if path == "/api/auth/sign-out":
             if self._reject_if_csrf_strict():

@@ -372,7 +372,7 @@ const HOUSE_DEFAULTS = {
     kind: 'house',
     title: 'Catch free drops early',
     slogan: 'Alerts when giveaways and sales land.',
-    tagline: 'Deal and watchlist alerts - coming soon for Pro.',
+    tagline: 'Tray alerts for wishlist price drops and new free games, with Pro.',
     cta: 'Support BAKLOG',
     url: PRO_CHECKOUT_MONTHLY,
     cover: '',
@@ -819,7 +819,7 @@ export const PRO_PROMO = {
     },
     {
       title: 'Deal/watchlist alerts',
-      desc: 'Coming soon: alerts when Epic, GOG, Steam, and Prime drops land, plus wishlist price targets.',
+      desc: 'Optional tray alerts when a wishlist game drops in price or a new free game appears. Turn it on in Connections.',
       icon: '🔔',
     },
   ],
@@ -832,7 +832,7 @@ export const PRO_PROMO = {
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
     { feature: 'Cloud sync', free: '-', pro: '✓ (opt-in)' },
-    { feature: 'Deal/watchlist alerts', free: '-', pro: 'Coming' },
+    { feature: 'Deal/watchlist alerts', free: '-', pro: '✓ (opt-in)' },
   ],
   trustPoints: [
     'Local-first - your library stays on your machine',

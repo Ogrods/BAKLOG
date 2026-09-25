@@ -50,9 +50,16 @@ describe('PRO_PROMO sync with landing', () => {
     expect(rowMatch[1].trim()).toBe(promoRow.pro);
   });
 
-  it('only deal alerts use Coming in tierCompare pro column', () => {
+  it('no tierCompare pro cell says Coming', () => {
     const comingRows = PRO_PROMO.tierCompare.filter((r) => /coming/i.test(String(r.pro)));
-    expect(comingRows.map((r) => r.feature).sort()).toEqual(['Deal/watchlist alerts']);
+    expect(comingRows).toEqual([]);
+  });
+
+  it('deal alerts are a shipped opt-in Pro row', () => {
+    const row = PRO_PROMO.tierCompare.find((r) => r.feature === 'Deal/watchlist alerts');
+    expect(row.pro).toMatch(/opt-in/i);
+    const feature = PRO_PROMO.features.find((f) => /deal\/watchlist alerts/i.test(f.title));
+    expect(feature.desc).not.toMatch(/coming soon/i);
   });
 
   it('trustPoints use canonical no telemetry by default wording', () => {

@@ -49,7 +49,7 @@ python-dotenv==1.2.3
 pywin32==312
 pywin32-ctypes==0.2.3
 requests==2.34.2
-ruff==0.15.21
+ruff==0.16.9
 setuptools==82.0.1
 shadowcopy==0.0.4
 six==1.17.0

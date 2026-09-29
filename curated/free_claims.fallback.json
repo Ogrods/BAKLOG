@@ -1,46 +1,33 @@
 {
-  "generated_at": "2026-09-24T18:09:29.584173+00:00",
+  "generated_at": "2026-09-29T19:55:53.137394+00:00",
   "items": [
     {
       "id": "epic-astrea-six-sided-oracles-33c949",
       "store": "epic",
       "title": "Astrea Six Sided Oracles",
       "claim_url": "https://store.epicgames.com/en-US/p/astrea-six-sided-oracles-33c949",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/4515173972ae4444a2582bc690c150bd/astrea-six-sided-oracles-offer-bvy0n.png",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1755830/0a034d750802c570aabef6af262c154ae46fedfa/header.jpg?t=1788710368",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-10-01T15:00:00Z",
       "steam_appid": 1755830,
+      "review_percent": 92,
       "source": "epic",
-      "first_seen": "2026-09-24T18:07:35Z"
+      "first_seen": "2026-09-29T19:55:36Z"
     },
     {
       "id": "epic-mechabellum-88a843",
       "store": "epic",
       "title": "Mechabellum",
       "claim_url": "https://store.epicgames.com/en-US/p/mechabellum-88a843",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/131adc2288294d74aaff6a2f02b51d59/mechabellum-95319.jpg",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/669330/845165412668d8b6765b3fa19639ea7c5b1d892c/header_alt_assets_2.jpg?t=1790680226",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-10-01T15:00:00Z",
       "steam_appid": 669330,
+      "review_percent": 84,
       "source": "epic",
-      "first_seen": "2026-09-24T18:07:35Z"
-    },
-    {
-      "id": "gamerpower-3788",
-      "store": "other",
-      "title": "Hamster Talk (Stove) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/hamster-talk-stove-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3985130/6c45ee8e034f6f78c3dac577626174b02d798c10/header.jpg?t=1789548719",
-      "genres": [],
-      "blurb": "Always wanted to have hamsters? Don’t miss out on this amazing giveaway! Score Hamster Talk for free on Stove! Hamster Talk is a 2d idle game where adorable hamsters live and move right on your screen. Don´t miss it!",
-      "ends_at": "2026-09-29T23:59:00Z",
-      "steam_appid": 3985130,
-      "review_percent": 95,
-      "source": "gamerpower",
-      "first_seen": "2026-09-24T18:07:35Z",
-      "premium_only": true
+      "first_seen": "2026-09-29T19:55:36Z"
     },
     {
       "id": "gamerpower-3787",
@@ -54,7 +41,7 @@
       "steam_appid": 3660140,
       "review_percent": 100,
       "source": "gamerpower",
-      "first_seen": "2026-09-24T18:07:35Z",
+      "first_seen": "2026-09-29T19:55:36Z",
       "premium_only": true
     },
     {
@@ -69,21 +56,7 @@
       "steam_appid": 1296880,
       "review_percent": 80,
       "source": "gamerpower",
-      "first_seen": "2026-09-24T18:07:35Z"
-    },
-    {
-      "id": "gamerpower-3778",
-      "store": "ubisoft",
-      "title": "FOR HONOR (Ubisoft) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/for-honor-ubisoft-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aa94d05ac575.jpg",
-      "genres": [],
-      "blurb": "Ubisoft is back with another amazing giveaway! Claim FOR HONOR for free via Ubisoft Store! For Honor is a popular team-based PvP melee fighting game with endless battles. Don´t miss it!",
-      "ends_at": "2026-09-28T23:59:00Z",
-      "steam_appid": 304390,
-      "review_percent": 69,
-      "source": "gamerpower",
-      "first_seen": "2026-09-17T19:18:10Z"
+      "first_seen": "2026-09-29T19:55:36Z"
     },
     {
       "id": "itad-3258e18ac3e8",
@@ -116,6 +89,21 @@
       "review_percent": 91,
       "source": "itad",
       "first_seen": "2026-09-17T19:18:10Z",
+      "premium_only": true
+    },
+    {
+      "id": "gamerpower-3788",
+      "store": "other",
+      "title": "Hamster Talk (Stove) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/hamster-talk-stove-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3985130/6c45ee8e034f6f78c3dac577626174b02d798c10/header.jpg?t=1789548719",
+      "genres": [],
+      "blurb": "Always wanted to have hamsters? Don’t miss out on this amazing giveaway! Score Hamster Talk for free on Stove! Hamster Talk is a 2d idle game where adorable hamsters live and move right on your screen. Don´t miss it!",
+      "ends_at": "2026-09-29T23:59:00Z",
+      "steam_appid": 3985130,
+      "review_percent": 95,
+      "source": "gamerpower",
+      "first_seen": "2026-09-24T18:07:35Z",
       "premium_only": true
     }
   ],

@@ -390,6 +390,8 @@ async function clearStaleAuthSession() {
 /** Verify the current bearer is accepted by server.py before boot continues. */
 async function probeServerToken() {
   if (!_accessToken) return false;
+  // 0 = no answer (network error / bad JSON); only 401 means the bearer was rejected.
+  _lastSessionProbeStatus = 0;
   try {
     const res = await fetch("/api/auth/session", {
       headers: { Authorization: `Bearer ${_accessToken}` },
@@ -403,6 +405,7 @@ async function probeServerToken() {
     if (data.email) _accountEmail = data.email;
     if (typeof data.plan === "string" && data.plan) setPlan(data.plan);
     const ok = !!data.ok;
+    _lastSessionProbeStatus = ok ? res.status : 401;
     if (ok && data.refreshSession && _supabase) {
       const { data: refData, error } = await _supabase.auth.refreshSession();
       if (!error && refData.session) applySession(refData.session);
@@ -422,6 +425,7 @@ async function probeServerToken() {
     }
     return ok;
   } catch {
+    _lastSessionProbeStatus = 0;
     return false;
   }
 }
@@ -858,9 +862,13 @@ export async function refreshAccessToken() {
       applySession(data.session);
       if (await probeServerTokenWithRetry(2)) return _accessToken;
       // Supabase refresh can succeed while the local server still rejects the
-      // bearer - clear so callers do not keep sending a dead JWT.
-      applySession(null);
-      return null;
+      // bearer - clear so callers do not keep sending a dead JWT. A network blip
+      // or 5xx is not a rejection, so keep the freshly refreshed session.
+      if (_lastSessionProbeStatus === 401) {
+        applySession(null);
+        return null;
+      }
+      return _accessToken;
     } finally {
       _refreshInFlight = null;
     }

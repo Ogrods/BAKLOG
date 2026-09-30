@@ -127,6 +127,9 @@ let postConnectFastPollTimer = null;
 let postConnectFastPollStopAt = 0;
 /** Active Connect EventSource by provider (cancel / error teardown). */
 const _activeConnectStreams = new Map();
+/** Latest Connect flow id per provider; a superseded flow must not tear down shared UI. */
+const _connectFlowIds = new Map();
+let _connectFlowSeq = 0;
 
 let gridWired = false;
 let noteSaveTimer = null;
@@ -2154,6 +2157,22 @@ async function startBrowserConnect(provider) {
   );
 
   const log = card?.querySelector(".conn-log");
+  const flowId = ++_connectFlowSeq;
+  _connectFlowIds.set(provider, flowId);
+  const isCurrentFlow = () => _connectFlowIds.get(provider) === flowId;
+  const setLog = (text) => {
+    if (log && isCurrentFlow()) log.textContent = text;
+  };
+  let es = null;
+  /** Release card-level state only while this flow still owns it. */
+  const releaseSharedUi = () => {
+    if (es && _activeConnectStreams.get(provider) === es) {
+      _activeConnectStreams.delete(provider);
+    }
+    if (!isCurrentFlow()) return;
+    hideConnectCancelControl(card);
+    stopPostConnectFastPoll();
+  };
 
   // A "Reconnect" (status connected/expired) should start a clean sign-in:
   // wipe the old profile cookies server-side so a stale/expired session never
@@ -2183,10 +2202,7 @@ async function startBrowserConnect(provider) {
       { method: "POST" },
     );
   } catch (err) {
-    if (log)
-      log.textContent =
-        "Could not reach the local server (is server.py running?).";
-
+    setLog("Could not reach the local server (is server.py running?).");
     return;
   }
 
@@ -2195,16 +2211,15 @@ async function startBrowserConnect(provider) {
   if (!res.ok) {
     const alreadyOpen = /already open/i.test(String(data.error || ""));
     if (alreadyOpen) {
-      if (log) {
-        log.textContent =
-          data.error ||
-          "A sign-in window is already open. Cancelling so you can retry…";
-      }
-      showConnectCancelControl(card, provider, log);
+      setLog(
+        data.error ||
+          "A sign-in window is already open. Cancelling so you can retry…",
+      );
+      if (isCurrentFlow()) showConnectCancelControl(card, provider, log);
       const cancelled = await cancelBrowserConnect(provider);
       if (cancelled) {
-        if (log) log.textContent = "Previous sign-in cancelled. Retrying…";
-        hideConnectCancelControl(card);
+        setLog("Previous sign-in cancelled. Retrying…");
+        if (isCurrentFlow()) hideConnectCancelControl(card);
         try {
           res = await baklogFetch(
             `/api/auth/${provider}/start${fresh ? "?fresh=1" : ""}`,
@@ -2212,24 +2227,24 @@ async function startBrowserConnect(provider) {
           );
           data = await res.json().catch(() => ({}));
         } catch {
-          if (log)
-            log.textContent =
-              "Could not reach the local server (is server.py running?).";
+          setLog("Could not reach the local server (is server.py running?).");
           return;
         }
       }
     }
     if (!res.ok) {
-      if (log) log.textContent = data.error || `Start failed (${res.status})`;
+      setLog(data.error || `Start failed (${res.status})`);
       return;
     }
   }
 
+  // A newer Connect click took over while this one was starting.
+  if (!isCurrentFlow()) return;
+
   showConnectCancelControl(card, provider, log);
   if (!data.session_id) {
-    if (log) log.textContent = "Connect start returned no session id.";
-    hideConnectCancelControl(card);
-    stopPostConnectFastPoll();
+    setLog("Connect start returned no session id.");
+    releaseSharedUi();
     return;
   }
   startPostConnectFastPoll();
@@ -2237,29 +2252,34 @@ async function startBrowserConnect(provider) {
   const streamUrl = await urlWithStreamTicket(
     `/api/auth/${data.session_id}/stream`,
   );
-  const es = new EventSource(streamUrl);
+  if (!isCurrentFlow()) return;
+  es = new EventSource(streamUrl);
   _activeConnectStreams.set(provider, es);
   let connectUiFinished = false;
   let transportErrorStreak = 0;
 
-  async function finishConnectUi() {
-    if (connectUiFinished) return;
-    connectUiFinished = true;
-    hideConnectCancelControl(card);
-    stopPostConnectFastPoll();
-    reconnectProviders.delete(provider);
-    renderReconnectBanner();
+  const closeStream = () => {
     try {
       es.onerror = null;
       es.close();
     } catch (_) {
       /* noop */
     }
-    _activeConnectStreams.delete(provider);
+  };
+
+  async function finishConnectUi() {
+    if (connectUiFinished) return;
+    connectUiFinished = true;
+    closeStream();
+    const owned = isCurrentFlow();
+    releaseSharedUi();
+    if (!owned) return;
+    reconnectProviders.delete(provider);
+    renderReconnectBanner();
     try {
       await refreshConnections();
       const row = getAuthStatusSnapshot().find((r) => r.key === provider);
-      if (log && row?.status === "connected") log.textContent = "Connected.";
+      if (row?.status === "connected") setLog("Connected.");
     } catch (_) {
       /* noop */
     }
@@ -2272,73 +2292,56 @@ async function startBrowserConnect(provider) {
       transportErrorStreak += 1;
       if (transportErrorStreak < 3) return;
     }
-    if (log) {
-      log.textContent =
-        "Sign-in stream dropped. Close the browser window and try Connect again.";
-    }
+    setLog(
+      "Sign-in stream dropped. Close the browser window and try Connect again.",
+    );
     connectUiFinished = true;
-    hideConnectCancelControl(card);
-    stopPostConnectFastPoll();
-    try {
-      es.onerror = null;
-      es.close();
-    } catch (_) {
-      /* noop */
-    }
-    _activeConnectStreams.delete(provider);
+    closeStream();
+    releaseSharedUi();
   };
 
   es.addEventListener("waiting_for_user", (ev) => {
     const msg = JSON.parse(ev.data);
-
-    if (log)
-      log.textContent =
-        msg.message || "Complete sign-in in the browser window…";
+    setLog(msg.message || "Complete sign-in in the browser window…");
   });
 
   es.addEventListener("status", (ev) => {
     try {
       const msg = JSON.parse(ev.data);
-      if (log && msg.message) log.textContent = msg.message;
+      if (msg.message) setLog(msg.message);
     } catch {
       /* ignore malformed status */
     }
   });
 
   es.addEventListener("signed_in", () => {
-    if (log) log.textContent = "Signed in - extracting credentials…";
+    setLog("Signed in - extracting credentials…");
   });
 
   es.addEventListener("extracted", () => {
-    if (log) log.textContent = "Connected.";
-
+    setLog("Connected.");
     void finishConnectUi();
   });
 
   es.addEventListener("error", (ev) => {
+    let text;
     try {
       const msg = JSON.parse(ev.data);
-
-      if (log) log.textContent = msg.message || "Sign-in failed";
+      text = msg.message || "Sign-in failed";
     } catch {
-      if (log) log.textContent = "Sign-in failed or window closed.";
+      text = "Sign-in failed or window closed.";
     }
 
     // On frozen builds, the server console stderr may contain the actual
     // error details (e.g. a traceback from the connect callback).
-    if (_serverFrozen && log) {
-      log.textContent += " Check connect-*.log in your BAKLOG data folder (see Settings > Data folder).";
+    if (_serverFrozen) {
+      text += " Check connect-*.log in your BAKLOG data folder (see Settings > Data folder).";
     }
+    setLog(text);
 
     connectUiFinished = true;
-    hideConnectCancelControl(card);
-    stopPostConnectFastPoll();
-    try {
-      es.close();
-    } catch (_) {
-      /* noop */
-    }
-    _activeConnectStreams.delete(provider);
+    closeStream();
+    releaseSharedUi();
   });
 
   es.addEventListener("done", () => {

@@ -140,6 +140,31 @@ describe('auth-gate', () => {
     expect(getAccountProfileId()).toBe('550e8400-e29b-41d4-a716-446655440000');
   });
 
+  async function bootSignedIn(sessionStatusAfterBoot) {
+    supabaseMock.setSession({ access_token: 'tok', user: { email: 'user@example.com' } });
+    const mod = await import('../js/auth-gate.js');
+    await mod.initAuthGate();
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url === '/api/auth/session') {
+        return new Response('{}', { status: sessionStatusAfterBoot });
+      }
+      return new Response('{}', { status: 404 });
+    }));
+    return mod;
+  }
+
+  it('refreshAccessToken keeps the refreshed session when the probe gets a 5xx', async () => {
+    const { refreshAccessToken, getAccessToken } = await bootSignedIn(503);
+    await expect(refreshAccessToken()).resolves.toBe('tok');
+    expect(getAccessToken()).toBe('tok');
+  }, 10_000);
+
+  it('refreshAccessToken clears the session when the server rejects the bearer', async () => {
+    const { refreshAccessToken, getAccessToken } = await bootSignedIn(401);
+    await expect(refreshAccessToken()).resolves.toBeNull();
+    expect(getAccessToken()).toBeNull();
+  }, 10_000);
+
   it('initAuthGate retries session probe after transient failure', async () => {
     let sessionHits = 0;
     vi.stubGlobal('fetch', vi.fn(async (url) => {

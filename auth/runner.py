@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import queue
 import re
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -112,6 +113,7 @@ class AuthSession:
         "_finished",
         "_cancelled",
         "_lock",
+        "_commit_lock",
     )
 
     def __init__(self, session_id: str, provider: str, *, fresh_connect: bool = False) -> None:
@@ -124,6 +126,8 @@ class AuthSession:
         self._cancelled = threading.Event()
         self.started_at = time.time()
         self._lock = threading.Lock()
+        # Separate from _lock so emit() inside a commit block cannot deadlock.
+        self._commit_lock = threading.Lock()
 
     def emit(self, event: str, data: dict[str, Any]) -> None:
         with self._lock:
@@ -140,10 +144,22 @@ class AuthSession:
 
     def cancel(self) -> None:
         """Ask the poll loop to abort; finish() is still called by the worker."""
-        self._cancelled.set()
+        with self._commit_lock:
+            self._cancelled.set()
 
     def is_cancelled(self) -> bool:
         return self._cancelled.is_set()
+
+    @contextlib.contextmanager
+    def commit(self) -> Iterator[bool]:
+        """Hold off cancel() while the worker writes its terminal credential state.
+
+        Yields False when already cancelled; the caller must then skip the write.
+        Once inside with True, a racing cancel() waits until the write finishes, so
+        a replacement session never has its result overwritten by this one.
+        """
+        with self._commit_lock:
+            yield not self._cancelled.is_set()
 
     def finish(self) -> None:
         self._finished.set()

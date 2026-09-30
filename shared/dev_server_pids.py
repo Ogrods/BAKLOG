@@ -206,7 +206,13 @@ def reclaim_stale_server(
     this start can take over. Prefers the pid file, falls back to whoever is
     listening on the port. Returns True if a reclaim was attempted."""
     me = os.getpid()
-    for pid in (read_pid_file(pid_file), pid_listening_on_port(host, port)):
+    recorded = read_pid_file(pid_file)
+    listener = pid_listening_on_port(host, port)
+    # Windows only checks the image name (python/baklog), so a recycled pid-file pid
+    # could be any unrelated python.exe. When the real listener is known, trust it.
+    if listener is not None and recorded != listener:
+        recorded = None
+    for pid in (recorded, listener):
         if pid is None or pid == me:
             continue
         if not pid_is_python_server(pid):

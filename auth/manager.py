@@ -412,7 +412,15 @@ def mark_invalid(provider: str, *, error: str | None = None) -> None:
     set_provider_blob(provider, blob)
 
 
-def mark_connected(provider: str, creds: dict[str, str], *, clear_error: bool = True) -> None:
+def mark_connected(
+    provider: str,
+    creds: dict[str, str],
+    *,
+    clear_error: bool = True,
+    profile_id: str | None = None,
+) -> None:
+    """``profile_id`` must be passed when writing another profile's secrets, so the
+    probe strike is cleared on that profile rather than the active one."""
     blob = get_provider_blob(provider)
     blob.update(creds)
     blob["status"] = "connected"
@@ -426,7 +434,7 @@ def mark_connected(provider: str, creds: dict[str, str], *, clear_error: bool = 
         from auth.connection_probe import clear_probe_strike
         from shared.profile_paths import get_active_profile_id
 
-        clear_probe_strike(get_active_profile_id(), provider)
+        clear_probe_strike(profile_id or get_active_profile_id(), provider)
     except Exception:  # noqa: BLE001 - probe strike reset is best-effort
         pass
 
@@ -539,7 +547,7 @@ def import_env_credentials(*, profile_id: str = DEFAULT_PROFILE_ID) -> list[str]
                     creds[alias] = val
             if not creds:
                 continue
-            mark_connected(provider, creds)
+            mark_connected(provider, creds, profile_id=profile_id)
             imported.append(provider)
     return imported
 
@@ -844,26 +852,31 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 # up to ~50s, so an immediate WL Xbox run collides and Chrome
                 # exits with "profile in use" (code 21). Trust the headed
                 # sign-in and do NOT launch a competing background browser.
-                if session.is_cancelled():
-                    return
-                mark_connected(provider, creds)
+                with session.commit() as live:
+                    if not live:
+                        return
+                    mark_connected(provider, creds)
                 session.emit("extracted", {"status": "connected"})
                 return
 
             probe_err = probe_browser_session(provider, creds)
-            if session.is_cancelled():
-                return
+            with session.commit() as live:
+                if not live:
+                    return
+                if probe_err:
+                    mark_invalid(provider, error=probe_err)
+                else:
+                    mark_connected(provider, creds)
             if probe_err:
-                mark_invalid(provider, error=probe_err)
                 session.emit("error", {"message": probe_err})
             else:
-                mark_connected(provider, creds)
                 session.emit("extracted", {"status": "connected"})
         except Exception as exc:  # noqa: BLE001
-            if session.is_cancelled():
-                return
             # Unexpected failure: clear stale state with a current message.
-            mark_invalid(provider, error=f"Sign-in did not complete: {exc}")
+            with session.commit() as live:
+                if not live:
+                    return
+                mark_invalid(provider, error=f"Sign-in did not complete: {exc}")
             session.emit("error", {"message": str(exc)})
         finally:
             session.finish()

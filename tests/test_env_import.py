@@ -207,3 +207,21 @@ def test_import_into_non_active_profile_uses_matching_hkdf(
     blob = _read_profile_blob("itch", other)
     assert blob["status"] == "connected"
     assert blob["ITCH_API_KEY"] == "itch-for-work"
+
+
+def test_import_into_non_active_profile_clears_that_profiles_probe_strike(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    other = "work"
+    (tmp_path / "profiles" / other).mkdir(parents=True, exist_ok=True)
+    cleared: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "auth.connection_probe.clear_probe_strike",
+        lambda pid, provider: cleared.append((pid, provider)),
+    )
+    monkeypatch.setenv("ITCH_API_KEY", "itch-for-work")
+
+    import_env_credentials(profile_id=other)
+
+    assert (other, "itch") in cleared
+    assert all(pid == other for pid, _ in cleared)

@@ -79,8 +79,14 @@ reviews:
         or sponsors.
     - path: "web/**"
       instructions: >
-        Marketing site only. No personal data. Sponsors feed edits that should ship
-        online belong in web/sponsors.json (hosted baklog.app wins over curated/).
+        Marketing site plus Vercel functions. No personal data outside web/mirror/.
+        Sponsors feed edits that should ship online belong in web/sponsors.json
+        (hosted baklog.app wins over curated/).
+    - path: "web/mirror/**"
+      instructions: >
+        Opt-in Pro cloud mirror viewer. Loading the signed-in user's own catalogs and
+        data/personal.json is intended. Credentials never sync; flag any path that
+        could read another user's objects or expose store secrets.
     - path: "tests/**"
       instructions: >
         Prefer focused regression tests. Use .venv Python on Windows guidance; do not

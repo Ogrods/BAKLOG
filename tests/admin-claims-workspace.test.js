@@ -238,6 +238,13 @@ describe('pruneDeadOrphanApprovals', () => {
     expect([...ids].sort()).toEqual(['auto-1', 'live-1']);
     expect(removed).toEqual(['dead-orphan']);
   });
+
+  it('does not approve active rows that were never approved', () => {
+    const auto = [{ id: 'auto-1', title: 'A' }, { id: 'auto-unapproved', title: 'U' }];
+    const live = [{ id: 'live-1', title: 'L' }];
+    const { ids } = pruneDeadOrphanApprovals(new Set(['auto-1', 'live-1']), auto, live);
+    expect(ids.has('auto-unapproved')).toBe(false);
+  });
 });
 
 describe('mergeCarriedApprovedRows', () => {
@@ -254,6 +261,17 @@ describe('mergeCarriedApprovedRows', () => {
     expect(merged).toHaveLength(2);
     expect(merged[1].id).toBe('carried-1');
     expect(merged[1]._carriedFromLive).toBe(true);
+  });
+
+  it('skips approved live rows already present in auto', () => {
+    const auto = [{ id: 'auto-1', title: 'A' }];
+    const live = [
+      { id: 'auto-1', title: 'A (live copy)' },
+      { id: 'carried-1', title: "Evan's Remains", claim_url: 'https://x' },
+    ];
+    const merged = mergeCarriedApprovedRows(auto, new Set(['auto-1', 'carried-1']), live);
+    expect(merged.map((r) => r.id)).toEqual(['auto-1', 'carried-1']);
+    expect(merged[0]._carriedFromLive).toBeUndefined();
   });
 
   it('does not inject live rows that are not approved', () => {

@@ -70,9 +70,23 @@ def test_reclaim_stale_server_kills_orphan_from_pid_file(
     pid_file.write_text("4242", encoding="utf-8")
     killed: list[int] = []
     monkeypatch.setattr(dsp, "pid_is_python_server", lambda _pid: True)
+    monkeypatch.setattr(dsp, "pid_listening_on_port", lambda *a, **k: None)
     monkeypatch.setattr(dsp, "terminate_pid", lambda pid: killed.append(pid))
     assert dsp.reclaim_stale_server("127.0.0.1", 8765, pid_file) is True
     assert killed == [4242]
+
+
+def test_reclaim_stale_server_ignores_recycled_pid_file_pid_when_listener_differs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pid_file = tmp_path / ".baklog_server.pid"
+    pid_file.write_text("4242", encoding="utf-8")
+    killed: list[int] = []
+    monkeypatch.setattr(dsp, "pid_is_python_server", lambda _pid: True)
+    monkeypatch.setattr(dsp, "pid_listening_on_port", lambda *a, **k: 5151)
+    monkeypatch.setattr(dsp, "terminate_pid", lambda pid: killed.append(pid))
+    assert dsp.reclaim_stale_server("127.0.0.1", 8765, pid_file) is True
+    assert killed == [5151]
 
 
 def test_reclaim_stale_server_skips_non_server_pid(

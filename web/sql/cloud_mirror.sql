@@ -17,10 +17,18 @@ values (
 )
 on conflict (id) do nothing;
 
--- Align existing bucket if this script is re-run after an older 50 MiB install.
+-- Align an existing bucket on re-run (older 50 MiB install, or a bucket created
+-- by hand as public / without the JSON mime allowlist).
 update storage.buckets
-set file_size_limit = 26214400
-where id = 'baklog-mirror' and coalesce(file_size_limit, 0) <> 26214400;
+set file_size_limit = 26214400,
+    public = false,
+    allowed_mime_types = array['application/json']::text[]
+where id = 'baklog-mirror'
+  and (
+    coalesce(file_size_limit, 0) <> 26214400
+    or public is distinct from false
+    or allowed_mime_types is distinct from array['application/json']::text[]
+  );
 
 -- Mirror metadata (optional complement to Storage object paths).
 create table if not exists public.cloud_mirror_snapshots (

@@ -19,6 +19,8 @@ if (Test-Path $VenvPython) {
 
 Write-Host "==> Working tree clean"
 $dirty = @(git status --porcelain)
+# A failed git call yields empty output; without this it would read as clean.
+if ($LASTEXITCODE -ne 0) { throw "Unable to determine working tree status (git status failed)" }
 if ($dirty.Count -gt 0) {
     $dirty | Select-Object -First 20 | ForEach-Object { Write-Host "    $_" }
     throw "Working tree is dirty. Commit or stash before a release preflight."

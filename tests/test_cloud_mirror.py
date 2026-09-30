@@ -152,6 +152,10 @@ def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.Monk
     catalog = profile_home / "games_steam.json"
     prior = {"games": [{"id": "1", "title": "Keep"}], "store": "steam", "game_count": 1}
     catalog.write_text(json.dumps(prior), encoding="utf-8")
+    personal = profile_home / "data" / "personal.json"
+    personal.parent.mkdir(parents=True, exist_ok=True)
+    prior_personal = json.dumps({"statuses": {"steam:1": "playing"}, "notes": {}})
+    personal.write_text(prior_personal, encoding="utf-8")
 
     monkeypatch.setattr(
         "shared.supabase_auth.verify_bearer_user",
@@ -168,24 +172,36 @@ def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.Monk
             return json.dumps(
                 {"games": [{"id": "2", "title": "New"}], "store": "steam", "game_count": 1}
             ).encode()
-        return json.dumps({"statuses": {}, "notes": {}}).encode()
+        return json.dumps({"statuses": {"steam:2": "done"}, "notes": {}}).encode()
 
     monkeypatch.setattr(cloud_mirror, "download_remote_mirror_artifact", _download)
 
-    def _boom(doc: dict[str, Any], *, allow_empty: bool = False) -> dict[str, Any]:
-        raise RuntimeError("personal save failed")
+    personal_writes: list[dict[str, Any]] = []
 
-    monkeypatch.setattr("shared.server_personal.save_personal_doc", _boom)
+    def _save_personal(doc: dict[str, Any], *, allow_empty: bool = False) -> dict[str, Any]:
+        personal.write_text(json.dumps(doc), encoding="utf-8")
+        personal_writes.append(doc)
+        return doc
 
-    with pytest.raises(RuntimeError, match="personal save failed"):
+    def _import_then_fail(payload: dict[str, Any]) -> dict[str, Any]:
+        # Partial write before failing: rollback must undo both files.
+        catalog.write_text(json.dumps(payload["catalogs"]["games_steam.json"]), encoding="utf-8")
+        raise RuntimeError("catalog import failed")
+
+    monkeypatch.setattr("shared.server_personal.save_personal_doc", _save_personal)
+    monkeypatch.setattr("shared.server_catalog_import.import_catalog_payload", _import_then_fail)
+
+    with pytest.raises(RuntimeError, match="catalog import failed"):
         import_remote_mirror_to_profile(
             authorization="Bearer x",
             source_profile_id="default",
             include_personal=True,
         )
 
+    assert personal_writes, "personal save must run before the catalog failure"
     restored = json.loads(catalog.read_text(encoding="utf-8"))
     assert restored["games"][0]["id"] == "1"
+    assert personal.read_text(encoding="utf-8") == prior_personal
 
 
 def test_import_successful_overwrite(profile_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:

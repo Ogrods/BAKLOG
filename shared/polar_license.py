@@ -9,6 +9,9 @@ import urllib.request
 
 _VALIDATE_PATH = "/v1/customer-portal/license-keys/validate"
 _GRANTED = frozenset({"granted"})
+# Unpinned requests follow Polar's Current version, which changes quarterly.
+# 2026-04 is supported until the January 2027 cycle; bump alongside the webhook endpoint.
+POLAR_API_VERSION = "2026-04"
 
 
 def polar_configured() -> bool:
@@ -42,7 +45,11 @@ def validate_license_key(key: str) -> dict:
         url,
         data=payload,
         method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Polar-Version": POLAR_API_VERSION,
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:

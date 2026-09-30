@@ -29,6 +29,7 @@ def test_validate_license_key_granted(monkeypatch):
         body = json.loads(req.data.decode())
         assert body["organization_id"] == "00000000-0000-4000-8000-000000000001"
         assert body["key"] == "BAKLOG-TEST"
+        assert req.get_header("Polar-version") == "2026-04"
         resp = MagicMock()
         resp.read.return_value = payload
         resp.__enter__ = lambda s: s

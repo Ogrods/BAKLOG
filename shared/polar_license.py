@@ -9,6 +9,11 @@ import urllib.request
 
 _VALIDATE_PATH = "/v1/customer-portal/license-keys/validate"
 _GRANTED = frozenset({"granted"})
+# Unpinned requests follow Polar's Current version, which changes quarterly.
+# 2026-10 is supported until the July 2027 cycle; bump alongside the webhook endpoint.
+POLAR_API_VERSION = "2026-10"
+# Polar's Cloudflare rejects the default Python-urllib agent with a 1010 block.
+_USER_AGENT = "BAKLOG-license/1.0 (+https://baklog.app)"
 
 
 def polar_configured() -> bool:
@@ -42,13 +47,26 @@ def validate_license_key(key: str) -> dict:
         url,
         data=payload,
         method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Polar-Version": POLAR_API_VERSION,
+            "User-Agent": _USER_AGENT,
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
+            # Polar echoes Polar-Version on handled requests; a 404 without it means the
+            # pinned version was removed, not that the key is missing.
+            if exc.headers is not None and not exc.headers.get("Polar-Version"):
+                return {
+                    "ok": False,
+                    "status": None,
+                    "error": f"Polar API version {POLAR_API_VERSION} is no longer supported",
+                }
             return {"ok": False, "status": None, "error": "License key not found"}
         detail = exc.read().decode("utf-8", errors="replace")[:200]
         return {"ok": False, "status": None, "error": detail or f"Polar HTTP {exc.code}"}

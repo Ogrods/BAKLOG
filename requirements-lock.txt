@@ -13,7 +13,7 @@ charset-normalizer==3.5.1
 colorama==0.4.6
 cryptography==50.0.1
 fake-useragent==2.2.0
-fonttools==4.64.0
+fonttools==4.66.0
 frozenlist==1.8.0
 git-filter-repo==2.47.0
 howlongtobeatpy==1.0.23
@@ -25,7 +25,7 @@ jaraco.functools==4.6.0
 keyring==25.7.0
 lz4==4.4.5
 more-itertools==11.1.0
-multidict==6.8.0
+multidict==6.9.1
 numpy==2.4.6
 packaging==26.3
 pefile==2024.8.26
@@ -39,7 +39,7 @@ pycryptodomex==3.23.0
 Pygments==2.21.0
 pyinstaller==6.22.2
 pyinstaller-hooks-contrib==2026.7
-PyJWT==2.14.0
+PyJWT==2.15.0
 pyrate-limiter==4.5.0
 pystray==0.19.5
 pytest==9.1.1
@@ -49,14 +49,14 @@ python-dotenv==1.2.3
 pywin32==312
 pywin32-ctypes==0.2.3
 requests==2.34.2
-ruff==0.15.21
+ruff==0.16.9
 setuptools==82.0.1
 shadowcopy==0.0.4
 six==1.17.0
 soupsieve==2.9.2
 termcolor==3.3.0
 typing_extensions==4.16.0
-urllib3==2.7.0
+urllib3==2.8.0
 websocket-client==1.9.2
 WMI==1.5.1
 wrapt==2.4.1

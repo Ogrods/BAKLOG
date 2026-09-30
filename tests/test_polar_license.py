@@ -29,6 +29,8 @@ def test_validate_license_key_granted(monkeypatch):
         body = json.loads(req.data.decode())
         assert body["organization_id"] == "00000000-0000-4000-8000-000000000001"
         assert body["key"] == "BAKLOG-TEST"
+        assert req.get_header("Polar-version") == "2026-10"
+        assert req.get_header("User-agent", "").startswith("BAKLOG-")
         resp = MagicMock()
         resp.read.return_value = payload
         resp.__enter__ = lambda s: s
@@ -75,3 +77,42 @@ def test_validate_license_key_not_found(monkeypatch):
     out = pl.validate_license_key("BAKLOG-MISSING")
     assert out["ok"] is False
     assert out["error"] == "License key not found"
+
+
+def _http_404(headers):
+    import email.message
+    import urllib.error
+
+    msg = email.message.Message()
+    for name, value in headers.items():
+        msg[name] = value
+    return urllib.error.HTTPError(
+        url="https://api.polar.sh/v1/customer-portal/license-keys/validate",
+        code=404,
+        msg="Not Found",
+        hdrs=msg,
+        fp=None,
+    )
+
+
+def test_validate_license_key_404_with_version_header_is_missing_key(monkeypatch):
+    err = _http_404({"Polar-Version": "2026-10"})
+
+    def fake_urlopen(req, timeout=0):
+        raise err
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    out = pl.validate_license_key("BAKLOG-MISSING")
+    assert out["error"] == "License key not found"
+
+
+def test_validate_license_key_404_without_version_header_is_retired_version(monkeypatch):
+    err = _http_404({"Content-Type": "application/json"})
+
+    def fake_urlopen(req, timeout=0):
+        raise err
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    out = pl.validate_license_key("BAKLOG-ANY")
+    assert out["ok"] is False
+    assert "no longer supported" in out["error"]

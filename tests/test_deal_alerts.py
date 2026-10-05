@@ -24,6 +24,8 @@ def files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Path]:
     monkeypatch.setattr(da, "itad_path", lambda profile_id=None: paths["itad"])
     monkeypatch.setattr(da, "free_claims_path", lambda profile_id=None: paths["claims"])
     monkeypatch.setattr(da, "alerts_enabled", lambda profile_id=None: True)
+    # take_pending()/ack() read the wall clock; pin it so NOW-dated events never age past the TTL.
+    monkeypatch.setattr(da, "_now", lambda: NOW)
     return paths
 
 

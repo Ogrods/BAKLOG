@@ -7,6 +7,13 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
+    # Lockfile-only bumps past what an installed dependency allows leave
+    # requirements-lock.txt uninstallable. Drop an entry once its pin lifts.
+    ignore:
+      - dependency-name: pycountry # psnawp 3.0.x requires pycountry<25
+        versions: [">=25"]
+      - dependency-name: multidict # aiohttp 3.14.x requires multidict<7
+        versions: [">=7"]
 
   - package-ecosystem: npm
     directory: "/"

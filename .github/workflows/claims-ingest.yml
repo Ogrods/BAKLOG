@@ -54,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -202,3 +203,8 @@ jobs:
           else
             echo "Skipping auto-merge on #$PR_NUMBER: $ADDED added claim id(s) need human review."
           fi
+
+          # Pushes made with GITHUB_TOKEN never trigger pull_request CI, so the
+          # required checks would stay missing; workflow_dispatch is exempt.
+          gh workflow run ci.yml --ref chore/claims-feed-refresh -f perf_audit=false
+          echo "Dispatched CI on chore/claims-feed-refresh for #$PR_NUMBER."

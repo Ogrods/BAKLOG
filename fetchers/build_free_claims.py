@@ -1644,6 +1644,24 @@ def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
     return len(ids) - len(kept_ids)
 
 
+def _published_feed_fully_expired(path: Path, now: datetime) -> bool:
+    """True when the existing published feed has items and every one is expired.
+
+    An empty rebuild is then the natural end of the curated set, not a source
+    outage, so the empty-publish guard can let it through.
+    """
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    items = doc.get("items") if isinstance(doc, dict) else None
+    if not isinstance(items, list) or not items:
+        return False
+    return all(
+        isinstance(item, dict) and _is_expired(_ends_at_for_prune(item), now) for item in items
+    )
+
+
 def main() -> int:
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1950,10 +1968,17 @@ def main() -> int:
             flush=True,
         )
     else:
+        allow_empty = args.allow_empty
+        if not items and not allow_empty and _published_feed_fully_expired(args.output, now):
+            print(
+                "Every item in the published feed has expired; publishing an empty feed.",
+                flush=True,
+            )
+            allow_empty = True
         empty_code = refuse_empty_result(
             items,
             label="build_free_claims publish set",
-            allow_empty=args.allow_empty,
+            allow_empty=allow_empty,
             output_path=args.output,
         )
         if empty_code:

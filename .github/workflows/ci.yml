@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      perf_audit:
-        description: Run the optional Playwright perf audit
-        type: boolean
-        default: true
 
 # One group per commit so a delayed/stale push for an older SHA cannot
 # cancel the tip run (cancel-in-progress previously keyed only on ref).
@@ -242,7 +237,7 @@ jobs:
     name: Perf audit (Playwright, optional)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: github.event_name == 'workflow_dispatch' && inputs.perf_audit
+    if: github.event_name == 'workflow_dispatch'
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6

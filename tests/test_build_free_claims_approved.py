@@ -2042,3 +2042,63 @@ def test_build_refuses_empty_publish_without_allow_empty(
     assert code == 2
     kept = json.loads(output_path.read_text(encoding="utf-8"))
     assert kept["items"][0]["id"] == "keep-me"
+
+
+def test_published_feed_fully_expired(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 10, tzinfo=UTC)
+    path = tmp_path / "free-claims.json"
+    assert bfc._published_feed_fully_expired(path, now) is False
+    path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    assert bfc._published_feed_fully_expired(path, now) is False
+    expired = [
+        {"id": "a", "ends_at": "2026-10-08T18:07:35Z"},
+        {"id": "b", "ends_at": "2026-10-09T23:59:00Z"},
+    ]
+    path.write_text(json.dumps({"items": expired}), encoding="utf-8")
+    assert bfc._published_feed_fully_expired(path, now) is True
+    mixed = [*expired[:1], {"id": "c", "ends_at": "2026-10-20T00:00:00Z"}]
+    path.write_text(json.dumps({"items": mixed}), encoding="utf-8")
+    assert bfc._published_feed_fully_expired(path, now) is False
+
+
+def _run_empty_build(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    published: list[dict],
+) -> tuple[int, Path]:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    output_path = tmp_path / "free-claims.json"
+    input_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    auto_path.write_text(json.dumps({"items": []}), encoding="utf-8")
+    output_path.write_text(json.dumps({"items": published}), encoding="utf-8")
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", tmp_path / "free_claims.approved.json")
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
+    return bfc.main(), output_path
+
+
+def test_empty_build_publishes_when_every_published_item_expired(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = [{"id": "old", "title": "Old", "ends_at": "2020-01-01T00:00:00Z"}]
+    code, output_path = _run_empty_build(tmp_path, monkeypatch, old)
+    assert code == 0
+    assert json.loads(output_path.read_text(encoding="utf-8"))["items"] == []
+
+
+def test_empty_build_still_refused_when_published_item_is_live(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = [{"id": "live", "title": "Live", "ends_at": "2099-01-01T00:00:00Z"}]
+    code, output_path = _run_empty_build(tmp_path, monkeypatch, live)
+    assert code == 2
+    assert json.loads(output_path.read_text(encoding="utf-8"))["items"] == live

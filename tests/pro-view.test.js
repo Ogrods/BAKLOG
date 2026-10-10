@@ -91,7 +91,7 @@ describe('renderProView', () => {
     expect(root.querySelector('.pro-view-pricing')).toBeNull();
     expect(root.querySelector('.pro-view-hero-main--beta')).toBeTruthy();
     expect(root.querySelector('.pro-view-hero-copy .pro-view-founder--hero-beta')).toBeTruthy();
-    expect(root.innerHTML).toContain('Checkout is closed during beta');
+    expect(root.innerHTML).toContain('Checkout is not open yet');
   });
 
   it('switches checkout label and hero banner when monthly plan is selected', async () => {

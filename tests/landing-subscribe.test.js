@@ -187,7 +187,7 @@ describe("web/api/subscribe.js", () => {
     const [, welcomeOpts] = fetchMock.mock.calls[1];
     const welcomePayload = JSON.parse(welcomeOpts.body);
     expect(welcomePayload.to).toBe("tester@example.com");
-    expect(welcomePayload.subject).toContain("open beta download");
+    expect(welcomePayload.subject).toContain("BAKLOG download");
     expect(welcomePayload.text).toContain("https://github.com/Ogrods/BAKLOG/releases/latest");
     expect(welcomePayload.html).toContain("https://github.com/Ogrods/BAKLOG/releases/latest");
   });
@@ -205,12 +205,12 @@ describe("web/api/subscribe.js", () => {
     const founderPayload = JSON.parse(founderOpts.body);
     expect(founderPayload.to).toBe("founder@example.com");
     expect(founderPayload.reply_to).toBe("tester@example.com");
-    expect(founderPayload.subject).toContain("open beta signup");
+    expect(founderPayload.subject).toContain("New BAKLOG signup");
 
     const [, welcomeOpts] = fetchMock.mock.calls[1];
     const welcomePayload = JSON.parse(welcomeOpts.body);
     expect(welcomePayload.to).toBe("tester@example.com");
-    expect(welcomePayload.subject).toContain("open beta download");
+    expect(welcomePayload.subject).toContain("BAKLOG download");
     expect(welcomePayload.text).toContain("https://github.com/Ogrods/BAKLOG/releases/latest");
   });
 

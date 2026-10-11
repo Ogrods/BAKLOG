@@ -814,7 +814,7 @@ def test_free_claims_preview_dry_run_merge(
                 "title": "Approved Epic",
                 "claim_url": "https://store.epicgames.com/en-US/p/approved",
                 "source": "epic",
-                "ends_at": "2026-12-01T00:00:00Z",
+                "ends_at": "2099-01-01T00:00:00Z",
             },
             {
                 "id": "gog-hidden",

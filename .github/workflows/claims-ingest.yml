@@ -9,6 +9,11 @@ on:
     # Daily ~15:00 UTC
     - cron: "0 15 * * *"
   workflow_dispatch:
+    inputs:
+      dry_run_approve:
+        description: Only report which feed PR CI run would be approved (no ingest)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,8 +23,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  approve-dry-run:
+    name: Approve dry run
+    if: inputs.dry_run_approve
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Report feed PR CI approval target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/approve_feed_pr_ci.py --dry-run
+
   ingest:
     name: Fetch + summarize
+    if: ${{ !inputs.dry_run_approve }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -204,22 +225,4 @@ jobs:
             echo "Skipping auto-merge on #$PR_NUMBER: $ADDED added claim id(s) need human review."
           fi
 
-          # pull_request CI for a bot-pushed head waits in action_required until
-          # approved, and required checks only count from that PR run (a
-          # workflow_dispatch run on the same SHA does not unblock the merge).
-          HEAD_SHA=$(git rev-parse HEAD)
-          RUN_ID=""
-          for _ in $(seq 1 18); do
-            RUN_ID=$(gh run list --workflow ci.yml --branch chore/claims-feed-refresh \
-              --event pull_request --limit 10 --json databaseId,headSha,conclusion \
-              --jq "map(select(.headSha == \"$HEAD_SHA\" and .conclusion == \"action_required\"))[0].databaseId // empty")
-            [ -n "$RUN_ID" ] && break
-            sleep 10
-          done
-          if [ -z "$RUN_ID" ]; then
-            echo "::warning::No action_required CI run found for $HEAD_SHA; check #$PR_NUMBER manually."
-          elif gh api -X POST "repos/${{ github.repository }}/actions/runs/$RUN_ID/approve"; then
-            echo "Approved CI run $RUN_ID for #$PR_NUMBER."
-          else
-            echo "::warning::Could not approve CI run $RUN_ID; approve it from the Actions tab so #$PR_NUMBER can merge."
-          fi
+          python scripts/approve_feed_pr_ci.py --sha "$(git rev-parse HEAD)"

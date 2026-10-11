@@ -216,7 +216,8 @@ describe("spotlight expanded categories", () => {
     steam_review_count: 1000,
     library_image: "x.jpg",
     header_image: "x.jpg",
-    release_date: "2015-01-01",
+    // Relative so the default never crosses the 12-year "Aged classic" line.
+    release_date: new Date(Date.now() - 5 * 365 * 864e5).toISOString().slice(0, 10),
     hltb_main_hours: 20,
     ...overrides,
   });

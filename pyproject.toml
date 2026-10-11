@@ -50,6 +50,7 @@ markers = [
     "integration: optional tests that launch a real Chrome/Edge browser",
     "no_leak_check: skip autouse thread/child leak detector for self-check tests",
     "slow: timing/subprocess-heavy tests (run on the dedicated Ubuntu slow lane; excluded from Windows/macOS smoke). Run locally with -m slow; skip with -m 'not slow'.",
+    "real_clock: compares file mtimes or other OS timestamps with time.time(); deselected by the time canary, which only shifts the in-process clock.",
     "release_smoke: store API contracts and fetcher regressions required before tagging a release (release.yml + test-all.ps1 -Full).",
 ]
 

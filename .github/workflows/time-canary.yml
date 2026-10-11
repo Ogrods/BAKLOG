@@ -1,0 +1,68 @@
+name: Time canary
+
+# Runs the fast test suites with the wall clock shifted forward so tests that
+# hardcode a date while the code under test reads the real clock fail here,
+# months before they would start failing in CI. Not a required check.
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+    inputs:
+      offset_days:
+        description: Days to shift the wall clock forward
+        default: "120"
+
+permissions:
+  contents: read
+
+env:
+  BAKLOG_CLOCK_OFFSET_DAYS: ${{ inputs.offset_days || '120' }}
+
+jobs:
+  python:
+    name: Python (fast, shifted clock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" time-machine
+
+      # tests/conftest.py shifts the in-process clock when BAKLOG_CLOCK_OFFSET_DAYS
+      # is set (libfaketime breaks time.sleep under Python on Linux).
+      - name: Run pytest with shifted clock
+        run: pytest -q -m "not integration and not slow and not release_smoke and not real_clock"
+
+  javascript:
+    name: JavaScript (vitest, shifted clock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Monotonic clocks drive test timeouts; shifting them only adds flakes.
+      FAKETIME_DONT_FAKE_MONOTONIC: "1"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q faketime
+          npm ci
+
+      - name: Run vitest with shifted clock
+        run: faketime -f "+${BAKLOG_CLOCK_OFFSET_DAYS}d" npm test

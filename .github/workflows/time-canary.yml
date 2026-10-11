@@ -4,8 +4,6 @@ name: Time canary
 # hardcode a date while the code under test reads the real clock fail here,
 # months before they would start failing in CI. Not a required check.
 on:
-  push:
-    branches: [fix/ci-hardening]
   schedule:
     - cron: "0 14 * * 1"
   workflow_dispatch:

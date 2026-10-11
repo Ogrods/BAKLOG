@@ -50,7 +50,7 @@ pywin32==312
 pywin32-ctypes==0.2.3
 requests==2.34.2
 ruff==0.16.10
-setuptools==82.0.1
+setuptools==84.0.0
 shadowcopy==0.0.4
 six==1.17.0
 soupsieve==2.10

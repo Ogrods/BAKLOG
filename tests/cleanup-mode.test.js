@@ -8,7 +8,8 @@ import { queryGames } from '../js/table-query.js';
 
 const NOW = Date.parse('2026-06-01');
 const OLD_RELEASE = '2019-01-01';
-const RECENT_RELEASE = '2025-01-01';
+// queryGames reads the wall clock, so "recent" must stay relative to it.
+const RECENT_RELEASE = new Date(Date.now() - 180 * 864e5).toISOString().slice(0, 10);
 
 const baseGame = {
   appid: 1,

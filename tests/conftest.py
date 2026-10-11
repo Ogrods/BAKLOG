@@ -19,6 +19,25 @@ from shared.subprocess_guard import child_pids_of, terminate_pid_tree
 _RUN_MANAGER_THREAD_PREFIXES = ("run-worker", "run-watchdog", "run-kill", "run-launch-")
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Time canary: shift the wall clock forward for the whole session.
+
+    In-process (time-machine) rather than libfaketime, which breaks time.sleep on
+    Linux. Monotonic clocks, sleeps and file mtimes stay real; tests that compare
+    mtimes against time.time() carry the ``real_clock`` marker and are deselected.
+    """
+    days = os.environ.get("BAKLOG_CLOCK_OFFSET_DAYS", "").strip()
+    if not days:
+        return
+    from datetime import UTC, datetime, timedelta
+
+    import time_machine
+
+    target = datetime.now(UTC) + timedelta(days=float(days))
+    config._baklog_clock_shift = time_machine.travel(target, tick=True)
+    config._baklog_clock_shift.start()
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _protect_real_profile_store() -> None:
     """Safety net: never let a test that forgot to isolate `profile_paths` mutate

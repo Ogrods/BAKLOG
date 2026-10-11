@@ -28,6 +28,7 @@ LIVE_URL = "https://baklog.app/free-claims.json"
 USER_AGENT = "BAKLOG-claims-ingest-summary/1.0"
 DEFAULT_MAX_AGE_DAYS = 7
 DEFAULT_SKEW_DAYS = 1.0
+DEFAULT_RUNWAY_HOURS = 48.0
 SAMPLE_LIMIT = 25
 _WS_RE = re.compile(r"\s+")
 
@@ -161,6 +162,28 @@ def landing_vs_live_skew_line(
     )
 
 
+def feed_runway_line(
+    landing_items: list[dict],
+    *,
+    now: datetime,
+    warn_hours: float = DEFAULT_RUNWAY_HOURS,
+) -> str:
+    """Warn before the published feed drains: empty, or every claim ending soon."""
+    ends = [_parse_generated_at(row.get("ends_at")) for row in landing_items]
+    live = [end for end in ends if end is None or end > now]
+    if not live:
+        return "WARN: published feed has no live claims - approve new claims in admin Claims"
+    dated = [end for end in live if end is not None]
+    if len(dated) == len(live):
+        remaining_h = (max(dated) - now).total_seconds() / 3600.0
+        if remaining_h <= warn_hours:
+            return (
+                f"WARN: all {len(live)} live claim(s) end within {warn_hours:g}h "
+                f"(last ends {_fmt_ts(max(dated))}) - approve new claims in admin Claims"
+            )
+    return f"OK: {len(live)} live claim(s) in the published feed"
+
+
 def build_markdown(
     *,
     auto_items: list[dict],
@@ -168,6 +191,7 @@ def build_markdown(
     live_line: str,
     live_stale: bool,
     skew_line: str | None = None,
+    runway_line: str | None = None,
 ) -> str:
     auto_by_id = _id_map(auto_items)
     land_by_id = _id_map(landing_items)
@@ -195,6 +219,9 @@ def build_markdown(
             lines.append(f"- `{src}`: {n}")
     else:
         lines.append("- (none)")
+
+    if runway_line:
+        lines.extend(["", "### Feed runway", "", runway_line])
 
     lines.extend(["", "### Live baklog.app age", "", live_line, ""])
     if live_stale:
@@ -286,6 +313,7 @@ def main(argv: list[str] | None = None) -> int:
         live_line=live_line,
         live_stale=live_stale,
         skew_line=skew_line,
+        runway_line=feed_runway_line(landing_items, now=datetime.now(UTC)),
     )
     _write_summary(md)
     return 0

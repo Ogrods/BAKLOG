@@ -10,17 +10,15 @@ on:
     - cron: "0 14 * * 1"
   workflow_dispatch:
     inputs:
-      offset:
-        description: Clock offset passed to faketime
-        default: "+120d"
+      offset_days:
+        description: Days to shift the wall clock forward
+        default: "120"
 
 permissions:
   contents: read
 
 env:
-  CLOCK_OFFSET: ${{ inputs.offset || '+120d' }}
-  # Monotonic clocks drive test timeouts and sleeps; shifting them only adds flakes.
-  FAKETIME_DONT_FAKE_MONOTONIC: "1"
+  BAKLOG_CLOCK_OFFSET_DAYS: ${{ inputs.offset_days || '120' }}
 
 jobs:
   python:
@@ -38,18 +36,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q faketime
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" time-machine
 
+      # tests/conftest.py shifts the in-process clock when BAKLOG_CLOCK_OFFSET_DAYS
+      # is set (libfaketime breaks time.sleep under Python on Linux).
       - name: Run pytest with shifted clock
-        run: faketime -f "$CLOCK_OFFSET" pytest -q -m "not integration and not slow and not release_smoke"
+        run: pytest -q -m "not integration and not slow and not release_smoke and not real_clock"
 
   javascript:
     name: JavaScript (vitest, shifted clock)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Monotonic clocks drive test timeouts; shifting them only adds flakes.
+      FAKETIME_DONT_FAKE_MONOTONIC: "1"
     steps:
       - uses: actions/checkout@v6
 
@@ -66,4 +67,4 @@ jobs:
           npm ci
 
       - name: Run vitest with shifted clock
-        run: faketime -f "$CLOCK_OFFSET" npm test
+        run: faketime -f "+${BAKLOG_CLOCK_OFFSET_DAYS}d" npm test

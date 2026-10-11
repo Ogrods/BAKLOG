@@ -98,3 +98,32 @@ def test_main_missing_auto_fails(tmp_path: Path) -> None:
         ]
     )
     assert code == 1
+
+
+def test_feed_runway_line() -> None:
+    now = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
+
+    def iso(delta: timedelta) -> str:
+        return (now + delta).isoformat().replace("+00:00", "Z")
+
+    assert cis.feed_runway_line([], now=now).startswith("WARN: published feed has no live claims")
+    expired = [{"id": "a", "ends_at": iso(timedelta(days=-1))}]
+    assert cis.feed_runway_line(expired, now=now).startswith("WARN: published feed has no live")
+    ending = [{"id": "b", "ends_at": iso(timedelta(hours=10))}]
+    assert cis.feed_runway_line(ending, now=now).startswith("WARN: all 1 live claim(s) end within 48h")
+    healthy = [*ending, {"id": "c", "ends_at": iso(timedelta(days=5))}]
+    assert cis.feed_runway_line(healthy, now=now) == "OK: 2 live claim(s) in the published feed"
+    undated = [*ending, {"id": "d", "ends_at": None}]
+    assert cis.feed_runway_line(undated, now=now).startswith("OK: 2 live claim(s)")
+
+
+def test_build_markdown_includes_runway_line() -> None:
+    md = cis.build_markdown(
+        auto_items=[],
+        landing_items=[],
+        live_line="SKIP",
+        live_stale=False,
+        runway_line="WARN: published feed has no live claims",
+    )
+    assert "### Feed runway" in md
+    assert "WARN: published feed has no live claims" in md

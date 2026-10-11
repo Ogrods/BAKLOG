@@ -6,6 +6,8 @@ import json
 import time
 from pathlib import Path
 
+import pytest
+
 from shared.update_ready_state import (
     APPLYING_LOCK_FILENAME,
     clear_apply_result,
@@ -15,6 +17,7 @@ from shared.update_ready_state import (
 )
 
 
+@pytest.mark.real_clock
 def test_write_and_clear_applying_lock(tmp_path: Path) -> None:
     assert is_update_apply_in_progress(tmp_path) is False
     write_applying_lock(tmp_path, version="0.8.37")

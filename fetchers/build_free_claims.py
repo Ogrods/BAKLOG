@@ -1644,18 +1644,19 @@ def _prune_expired_from_approved(path: Path, expired_ids: set[str]) -> int:
     return len(ids) - len(kept_ids)
 
 
-def _published_feed_fully_expired(path: Path, now: datetime) -> bool:
-    """True when the existing published feed has items and every one is expired.
+def _published_feed_has_no_live_items(path: Path, now: datetime) -> bool:
+    """True when the existing published feed is already empty or fully expired.
 
     An empty rebuild is then the natural end of the curated set, not a source
-    outage, so the empty-publish guard can let it through.
+    outage, so the empty-publish guard can let it through. A missing or
+    unreadable feed is not trusted.
     """
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     items = doc.get("items") if isinstance(doc, dict) else None
-    if not isinstance(items, list) or not items:
+    if not isinstance(items, list):
         return False
     return all(
         isinstance(item, dict) and _is_expired(_ends_at_for_prune(item), now) for item in items
@@ -1969,9 +1970,9 @@ def main() -> int:
         )
     else:
         allow_empty = args.allow_empty
-        if not items and not allow_empty and _published_feed_fully_expired(args.output, now):
+        if not items and not allow_empty and _published_feed_has_no_live_items(args.output, now):
             print(
-                "Every item in the published feed has expired; publishing an empty feed.",
+                "Published feed has no live items; publishing an empty feed.",
                 flush=True,
             )
             allow_empty = True

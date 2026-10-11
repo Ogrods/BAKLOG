@@ -2044,23 +2044,25 @@ def test_build_refuses_empty_publish_without_allow_empty(
     assert kept["items"][0]["id"] == "keep-me"
 
 
-def test_published_feed_fully_expired(tmp_path: Path) -> None:
+def test_published_feed_has_no_live_items(tmp_path: Path) -> None:
     from datetime import UTC, datetime
 
     now = datetime(2026, 10, 10, tzinfo=UTC)
     path = tmp_path / "free-claims.json"
-    assert bfc._published_feed_fully_expired(path, now) is False
+    assert bfc._published_feed_has_no_live_items(path, now) is False
+    path.write_text("not json", encoding="utf-8")
+    assert bfc._published_feed_has_no_live_items(path, now) is False
     path.write_text(json.dumps({"items": []}), encoding="utf-8")
-    assert bfc._published_feed_fully_expired(path, now) is False
+    assert bfc._published_feed_has_no_live_items(path, now) is True
     expired = [
         {"id": "a", "ends_at": "2026-10-08T18:07:35Z"},
         {"id": "b", "ends_at": "2026-10-09T23:59:00Z"},
     ]
     path.write_text(json.dumps({"items": expired}), encoding="utf-8")
-    assert bfc._published_feed_fully_expired(path, now) is True
+    assert bfc._published_feed_has_no_live_items(path, now) is True
     mixed = [*expired[:1], {"id": "c", "ends_at": "2026-10-20T00:00:00Z"}]
     path.write_text(json.dumps({"items": mixed}), encoding="utf-8")
-    assert bfc._published_feed_fully_expired(path, now) is False
+    assert bfc._published_feed_has_no_live_items(path, now) is False
 
 
 def _run_empty_build(
@@ -2090,6 +2092,15 @@ def test_empty_build_publishes_when_every_published_item_expired(
 ) -> None:
     old = [{"id": "old", "title": "Old", "ends_at": "2020-01-01T00:00:00Z"}]
     code, output_path = _run_empty_build(tmp_path, monkeypatch, old)
+    assert code == 0
+    assert json.loads(output_path.read_text(encoding="utf-8"))["items"] == []
+
+
+def test_empty_build_publishes_when_published_feed_already_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    code, output_path = _run_empty_build(tmp_path, monkeypatch, [])
     assert code == 0
     assert json.loads(output_path.read_text(encoding="utf-8"))["items"] == []
 

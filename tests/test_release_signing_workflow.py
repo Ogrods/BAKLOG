@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -159,6 +160,12 @@ def _powershell() -> str | None:
     return shutil.which("powershell") or shutil.which("pwsh")
 
 
+def _ps_env() -> dict[str, str]:
+    # Under a pwsh CI step, an inherited PSModulePath points Windows PowerShell 5.1
+    # at PowerShell 7 modules and Get-AuthenticodeSignature fails to autoload.
+    return {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Authenticode helpers are Windows-only")
 def test_sign_script_list_and_verify_smoke(tmp_path: Path) -> None:
     ps = _powershell()
@@ -178,6 +185,7 @@ def test_sign_script_list_and_verify_smoke(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         timeout=120,
+        env=_ps_env(),
     )
     assert listed.returncode == 0, listed.stdout + listed.stderr
     names = sorted(Path(p).name for p in out.read_text(encoding="utf-8").splitlines() if p.strip())
@@ -189,6 +197,7 @@ def test_sign_script_list_and_verify_smoke(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         timeout=120,
+        env=_ps_env(),
     )
     assert verified.returncode != 0
     assert "FAIL" in verified.stdout
@@ -204,6 +213,7 @@ def test_sign_script_rejects_missing_mode(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         timeout=120,
+        env=_ps_env(),
     )
     assert result.returncode != 0
 

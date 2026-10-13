@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Window } from 'happy-dom';
 import { syntheticSteamGames } from './fixtures/synthetic-games.js';
 
@@ -30,6 +30,31 @@ function mountTableShell() {
       </div>
     </div>
   `;
+}
+
+const STUBBED_GLOBALS = [
+  'window',
+  'document',
+  'performance',
+  'localStorage',
+  'ResizeObserver',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setTimeout',
+  'clearTimeout',
+  'CSS',
+];
+const realGlobals = new Map(
+  STUBBED_GLOBALS.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+);
+
+function restoreGlobals() {
+  for (const [name, desc] of realGlobals) {
+    if (desc) Object.defineProperty(globalThis, name, desc);
+    else delete globalThis[name];
+  }
 }
 
 function setupWindow() {
@@ -103,6 +128,11 @@ describe('table render perf', () => {
     delete global.window;
     delete global.document;
     delete global.window?.__baklogPerf;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    restoreGlobals();
   });
 
   for (const count of [100, 500, 2000]) {

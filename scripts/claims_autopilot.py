@@ -32,6 +32,7 @@ from shared.claims_decisions import (  # noqa: E402
     scoped_match_keys,
 )
 from shared.claims_dedupe import group_claims  # noqa: E402
+from shared.claims_expiry import needs_approve_end_date  # noqa: E402
 from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path  # noqa: E402
 from shared.claims_policy import (  # noqa: E402
     AUTO_PUBLISH,
@@ -221,9 +222,10 @@ def render_digest(
         lines.append("- (none)")
     for c in review:
         new = " (new)" if c.id in diff["review_added"] else ""
+        action = "approve-stale" if needs_approve_end_date(by_id[c.id], now) else "approve"
         lines.append(
             f"- [ ] Approve: {_line(by_id[c.id])}{new} <sub>{c.reason}</sub> "
-            f"<!-- cmd:approve:{c.id} -->"
+            f"<!-- cmd:{action}:{c.id} -->"
         )
     lines.append("")
     return "\n".join(lines)

@@ -565,6 +565,22 @@ def handle_internal_free_claims_sync(handler: SimpleHTTPRequestHandler) -> None:
     s._send_json(handler, HTTPStatus.OK, {"ok": True, **result})
 
 
+def handle_internal_free_claims_dispatch(handler: SimpleHTTPRequestHandler) -> None:
+    """Start Claims ingest on GitHub so a local Publish goes live via the feed PR."""
+    s = _srv()
+    from shared.claims_sync import ClaimsSyncError, dispatch_claims_ingest
+
+    try:
+        result = dispatch_claims_ingest(s.data_root())
+    except ClaimsSyncError as exc:
+        s._send_json(handler, HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
+        return
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        s._send_json(handler, HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
+        return
+    s._send_json(handler, HTTPStatus.OK, {"ok": True, **result})
+
+
 def _admin_sponsors_path(s):
     """Profile-scoped sponsors.json for the app; BAKLOG_SPONSORS_INPUT overrides."""
     import os

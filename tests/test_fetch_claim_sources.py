@@ -114,6 +114,27 @@ def test_failed_source_carries_prior_rows_forward(monkeypatch, out_path):
     assert ids == {"itad-new", "gamerpower-old"}
 
 
+def test_last_seen_stamps_fetched_rows_not_carried_rows(monkeypatch, out_path):
+    """A failed source's carried rows keep their old last_seen so an outage
+    cannot make delisted GamerPower giveaways look live."""
+    old_stamp = "2026-10-01T00:00:00+00:00"
+    prior = {"items": [
+        {**_claim("gamerpower-old", "gamerpower"), "last_seen": old_stamp},
+        {**_claim("itad-kept", "itad"), "last_seen": old_stamp},
+    ]}
+    out_path.write_text(json.dumps(prior), encoding="utf-8")
+    monkeypatch.setattr(
+        fcs, "collect_claims", lambda sources, **kw: ([_claim("itad-kept", "itad")], {"itad": 1})
+    )
+    monkeypatch.setattr(
+        sys, "argv", ["fetchers.fetch_claim_sources.py", "--output", str(out_path), "--allow-drift"]
+    )
+    assert fcs.main() == 0
+    rows = {r["id"]: r for r in json.loads(out_path.read_text(encoding="utf-8"))["items"]}
+    assert rows["gamerpower-old"]["last_seen"] == old_stamp
+    assert rows["itad-kept"]["last_seen"] > old_stamp
+
+
 def test_genuine_zero_source_not_carried_forward(monkeypatch, out_path):
     """A source that returns 0 (key present) must not resurrect prior rows."""
     prior = {"items": [_claim("gamerpower-old", "gamerpower")]}

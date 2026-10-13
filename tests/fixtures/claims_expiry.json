@@ -1,0 +1,45 @@
+{
+  "now": "2026-10-13T05:00:00Z",
+  "cases": [
+    {
+      "name": "gamerpower undated, old first_seen, fetched this run",
+      "item": {"source": "gamerpower", "ends_at": null, "first_seen": "2026-09-07T21:47:23.868533+00:00", "last_seen": "2026-10-13T04:50:20.123456+00:00"},
+      "trusted": true, "expired": false, "needs_approve_end_date": false
+    },
+    {
+      "name": "gamerpower undated, last seen 2 days ago (delisted)",
+      "item": {"source": "gamerpower", "ends_at": null, "first_seen": "2026-09-07T21:47:23+00:00", "last_seen": "2026-10-11T04:00:00+00:00"},
+      "trusted": false, "expired": true, "needs_approve_end_date": true
+    },
+    {
+      "name": "gamerpower undated, never stamped",
+      "item": {"source": "gamerpower", "ends_at": null, "first_seen": "2026-09-24T18:07:35+00:00"},
+      "trusted": false, "expired": true, "needs_approve_end_date": true
+    },
+    {
+      "name": "gamerpower undated, recent first_seen",
+      "item": {"source": "gamerpower", "ends_at": null, "first_seen": "2026-10-10T00:00:00+00:00"},
+      "trusted": false, "expired": false, "needs_approve_end_date": false
+    },
+    {
+      "name": "itad undated lingerer, fresh last_seen does not count",
+      "item": {"source": "itad", "ends_at": null, "first_seen": "2026-09-20T00:00:00+00:00", "last_seen": "2026-10-13T04:50:00+00:00"},
+      "trusted": false, "expired": true, "needs_approve_end_date": true
+    },
+    {
+      "name": "itad with future ends_at",
+      "item": {"source": "itad", "ends_at": "2026-10-20T00:00:00Z", "first_seen": "2026-09-20T00:00:00+00:00"},
+      "trusted": false, "expired": false, "needs_approve_end_date": false
+    },
+    {
+      "name": "itad with past ends_at is expired but a date already exists",
+      "item": {"source": "itad", "ends_at": "2026-10-01T00:00:00Z", "first_seen": "2026-09-20T00:00:00+00:00"},
+      "trusted": false, "expired": true, "needs_approve_end_date": false
+    },
+    {
+      "name": "no first_seen cannot be aged",
+      "item": {"source": "itad", "ends_at": null},
+      "trusted": false, "expired": false, "needs_approve_end_date": false
+    }
+  ]
+}

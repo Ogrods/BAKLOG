@@ -1384,6 +1384,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             server_internal_routes.handle_internal_free_claims_sync(self)
             return
+        if path == "/api/internal/free-claims/dispatch":
+            if not ADMIN_ENABLED:
+                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                return
+            server_internal_routes.handle_internal_free_claims_dispatch(self)
+            return
         if path == "/api/internal/discord-notify":
             if not ADMIN_ENABLED:
                 self.send_error(HTTPStatus.NOT_FOUND, "Not found")

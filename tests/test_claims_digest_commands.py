@@ -124,6 +124,52 @@ def test_apply_commands_updates_owner_doc() -> None:
     assert log == ["removed epic-a", "approved gamerpower-k", "split epic-b, gamerpower-b, itad-b"]
 
 
+def test_approve_stale_sets_end_date_override() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 13, 5, 0, 30, tzinfo=UTC)
+    new = "- [x] Approve: **Old** <!-- cmd:approve-stale:itad-old -->\n"
+    commands = cmds.newly_checked(new.replace("[x]", "[ ]"), new)
+    assert commands == [("approve-stale", ["itad-old"])]
+    doc = {"ids": [], "field_overrides": {"itad-old": {"title": "Old"}}}
+    updated, log = cmds.apply_commands(doc, commands, now=now)
+    assert updated["ids"] == ["itad-old"]
+    assert updated["field_overrides"] == {
+        "itad-old": {"title": "Old", "ends_at": "2026-10-27T05:00:30Z"}
+    }
+    assert log == ["approved itad-old (end date 2026-10-27)"]
+    again, _ = cmds.apply_commands(
+        {**updated, "field_overrides": {"itad-old": {"ends_at": "2026-11-01T00:00:00Z"}}},
+        commands,
+        now=now,
+    )
+    assert again["field_overrides"]["itad-old"]["ends_at"] == "2026-11-01T00:00:00Z"
+
+
+def test_digest_marks_stale_review_rows_approve_stale() -> None:
+    from datetime import UTC, datetime
+
+    from shared.claims_policy import classify_inbox
+
+    now = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
+    items = [
+        {"id": "itad-old", "source": "itad", "store": "other", "title": "Old",
+         "claim_url": "https://example.com/old", "ends_at": None,
+         "first_seen": "2026-09-01T00:00:00Z"},
+        {"id": "gamerpower-live", "source": "gamerpower", "store": "other", "title": "Live",
+         "claim_url": "https://example.com/live", "ends_at": None,
+         "first_seen": "2026-09-01T00:00:00Z", "last_seen": "2026-10-13T04:50:00Z"},
+    ]
+    results = classify_inbox(items, now=now)
+    reasons = {c.id: c.reason for c in results}
+    assert "no end date, first seen 42d ago" in reasons["itad-old"]
+    assert "no end date" not in reasons["gamerpower-live"]
+    empty = {"approved_added": [], "approved_removed": [], "dismissed_added": [], "review_added": []}
+    md = autopilot.render_digest(results, items, empty, now=now)
+    assert "<!-- cmd:approve-stale:itad-old -->" in md
+    assert "<!-- cmd:approve:gamerpower-live -->" in md
+
+
 def _event(tmp_path: Path, sender: str, old: str, new: str) -> Path:
     path = tmp_path / "event.json"
     path.write_text(

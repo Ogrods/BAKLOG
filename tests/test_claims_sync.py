@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from shared import claims_paths
-from shared.claims_sync import ClaimsSyncError, sync_claims_decisions
+from shared.claims_sync import ClaimsSyncError, dispatch_claims_ingest, sync_claims_decisions
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
@@ -109,3 +109,36 @@ def test_sync_aborts_rebase_on_pull_failure(tmp_path: Path, monkeypatch: pytest.
     subs = [c[0] for c in calls]
     assert subs == ["add", "diff", "commit", "pull", "rebase"]
     assert calls[-1] == ["rebase", "--abort"]
+
+
+def test_dispatch_runs_ingest_and_returns_actions_url(tmp_path: Path) -> None:
+    calls: list[tuple[list[str], str]] = []
+
+    def fake(cmd, **kwargs):
+        calls.append((cmd, kwargs.get("cwd")))
+        if cmd[1:3] == ["repo", "view"]:
+            return subprocess.CompletedProcess(cmd, 0, "https://github.com/o/BAKLOG\n", "")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    result = dispatch_claims_ingest(tmp_path, runner=fake)
+    assert calls[0] == (["gh", "workflow", "run", "claims-ingest.yml"], str(tmp_path))
+    assert result == {
+        "workflow": "claims-ingest.yml",
+        "url": "https://github.com/o/BAKLOG/actions/workflows/claims-ingest.yml",
+    }
+
+
+def test_dispatch_reports_gh_failure(tmp_path: Path) -> None:
+    def fake(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 1, "", "HTTP 403: Resource not accessible")
+
+    with pytest.raises(ClaimsSyncError, match="403"):
+        dispatch_claims_ingest(tmp_path, runner=fake)
+
+
+def test_dispatch_without_gh_cli(tmp_path: Path) -> None:
+    def fake(cmd, **kwargs):
+        raise FileNotFoundError(cmd[0])
+
+    with pytest.raises(ClaimsSyncError, match="gh"):
+        dispatch_claims_ingest(tmp_path, runner=fake)

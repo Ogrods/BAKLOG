@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from shared.claims_dedupe import ClaimGroup, group_claims, merge_group_fields, pick_winner
+from shared.claims_expiry import DEFAULT_EXPIRY_DAYS, needs_approve_end_date
 from shared.free_claims_sources import has_valid_claim_links
 
 AUTO_PUBLISH = "auto_publish"
@@ -92,6 +93,8 @@ def trusted_reason(item: dict, *, now: datetime, owner: OwnerState | None = None
     ends = _parse_dt(item.get("ends_at"))
     if ends is not None and ends <= now:
         return None
+    if needs_approve_end_date(item, now):
+        return None
     source = str(item.get("source") or "").lower()
     store = str(item.get("store") or "").lower()
     if source == "epic" and store == "epic":
@@ -102,11 +105,23 @@ def trusted_reason(item: dict, *, now: datetime, owner: OwnerState | None = None
 
 
 def review_reason(item: dict, *, now: datetime | None = None) -> str:
-    title = str(item.get("title") or "")
-    store = str(item.get("store") or "").lower()
     ends = _parse_dt(item.get("ends_at"))
     if now is not None and ends is not None and ends <= now:
         return "expired"
+    reason = _base_review_reason(item)
+    if now is not None and needs_approve_end_date(item, now):
+        first_seen = _parse_dt(item.get("first_seen"))
+        age = f", first seen {(now - first_seen).days}d ago" if first_seen else ""
+        reason += (
+            f"; no end date{age} (approving sets an end date "
+            f"{DEFAULT_EXPIRY_DAYS} days out)"
+        )
+    return reason
+
+
+def _base_review_reason(item: dict) -> str:
+    title = str(item.get("title") or "")
+    store = str(item.get("store") or "").lower()
     if _KEY_GIVEAWAY_RE.search(title):
         return "key giveaway"
     if _BONUS_RE.search(title):

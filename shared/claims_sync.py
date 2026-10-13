@@ -80,3 +80,34 @@ def sync_claims_decisions(
     head = _git(runner, internal, "rev-parse", "--short", "HEAD")
     _check(head, "git rev-parse")
     return {"changed": changed, "sha": head.stdout.strip(), "pushed": pushed}
+
+
+INGEST_WORKFLOW = "claims-ingest.yml"
+
+
+def dispatch_claims_ingest(repo_root: Path, *, runner: Runner = subprocess.run) -> dict:
+    """Start the public repo's Claims ingest run with the maintainer's ``gh`` login.
+
+    That run rebuilds the feed from the synced decisions and opens (and, when
+    every added id is vetted, auto-merges) the feed PR. Returns
+    ``{"workflow": str, "url": str}``; raises ``ClaimsSyncError`` on failure.
+    """
+
+    def gh(*args: str) -> subprocess.CompletedProcess:
+        try:
+            return runner(
+                ["gh", *args],
+                cwd=str(repo_root),
+                capture_output=True,
+                text=True,
+                timeout=GIT_TIMEOUT_SEC,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise ClaimsSyncError("GitHub CLI (gh) not found on PATH") from exc
+
+    _check(gh("workflow", "run", INGEST_WORKFLOW), "gh workflow run")
+    repo = gh("repo", "view", "--json", "url", "-q", ".url")
+    base = repo.stdout.strip() if repo.returncode == 0 else ""
+    url = f"{base}/actions/workflows/{INGEST_WORKFLOW}" if base else ""
+    return {"workflow": INGEST_WORKFLOW, "url": url}

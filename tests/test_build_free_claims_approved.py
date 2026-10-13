@@ -2129,6 +2129,11 @@ def test_published_feed_has_no_live_items(tmp_path: Path) -> None:
     mixed = [*expired[:1], {"id": "c", "ends_at": "2026-10-20T00:00:00Z"}]
     path.write_text(json.dumps({"items": mixed}), encoding="utf-8")
     assert bfc._published_feed_has_no_live_items(path, now) is False
+    # Undated GamerPower rows publish without last_seen, so they never count as dead.
+    gamerpower = [*expired, {"id": "gamerpower-1", "source": "gamerpower", "ends_at": None,
+                             "first_seen": "2026-08-01T00:00:00Z"}]
+    path.write_text(json.dumps({"items": gamerpower}), encoding="utf-8")
+    assert bfc._published_feed_has_no_live_items(path, now) is False
 
 
 def _run_empty_build(

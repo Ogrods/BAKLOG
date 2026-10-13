@@ -16,7 +16,13 @@ import requests
 from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.claims_decisions import load_auto_decisions, merge_decisions
-from shared.claims_expiry import DEFAULT_EXPIRY_DAYS, default_ends_at, is_trusted_live_listing
+from shared.claims_expiry import (
+    DEFAULT_EXPIRY_DAYS,
+    LIVE_LISTING_SOURCES,
+    default_ends_at,
+    has_ends_at,
+    is_trusted_live_listing,
+)
 from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
@@ -1746,8 +1752,15 @@ def _published_feed_has_no_live_items(path: Path, now: datetime) -> bool:
     items = doc.get("items") if isinstance(doc, dict) else None
     if not isinstance(items, list):
         return False
+    # Published rows carry no last_seen, so an undated live-listing row cannot be
+    # proven dead here; treat it as live so an outage cannot empty the feed.
     return all(
-        isinstance(item, dict) and _is_expired(_ends_at_for_prune(item, now), now)
+        isinstance(item, dict)
+        and not (
+            str(item.get("source") or "").strip().lower() in LIVE_LISTING_SOURCES
+            and not has_ends_at(item)
+        )
+        and _is_expired(_ends_at_for_prune(item, now), now)
         for item in items
     )
 

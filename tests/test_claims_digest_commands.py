@@ -159,15 +159,25 @@ def test_digest_marks_stale_review_rows_approve_stale() -> None:
         {"id": "gamerpower-live", "source": "gamerpower", "store": "other", "title": "Live",
          "claim_url": "https://example.com/live", "ends_at": None,
          "first_seen": "2026-09-01T00:00:00Z", "last_seen": "2026-10-13T04:50:00Z"},
+        {"id": "itad-fresh", "source": "itad", "store": "other", "title": "Fresh",
+         "claim_url": "https://example.com/fresh", "ends_at": None,
+         "first_seen": "2026-10-10T00:00:00Z"},
+        {"id": "itad-dated", "source": "itad", "store": "other", "title": "Dated",
+         "claim_url": "https://example.com/dated", "ends_at": "2026-10-20T00:00:00Z",
+         "first_seen": "2026-09-01T00:00:00Z"},
     ]
     results = classify_inbox(items, now=now)
     reasons = {c.id: c.reason for c in results}
     assert "no end date, first seen 42d ago" in reasons["itad-old"]
     assert "no end date" not in reasons["gamerpower-live"]
+    assert "no end date" not in reasons["itad-fresh"]
     empty = {"approved_added": [], "approved_removed": [], "dismissed_added": [], "review_added": []}
     md = autopilot.render_digest(results, items, empty, now=now)
     assert "<!-- cmd:approve-stale:itad-old -->" in md
+    # Fresh undated rows may cross the 14-day line before the box is ticked.
+    assert "<!-- cmd:approve-stale:itad-fresh -->" in md
     assert "<!-- cmd:approve:gamerpower-live -->" in md
+    assert "<!-- cmd:approve:itad-dated -->" in md
 
 
 def _event(tmp_path: Path, sender: str, old: str, new: str) -> Path:
@@ -225,7 +235,9 @@ def test_autopilot_digest_lines_round_trip_through_command_parser() -> None:
     md = autopilot.render_digest(results, fixture["items"], empty, now=now)
     parsed = cmds._commands(md)
     actions = {a for a, _ in parsed}
-    assert actions == {"remove", "approve", "split"}
+    assert {"remove", "split"} <= actions
+    assert actions & {"approve", "approve-stale"}
+    assert actions <= {"remove", "approve", "approve-stale", "split"}
     assert not any(parsed.values())
     ticked = md.replace("- [ ] Remove: **Out of Sight**", "- [x] Remove: **Out of Sight**")
     assert cmds.newly_checked(md, ticked) == [("remove", ["epic-out-of-sight-b96ca8"])]

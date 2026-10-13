@@ -10,7 +10,8 @@ Commands (HTML comment markers written by ``claims_autopilot.py``):
 - ``cmd:remove:<id>``    -> add to ``blocked`` (and drop from ``ids``)
 - ``cmd:approve:<id>``   -> add to ``ids`` (and drop from ``dismissed`` / ``blocked``)
 - ``cmd:approve-stale:<id>`` -> approve, plus an ``ends_at`` field override 14 days
-  out (undated row past the build's first_seen + 14d window)
+  out when none is set (undated row that may be past the build's
+  first_seen + 14d window by the time the box is ticked)
 - ``cmd:split:<a>,<b>,…`` -> add every pair to ``dupe_splits``
 """
 

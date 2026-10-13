@@ -571,7 +571,7 @@ def handle_internal_free_claims_dispatch(handler: SimpleHTTPRequestHandler) -> N
     from shared.claims_sync import ClaimsSyncError, dispatch_claims_ingest
 
     try:
-        result = dispatch_claims_ingest(s.data_root())
+        result = dispatch_claims_ingest()
     except ClaimsSyncError as exc:
         s._send_json(handler, HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
         return

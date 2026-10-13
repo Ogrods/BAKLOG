@@ -1141,7 +1141,7 @@ def test_claims_dispatch_route_starts_ingest(
     monkeypatch.setattr(
         claims_sync,
         "dispatch_claims_ingest",
-        lambda root: {"workflow": "claims-ingest.yml", "url": "https://example.com/run"},
+        lambda: {"workflow": "claims-ingest.yml", "url": "https://example.com/run"},
     )
     base, _ = admin_server
     code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
@@ -1154,7 +1154,7 @@ def test_claims_dispatch_route_reports_gh_failure(
 ) -> None:
     from shared import claims_sync
 
-    def boom(root):
+    def boom():
         raise claims_sync.ClaimsSyncError("GitHub CLI (gh) not found on PATH")
 
     monkeypatch.setattr(claims_sync, "dispatch_claims_ingest", boom)

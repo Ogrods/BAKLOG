@@ -49,6 +49,52 @@ def test_landing_vs_live_skew_line() -> None:
     assert ok.startswith("OK:")
 
 
+def _old_live_doc(items: list[dict], *, days: float = 10.0) -> dict:
+    generated = datetime.now(UTC) - timedelta(days=days)
+    return {"generated_at": generated.isoformat(), "items": items}
+
+
+def test_check_live_age_old_but_unchanged_is_ok(monkeypatch) -> None:
+    claims = [{"id": "a1", "title": "A", "store": "epic", "claim_url": "https://x/a1"}]
+    monkeypatch.setattr(cis, "fetch_live_doc", lambda _url: (_old_live_doc(claims), None))
+    line, stale, generated = cis.check_live_age(
+        "https://example.invalid", max_age_days=7, landing_items=[dict(claims[0])]
+    )
+    assert stale is False
+    assert generated is not None
+    assert line.startswith("OK:")
+    assert "claims unchanged" in line
+
+
+def test_check_live_age_old_and_divergent_is_stale(monkeypatch) -> None:
+    live = [{"id": "a1", "title": "A", "store": "epic"}]
+    landing = [*live, {"id": "b2", "title": "B", "store": "gog"}]
+    monkeypatch.setattr(cis, "fetch_live_doc", lambda _url: (_old_live_doc(live), None))
+    line, stale, _ = cis.check_live_age(
+        "https://example.invalid", max_age_days=7, landing_items=landing
+    )
+    assert stale is True
+    assert line.startswith("WARN:")
+    assert "refresh and republish" in line
+
+
+def test_check_live_age_old_without_landing_stays_stale(monkeypatch) -> None:
+    live = [{"id": "a1", "title": "A", "store": "epic"}]
+    monkeypatch.setattr(cis, "fetch_live_doc", lambda _url: (_old_live_doc(live), None))
+    line, stale, _ = cis.check_live_age("https://example.invalid", max_age_days=7)
+    assert stale is True
+    assert line.startswith("WARN:")
+
+
+def test_check_live_age_fresh_is_ok(monkeypatch) -> None:
+    live = [{"id": "a1", "title": "A", "store": "epic"}]
+    monkeypatch.setattr(cis, "fetch_live_doc", lambda _url: (_old_live_doc(live, days=1), None))
+    line, stale, _ = cis.check_live_age("https://example.invalid", max_age_days=7, landing_items=[])
+    assert stale is False
+    assert line.startswith("OK:")
+    assert "claims unchanged" not in line
+
+
 def test_main_skip_live_writes_summary(tmp_path: Path, monkeypatch, capsys) -> None:
     auto_path = tmp_path / "auto.json"
     landing_path = tmp_path / "landing.json"

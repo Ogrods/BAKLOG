@@ -160,6 +160,10 @@ class RunStats:
     errors: int = 0
     warning_messages: list[str] = field(default_factory=list)
 
+    def info(self, msg: str) -> None:
+        """Routine status line; not counted or repeated in the warning footer."""
+        print(f"  INFO: {redact_log_line(msg)}", flush=True)
+
     def warn(self, msg: str) -> None:
         self.warnings += 1
         safe = redact_log_line(msg)

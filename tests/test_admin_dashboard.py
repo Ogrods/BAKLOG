@@ -316,6 +316,79 @@ def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path],
     }
 
 
+def test_free_claims_get_returns_dupe_groups(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    auto_path = tmp_path / "curated" / "free_claims.auto.json"
+    auto_path.parent.mkdir(parents=True, exist_ok=True)
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {"id": "epic-foo", "source": "epic", "store": "epic", "title": "Foo"},
+                    {"id": "gamerpower-1", "source": "gamerpower", "store": "epic",
+                     "title": "Foo (Epic Games) Giveaway"},
+                    {"id": "itad-1", "source": "itad", "store": "epic",
+                     "title": "Foo - Free via EGS on Epic Game Store"},
+                    {"id": "itad-2", "source": "itad", "store": "steam", "title": "Bar on Steam"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    [group] = data["dupe_groups"]
+    assert group["tier"] == "strong"
+    assert group["winner_id"] == "epic-foo"
+    assert group["size"] == 3
+    assert data["dupe_splits"] == []
+
+
+def test_free_claims_get_honors_dupe_splits(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    curated = tmp_path / "curated"
+    curated.mkdir(parents=True, exist_ok=True)
+    (curated / "free_claims.auto.json").write_text(
+        json.dumps(
+            {
+                "items": [
+                    {"id": "gamerpower-1", "source": "gamerpower", "title": "Foo (Steam) Giveaway"},
+                    {"id": "itad-1", "source": "itad", "title": "Foo on Steam"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (curated / "free_claims.approved.json").write_text(
+        json.dumps({"ids": [], "dupe_splits": [["itad-1", "gamerpower-1"]]}), encoding="utf-8"
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data["dupe_groups"] == []
+    assert data["dupe_splits"] == [["gamerpower-1", "itad-1"]]
+
+
+def test_free_claims_approved_put_preserves_dupe_splits(
+    admin_server: tuple[str, Path], tmp_path: Path
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    approved_path.parent.mkdir(parents=True, exist_ok=True)
+    approved_path.write_text(
+        json.dumps({"ids": [], "dupe_splits": [["a", "b"]]}), encoding="utf-8"
+    )
+    code, _ = _request(base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["epic-x"]})
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert saved["dupe_splits"] == [["a", "b"]]
+    code, _ = _request(
+        base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["epic-x"], "dupe_splits": []}
+    )
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert "dupe_splits" not in saved
+
+
 def test_free_claims_approved_put_validation(admin_server: tuple[str, Path]) -> None:
     base, _ = admin_server
     code, data = _request(
@@ -1027,3 +1100,78 @@ def test_discord_notify_admin_off_404(admin_off_server: str) -> None:
         body={"claims": [{"title": "x"}]},
     )
     assert code == 404
+
+
+def test_claims_sync_route_returns_sha(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    monkeypatch.setattr(
+        claims_sync,
+        "sync_claims_decisions",
+        lambda root, message="": {"changed": True, "sha": "abc1234", "pushed": True},
+    )
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/sync", body={})
+    assert code == 200, data
+    assert data == {"ok": True, "changed": True, "sha": "abc1234", "pushed": True}
+
+
+def test_claims_sync_route_reports_conflict(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    def boom(root, message=""):
+        raise claims_sync.ClaimsSyncError("git pull --rebase failed: CONFLICT")
+
+    monkeypatch.setattr(claims_sync, "sync_claims_decisions", boom)
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/sync", body={})
+    assert code == 409
+    assert "CONFLICT" in data["error"]
+
+
+def test_claims_dispatch_route_starts_ingest(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    monkeypatch.setattr(
+        claims_sync,
+        "dispatch_claims_ingest",
+        lambda: {"workflow": "claims-ingest.yml", "url": "https://example.com/run"},
+    )
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
+    assert code == 200, data
+    assert data == {"ok": True, "workflow": "claims-ingest.yml", "url": "https://example.com/run"}
+
+
+def test_claims_dispatch_route_reports_gh_failure(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    def boom():
+        raise claims_sync.ClaimsSyncError("GitHub CLI (gh) not found on PATH")
+
+    monkeypatch.setattr(claims_sync, "dispatch_claims_ingest", boom)
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
+    assert code == 502
+    assert "gh" in data["error"]
+
+
+def test_claims_sync_route_rejects_missing_local_header(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    req = urllib.request.Request(
+        f"{base}/api/internal/free-claims/sync",
+        method="POST",
+        data=json.dumps({}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req, timeout=10)
+    assert exc.value.code in (401, 403)

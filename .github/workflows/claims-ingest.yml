@@ -1,15 +1,27 @@
-# Phase 1: fetch + summarize (read-only). Soft-warn on stale baklog.app feed.
-# Phase 2: rebuild published ids → sticky PR only when fingerprint changes.
-# Auto-merge (squash) when fingerprint adds 0 new ids; human merge if any added.
-# No artifacts, no secrets, no blind auto-approve of new scrapes.
+# Claims autopilot: fetch once, classify under owner decisions, rebuild, publish.
+#
+# Owner decisions live in the private repo (claims/free_claims.approved.json).
+# The autopilot writes claims/auto_decisions.json there (trusted auto-publish +
+# dupe dismissals) and posts a digest issue with command checkboxes. The last
+# scrape (claims/free_claims.auto.json) is stored there too so first_seen and
+# last_seen survive between runs.
+#
+# Sticky PR chore/claims-feed-refresh auto-merges only when every added id is
+# owner- or autopilot-approved. Without BAKLOG_INTERNAL_TOKEN the job falls
+# back to refreshing already-published ids (landing synth, no autopilot).
 name: Claims ingest
 
 on:
   schedule:
-    # Daily ~15:00 UTC
-    - cron: "0 15 * * *"
+    - cron: "0 */6 * * *"
+    # Epic weekly rollover is Thursday 15:00 UTC
+    - cron: "30 15 * * 4"
   workflow_dispatch:
     inputs:
+      dry_run:
+        description: Fetch, classify and build, but push nothing (no decisions, PR or digest)
+        type: boolean
+        default: false
       dry_run_approve:
         description: Only report which feed PR CI run would be approved (no ingest)
         type: boolean
@@ -39,47 +51,45 @@ jobs:
         run: python3 scripts/approve_feed_pr_ci.py --dry-run
 
   ingest:
-    name: Fetch + summarize
+    name: Fetch, autopilot, refresh PR
     if: ${{ !inputs.dry_run_approve }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-
-      - name: Fetch claim sources
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: python fetchers/fetch_claim_sources.py
-
-      - name: Summarize vs landing + live age
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: python scripts/claims_ingest_summary.py
-
-  refresh:
-    name: Refresh PR (published ids)
-    needs: ingest
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       actions: write
       contents: write
       pull-requests: write
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      INTERNAL_TOKEN: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
+      INTERNAL_REPO: ${{ github.repository_owner }}/baklog-internal
+      INTERNAL_DIR: .internal-claims
+      DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check out private decisions
+        if: env.INTERNAL_TOKEN != ''
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.INTERNAL_REPO }}
+          token: ${{ env.INTERNAL_TOKEN }}
+          path: ${{ env.INTERNAL_DIR }}
+          sparse-checkout: claims
+          persist-credentials: true
+
+      - name: Decision source
+        id: source
+        run: |
+          if [ -n "$INTERNAL_TOKEN" ] && [ -f "$INTERNAL_DIR/claims/free_claims.approved.json" ]; then
+            echo "mode=internal" >> "$GITHUB_OUTPUT"
+            echo "BAKLOG_FREE_CLAIMS_APPROVED=$GITHUB_WORKSPACE/$INTERNAL_DIR/claims/free_claims.approved.json" >> "$GITHUB_ENV"
+            echo "BAKLOG_CLAIMS_AUTO_DECISIONS=$GITHUB_WORKSPACE/$INTERNAL_DIR/claims/auto_decisions.json" >> "$GITHUB_ENV"
+            echo "Using private owner decisions + autopilot."
+          else
+            echo "mode=synth" >> "$GITHUB_OUTPUT"
+            echo "::warning::BAKLOG_INTERNAL_TOKEN missing or claims/ not found; refreshing published ids only (no autopilot)."
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -92,44 +102,61 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      # The runner starts clean, so seed the previous scrape from the private repo:
+      # it keeps first_seen (14-day default end dates) and last_seen stable across
+      # runs and lets a failed source carry its prior rows forward.
+      - name: Seed previous scrape
+        if: steps.source.outputs.mode == 'internal'
+        run: |
+          if [ -f "$INTERNAL_DIR/claims/free_claims.auto.json" ]; then
+            cp "$INTERNAL_DIR/claims/free_claims.auto.json" curated/free_claims.auto.json
+            echo "Seeded previous scrape from private repo."
+          else
+            echo "::notice::No previous scrape in private repo; first_seen starts now."
+          fi
+
       - name: Fetch claim sources
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python fetchers/fetch_claim_sources.py
+
+      - name: Summarize vs landing + live age
+        run: python scripts/claims_ingest_summary.py
 
       - name: Snapshot landing before rebuild
         run: cp web/free-claims.json /tmp/landing-before.json
 
+      - name: Autopilot (classify + auto decisions)
+        id: autopilot
+        if: steps.source.outputs.mode == 'internal'
+        run: |
+          python scripts/claims_autopilot.py run \
+            --decisions "$BAKLOG_CLAIMS_AUTO_DECISIONS" \
+            --digest-md /tmp/claims-digest.md \
+            --digest-json /tmp/claims-digest.json
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat /tmp/claims-digest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Synthesize ephemeral approved.json from landing
-        env:
-          PYTHONPATH: ${{ github.workspace }}
+        if: steps.source.outputs.mode == 'synth'
         run: python scripts/synth_claims_approved_from_landing.py
 
       - name: Stub empty free-claims.input.json
-        run: |
-          printf '%s\n' '{"items":[]}' > free-claims.input.json
+        run: printf '%s\n' '{"items":[]}' > free-claims.input.json
 
       - name: Build free-claims (no empty publish)
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python fetchers/build_free_claims.py --no-profile
 
-      # Re-synth after build: expired published ids are pruned from landing, so the
+      # Synth mode only: expired published ids are pruned from landing, so the
       # pre-build approved id list would otherwise flag high "orphans_not_in_built".
       - name: Resync ephemeral approved.json to built landing
-        env:
-          PYTHONPATH: ${{ github.workspace }}
+        if: steps.source.outputs.mode == 'synth'
         run: python scripts/synth_claims_approved_from_landing.py
 
       - name: Audit free-surface data
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python scripts/audit_free_surface_data.py --fail-on high
 
       - name: Fingerprint gate
         id: gate
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: |
           set +e
           env -u GITHUB_STEP_SUMMARY python scripts/claims_feed_fingerprint.py \
@@ -152,10 +179,55 @@ jobs:
           fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Open or update sticky refresh PR
+      - name: Auto-merge gate (every added id vetted)
+        id: vetted
         if: steps.gate.outputs.changed == 'true'
+        run: |
+          if [ "${{ steps.source.outputs.mode }}" = "internal" ]; then
+            set +e
+            python scripts/claims_autopilot.py verify-added \
+              --before /tmp/landing-before.json \
+              --after web/free-claims.json \
+              --approved "$BAKLOG_FREE_CLAIMS_APPROVED" \
+              --decisions "$BAKLOG_CLAIMS_AUTO_DECISIONS" \
+              --manual free-claims.input.json
+            code=$?
+            set -e
+            if [ "$code" -eq 0 ]; then echo "auto_merge=true" >> "$GITHUB_OUTPUT";
+            elif [ "$code" -eq 3 ]; then echo "auto_merge=false" >> "$GITHUB_OUTPUT";
+            else exit "$code"; fi
+          else
+            ADDED=$(python3 -c "import json; print(len(json.load(open('/tmp/claims-fp-diff.json'))['added']))")
+            if [ "$ADDED" -eq 0 ]; then echo "auto_merge=true" >> "$GITHUB_OUTPUT";
+            else echo "auto_merge=false" >> "$GITHUB_OUTPUT"; fi
+          fi
+
+      - name: Push autopilot decisions + scrape to private repo
+        if: steps.source.outputs.mode == 'internal' && env.DRY_RUN != 'true'
+        working-directory: ${{ env.INTERNAL_DIR }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp "$GITHUB_WORKSPACE/curated/free_claims.auto.json" claims/free_claims.auto.json
+          git add -- claims/auto_decisions.json claims/free_claims.auto.json
+          if git diff --cached --quiet; then
+            echo "Decisions and scrape unchanged."
+            exit 0
+          fi
+          git commit -m "claims: autopilot decisions + scrape"
+          for attempt in 1 2 3; do
+            if git pull --rebase -q && git push -q; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not push autopilot decisions"
+          exit 1
+
+      - name: Open or update sticky refresh PR
+        if: steps.gate.outputs.changed == 'true' && env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          AUTO_MERGE: ${{ steps.vetted.outputs.auto_merge }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -172,7 +244,7 @@ jobs:
             echo "Nothing staged after add - skip PR."
             exit 0
           fi
-          git commit -m "Refresh free-claims feed (published ids only)"
+          git commit -m "Refresh free-claims feed"
 
           git push -u origin HEAD:chore/claims-feed-refresh --force
 
@@ -180,9 +252,12 @@ jobs:
           {
             echo "## Summary"
             echo
-            echo "Automated refresh of **already-published** free-claims ids from live sources."
-            echo "New scrapes are **not** auto-approved."
-            echo "Squash auto-merge is enabled only when this fingerprint has **0 added** ids."
+            echo "Automated free-claims refresh from live sources."
+            if [ "$AUTO_MERGE" = "true" ]; then
+              echo "Every added claim is owner- or autopilot-approved, so squash auto-merge is on."
+            else
+              echo "Some added claims are not vetted yet, so this PR needs a human merge."
+            fi
             echo
             cat /tmp/claims-fp-diff.md
             echo
@@ -217,12 +292,22 @@ jobs:
             fi
           fi
 
-          ADDED=$(python3 -c "import json; print(len(json.load(open('/tmp/claims-fp-diff.json'))['added']))")
-          if [ "$ADDED" -eq 0 ]; then
-            echo "Enabling squash auto-merge on #$PR_NUMBER (0 added claim ids)."
+          if [ "$AUTO_MERGE" = "true" ]; then
+            echo "Enabling squash auto-merge on #$PR_NUMBER (all added ids vetted)."
             gh pr merge "$PR_NUMBER" --squash --auto
           else
-            echo "Skipping auto-merge on #$PR_NUMBER: $ADDED added claim id(s) need human review."
+            echo "Skipping auto-merge on #$PR_NUMBER: unvetted added claim id(s) need review."
           fi
 
           python scripts/approve_feed_pr_ci.py --sha "$(git rev-parse HEAD)"
+
+      - name: Post digest issue (private repo)
+        if: steps.source.outputs.mode == 'internal' && env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ env.INTERNAL_TOKEN }}
+        run: |
+          python scripts/claims_digest_issue.py \
+            --repo "$INTERNAL_REPO" \
+            --digest-md /tmp/claims-digest.md \
+            --digest-json /tmp/claims-digest.json \
+            --mention "${{ github.repository_owner }}"

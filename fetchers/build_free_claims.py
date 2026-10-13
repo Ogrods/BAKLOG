@@ -15,6 +15,15 @@ import requests
 
 from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import HeartbeatTimer, RunStats, started
+from shared.claims_decisions import load_auto_decisions, merge_decisions
+from shared.claims_expiry import (
+    DEFAULT_EXPIRY_DAYS,
+    LIVE_LISTING_SOURCES,
+    default_ends_at,
+    has_ends_at,
+    is_trusted_live_listing,
+)
+from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
     EPIC_MOBILE_STORE,
@@ -33,6 +42,14 @@ from shared.steam_match import appid_from_steam_url, pick_appid, strip_giveaway_
 INPUT_PATH = Path("free-claims.input.json")
 AUTO_PATH = Path("curated/free_claims.auto.json")
 APPROVED_PATH = Path("curated/free_claims.approved.json")
+_DEFAULT_APPROVED_PATH = APPROVED_PATH
+
+
+def _approved_path() -> Path:
+    """Owner decisions file; a patched ``APPROVED_PATH`` (tests) wins over discovery."""
+    if APPROVED_PATH != _DEFAULT_APPROVED_PATH:
+        return APPROVED_PATH
+    return resolve_approved_path(Path.cwd(), APPROVED_PATH)
 OUTPUT_PATH = Path("web/free-claims.json")
 FALLBACK_PATH = Path("curated/free_claims.fallback.json")
 STORE_DELAY_SEC = 1.5
@@ -145,10 +162,6 @@ def _steam_storesearch(term: str, last_call: list[float]) -> list[dict]:
         return items if isinstance(items, list) else []
     except requests.RequestException:
         return []
-
-
-def _cover_lookup_key(title: str) -> str:
-    return norm_title(strip_giveaway_decorations(title))
 
 
 def _steam_portrait_cover(appid: int) -> str:
@@ -342,8 +355,8 @@ def _infer_store_from_text(
 DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower", "itad"})
 # Null ends_at older than DEFAULT_EXPIRY_DAYS from first_seen are pruned:
 # publish/enrich via _resolve_ends_at; approved selection + carry-forward via
-# _ends_at_for_prune so re-approved ITAD lingerers cannot resurrect.
-DEFAULT_EXPIRY_DAYS = 14
+# _ends_at_for_prune so re-approved ITAD lingerers cannot resurrect. GamerPower
+# rows seen in a recent fetch are exempt (shared/claims_expiry.py).
 
 
 def _claim_links_payload(raw: dict, store: str) -> dict[str, object]:
@@ -574,7 +587,7 @@ def _carry_forward_missing_approved(
         keys = claim_match_keys(row)
         if keys & published_keys or keys & seen_keys:
             continue
-        if _is_expired(_ends_at_for_prune(row), now):
+        if _is_expired(_ends_at_for_prune(row, now), now):
             continue
         carried.append(dict(row))
         seen_keys |= keys or {f"id:{item_id}"}
@@ -620,6 +633,63 @@ def _load_dismissed_keys(path: Path) -> set[str]:
         return set()
     keys = doc.get("dismissed_keys") or []
     return {str(k).strip() for k in keys if isinstance(k, str) and k.strip()}
+
+
+def _load_dupe_splits(path: Path) -> list[list[str]]:
+    if not path.is_file():
+        return []
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return normalize_dupe_splits(doc.get("dupe_splits"))
+
+
+def collapse_dupe_groups(
+    selected: list[dict],
+    auto_items_all: list[dict],
+    *,
+    splits: list[list[str]] | None = None,
+) -> tuple[list[dict], list[str]]:
+    """Keep one row per strong dupe group among ``selected``; fill gaps from siblings.
+
+    Returns ``(items, dropped_ids)``. The kept row is the best-ranked *selected*
+    member (owner approval still decides what ships); its missing ``ends_at`` /
+    ``steam_appid`` / ``header_image`` come from every group member in the feed.
+    """
+    from shared.claims_dedupe import group_claims, groups_by_member, merge_group_fields, pick_winner
+
+    if not selected:
+        return selected, []
+    by_member = groups_by_member(
+        group_claims(auto_items_all, splits=normalize_dupe_splits(splits))
+    )
+    if not by_member:
+        return selected, []
+    all_by_id = _auto_items_by_id(auto_items_all)
+    buckets: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for it in selected:
+        item_id = str(it.get("id") or "").strip()
+        group = by_member.get(item_id)
+        bucket = f"group:{group.key}" if group else f"id:{item_id or id(it)}"
+        if bucket not in buckets:
+            buckets[bucket] = []
+            order.append(bucket)
+        buckets[bucket].append(it)
+    out: list[dict] = []
+    dropped: list[str] = []
+    for bucket in order:
+        rows = buckets[bucket]
+        if not bucket.startswith("group:"):
+            out.extend(rows)
+            continue
+        keep = pick_winner(rows)
+        dropped.extend(str(r.get("id") or "") for r in rows if r is not keep)
+        group = by_member[str(keep.get("id") or "").strip()]
+        siblings = [all_by_id[m] for m in group.member_ids if m in all_by_id]
+        out.append(merge_group_fields(keep, siblings))
+    return out, dropped
 
 
 def _load_blocked_ids(path: Path) -> set[str]:
@@ -983,7 +1053,7 @@ def _select_approved_auto_items(
         # When ends_at is still null after overrides, apply the 14d first_seen
         # default so stale null-dated rows are pruned from approved (not only
         # dropped later at enrich / carry-forward).
-        prune_ends = _ends_at_for_prune({**item, "ends_at": ends_at})
+        prune_ends = _ends_at_for_prune({**item, "ends_at": ends_at}, now)
         if _is_expired(prune_ends, now):
             if item_id in approved_ids:
                 expired_approved_ids.add(item_id)
@@ -1034,6 +1104,8 @@ def _resolve_ends_at(raw: dict, *, now: datetime | None = None) -> str | None:
     clock = now or datetime.now(UTC)
     if clock.tzinfo is None:
         clock = clock.replace(tzinfo=UTC)
+    if is_trusted_live_listing(raw, clock):
+        return None
     anchor = _parse_ends_at(raw.get("first_seen")) or clock
     default_end = anchor + timedelta(days=DEFAULT_EXPIRY_DAYS)
     return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -1069,27 +1141,24 @@ def _is_expired(ends_at: object, now: datetime) -> bool:
     return parsed < now
 
 
-def _ends_at_for_prune(item: dict) -> object:
+def _ends_at_for_prune(item: dict, now: datetime | None = None) -> object:
     """ends_at used for expiry / prune / carry-forward decisions.
 
     When ``ends_at`` is null/empty and ``first_seen`` is known, treat expiry as
     ``first_seen + DEFAULT_EXPIRY_DAYS`` (14d). Null ends_at older than that
     window are pruned so approved carry-forward cannot resurrect lingerers.
+    With ``now``, GamerPower rows seen in a recent fetch never expire.
     """
     ends = item.get("ends_at")
     if ends is not None and str(ends).strip():
         return ends
-    first_seen = _parse_ends_at(item.get("first_seen"))
-    if first_seen is None:
-        return None
-    default_end = first_seen + timedelta(days=DEFAULT_EXPIRY_DAYS)
-    return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return default_ends_at(item, now)
 
 
 def _is_expired_for_publish(raw: dict, now: datetime) -> bool:
     """True when source default ends_at or null-ends_at first_seen+14d is past."""
     resolved = _resolve_ends_at(raw, now=now)
-    return _is_expired(_ends_at_for_prune({**raw, "ends_at": resolved}), now)
+    return _is_expired(_ends_at_for_prune({**raw, "ends_at": resolved}, now), now)
 
 
 def _live_items_by_id(live_items: list[dict] | None) -> dict[str, dict]:
@@ -1215,6 +1284,7 @@ def preview_publish_items(
     premium_only_ids: set[str] | None = None,
     require_manual_approval: bool = False,
     now: datetime | None = None,
+    dupe_splits: list[list[str]] | None = None,
 ) -> list[dict]:
     """Dry-run merge + prune for admin preview (no disk writes, no Steam API)."""
     store_overrides = store_overrides or {}
@@ -1248,6 +1318,7 @@ def preview_publish_items(
             it for it in auto_items
             if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
+    auto_items, _ = collapse_dupe_groups(auto_items, auto_items_all, splits=dupe_splits)
 
     if store_overrides or store_by_key:
         _apply_store_overrides(
@@ -1546,7 +1617,26 @@ def parse_approved_put_payload(payload: dict) -> dict:
         "dismissed": dismissed,
         "dismissed_keys": dismissed_keys,
         "blocked": blocked,
+        "dupe_splits": normalize_dupe_splits(payload.get("dupe_splits")),
     }
+
+
+def normalize_dupe_splits(raw: object) -> list[list[str]]:
+    """Owner "not a dupe" decisions: sorted, de-duplicated id pairs."""
+    seen: set[tuple[str, str]] = set()
+    out: list[list[str]] = []
+    if not isinstance(raw, list):
+        return out
+    for pair in raw:
+        if not isinstance(pair, (list, tuple)):
+            continue
+        ids = sorted({str(x).strip() for x in pair if str(x).strip()})
+        for i, a in enumerate(ids):
+            for b in ids[i + 1 :]:
+                if (a, b) not in seen:
+                    seen.add((a, b))
+                    out.append([a, b])
+    return out
 
 
 def prepare_approved_document(
@@ -1560,6 +1650,7 @@ def prepare_approved_document(
     auto_items: list[dict],
     blocked: list[str] | None = None,
     prior_rows_by_id: dict[str, dict] | None = None,
+    dupe_splits: list[list[str]] | None = None,
 ) -> dict:
     """Re-key approved state and shape the on-disk approved.json document.
 
@@ -1608,6 +1699,9 @@ def prepare_approved_document(
         out["blocked"] = blocked_list
     if premium_list:
         out["premium_only_ids"] = premium_list
+    splits = normalize_dupe_splits(dupe_splits)
+    if splits:
+        out["dupe_splits"] = splits
     return out
 
 
@@ -1658,8 +1752,16 @@ def _published_feed_has_no_live_items(path: Path, now: datetime) -> bool:
     items = doc.get("items") if isinstance(doc, dict) else None
     if not isinstance(items, list):
         return False
+    # Published rows carry no last_seen, so an undated live-listing row cannot be
+    # proven dead here; treat it as live so an outage cannot empty the feed.
     return all(
-        isinstance(item, dict) and _is_expired(_ends_at_for_prune(item), now) for item in items
+        isinstance(item, dict)
+        and not (
+            str(item.get("source") or "").strip().lower() in LIVE_LISTING_SOURCES
+            and not has_ends_at(item)
+        )
+        and _is_expired(_ends_at_for_prune(item, now), now)
+        for item in items
     )
 
 
@@ -1683,6 +1785,18 @@ def main() -> int:
         "--require-manual-approval",
         action="store_true",
         help="Only publish manual rows with approved: true (default: publish unless approved: false)",
+    )
+    parser.add_argument(
+        "--approved",
+        type=Path,
+        default=None,
+        help="Owner decisions file (default: env, then baklog-internal/claims, then curated/)",
+    )
+    parser.add_argument(
+        "--auto-decisions",
+        type=Path,
+        default=None,
+        help="Autopilot decisions file merged under owner decisions",
     )
     args = parser.parse_args()
     require_manual_approval = require_manual_approval_enabled(cli_flag=args.require_manual_approval)
@@ -1712,14 +1826,17 @@ def main() -> int:
             src = str(row.get("source") or "unknown")
             by_source[src] = by_source.get(src, 0) + 1
         _debug_claims(f"auto feed: {len(auto_items_all)} item(s) by source {by_source}")
-    approved_ids = _load_approved_ids(APPROVED_PATH)
+    approved_path = args.approved or _approved_path()
+    if approved_path != APPROVED_PATH:
+        stats.warn(f"owner decisions: {approved_path.name} from {approved_path.parent.name}/")
+    approved_ids = _load_approved_ids(approved_path)
     # Blocked ids are a permanent kill list; fold them into the dismissed filter
     # so they are excluded from the feed exactly like a soft-hidden claim.
-    dismissed_ids = _load_dismissed_ids(APPROVED_PATH) | _load_blocked_ids(APPROVED_PATH)
-    dismissed_keys = _load_dismissed_keys(APPROVED_PATH)
-    premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
-    store_overrides = _load_store_overrides(APPROVED_PATH)
-    field_overrides = _load_field_overrides(APPROVED_PATH)
+    dismissed_ids = _load_dismissed_ids(approved_path) | _load_blocked_ids(approved_path)
+    dismissed_keys = _load_dismissed_keys(approved_path)
+    premium_only_ids = _load_premium_only_ids(approved_path)
+    store_overrides = _load_store_overrides(approved_path)
+    field_overrides = _load_field_overrides(approved_path)
     orig_store_overrides = dict(store_overrides)
     orig_field_overrides = {k: dict(v) for k, v in field_overrides.items()}
     orig_premium_only_ids = set(premium_only_ids)
@@ -1745,9 +1862,9 @@ def main() -> int:
         or field_overrides != orig_field_overrides
         or premium_only_ids != orig_premium_only_ids
     )
-    if not args.dry_run and approved_changed and APPROVED_PATH.is_file():
+    if not args.dry_run and approved_changed and approved_path.is_file():
         try:
-            appr_doc = json.loads(APPROVED_PATH.read_text(encoding="utf-8"))
+            appr_doc = json.loads(approved_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             appr_doc = {}
         appr_doc["ids"] = rekeyed_ids
@@ -1763,7 +1880,27 @@ def main() -> int:
             appr_doc["premium_only_ids"] = sorted(premium_only_ids)
         else:
             appr_doc.pop("premium_only_ids", None)
-        safe_write_text(APPROVED_PATH, json.dumps(appr_doc, indent=2, ensure_ascii=False))
+        safe_write_text(approved_path, json.dumps(appr_doc, indent=2, ensure_ascii=False))
+    owner_approved_ids = set(approved_ids)
+    auto_decisions_path = args.auto_decisions or resolve_auto_decisions_path(Path.cwd())
+    if auto_decisions_path is not None and auto_decisions_path.is_file():
+        merged = merge_decisions(
+            owner_approved=approved_ids,
+            owner_dismissed=dismissed_ids,
+            auto=load_auto_decisions(auto_decisions_path),
+            auto_items=auto_items_all,
+            owner_dismissed_item_ids={
+                str(it.get("id") or "").strip()
+                for it in auto_items_all
+                if dismissed_keys and _cover_lookup_key(it.get("title") or "") in dismissed_keys
+            },
+        )
+        approved_ids = merged.approved_ids
+        dismissed_ids = merged.dismissed_ids
+        stats.warn(
+            f"autopilot: +{len(merged.auto_approved)} approved, "
+            f"{len(merged.auto_dismissed)} dismissed"
+        )
     now = datetime.now(UTC)
     auto_by_id = _auto_items_by_id(auto_items_all)
     approved_keys = _resolve_approved_keys(approved_ids, auto_items_all, field_overrides)
@@ -1788,6 +1925,11 @@ def main() -> int:
             it for it in auto_items
             if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
+    auto_items, dupe_dropped = collapse_dupe_groups(
+        auto_items, auto_items_all, splits=_load_dupe_splits(approved_path)
+    )
+    if dupe_dropped:
+        stats.warn(f"collapsed {len(dupe_dropped)} approved dupe row(s): {', '.join(dupe_dropped)}")
     if store_overrides or store_by_key:
         _apply_store_overrides(
             auto_items,
@@ -1803,7 +1945,9 @@ def main() -> int:
     if expired_approved_ids:
         stats.warn(f"skipped {len(expired_approved_ids)} expired approved auto item(s)")
         if not args.dry_run:
-            pruned = _prune_expired_from_approved(APPROVED_PATH, expired_approved_ids)
+            pruned = _prune_expired_from_approved(
+                approved_path, expired_approved_ids & owner_approved_ids
+            )
             if pruned:
                 stats.warn(f"pruned {pruned} expired item(s) from approved list")
     if auto_items_all:

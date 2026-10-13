@@ -34,6 +34,8 @@ _PROFILE_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _lock = threading.Lock()
 _pending: dict[str, dict[str, Any]] = {}
 _worker_started = False
+# Event.wait, not time.sleep: tests that patch time.sleep must not see the flush loop.
+_flush_stop = threading.Event()
 
 
 class MirrorProfileMismatch(ValueError):
@@ -59,8 +61,7 @@ def start_flush_worker() -> None:
 
 
 def _flush_loop() -> None:
-    while True:
-        time.sleep(_FLUSH_POLL_SEC)
+    while not _flush_stop.wait(_FLUSH_POLL_SEC):
         try:
             maybe_flush_mirror_uploads()
         except Exception as exc:  # noqa: BLE001

@@ -1,0 +1,359 @@
+{
+  "_comment": "Snapshot of the 2026-10 claims inbox (public feed fields only). expected_groups lists every strong dupe group; first id is the expected winner.",
+  "items": [
+    {
+      "id": "epic-out-of-sight-b96ca8",
+      "source": "epic",
+      "store": "epic",
+      "title": "Out of Sight",
+      "steam_appid": 2526310,
+      "ends_at": "2026-10-15T15:00:00Z",
+      "claim_url": "https://store.epicgames.com/en-US/p/out-of-sight-b96ca8",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2526310/5ac77fa5a0ae808cda04e176a1de28d7fbc48a12/header.jpg?t=1789043494"
+    },
+    {
+      "id": "epic-terrascape-2b12b1",
+      "source": "epic",
+      "store": "epic",
+      "title": "TerraScape",
+      "steam_appid": 2290000,
+      "ends_at": "2026-10-15T15:00:00Z",
+      "claim_url": "https://store.epicgames.com/en-US/p/terrascape-2b12b1",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2290000/header.jpg?t=1784796390"
+    },
+    {
+      "id": "gamerpower-3810",
+      "source": "gamerpower",
+      "store": "steam",
+      "title": "Fireside Feelings (Steam) Giveaway",
+      "steam_appid": 2990600,
+      "ends_at": "2026-10-12T23:59:00Z",
+      "claim_url": "https://www.gamerpower.com/open/fireside-feelings-steam-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2990600/89d745fd5604055c7b68b44ed28eba5b7df89d58/header.jpg?t=1789504567"
+    },
+    {
+      "id": "gamerpower-3809",
+      "source": "gamerpower",
+      "store": "steam",
+      "title": "Pony Island (Steam) Giveaway",
+      "steam_appid": 405640,
+      "ends_at": "2026-10-12T23:59:00Z",
+      "claim_url": "https://www.gamerpower.com/open/pony-island-steam-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/405640/header.jpg?t=1791477267"
+    },
+    {
+      "id": "gamerpower-3807",
+      "source": "gamerpower",
+      "store": "epic",
+      "title": "TerraScape (Epic Games) Giveaway",
+      "steam_appid": null,
+      "ends_at": "2026-10-15T23:59:00Z",
+      "claim_url": "https://www.gamerpower.com/open/terrascape-epic-games-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ac7b1a7b298e.jpg"
+    },
+    {
+      "id": "gamerpower-3806",
+      "source": "gamerpower",
+      "store": "epic",
+      "title": "Out of Sight (Epic Games) Giveaway",
+      "steam_appid": null,
+      "ends_at": "2026-10-15T23:59:00Z",
+      "claim_url": "https://www.gamerpower.com/open/out-of-sight-epic-games-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ac7b0593f3d5.jpg"
+    },
+    {
+      "id": "gamerpower-3328",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Best Plumber (IndieGala) Giveaway",
+      "steam_appid": 1166580,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/best-plumber-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68f40b259de93.jpg"
+    },
+    {
+      "id": "gamerpower-3322",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Sausage Hunter (Indiegala) Giveaway",
+      "steam_appid": 1296880,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/sausage-hunter-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68eadb2d6f0c4.jpg"
+    },
+    {
+      "id": "gamerpower-3324",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Battle Ram (IndieGala) Giveaway",
+      "steam_appid": 1262060,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/battle-ram-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68efabd65f913.jpg"
+    },
+    {
+      "id": "gamerpower-3316",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Leaper (IndieGala) Giveaway",
+      "steam_appid": 1495670,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/leaper-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68e6513c31514.jpg"
+    },
+    {
+      "id": "gamerpower-3313",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Wordle (IndieGala) Giveaway",
+      "steam_appid": 1532580,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/wordle-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68e15e986da99.jpg"
+    },
+    {
+      "id": "gamerpower-3301",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Bad cat Sam (IndieGala) Giveaway",
+      "steam_appid": 2256230,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/bad-cat-sam-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68d828fc4174f.jpg"
+    },
+    {
+      "id": "gamerpower-3716",
+      "source": "gamerpower",
+      "store": "steam",
+      "title": "Dwarven Realms (Steam) Key Giveaway",
+      "steam_appid": 2015240,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/dwarven-realms-steam-key-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6a59119a8eb8d.jpg"
+    },
+    {
+      "id": "gamerpower-3498",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "Primal Slideee Deluxe (Stove) Giveaway",
+      "steam_appid": null,
+      "ends_at": "2026-10-31T23:59:59Z",
+      "claim_url": "https://www.gamerpower.com/open/primal-slideee-deluxe-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6993208da38c7.jpg"
+    },
+    {
+      "id": "gamerpower-3446",
+      "source": "gamerpower",
+      "store": "other",
+      "title": "GigaBash (Stove) Giveaway",
+      "steam_appid": 1546400,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/gigabash-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/69567c4ee0fa3.jpg"
+    },
+    {
+      "id": "gamerpower-2204",
+      "source": "gamerpower",
+      "store": "itch",
+      "title": "Dual Chroma: Academy Carols (itch.io) Giveaway",
+      "steam_appid": 2299730,
+      "ends_at": null,
+      "claim_url": "https://www.gamerpower.com/open/dual-chroma-academy-carols-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/63c6f67bb9c8b.jpg"
+    },
+    {
+      "id": "itad-4c479b8cc205",
+      "source": "itad",
+      "store": "steam",
+      "title": "Fireside Feelings on Steam on Steam",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16647/",
+      "header_image": null
+    },
+    {
+      "id": "itad-6b4a0c098140",
+      "source": "itad",
+      "store": "epic",
+      "title": "The Big Con free on MOBILE from EGS on Epic Game Store",
+      "steam_appid": 1139280,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16646/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1139280/header.jpg?t=1786075312"
+    },
+    {
+      "id": "itad-0907da53fe78",
+      "source": "itad",
+      "store": "epic",
+      "title": "TerraScape - Free via EGS on Epic Game Store",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16643/",
+      "header_image": null
+    },
+    {
+      "id": "itad-fadc757d9c68",
+      "source": "itad",
+      "store": "epic",
+      "title": "Out of Sight - Free via EGS on Epic Game Store",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16642/",
+      "header_image": null
+    },
+    {
+      "id": "itad-4d6f2e0ae3da",
+      "source": "itad",
+      "store": "steam",
+      "title": "Pony Island - FREE on Steam on Steam",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16641/",
+      "header_image": null
+    },
+    {
+      "id": "itad-f99d00439cb6",
+      "source": "itad",
+      "store": "steam",
+      "title": "Rotwood: Drakin Armoury Pack - FREE on Steam on Steam",
+      "steam_appid": 5067220,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16624/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5067220/96b7698e59ba01a95be5261b12963b21e7a706e7/header.jpg?t=1790874934"
+    },
+    {
+      "id": "itad-538f08a31cd9",
+      "source": "itad",
+      "store": "steam",
+      "title": "MXGP 26 - Scrubdesignz Liveries - FREE on Steam on Steam",
+      "steam_appid": 4847440,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16623/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4847440/29e3b1f272186cffd9336fef4f8374416d280d97/header.jpg?t=1790841917"
+    },
+    {
+      "id": "itad-5b6611643316",
+      "source": "itad",
+      "store": "other",
+      "title": "Bad Cat Sam - FREE on IndieGala on IndieGala Store",
+      "steam_appid": 2256230,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/16427/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2256230/header.jpg?t=1728246808"
+    },
+    {
+      "id": "itad-123db3b7378b",
+      "source": "itad",
+      "store": "other",
+      "title": "Best Plumber - FREE on IndieGala on IndieGala Store",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/15503/",
+      "header_image": null
+    },
+    {
+      "id": "itad-0f0b465c2e09",
+      "source": "itad",
+      "store": "other",
+      "title": "Battle Ram - FREE on IndieGala on IndieGala Store",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/15493/",
+      "header_image": null
+    },
+    {
+      "id": "itad-0a18997f8352",
+      "source": "itad",
+      "store": "other",
+      "title": "Sausage Hunter - FREE on IndieGala on IndieGala Store",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/15486/",
+      "header_image": null
+    },
+    {
+      "id": "itad-fab6e3a6a94f",
+      "source": "itad",
+      "store": "other",
+      "title": "Leaper - FREE on IndieGala on IndieGala Store",
+      "steam_appid": null,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/15480/",
+      "header_image": null
+    },
+    {
+      "id": "itad-b39ef7bfe392",
+      "source": "itad",
+      "store": "other",
+      "title": "Wordle on IndieGala Store",
+      "steam_appid": 1532580,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/15475/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1532580/header.jpg?t=1654494842"
+    },
+    {
+      "id": "itad-4617ce1ab23a",
+      "source": "itad",
+      "store": "other",
+      "title": "Scamster Kombat - FREE on IndieGala on IndieGala Store",
+      "steam_appid": 3218690,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/15424/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3218690/header.jpg?t=1730801171"
+    },
+    {
+      "id": "itad-1b0433806065",
+      "source": "itad",
+      "store": "other",
+      "title": "Die Young: Prologue - FREE on IndieGala",
+      "steam_appid": 973000,
+      "ends_at": null,
+      "claim_url": "https://isthereanydeal.com/giveaways/7433/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/973000/header.jpg?t=1669757014"
+    }
+  ],
+  "expected_groups": [
+    [
+      "epic-out-of-sight-b96ca8",
+      "gamerpower-3806",
+      "itad-fadc757d9c68"
+    ],
+    [
+      "epic-terrascape-2b12b1",
+      "gamerpower-3807",
+      "itad-0907da53fe78"
+    ],
+    [
+      "gamerpower-3810",
+      "itad-4c479b8cc205"
+    ],
+    [
+      "gamerpower-3809",
+      "itad-4d6f2e0ae3da"
+    ],
+    [
+      "gamerpower-3328",
+      "itad-123db3b7378b"
+    ],
+    [
+      "gamerpower-3322",
+      "itad-0a18997f8352"
+    ],
+    [
+      "gamerpower-3324",
+      "itad-0f0b465c2e09"
+    ],
+    [
+      "gamerpower-3316",
+      "itad-fab6e3a6a94f"
+    ],
+    [
+      "gamerpower-3313",
+      "itad-b39ef7bfe392"
+    ],
+    [
+      "gamerpower-3301",
+      "itad-5b6611643316"
+    ]
+  ]
+}

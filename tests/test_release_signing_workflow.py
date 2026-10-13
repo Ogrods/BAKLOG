@@ -252,3 +252,21 @@ def test_local_build_scripts_fail_fast() -> None:
         idx = next(i for i, line in enumerate(build) if needle in line and line.strip().startswith("&"))
         following = "\n".join(build[idx + 1 : idx + 3])
         assert "LASTEXITCODE" in following, needle
+
+
+def _macos_job() -> str:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    return text[text.index("\n  build-macos:\n") : text.index("\n  build-linux:\n")]
+
+
+def test_macos_job_runs_frozen_smokes_before_upload() -> None:
+    steps = _steps(_macos_job())
+    upload = _index(steps, "gh release upload")
+    for needle in (
+        "frozen_import_smoke",
+        "frozen_data_dir_migration_smoke",
+        "frozen_bundle_smoke",
+        "frozen_connect_smoke",
+        "bundled .env lost during smokes",
+    ):
+        assert _index(steps, needle) < upload, needle

@@ -14,6 +14,13 @@ const adminOnlyTests = [
   "tests/claims-expiry-parity.test.js",
   "tests/giveaway-strip-parity.test.js",
 ];
+// Wall-clock budgets (perf-budget.json) flake under full-suite load; they run
+// alone via `npm run test:perf` (vitest.perf.config.js).
+export const perfBudgetTests = [
+  "tests/table-render-perf.test.js",
+  "tests/table-query-perf.test.js",
+  "tests/loading-curtain-perf.test.js",
+];
 
 export default defineConfig({
   test: {
@@ -25,7 +32,7 @@ export default defineConfig({
     setupFiles: ["tests/vitest.setup.js"],
     include: ["tests/**/*.test.js"],
     // admin/ is gitignored (baklog-internal); skip its unit tests on public CI.
-    exclude: adminPresent ? [] : adminOnlyTests,
+    exclude: [...(adminPresent ? [] : adminOnlyTests), ...perfBudgetTests],
     globals: false,
   },
 });

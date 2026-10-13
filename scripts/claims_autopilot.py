@@ -338,11 +338,10 @@ def _link_hosts(item: dict) -> set[str]:
             parts, host = None, ""
         # Browsers read "\" as "/" and skip userinfo, so such URLs can show one host
         # here and open another; keep the raw URL so any edit to it reads as a change.
-        if parts is None or "\\" in raw or "@" in parts.netloc or any(ord(ch) < 33 for ch in raw):
+        if not host or "\\" in raw or "@" in parts.netloc or any(ord(ch) < 33 for ch in raw):
             hosts.add(f"unparsed:{raw}")
             continue
-        if host:
-            hosts.add(host.removeprefix("www."))
+        hosts.add(host.removeprefix("www."))
     return hosts
 
 

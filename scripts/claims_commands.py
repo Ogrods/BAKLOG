@@ -9,6 +9,9 @@ Commands (HTML comment markers written by ``claims_autopilot.py``):
 
 - ``cmd:remove:<id>``    -> add to ``blocked`` (and drop from ``ids``)
 - ``cmd:approve:<id>``   -> add to ``ids`` (and drop from ``dismissed`` / ``blocked``)
+- ``cmd:approve-stale:<id>`` -> approve, plus an ``ends_at`` field override 14 days
+  out when none is set (undated row that may be past the build's
+  first_seen + 14d window by the time the box is ticked)
 - ``cmd:split:<a>,<b>,…`` -> add every pair to ``dupe_splits``
 """
 
@@ -19,11 +22,16 @@ import json
 import os
 import re
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 _CHECKBOX_RE = re.compile(
-    r"^\s*[-*]\s+\[(?P<mark>[ xX])\]\s.*<!--\s*cmd:(?P<action>remove|approve|split):(?P<args>[^>\s]+)\s*-->",
+    r"^\s*[-*]\s+\[(?P<mark>[ xX])\]\s.*<!--\s*cmd:(?P<action>remove|approve-stale|approve|split)"
+    r":(?P<args>[^>\s]+)\s*-->",
 )
+# The commands workflow sparse-checks out scripts/ only, so this cannot import
+# shared.claims_expiry; keep in step with DEFAULT_EXPIRY_DAYS there.
+_APPROVE_END_DAYS = 14
 _ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,120}$")
 
 
@@ -59,13 +67,21 @@ def _list(doc: dict, key: str) -> list:
     return list(raw) if isinstance(raw, list) else []
 
 
-def apply_commands(doc: dict, commands: list[tuple[str, list[str]]]) -> tuple[dict, list[str]]:
+def apply_commands(
+    doc: dict,
+    commands: list[tuple[str, list[str]]],
+    *,
+    now: datetime | None = None,
+) -> tuple[dict, list[str]]:
     out = dict(doc)
+    now = now or datetime.now(UTC)
     ids = [str(i) for i in _list(out, "ids")]
     blocked = [str(i) for i in _list(out, "blocked")]
     dismissed = [str(i) for i in _list(out, "dismissed")]
     splits = [list(p) for p in _list(out, "dupe_splits") if isinstance(p, list)]
     seen_pairs = {tuple(sorted(p)) for p in splits if len(p) == 2}
+    raw_fields = out.get("field_overrides")
+    fields = {k: dict(v) for k, v in raw_fields.items()} if isinstance(raw_fields, dict) else {}
     log: list[str] = []
     for action, args in commands:
         if action == "remove":
@@ -74,13 +90,21 @@ def apply_commands(doc: dict, commands: list[tuple[str, list[str]]]) -> tuple[di
             if item not in blocked:
                 blocked.append(item)
             log.append(f"removed {item}")
-        elif action == "approve":
+        elif action in ("approve", "approve-stale"):
             item = args[0]
             blocked = [i for i in blocked if i != item]
             dismissed = [i for i in dismissed if i != item]
             if item not in ids:
                 ids.append(item)
-            log.append(f"approved {item}")
+            entry = fields.setdefault(item, {})
+            if action == "approve-stale" and not str(entry.get("ends_at") or "").strip():
+                end = (now + timedelta(days=_APPROVE_END_DAYS)).astimezone(UTC).replace(microsecond=0)
+                entry["ends_at"] = end.isoformat().replace("+00:00", "Z")
+                log.append(f"approved {item} (end date {entry['ends_at'][:10]})")
+            else:
+                log.append(f"approved {item}")
+            if not entry:
+                fields.pop(item, None)
         elif action == "split":
             members = sorted(set(args))
             for a_pos, a in enumerate(members):
@@ -90,7 +114,12 @@ def apply_commands(doc: dict, commands: list[tuple[str, list[str]]]) -> tuple[di
                         splits.append([a, b])
             log.append(f"split {', '.join(members)}")
     out["ids"] = ids
-    for key, val in (("blocked", blocked), ("dismissed", dismissed), ("dupe_splits", splits)):
+    for key, val in (
+        ("blocked", blocked),
+        ("dismissed", dismissed),
+        ("dupe_splits", splits),
+        ("field_overrides", fields),
+    ):
         if val:
             out[key] = val
         else:

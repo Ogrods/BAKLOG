@@ -7,6 +7,7 @@ staged; nothing else in the private clone is touched.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -80,3 +81,33 @@ def sync_claims_decisions(
     head = _git(runner, internal, "rev-parse", "--short", "HEAD")
     _check(head, "git rev-parse")
     return {"changed": changed, "sha": head.stdout.strip(), "pushed": pushed}
+
+
+INGEST_WORKFLOW = "claims-ingest.yml"
+PUBLIC_REPO_ENV = "BAKLOG_PUBLIC_REPO"
+DEFAULT_PUBLIC_REPO = "Ogrods/BAKLOG"
+
+
+def dispatch_claims_ingest(*, runner: Runner = subprocess.run) -> dict:
+    """Start the public repo's Claims ingest run with the maintainer's ``gh`` login.
+
+    That run rebuilds the feed from the synced decisions and opens (and, when
+    every added id is vetted, auto-merges) the feed PR. Returns
+    ``{"workflow": str, "url": str}``; raises ``ClaimsSyncError`` on failure.
+    """
+    repo = os.environ.get(PUBLIC_REPO_ENV, "").strip() or DEFAULT_PUBLIC_REPO
+    try:
+        proc = runner(
+            ["gh", "workflow", "run", INGEST_WORKFLOW, "-R", repo],
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT_SEC,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise ClaimsSyncError("GitHub CLI (gh) not found on PATH") from exc
+    _check(proc, "gh workflow run")
+    return {
+        "workflow": INGEST_WORKFLOW,
+        "url": f"https://github.com/{repo}/actions/workflows/{INGEST_WORKFLOW}",
+    }

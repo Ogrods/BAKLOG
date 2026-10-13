@@ -16,6 +16,13 @@ import requests
 from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.claims_decisions import load_auto_decisions, merge_decisions
+from shared.claims_expiry import (
+    DEFAULT_EXPIRY_DAYS,
+    LIVE_LISTING_SOURCES,
+    default_ends_at,
+    has_ends_at,
+    is_trusted_live_listing,
+)
 from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
@@ -348,8 +355,8 @@ def _infer_store_from_text(
 DEFAULT_EXPIRY_SOURCES = frozenset({"epic", "gamerpower", "itad"})
 # Null ends_at older than DEFAULT_EXPIRY_DAYS from first_seen are pruned:
 # publish/enrich via _resolve_ends_at; approved selection + carry-forward via
-# _ends_at_for_prune so re-approved ITAD lingerers cannot resurrect.
-DEFAULT_EXPIRY_DAYS = 14
+# _ends_at_for_prune so re-approved ITAD lingerers cannot resurrect. GamerPower
+# rows seen in a recent fetch are exempt (shared/claims_expiry.py).
 
 
 def _claim_links_payload(raw: dict, store: str) -> dict[str, object]:
@@ -580,7 +587,7 @@ def _carry_forward_missing_approved(
         keys = claim_match_keys(row)
         if keys & published_keys or keys & seen_keys:
             continue
-        if _is_expired(_ends_at_for_prune(row), now):
+        if _is_expired(_ends_at_for_prune(row, now), now):
             continue
         carried.append(dict(row))
         seen_keys |= keys or {f"id:{item_id}"}
@@ -1046,7 +1053,7 @@ def _select_approved_auto_items(
         # When ends_at is still null after overrides, apply the 14d first_seen
         # default so stale null-dated rows are pruned from approved (not only
         # dropped later at enrich / carry-forward).
-        prune_ends = _ends_at_for_prune({**item, "ends_at": ends_at})
+        prune_ends = _ends_at_for_prune({**item, "ends_at": ends_at}, now)
         if _is_expired(prune_ends, now):
             if item_id in approved_ids:
                 expired_approved_ids.add(item_id)
@@ -1097,6 +1104,8 @@ def _resolve_ends_at(raw: dict, *, now: datetime | None = None) -> str | None:
     clock = now or datetime.now(UTC)
     if clock.tzinfo is None:
         clock = clock.replace(tzinfo=UTC)
+    if is_trusted_live_listing(raw, clock):
+        return None
     anchor = _parse_ends_at(raw.get("first_seen")) or clock
     default_end = anchor + timedelta(days=DEFAULT_EXPIRY_DAYS)
     return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -1132,27 +1141,24 @@ def _is_expired(ends_at: object, now: datetime) -> bool:
     return parsed < now
 
 
-def _ends_at_for_prune(item: dict) -> object:
+def _ends_at_for_prune(item: dict, now: datetime | None = None) -> object:
     """ends_at used for expiry / prune / carry-forward decisions.
 
     When ``ends_at`` is null/empty and ``first_seen`` is known, treat expiry as
     ``first_seen + DEFAULT_EXPIRY_DAYS`` (14d). Null ends_at older than that
     window are pruned so approved carry-forward cannot resurrect lingerers.
+    With ``now``, GamerPower rows seen in a recent fetch never expire.
     """
     ends = item.get("ends_at")
     if ends is not None and str(ends).strip():
         return ends
-    first_seen = _parse_ends_at(item.get("first_seen"))
-    if first_seen is None:
-        return None
-    default_end = first_seen + timedelta(days=DEFAULT_EXPIRY_DAYS)
-    return default_end.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return default_ends_at(item, now)
 
 
 def _is_expired_for_publish(raw: dict, now: datetime) -> bool:
     """True when source default ends_at or null-ends_at first_seen+14d is past."""
     resolved = _resolve_ends_at(raw, now=now)
-    return _is_expired(_ends_at_for_prune({**raw, "ends_at": resolved}), now)
+    return _is_expired(_ends_at_for_prune({**raw, "ends_at": resolved}, now), now)
 
 
 def _live_items_by_id(live_items: list[dict] | None) -> dict[str, dict]:
@@ -1746,8 +1752,16 @@ def _published_feed_has_no_live_items(path: Path, now: datetime) -> bool:
     items = doc.get("items") if isinstance(doc, dict) else None
     if not isinstance(items, list):
         return False
+    # Published rows carry no last_seen, so an undated live-listing row cannot be
+    # proven dead here; treat it as live so an outage cannot empty the feed.
     return all(
-        isinstance(item, dict) and _is_expired(_ends_at_for_prune(item), now) for item in items
+        isinstance(item, dict)
+        and not (
+            str(item.get("source") or "").strip().lower() in LIVE_LISTING_SOURCES
+            and not has_ends_at(item)
+        )
+        and _is_expired(_ends_at_for_prune(item, now), now)
+        for item in items
     )
 
 

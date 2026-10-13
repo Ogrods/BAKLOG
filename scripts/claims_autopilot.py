@@ -32,6 +32,7 @@ from shared.claims_decisions import (  # noqa: E402
     scoped_match_keys,
 )
 from shared.claims_dedupe import group_claims  # noqa: E402
+from shared.claims_expiry import has_ends_at, is_trusted_live_listing  # noqa: E402
 from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path  # noqa: E402
 from shared.claims_policy import (  # noqa: E402
     AUTO_PUBLISH,
@@ -221,9 +222,14 @@ def render_digest(
         lines.append("- (none)")
     for c in review:
         new = " (new)" if c.id in diff["review_added"] else ""
+        # Decided at tick time by claims_commands, which has no feed rows: any
+        # undated row that is not a live listing may cross first_seen + 14d first.
+        row = by_id[c.id]
+        undated_unlisted = not has_ends_at(row) and not is_trusted_live_listing(row, now)
+        action = "approve-stale" if undated_unlisted else "approve"
         lines.append(
             f"- [ ] Approve: {_line(by_id[c.id])}{new} <sub>{c.reason}</sub> "
-            f"<!-- cmd:approve:{c.id} -->"
+            f"<!-- cmd:{action}:{c.id} -->"
         )
     lines.append("")
     return "\n".join(lines)

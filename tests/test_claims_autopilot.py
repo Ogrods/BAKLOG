@@ -74,7 +74,8 @@ def test_run_writes_decisions_and_digest(paths, monkeypatch, tmp_path: Path) -> 
     md = paths["md"].read_text(encoding="utf-8")
     assert md.startswith(ap.DIGEST_MARKER)
     assert "<!-- cmd:remove:epic-out-of-sight-b96ca8 -->" in md
-    assert "<!-- cmd:approve:gamerpower-3716 -->" in md
+    # Undated and no last_seen in the fixture, so approving also sets an end date.
+    assert "<!-- cmd:approve-stale:gamerpower-3716 -->" in md
     assert "<!-- cmd:split:epic-out-of-sight-b96ca8,gamerpower-3806,itad-fadc757d9c68 -->" in md \
         or "<!-- cmd:split:epic-out-of-sight-b96ca8,itad-fadc757d9c68,gamerpower-3806 -->" in md
     summary = json.loads(paths["json"].read_text(encoding="utf-8"))

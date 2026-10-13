@@ -211,6 +211,12 @@ def _stamp_first_seen(
         item["first_seen"] = prior or fetched_at
 
 
+def _stamp_last_seen(items: list[dict], fetched_at: str) -> None:
+    """Mark rows a source actually returned this run (not carried-forward rows)."""
+    for item in items:
+        item["last_seen"] = fetched_at
+
+
 def main() -> int:
     configure_stdout()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -251,6 +257,8 @@ def main() -> int:
             carry_claim_enrichment(item, existing_by_id.get(str(item.get("id") or "").strip()))
             for item in items
         ]
+    _stamp_last_seen(items, fetched_at)
+    if existing_by_id:
         # A source that raised (network/parse hiccup) is absent from `counts`,
         # unlike a source that genuinely returned 0 (key present, value 0). When
         # at least one other source succeeded, carry that failed source's prior

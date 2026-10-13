@@ -1386,6 +1386,72 @@ def test_preview_publish_items_does_not_carry_stale_null_ends_at() -> None:
     assert items == []
 
 
+def _undated_row(row_id: str, source: str, **extra) -> dict:
+    return {
+        "id": row_id,
+        "store": "other",
+        "source": source,
+        "title": f"Game {row_id}",
+        "claim_url": f"https://example.com/{row_id}",
+        "ends_at": None,
+        "first_seen": "2026-09-07T00:00:00Z",
+        **extra,
+    }
+
+
+def test_select_approved_keeps_old_gamerpower_row_while_listed() -> None:
+    """Owner approvals of undated GamerPower rows survive past first_seen + 14d
+    while GamerPower still lists them (fresh last_seen)."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
+    listed = _undated_row("gamerpower-1", "gamerpower", last_seen="2026-10-13T04:50:00+00:00")
+    delisted = _undated_row("gamerpower-2", "gamerpower", last_seen="2026-10-10T00:00:00+00:00")
+    lingerer = _undated_row("itad-3", "itad", last_seen="2026-10-13T04:50:00+00:00")
+    kept, expired = bfc._select_approved_auto_items(
+        [listed, delisted, lingerer],
+        approved_ids={"gamerpower-1", "gamerpower-2", "itad-3"},
+        approved_keys=set(),
+        now=now,
+    )
+    assert [r["id"] for r in kept] == ["gamerpower-1"]
+    assert expired == {"gamerpower-2", "itad-3"}
+    assert bfc._resolve_ends_at(listed, now=now) is None
+    assert not bfc._is_expired_for_publish(listed, now)
+    assert bfc._is_expired_for_publish(delisted, now)
+
+
+def test_select_approved_keeps_stale_row_with_owner_end_date() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
+    kept, expired = bfc._select_approved_auto_items(
+        [_undated_row("itad-3", "itad")],
+        approved_ids={"itad-3"},
+        approved_keys=set(),
+        now=now,
+        field_overrides={"itad-3": {"ends_at": "2026-10-27T05:00:00Z"}},
+    )
+    assert [r["id"] for r in kept] == ["itad-3"]
+    assert expired == set()
+
+
+def test_preview_publish_items_publishes_listed_gamerpower_without_end_date() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
+    items = bfc.preview_publish_items(
+        manual_items=[],
+        auto_items_all=[
+            _undated_row("gamerpower-1", "gamerpower", last_seen="2026-10-13T04:50:00+00:00")
+        ],
+        approved_ids={"gamerpower-1"},
+        now=now,
+    )
+    assert [it["id"] for it in items] == ["gamerpower-1"]
+    assert items[0].get("ends_at") is None
+
+
 def test_preview_publish_items_does_not_carry_dismissed_or_expired() -> None:
     from datetime import UTC, datetime
 
@@ -2062,6 +2128,11 @@ def test_published_feed_has_no_live_items(tmp_path: Path) -> None:
     assert bfc._published_feed_has_no_live_items(path, now) is True
     mixed = [*expired[:1], {"id": "c", "ends_at": "2026-10-20T00:00:00Z"}]
     path.write_text(json.dumps({"items": mixed}), encoding="utf-8")
+    assert bfc._published_feed_has_no_live_items(path, now) is False
+    # Undated GamerPower rows publish without last_seen, so they never count as dead.
+    gamerpower = [*expired, {"id": "gamerpower-1", "source": "gamerpower", "ends_at": None,
+                             "first_seen": "2026-08-01T00:00:00Z"}]
+    path.write_text(json.dumps({"items": gamerpower}), encoding="utf-8")
     assert bfc._published_feed_has_no_live_items(path, now) is False
 
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from shared import claims_paths
-from shared.claims_sync import ClaimsSyncError, sync_claims_decisions
+from shared.claims_sync import ClaimsSyncError, dispatch_claims_ingest, sync_claims_decisions
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
@@ -109,3 +109,47 @@ def test_sync_aborts_rebase_on_pull_failure(tmp_path: Path, monkeypatch: pytest.
     subs = [c[0] for c in calls]
     assert subs == ["add", "diff", "commit", "pull", "rebase"]
     assert calls[-1] == ["rebase", "--abort"]
+
+
+def test_dispatch_targets_public_repo_explicitly(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BAKLOG_PUBLIC_REPO", "o/BAKLOG")
+    calls: list[list[str]] = []
+
+    def fake(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    result = dispatch_claims_ingest(runner=fake)
+    assert calls == [["gh", "workflow", "run", "claims-ingest.yml", "-R", "o/BAKLOG"]]
+    assert result == {
+        "workflow": "claims-ingest.yml",
+        "url": "https://github.com/o/BAKLOG/actions/workflows/claims-ingest.yml",
+    }
+
+
+def test_dispatch_defaults_to_public_repo(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BAKLOG_PUBLIC_REPO", raising=False)
+    calls: list[list[str]] = []
+
+    def fake(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    dispatch_claims_ingest(runner=fake)
+    assert calls[0][-2:] == ["-R", "Ogrods/BAKLOG"]
+
+
+def test_dispatch_reports_gh_failure() -> None:
+    def fake(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 1, "", "HTTP 403: Resource not accessible")
+
+    with pytest.raises(ClaimsSyncError, match="403"):
+        dispatch_claims_ingest(runner=fake)
+
+
+def test_dispatch_without_gh_cli() -> None:
+    def fake(cmd, **kwargs):
+        raise FileNotFoundError(cmd[0])
+
+    with pytest.raises(ClaimsSyncError, match="gh"):
+        dispatch_claims_ingest(runner=fake)

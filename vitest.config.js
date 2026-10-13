@@ -11,6 +11,7 @@ const adminOnlyTests = [
   "tests/admin-pacific-dates.test.js",
   "tests/admin-run-console-lifecycle.test.js",
   "tests/admin-run-console.test.js",
+  "tests/claims-expiry-parity.test.js",
   "tests/giveaway-strip-parity.test.js",
 ];
 

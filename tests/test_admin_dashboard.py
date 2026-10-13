@@ -1133,6 +1133,37 @@ def test_claims_sync_route_reports_conflict(
     assert "CONFLICT" in data["error"]
 
 
+def test_claims_dispatch_route_starts_ingest(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    monkeypatch.setattr(
+        claims_sync,
+        "dispatch_claims_ingest",
+        lambda: {"workflow": "claims-ingest.yml", "url": "https://example.com/run"},
+    )
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
+    assert code == 200, data
+    assert data == {"ok": True, "workflow": "claims-ingest.yml", "url": "https://example.com/run"}
+
+
+def test_claims_dispatch_route_reports_gh_failure(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    def boom():
+        raise claims_sync.ClaimsSyncError("GitHub CLI (gh) not found on PATH")
+
+    monkeypatch.setattr(claims_sync, "dispatch_claims_ingest", boom)
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
+    assert code == 502
+    assert "gh" in data["error"]
+
+
 def test_claims_sync_route_rejects_missing_local_header(admin_server: tuple[str, Path]) -> None:
     base, _ = admin_server
     req = urllib.request.Request(

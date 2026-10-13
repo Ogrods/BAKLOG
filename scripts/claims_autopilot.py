@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,7 +45,13 @@ from shared.claims_policy import (  # noqa: E402
 )
 from shared.free_claims_sources import norm_title  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from claims_md import md_label, md_text  # noqa: E402
+
 DIGEST_MARKER = "<!-- baklog-claims-digest -->"
+# Same shape claims_commands accepts; anything else gets no command marker.
+_MARKER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,120}$")
+_URL_UNSAFE_RE = re.compile(r"[\s()<>\[\]`]")
 _COVER_STOPWORDS = {"a", "an", "and", "the", "of"}
 
 
@@ -155,16 +162,24 @@ def has_changes(diff: dict[str, list[str]]) -> bool:
 
 def _ends(item: dict) -> str:
     raw = str(item.get("ends_at") or "")
-    return f", ends {raw[:10]}" if raw else ""
+    return f", ends {md_text(raw[:10])}" if raw else ""
 
 
 def _line(item: dict) -> str:
-    title = str(item.get("title") or item.get("id") or "").replace("|", "/")
-    src = str(item.get("source") or "?")
-    store = str(item.get("store") or "?")
-    url = str(item.get("claim_url") or "")
-    link = f" [link]({url})" if url.startswith(("http://", "https://")) else ""
+    title = md_text(item.get("title") or item.get("id") or "")
+    src = md_text(item.get("source") or "?")
+    store = md_text(item.get("store") or "?")
+    url = str(item.get("claim_url") or "").strip()
+    safe_url = url.startswith(("http://", "https://")) and not _URL_UNSAFE_RE.search(url)
+    link = f" [link]({url})" if safe_url else ""
     return f"**{title}** ({src}, {store}{_ends(item)}){link}"
+
+
+def _marker(action: str, *ids: str) -> str:
+    """Command marker, or "" when an upstream id could break the comment syntax."""
+    if not ids or not all(_MARKER_ID_RE.match(i) for i in ids):
+        return ""
+    return f" <!-- cmd:{action}:{','.join(ids)} -->"
 
 
 def render_digest(
@@ -204,18 +219,20 @@ def render_digest(
     for c in auto:
         new = " (new)" if c.id in diff["approved_added"] else ""
         lines.append(
-            f"- [ ] Remove: {_line(by_id[c.id])}{new} <sub>{c.reason}</sub> "
-            f"<!-- cmd:remove:{c.id} -->"
+            f"- [ ] Remove: {_line(by_id[c.id])}{new} <sub>{md_text(c.reason)}</sub>"
+            f"{_marker('remove', c.id)}"
         )
     lines += ["", "## Dupes merged", ""]
     if not dupes:
         lines.append("- (none)")
     for keeper_id, losers in sorted(dupes.items()):
         keeper = by_id.get(keeper_id, {"id": keeper_id})
-        hidden = ", ".join(f"`{c.id}`" for c in losers)
-        members = ",".join([keeper_id, *(c.id for c in losers)])
+        hidden = ", ".join(
+            md_label(by_id.get(c.id, {}).get("title"), c.id) for c in losers
+        )
         lines.append(
-            f"- [ ] Not a dupe: kept {_line(keeper)}, hid {hidden} <!-- cmd:split:{members} -->"
+            f"- [ ] Not a dupe: kept {_line(keeper)}, hid {hidden}"
+            f"{_marker('split', keeper_id, *(c.id for c in losers))}"
         )
     lines += ["", "## Needs review", ""]
     if not review:
@@ -228,8 +245,8 @@ def render_digest(
         undated_unlisted = not has_ends_at(row) and not is_trusted_live_listing(row, now)
         action = "approve-stale" if undated_unlisted else "approve"
         lines.append(
-            f"- [ ] Approve: {_line(by_id[c.id])}{new} <sub>{c.reason}</sub> "
-            f"<!-- cmd:{action}:{c.id} -->"
+            f"- [ ] Approve: {_line(by_id[c.id])}{new} <sub>{md_text(c.reason)}</sub>"
+            f"{_marker(action, c.id)}"
         )
     lines.append("")
     return "\n".join(lines)
@@ -275,9 +292,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     if args.digest_md:
         args.digest_md.write_text(digest, encoding="utf-8")
     if args.digest_json:
+        touched = {i for ids in diff.values() for i in ids}
         summary = {
             "changed": changed,
             "diff": diff,
+            "titles": {
+                str(it.get("id")): str(it.get("title") or "")
+                for it in items
+                if str(it.get("id") or "") in touched and str(it.get("title") or "").strip()
+            },
             "counts": {
                 "items": len(items),
                 "auto_publish": len(new["approve"]),

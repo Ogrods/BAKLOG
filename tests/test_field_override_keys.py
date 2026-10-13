@@ -32,3 +32,16 @@ def test_apply_field_overrides_ignores_unknown_keys() -> None:
     assert items[0]["blurb"] == "keep me"
     assert items[0]["header_image"] == "https://example.com/cover.jpg"
     assert "blurb" not in FIELD_OVERRIDE_KEYS
+
+
+def test_title_fallback_does_not_match_a_substring_title() -> None:
+    items = [{"id": "gamerpower-1", "store": "steam", "title": "Outrage", "claim_url": "https://a"}]
+    overrides = {"gamerpower-9": {"title": "Rage", "claim_url": "https://rage", "ends_at": "2026-11-01T00:00:00Z"}}
+    _apply_field_overrides(items, field_overrides=overrides)
+    assert items[0] == {"id": "gamerpower-1", "store": "steam", "title": "Outrage", "claim_url": "https://a"}
+    exact = [{"id": "gamerpower-2", "store": "steam", "title": "Rage", "claim_url": "https://a"}]
+    _apply_field_overrides(exact, field_overrides=overrides)
+    assert exact[0]["claim_url"] == "https://rage"
+    unapproved = [{"id": "gamerpower-3", "store": "steam", "title": "Rage", "claim_url": "https://a"}]
+    _apply_field_overrides(unapproved, field_overrides=overrides, title_fallback_ids={"gamerpower-3"})
+    assert unapproved[0]["claim_url"] == "https://a"

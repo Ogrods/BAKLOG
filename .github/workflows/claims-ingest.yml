@@ -132,8 +132,9 @@ jobs:
             --decisions "$BAKLOG_CLAIMS_AUTO_DECISIONS" \
             --digest-md /tmp/claims-digest.md \
             --digest-json /tmp/claims-digest.json
+          # Public run summary gets counts only; the full digest lives in the private issue.
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-            cat /tmp/claims-digest.md >> "$GITHUB_STEP_SUMMARY"
+            python3 -c "import json; c = json.load(open('/tmp/claims-digest.json'))['counts']; print('## Claims autopilot\n\n' + ''.join(f'- {k}: **{v}**\n' for k, v in c.items()))" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Synthesize ephemeral approved.json from landing
@@ -209,6 +210,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The build may prune/rekey owner decisions in place; CI re-derives that every
+          # run and never owns the file, and an unstaged edit would make pull --rebase refuse.
+          git checkout -- claims/free_claims.approved.json 2>/dev/null || true
           cp "$GITHUB_WORKSPACE/curated/free_claims.auto.json" claims/free_claims.auto.json
           git add -- claims/auto_decisions.json claims/free_claims.auto.json
           if git diff --cached --quiet; then
@@ -218,10 +222,25 @@ jobs:
           git commit -m "claims: autopilot decisions + scrape"
           for attempt in 1 2 3; do
             if git pull --rebase -q && git push -q; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
             sleep $((attempt * 5))
           done
           echo "::error::Could not push autopilot decisions"
           exit 1
+
+      # Build matches main, so any open refresh PR carries stale content (for example a
+      # claim the owner just removed) and must not auto-merge later.
+      - name: Close stale sticky refresh PR
+        if: steps.gate.outputs.changed == 'false' && env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          STALE=$(gh pr list --head chore/claims-feed-refresh --state open --json number --jq '.[0].number // empty')
+          if [ -n "$STALE" ]; then
+            gh pr close "$STALE" --delete-branch \
+              --comment "Closed by Claims ingest: the rebuilt feed now matches main."
+          fi
 
       - name: Open or update sticky refresh PR
         if: steps.gate.outputs.changed == 'true' && env.DRY_RUN != 'true'
@@ -296,7 +315,13 @@ jobs:
             echo "Enabling squash auto-merge on #$PR_NUMBER (all added ids vetted)."
             gh pr merge "$PR_NUMBER" --squash --auto
           else
-            echo "Skipping auto-merge on #$PR_NUMBER: unvetted added claim id(s) need review."
+            # An earlier vetted run may have enabled it; this push must not ride along.
+            echo "Unvetted added claim id(s) on #$PR_NUMBER need review."
+            ENABLED=$(gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest != null')
+            if [ "$ENABLED" = "true" ]; then
+              echo "Disabling auto-merge on #$PR_NUMBER."
+              gh pr merge "$PR_NUMBER" --disable-auto
+            fi
           fi
 
           python scripts/approve_feed_pr_ci.py --sha "$(git rev-parse HEAD)"

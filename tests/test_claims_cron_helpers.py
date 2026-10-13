@@ -153,6 +153,28 @@ def test_fingerprint_cli_exit_codes(tmp_path: Path, capsys) -> None:
         encoding="utf-8",
     )
     assert cff.main(["--before", str(before), "--after", str(after_same)]) == 3
-    assert cff.main(["--before", str(before), "--after", str(after_diff)]) == 0
+    json_out = tmp_path / "diff.json"
+    assert cff.main(
+        ["--before", str(before), "--after", str(after_diff), "--json-out", str(json_out)]
+    ) == 0
     out = capsys.readouterr().out
-    assert "fingerprint diff" in out.lower() or "Changed" in out
+    assert "- A2 <sub>(a)</sub>" in out
+    doc = json.loads(json_out.read_text(encoding="utf-8"))
+    assert doc["changed"] == ["a"] and doc["added"] == []
+    assert doc["titles"] == {"a": "A2"}
+
+
+def test_titles_by_id_blank_after_title_falls_back_to_id() -> None:
+    titles = cff.titles_by_id([{"id": "a", "title": "A"}], [{"id": "a", "title": "  "}])
+    assert titles == {}
+
+
+def test_diff_markdown_shows_titles_escaped_with_id_fallback() -> None:
+    diff = {"added": ["gamerpower-3322", "epic-x"], "removed": ["gone"], "changed": []}
+    md = cff.format_diff_markdown(
+        diff,
+        titles={"gamerpower-3322": "Sausage Hunter", "gone": "Bad_[link](x)\nFixes #1 @me"},
+    )
+    assert "- Sausage Hunter <sub>(gamerpower-3322)</sub>" in md
+    assert "- epic-x\n" in md
+    assert "- Bad\\_\\[link\\]\\(x\\) Fixes \\#1 &#64;me <sub>(gone)</sub>" in md

@@ -469,6 +469,17 @@ def test_clear_remote_mirror_profile_deletes_allowlisted(
     assert state.get("artifacts") == {}
 
 
+def test_clear_upload_state_drops_queued_upload(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(cloud_mirror._pending, "default", {"paths": {"games_steam.json"}, "flush_at": 0})
+    monkeypatch.setitem(cloud_mirror._pending, "other", {"paths": {"games_gog.json"}, "flush_at": 0})
+    cloud_mirror._clear_mirror_upload_state("default")
+    assert "default" not in cloud_mirror._pending
+    assert "other" in cloud_mirror._pending
+    assert not cloud_mirror._lock.locked()
+
+
 def test_mirror_upload_blocked_when_opt_in_off(
     profile_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

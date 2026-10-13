@@ -186,3 +186,32 @@ def test_loop_does_not_poll_when_not_frozen(monkeypatch):
     tray_app._start_deal_alerts(MagicMock())
     assert started == ["tray-deal-alerts"]
     assert polled == []
+
+
+def test_menu_refreshes_only_when_alerts_enabled_changes(tray_env):
+    _, responses, _ = tray_env
+    icon = MagicMock()
+    responses["/api/deal-alerts/pending"] = {"enabled": True, "alerts": []}
+    tray_app._deal_alerts_cycle(icon)
+    assert icon.update_menu.call_count == 1
+    tray_app._deal_alerts_cycle(icon)
+    assert icon.update_menu.call_count == 1
+    responses["/api/deal-alerts/pending"] = {"enabled": False, "alerts": []}
+    tray_app._deal_alerts_cycle(icon)
+    assert icon.update_menu.call_count == 2
+
+
+def test_menu_refresh_failure_does_not_break_the_poll(tray_env):
+    _, responses, _ = tray_env
+    icon = MagicMock()
+    icon.update_menu.side_effect = RuntimeError("backend gone")
+    responses["/api/deal-alerts/pending"] = {"enabled": True, "alerts": [_drop()]}
+    assert tray_app._deal_alerts_cycle(icon) == 1
+    assert tray_app._deal_alerts_enabled is True
+
+
+def test_snooze_write_is_atomic(tmp_path, monkeypatch):
+    written = []
+    monkeypatch.setattr(dat, "atomic_write_text", lambda path, text: written.append((path, text)))
+    dat.set_snoozed(tmp_path, True, date(2026, 9, 26))
+    assert written == [(dat.snooze_path(tmp_path), '{"snoozed_on": "2026-09-26"}\n')]

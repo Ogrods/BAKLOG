@@ -89,6 +89,25 @@ def test_title_matched_rows_never_emit(files):
     assert "wishlist:gog-1" not in da.load_state()["price_snapshot"]
 
 
+def test_library_rows_never_alert_as_wishlist_drops(files):
+    _itad(files, **{"steam:570": _row(49.99)})
+    da.scan(pro=True, now=NOW)
+    _itad(files, **{"steam:570": _row(9.99)})
+    assert da.scan(pro=True, now=NOW) == 0
+    assert "steam:570" not in da.load_state()["price_snapshot"]
+
+
+def test_currency_change_rebaselines_without_alerting(files):
+    _itad(files, **{"wishlist:570": _row(49.99)})
+    da.scan(pro=True, now=NOW)
+    gbp = {**_row(39.99), "currency": "GBP"}
+    _itad(files, **{"wishlist:570": gbp})
+    assert da.scan(pro=True, now=NOW) == 0
+    assert da.load_state()["price_snapshot"]["wishlist:570"]["currency"] == "GBP"
+    _itad(files, **{"wishlist:570": {**_row(19.99), "currency": "GBP"}})
+    assert da.scan(pro=True, now=NOW) == 1
+
+
 def test_new_key_after_seed_is_snapshotted_not_alerted(files):
     _itad(files, **{"wishlist:1": _row(10.0)})
     da.scan(pro=True, now=NOW)

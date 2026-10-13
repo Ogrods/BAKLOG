@@ -363,7 +363,21 @@ def test_state_file_keeps_both_clocks(monkeypatch, tmp_path):
     s.tick(now=now)
     s.tick(now=now + 60)
     doc = json.loads((tmp_path / "runs" / "scheduler_state.json").read_text(encoding="utf-8"))
-    assert doc == {"last_run": now, "last_alert_run": now + 60}
+    assert doc == {"last_run": now, "last_alert_run": now + 60, "last_alert_attempt:itad": now + 60}
+
+
+def test_alert_source_that_writes_nothing_does_not_starve_the_other(monkeypatch):
+    # fetch_itad exits 0 without writing when the wishlist is empty, so its file stays missing.
+    _set_ages(monkeypatch, {"steam": 10})
+    _alerts_on(monkeypatch, {"itad_prices.json": None, "free_claims.json": STALE_ALERT})
+    mgr = FakeManager()
+    s = _make(mgr)
+    now = time.time()
+    assert s.tick(now=now) == "itad"
+    later = now + sched.DEFAULT_STAGGER_SEC + 1
+    assert s.tick(now=later) == "claims"
+    assert s.tick(now=later + sched.DEFAULT_STAGGER_SEC + 1) is None
+    assert [k for k, _ in mgr.submitted] == ["itad", "claims"]
 
 
 def test_probe_skipped_when_scheduler_disabled(monkeypatch):

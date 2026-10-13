@@ -280,11 +280,15 @@ def _clear_mirror_upload_state(profile_id: str) -> None:
         return
     path = _mirror_state_path(pid)
     doc = {"artifacts": {}, "last_upload_at": None, "device_id": None}
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(path, json.dumps(doc, indent=2) + "\n")
-    except OSError:
-        pass
+    # Same lock as the upload worker: atomic_write_text shares one .tmp path, and a
+    # debounced upload queued before the clear must not re-upload right after it.
+    with _lock:
+        _pending.pop(pid, None)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(path, json.dumps(doc, indent=2) + "\n")
+        except OSError:
+            pass
 
 
 def _looks_like_account_profile_id(profile_id: str) -> bool:

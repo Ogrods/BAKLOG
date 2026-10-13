@@ -11,6 +11,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from shared.safe_write import atomic_write_text
+
 # Windows toast limits are roughly 64 characters of title and 256 of body.
 TITLE_MAX = 64
 BODY_MAX = 256
@@ -138,4 +140,4 @@ def set_snoozed(data_root: Path, snoozed: bool, today: date | None = None) -> No
         return
     data_root.mkdir(parents=True, exist_ok=True)
     payload = {"snoozed_on": (today or date.today()).isoformat()}
-    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    atomic_write_text(path, json.dumps(payload) + "\n")

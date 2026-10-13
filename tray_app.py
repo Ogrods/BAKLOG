@@ -413,15 +413,30 @@ def _deal_alerts_request(path: str, body: dict | None = None) -> dict | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _refresh_tray_menu(icon) -> None:
+    # pystray's Windows backend builds the menu once; visible/checked callables
+    # are only re-read on update_menu().
+    try:
+        icon.update_menu()
+    except Exception:  # noqa: BLE001 - menu refresh is cosmetic; never break the poll
+        pass
+
+
+def _set_deal_alerts_enabled(icon, enabled: bool) -> None:
+    global _deal_alerts_enabled
+    if enabled != _deal_alerts_enabled:
+        _deal_alerts_enabled = enabled
+        _refresh_tray_menu(icon)
+
+
 def _deal_alerts_cycle(icon) -> int:
     """One poll: notify once per kind, then ack. Returns alerts delivered."""
-    global _deal_alerts_enabled
     if is_snoozed(data_root()):
         return 0
     payload = _deal_alerts_request("/api/deal-alerts/pending")
     if payload is None:
         return 0
-    _deal_alerts_enabled = payload.get("enabled") is True
+    _set_deal_alerts_enabled(icon, payload.get("enabled") is True)
     alerts = payload.get("alerts") if _deal_alerts_enabled else None
     if not isinstance(alerts, list) or not alerts:
         return 0
@@ -546,7 +561,12 @@ def run_tray() -> int:
         toggle_startup()
 
     def _toggle_snooze(icon, _item) -> None:  # noqa: ANN001
-        set_snoozed(data_root(), not is_snoozed(data_root()))
+        try:
+            set_snoozed(data_root(), not is_snoozed(data_root()))
+        except OSError as exc:
+            _tray_notify(icon, "Snooze failed", str(exc))
+            return
+        _refresh_tray_menu(icon)
 
     menu_items = [
         pystray.MenuItem("Open BAKLOG", _on_open, default=True),

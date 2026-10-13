@@ -150,6 +150,9 @@ def scan_prices(state: State, itad_doc: dict | None, *, emit: bool = True, now: 
     snapshot: dict = state["price_snapshot"]
     events: list[Event] = []
     for key, row in by_key.items():
+        # Library rows (fetch_itad --include-library) are owned games, not wishlist drops.
+        if not str(key).startswith("wishlist:"):
+            continue
         if not isinstance(row, dict) or row.get("match") != "appid":
             continue
         price = _to_price(row.get("price"))
@@ -157,8 +160,11 @@ def scan_prices(state: State, itad_doc: dict | None, *, emit: bool = True, now: 
             continue
         prev = snapshot.get(key)
         old = _to_price(prev.get("price")) if isinstance(prev, dict) else None
-        snapshot[key] = {"price": price, "cut": row.get("cut")}
-        if not emit or old is None or not price < old - DROP_EPSILON:
+        currency = row.get("currency")
+        # A region/currency switch is not a price drop; re-baseline silently.
+        same_currency = isinstance(prev, dict) and prev.get("currency") == currency
+        snapshot[key] = {"price": price, "cut": row.get("cut"), "currency": currency}
+        if not emit or old is None or not same_currency or not price < old - DROP_EPSILON:
             continue
         event = {
             "id": f"drop:{key}:{round(price * 100)}",

@@ -116,7 +116,8 @@ def test_expire_only_touches_past_comp_until(monkeypatch, capsys) -> None:
     assert rc == 0
     assert len(writes) == 1
     assert writes[0][1].endswith("/u1")
-    assert writes[0][2]["app_metadata"] == {"plan": "free"}
+    # GoTrue merges app_metadata on PUT; None (JSON null) is what removes comp_until.
+    assert writes[0][2]["app_metadata"] == {"plan": "free", "comp_until": None}
     assert "paul@example.com" not in out
     assert "payer@example.com" not in out
     assert "paid-tester@example.com" not in out

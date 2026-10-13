@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const URL_BASE = 'https://demo.supabase.co';
 
-function makeFetch({ users, pending = [] }) {
+function makeFetch({ users, pending = [], fresh = {} }) {
   return vi.fn(async (url, init = {}) => {
     const u = String(url);
     const method = (init.method || 'GET').toUpperCase();
@@ -16,7 +16,7 @@ function makeFetch({ users, pending = [] }) {
     const m = u.match(/\/auth\/v1\/admin\/users\/([^/?]+)$/);
     if (m) {
       if (method === 'GET') {
-        const user = users.find((x) => x.id === m[1]);
+        const user = fresh[m[1]] || users.find((x) => x.id === m[1]);
         return { ok: true, json: async () => user };
       }
       return { ok: true, json: async () => ({}) };
@@ -26,9 +26,9 @@ function makeFetch({ users, pending = [] }) {
   });
 }
 
-async function runCron({ users, pending, auth = 'Bearer cron-secret' }) {
+async function runCron({ users, pending, fresh, auth = 'Bearer cron-secret' }) {
   vi.resetModules();
-  const fetchMock = makeFetch({ users, pending });
+  const fetchMock = makeFetch({ users, pending, fresh });
   vi.stubGlobal('fetch', fetchMock);
   const mod = await import('../web/api/comp-expire.js');
   const res = await mod.default.fetch(new Request('https://baklog.app/api/comp-expire', {
@@ -67,7 +67,17 @@ describe('comp-expire cron', () => {
     ];
     const { json, fetchMock } = await runCron({ users });
     expect(json).toMatchObject({ ok: true, expired: 1, applied: 0 });
-    expect(puts(fetchMock)).toEqual([{ id: 'u1', meta: { plan: 'free', beta: true } }]);
+    expect(puts(fetchMock)).toEqual([{ id: 'u1', meta: { plan: 'free', comp_until: null, beta: true } }]);
+  });
+
+  it('skips a user whose fresh metadata shows a payment made after the list was fetched', async () => {
+    const users = [{ id: 'u1', email: 'raced@example.com', app_metadata: { plan: 'pro', comp_until: '2020-01-01' } }];
+    const fresh = {
+      u1: { ...users[0], app_metadata: { plan: 'pro', comp_until: '2020-01-01', paid: true, paid_since: '2026-10-13' } },
+    };
+    const { json, fetchMock } = await runCron({ users, fresh });
+    expect(json).toMatchObject({ ok: true, expired: 0 });
+    expect(puts(fetchMock)).toEqual([]);
   });
 
   it('applies pending purchases only to confirmed accounts and emails a summary', async () => {

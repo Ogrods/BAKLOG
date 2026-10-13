@@ -179,7 +179,8 @@ def main(argv: list[str] | None = None) -> int:
         if target_plan == "pro" and until:
             meta[COMP_UNTIL_KEY] = until
         elif target_plan == "free":
-            meta.pop(COMP_UNTIL_KEY, None)
+            # GoTrue merges app_metadata on PUT; only an explicit null removes a key.
+            meta[COMP_UNTIL_KEY] = None
         until_note = f"  comp_until {prev_until!r} -> {meta.get(COMP_UNTIL_KEY)!r}" if prev_until or until else ""
         print(f"  {mail}  {prev!r} -> {target_plan!r}{until_note}  ({uid})")
         if args.apply and uid:

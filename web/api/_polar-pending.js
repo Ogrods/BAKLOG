@@ -63,13 +63,13 @@ export function applyPaidEntitlement(meta, plan, { eventAt = "", now = new Date(
   const today = isoDay(now);
   let creditedDays = 0;
   if (plan === "pro") {
-    if (!next.paid || !validDay(next.paid_since)) next.paid_since = today;
+    if (next.paid !== true || !validDay(next.paid_since)) next.paid_since = today;
     next.paid = true;
     next.plan = "pro";
   } else {
     const compUntil = validDay(next.comp_until);
     const paidSince = validDay(next.paid_since);
-    if (next.paid && compUntil && paidSince) {
+    if (next.paid === true && compUntil && paidSince) {
       const leftover = Math.max(0, daysBetween(paidSince, compUntil));
       const credited = addDays(today, leftover);
       if (leftover > 0 && credited > compUntil) {
@@ -77,8 +77,9 @@ export function applyPaidEntitlement(meta, plan, { eventAt = "", now = new Date(
         creditedDays = leftover;
       }
     }
-    delete next.paid;
-    delete next.paid_since;
+    // GoTrue merges app_metadata on PUT; only an explicit null removes a key.
+    next.paid = null;
+    next.paid_since = null;
     next.plan = compActive(next, now) ? "pro" : "free";
   }
   return { meta: next, stale: false, creditedDays };
@@ -86,16 +87,14 @@ export function applyPaidEntitlement(meta, plan, { eventAt = "", now = new Date(
 
 /** Comp that has run out: not paid and comp_until before today (matches grant_beta_pro.py --expire). */
 export function compExpired(meta, now = new Date()) {
-  if (meta?.paid) return false;
+  if (meta?.paid === true) return false;
   const day = validDay(meta?.comp_until);
   return Boolean(day) && day < isoDay(now);
 }
 
-/** Metadata after the daily cron expires a comp: plan=free, comp_until removed. */
+/** Metadata after the daily cron expires a comp: plan=free, comp_until cleared (null removes it). */
 export function expireCompMeta(meta) {
-  const next = { ...(meta || {}), plan: "free" };
-  delete next.comp_until;
-  return next;
+  return { ...(meta || {}), plan: "free", comp_until: null };
 }
 
 export class SupabaseAdminError extends Error {
@@ -131,10 +130,20 @@ export async function putAppMetadata({ url, key, userId, meta }) {
 /**
  * Apply a paid Polar entitlement to a Supabase user. Throws SupabaseAdminError
  * (status 404 when the user id does not exist). Returns
- * { plan, before, after, email, stale, creditedDays }.
+ * { plan, before, after, email, stale, creditedDays }, or null without writing
+ * when requireConfirmed is set and the account email is not confirmed.
  */
-export async function setUserPlan({ url, key, userId, plan, eventAt = "", now = new Date() }) {
+export async function setUserPlan({
+  url,
+  key,
+  userId,
+  plan,
+  eventAt = "",
+  now = new Date(),
+  requireConfirmed = false,
+}) {
   const user = await getAdminUser({ url, key, userId });
+  if (requireConfirmed && !user?.email_confirmed_at) return null;
   const before = { ...(user?.app_metadata || {}) };
   const result = applyPaidEntitlement(before, plan, { eventAt, now });
   if (!result.stale) {

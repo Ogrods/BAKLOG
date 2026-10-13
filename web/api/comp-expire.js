@@ -16,6 +16,7 @@ import { notifyFounder } from "./_notify.js";
 import {
   compExpired,
   expireCompMeta,
+  getAdminUser,
   listAllUsers,
   listUnappliedPendingPro,
   markPendingApplied,
@@ -41,7 +42,10 @@ function authorized(request) {
 async function expireComps({ url, key, users, now }) {
   const expired = [];
   for (const user of users) {
-    const meta = user?.app_metadata || {};
+    if (!compExpired(user?.app_metadata || {}, now)) continue;
+    // A Polar webhook may have changed this user since the list was fetched.
+    const fresh = await getAdminUser({ url, key, userId: user.id });
+    const meta = fresh?.app_metadata || {};
     if (!compExpired(meta, now)) continue;
     const prevUntil = meta.comp_until;
     await putAppMetadata({ url, key, userId: user.id, meta: expireCompMeta(meta) });

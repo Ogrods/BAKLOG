@@ -16,7 +16,12 @@ function signBody(body, secret = WEBHOOK_SECRET) {
   };
 }
 
-async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {}, appMeta = { beta: true } } = {}) {
+const CONFIRMED_AT = '2026-09-01T00:00:00Z';
+
+async function postWebhook(
+  event,
+  { secret = WEBHOOK_SECRET, env = {}, appMeta = { beta: true }, confirmedAt = CONFIRMED_AT } = {},
+) {
   vi.resetModules();
   process.env.POLAR_WEBHOOK_SECRET = secret;
   process.env.SUPABASE_URL = SUPABASE_URL;
@@ -33,10 +38,13 @@ async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {}, appMeta =
       if (method === 'GET') {
         return {
           ok: true,
-          json: async () => ({ id: 'u1', app_metadata: { ...appMeta } }),
+          json: async () => ({ id: 'u1', email_confirmed_at: confirmedAt, app_metadata: { ...appMeta } }),
         };
       }
       return { ok: true, json: async () => ({}) };
+    }
+    if (String(url).includes('/rest/v1/polar_pending_entitlements')) {
+      return { ok: true, text: async () => '' };
     }
     if (String(url) === 'https://api.resend.com/emails') return { ok: true, text: async () => '' };
     throw new Error(`unexpected fetch ${url} ${init?.method || ''}`);
@@ -184,7 +192,7 @@ describe('polar-webhook', () => {
       appMeta: { plan: 'pro', paid: true, comp_until: '2999-12-31' },
     });
     expect(json.plan).toBe('pro');
-    expect(putMeta(fetchMock)).toEqual({ plan: 'pro', comp_until: '2999-12-31' });
+    expect(putMeta(fetchMock)).toEqual({ plan: 'pro', comp_until: '2999-12-31', paid: null, paid_since: null });
   });
 
   it('drops to free on cancel once the comp grant has ended', async () => {
@@ -192,7 +200,19 @@ describe('polar-webhook', () => {
       appMeta: { plan: 'pro', paid: true, comp_until: '2020-01-01' },
     });
     expect(json.plan).toBe('free');
-    expect(putMeta(fetchMock)).toEqual({ plan: 'free', comp_until: '2020-01-01' });
+    expect(putMeta(fetchMock)).toEqual({ plan: 'free', comp_until: '2020-01-01', paid: null, paid_since: null });
+  });
+
+  it('routes an email match with an unconfirmed address to pending without writing metadata', async () => {
+    const { res, json, fetchMock } = await postWebhook(
+      { type: 'order.paid', data: { product: {}, customer: { email: 'squatter@example.com' } } },
+      { confirmedAt: null },
+    );
+    expect(res.status).toBe(202);
+    expect(json).toMatchObject({ matched: false, pending: true });
+    expect(fetchMock.mock.calls.some(([, init]) => String(init?.method || '').toUpperCase() === 'PUT')).toBe(false);
+    const upsert = fetchMock.mock.calls.find(([u]) => String(u).includes('/rest/v1/polar_pending_entitlements'));
+    expect(JSON.parse(upsert[1].body)).toMatchObject({ email: 'squatter@example.com', plan: 'pro' });
   });
 
   it('ignores an event older than the last applied one', async () => {
@@ -225,7 +245,10 @@ describe('polar-webhook', () => {
       if (u.includes('/rpc/get_user_id_by_email')) return { ok: true, json: async () => real };
       if (u.endsWith(`/admin/users/${real}`)) {
         return method === 'GET'
-          ? { ok: true, json: async () => ({ email: 'buyer@example.com', app_metadata: {} }) }
+          ? {
+            ok: true,
+            json: async () => ({ email: 'buyer@example.com', email_confirmed_at: CONFIRMED_AT, app_metadata: {} }),
+          }
           : { ok: true, json: async () => ({}) };
       }
       throw new Error(`unexpected fetch ${u}`);
@@ -390,7 +413,7 @@ describe('polar-webhook', () => {
         return { ok: true, json: async () => '11111111-1111-4111-8111-111111111111' };
       }
       if (String(url).includes('/auth/v1/admin/users/')) {
-        return { ok: true, json: async () => ({}) };
+        return { ok: true, json: async () => ({ email_confirmed_at: CONFIRMED_AT }) };
       }
       throw new Error(`unexpected fetch ${url}`);
     });

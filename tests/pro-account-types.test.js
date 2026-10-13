@@ -119,15 +119,25 @@ describe('Pro tab by account type (real auth-gate)', () => {
   });
 });
 
+/** What Supabase stores after an admin PUT: app_metadata is merged and null deletes a key. */
+function persist(prev, next) {
+  const out = { ...prev };
+  for (const [k, v] of Object.entries(next)) {
+    if (v === null) delete out[k];
+    else out[k] = v;
+  }
+  return out;
+}
+
 /** Run the daily cron rule on one account. */
 function cron(meta, day) {
-  return compExpired(meta, at(day)) ? expireCompMeta(meta) : meta;
+  return compExpired(meta, at(day)) ? persist(meta, expireCompMeta(meta)) : meta;
 }
 function at(day) {
   return new Date(`${day}T12:00:00Z`);
 }
-const pay = (meta, day) => applyPaidEntitlement(meta, 'pro', { now: at(day) }).meta;
-const cancel = (meta, day) => applyPaidEntitlement(meta, 'free', { now: at(day) }).meta;
+const pay = (meta, day) => persist(meta, applyPaidEntitlement(meta, 'pro', { now: at(day) }).meta);
+const cancel = (meta, day) => persist(meta, applyPaidEntitlement(meta, 'free', { now: at(day) }).meta);
 
 describe('entitlement lifecycle by account type', () => {
   it('beta tester who never pays: Pro through Mar 31, free from Apr 1', () => {

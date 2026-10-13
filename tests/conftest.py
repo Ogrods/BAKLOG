@@ -166,6 +166,18 @@ def _default_supabase_auth_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _no_internal_claims_store(monkeypatch: pytest.MonkeyPatch, tmp_path_factory) -> None:
+    """Keep claim builds off the developer's sibling baklog-internal clone."""
+    from shared import claims_paths
+
+    monkeypatch.setenv(
+        claims_paths.INTERNAL_REPO_ENV, str(tmp_path_factory.getbasetemp() / "no-internal-repo")
+    )
+    monkeypatch.delenv(claims_paths.APPROVED_ENV, raising=False)
+    monkeypatch.delenv(claims_paths.AUTO_DECISIONS_ENV, raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _reset_auth_sessions():
     """Isolate the browser sign-in registry between tests.
 

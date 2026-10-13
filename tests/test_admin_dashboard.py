@@ -1100,3 +1100,47 @@ def test_discord_notify_admin_off_404(admin_off_server: str) -> None:
         body={"claims": [{"title": "x"}]},
     )
     assert code == 404
+
+
+def test_claims_sync_route_returns_sha(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    monkeypatch.setattr(
+        claims_sync,
+        "sync_claims_decisions",
+        lambda root, message="": {"changed": True, "sha": "abc1234", "pushed": True},
+    )
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/sync", body={})
+    assert code == 200, data
+    assert data == {"ok": True, "changed": True, "sha": "abc1234", "pushed": True}
+
+
+def test_claims_sync_route_reports_conflict(
+    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import claims_sync
+
+    def boom(root, message=""):
+        raise claims_sync.ClaimsSyncError("git pull --rebase failed: CONFLICT")
+
+    monkeypatch.setattr(claims_sync, "sync_claims_decisions", boom)
+    base, _ = admin_server
+    code, data = _request(base, "POST", "/api/internal/free-claims/sync", body={})
+    assert code == 409
+    assert "CONFLICT" in data["error"]
+
+
+def test_claims_sync_route_rejects_missing_local_header(admin_server: tuple[str, Path]) -> None:
+    base, _ = admin_server
+    req = urllib.request.Request(
+        f"{base}/api/internal/free-claims/sync",
+        method="POST",
+        data=json.dumps({}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req, timeout=10)
+    assert exc.value.code in (401, 403)

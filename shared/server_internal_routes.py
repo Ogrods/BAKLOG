@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
@@ -24,6 +25,13 @@ def _srv():
     import server
 
     return server
+
+
+def _approved_path(s, root):
+    """Owner claim decisions: env, then sibling baklog-internal/claims, then curated/."""
+    from shared.claims_paths import resolve_approved_path
+
+    return resolve_approved_path(root, root / s.FREE_CLAIMS_APPROVED_PATH)
 
 
 def validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
@@ -312,26 +320,26 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
         auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH) or {}
         auto_items = auto_doc.get("items") or []
     if approved is None:
-        approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
         approved = approved_doc.get("ids") or []
 
     store_overrides = payload.get("store_overrides")
     if store_overrides is None:
-        approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
         store_overrides = approved_doc.get("store_overrides") or {}
     field_overrides = payload.get("field_overrides")
     if field_overrides is None:
-        approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
         field_overrides = approved_doc.get("field_overrides") or {}
     if dismissed is None:
-        approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
         dismissed = approved_doc.get("dismissed") or []
     if blocked is None:
-        approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
         blocked = approved_doc.get("blocked") or []
     premium_only_ids_payload = payload.get("premium_only_ids")
     if premium_only_ids_payload is None:
-        approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
         premium_only_ids_payload = approved_doc.get("premium_only_ids") or []
 
     if not isinstance(store_overrides, dict):
@@ -401,7 +409,7 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
         require_manual_approval=require_manual_approval_enabled(),
         dupe_splits=payload.get("dupe_splits")
         if isinstance(payload.get("dupe_splits"), list)
-        else (s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}).get("dupe_splits"),
+        else (s._read_optional_json(_approved_path(s, root)) or {}).get("dupe_splits"),
     )
     from fetchers.build_free_claims import GAMERPOWER_ATTRIBUTION
 
@@ -420,7 +428,7 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
 def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
     s = _srv()
     root = s.data_root()
-    approved_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+    approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
     approved_ids = approved_doc.get("ids") or []
     if not isinstance(approved_ids, list):
         approved_ids = []
@@ -514,7 +522,7 @@ def handle_internal_free_claims_approved_put(handler: SimpleHTTPRequestHandler) 
     parsed = parse_approved_put_payload(payload)
     root = s.data_root()
     if "dupe_splits" not in payload:
-        prior_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        prior_doc = s._read_optional_json(_approved_path(s, root)) or {}
         parsed["dupe_splits"] = prior_doc.get("dupe_splits") or []
     auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH) or {}
     auto_items = [it for it in (auto_doc.get("items") or []) if isinstance(it, dict)]
@@ -525,13 +533,36 @@ def handle_internal_free_claims_approved_put(handler: SimpleHTTPRequestHandler) 
         if isinstance(it, dict) and str(it.get("id") or "").strip()
     }
     out = prepare_approved_document(**parsed, auto_items=auto_items, prior_rows_by_id=prior_rows)
-    out_path = s.data_root() / s.FREE_CLAIMS_APPROVED_PATH
+    out_path = _approved_path(s, s.data_root())
     out_path.parent.mkdir(parents=True, exist_ok=True)
     safe_write_text(
         out_path,
         json.dumps(out, indent=2, ensure_ascii=False),
     )
     s._send_json(handler, HTTPStatus.OK, {"ok": True, "ids": len(out.get("ids") or [])})
+
+
+def handle_internal_free_claims_sync(handler: SimpleHTTPRequestHandler) -> None:
+    """Commit + push claims/ in the sibling baklog-internal clone."""
+    s = _srv()
+    from shared.claims_sync import ClaimsSyncError, sync_claims_decisions
+
+    payload, err = s._read_json_body(handler)
+    if err:
+        payload = {}
+    message = str((payload or {}).get("message") or "").strip()[:200]
+    try:
+        result = sync_claims_decisions(
+            s.data_root(),
+            message=message or "claims: owner decisions from admin",
+        )
+    except ClaimsSyncError as exc:
+        s._send_json(handler, HTTPStatus.CONFLICT, {"ok": False, "error": str(exc)})
+        return
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        s._send_json(handler, HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
+        return
+    s._send_json(handler, HTTPStatus.OK, {"ok": True, **result})
 
 
 def _admin_sponsors_path(s):

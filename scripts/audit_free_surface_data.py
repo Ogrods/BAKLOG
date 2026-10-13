@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.claims_paths import resolve_approved_path
 from shared.free_claims_sources import (
     claim_match_keys,
     is_epic_mobile_store,
@@ -41,7 +42,7 @@ from shared.profile_paths import (
 )
 
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"
-APPROVED_PATH = ROOT / "curated" / "free_claims.approved.json"
+APPROVED_PATH = resolve_approved_path(ROOT, ROOT / "curated" / "free_claims.approved.json")
 INPUT_PATH = ROOT / "free-claims.input.json"
 BUILT_PATH = ROOT / "web" / "free-claims.json"
 FALLBACK_PATH = ROOT / "curated" / "free_claims.fallback.json"
@@ -70,12 +71,20 @@ def _load_json(path: Path) -> dict | list | None:
         return None
 
 
+def _display_path(path: Path) -> str:
+    """Repo-relative when possible; otherwise ``<parent>/<name>`` (no machine paths)."""
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return f"{path.parent.name}/{path.name}"
+
+
 def _file_meta(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        return {"path": str(path.relative_to(ROOT)), "exists": False}
+        return {"path": _display_path(path), "exists": False}
     stat = path.stat()
     return {
-        "path": str(path.relative_to(ROOT)),
+        "path": _display_path(path),
         "exists": True,
         "size_bytes": stat.st_size,
         "mtime_iso": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),

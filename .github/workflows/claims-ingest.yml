@@ -61,27 +61,35 @@ jobs:
       pull-requests: write
     env:
       PYTHONPATH: ${{ github.workspace }}
-      INTERNAL_TOKEN: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
+      # The private-repo token is passed only to the checkout, push and digest steps,
+      # never job-wide: install/fetch/build steps run third-party code and parse scraped data.
       INTERNAL_REPO: ${{ github.repository_owner }}/baklog-internal
       INTERNAL_DIR: .internal-claims
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v6
 
+      - name: Private token present
+        id: has_token
+        env:
+          TOKEN: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Check out private decisions
-        if: env.INTERNAL_TOKEN != ''
+        if: steps.has_token.outputs.present == 'true'
         uses: actions/checkout@v6
         with:
           repository: ${{ env.INTERNAL_REPO }}
-          token: ${{ env.INTERNAL_TOKEN }}
+          token: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
           path: ${{ env.INTERNAL_DIR }}
           sparse-checkout: claims
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Decision source
         id: source
         run: |
-          if [ -n "$INTERNAL_TOKEN" ] && [ -f "$INTERNAL_DIR/claims/free_claims.approved.json" ]; then
+          if [ "${{ steps.has_token.outputs.present }}" = "true" ] && [ -f "$INTERNAL_DIR/claims/free_claims.approved.json" ]; then
             echo "mode=internal" >> "$GITHUB_OUTPUT"
             echo "BAKLOG_FREE_CLAIMS_APPROVED=$GITHUB_WORKSPACE/$INTERNAL_DIR/claims/free_claims.approved.json" >> "$GITHUB_ENV"
             echo "BAKLOG_CLAIMS_AUTO_DECISIONS=$GITHUB_WORKSPACE/$INTERNAL_DIR/claims/auto_decisions.json" >> "$GITHUB_ENV"
@@ -206,8 +214,14 @@ jobs:
       - name: Push autopilot decisions + scrape to private repo
         if: steps.source.outputs.mode == 'internal' && env.DRY_RUN != 'true'
         working-directory: ${{ env.INTERNAL_DIR }}
+        env:
+          PUSH_TOKEN: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
         run: |
           set -euo pipefail
+          # Credentials for this step's git calls only (checkout did not persist them).
+          AUTH=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          authgit() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" "$@"; }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # The build may prune/rekey owner decisions in place; CI re-derives that every
@@ -221,7 +235,7 @@ jobs:
           fi
           git commit -m "claims: autopilot decisions + scrape"
           for attempt in 1 2 3; do
-            if git pull --rebase -q && git push -q; then exit 0; fi
+            if authgit pull --rebase -q && authgit push -q; then exit 0; fi
             git rebase --abort 2>/dev/null || true
             sleep $((attempt * 5))
           done
@@ -275,7 +289,7 @@ jobs:
             if [ "$AUTO_MERGE" = "true" ]; then
               echo "Every added claim is owner- or autopilot-approved, so squash auto-merge is on."
             else
-              echo "Some added claims are not vetted yet, so this PR needs a human merge."
+              echo "Some added claims are not vetted yet, or a published claim's link moved to a new domain, so this PR needs a human merge (the run log lists which)."
             fi
             echo
             cat /tmp/claims-fp-diff.md
@@ -329,7 +343,7 @@ jobs:
       - name: Post digest issue (private repo)
         if: steps.source.outputs.mode == 'internal' && env.DRY_RUN != 'true'
         env:
-          GH_TOKEN: ${{ env.INTERNAL_TOKEN }}
+          GH_TOKEN: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
         run: |
           python scripts/claims_digest_issue.py \
             --repo "$INTERNAL_REPO" \

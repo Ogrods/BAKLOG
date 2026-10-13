@@ -10,7 +10,8 @@ Subcommands:
 
 ``verify-added``
     Auto-merge gate: every id added to the published feed must be owner-approved or
-    autopilot-approved. Exit 0 = safe to auto-merge, 3 = needs a human.
+    autopilot-approved, and no published id's claim link may move to a new domain.
+    Exit 0 = safe to auto-merge, 3 = needs a human.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -320,8 +322,53 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _link_hosts(item: dict) -> set[str]:
+    urls = [item.get("claim_url")]
+    if isinstance(item.get("claim_urls"), dict):
+        urls += list(item["claim_urls"].values())
+    hosts: set[str] = set()
+    for url in urls:
+        raw = str(url or "").strip()
+        if not raw:
+            continue
+        try:
+            parts = urlsplit(raw)
+            host = (parts.hostname or "").lower()
+        except ValueError:
+            parts, host = None, ""
+        # Browsers read "\" as "/" and skip userinfo, so such URLs can show one host
+        # here and open another; keep the raw URL so any edit to it reads as a change.
+        if not host or "\\" in raw or "@" in parts.netloc or any(ord(ch) < 33 for ch in raw):
+            hosts.add(f"unparsed:{raw}")
+            continue
+        hosts.add(host.removeprefix("www."))
+    return hosts
+
+
+def link_host_changes(before_items: list[dict], after_items: list[dict]) -> list[str]:
+    """Published ids whose claim link now points at a different domain.
+
+    Same-domain URL refreshes are routine; a new domain on an already-approved
+    id is a new destination nobody vetted.
+    """
+    before_by_id = {str(it.get("id")): it for it in before_items}
+    out: list[str] = []
+    for it in after_items:
+        item_id = str(it.get("id"))
+        prev = before_by_id.get(item_id)
+        if prev is None:
+            continue
+        old_hosts, new_hosts = _link_hosts(prev), _link_hosts(it)
+        if new_hosts - old_hosts:
+            title = str(it.get("title") or "").strip()
+            label = f"{title} ({item_id})" if title else item_id
+            out.append(f"{label} {','.join(sorted(old_hosts)) or '-'} -> {','.join(sorted(new_hosts))}")
+    return out
+
+
 def cmd_verify_added(args: argparse.Namespace) -> int:
-    before = {str(it.get("id")) for it in _read_json(args.before).get("items") or [] if isinstance(it, dict)}
+    before_items = [it for it in _read_json(args.before).get("items") or [] if isinstance(it, dict)]
+    before = {str(it.get("id")) for it in before_items}
     after_items = [it for it in _read_json(args.after).get("items") or [] if isinstance(it, dict)]
     added = sorted({str(it.get("id")) for it in after_items} - before)
     allowed = _id_set(_read_json(args.approved), "ids") | set(
@@ -331,11 +378,15 @@ def cmd_verify_added(args: argparse.Namespace) -> int:
         str(it.get("id")) for it in _read_json(args.manual).get("items") or [] if isinstance(it, dict)
     } if args.manual else set()
     unvetted = [i for i in added if i not in allowed and i not in manual_ids]
-    print(f"added {len(added)}; unvetted {len(unvetted)}")
+    host_changes = link_host_changes(before_items, after_items)
+    print(f"added {len(added)}; unvetted {len(unvetted)}; link host changes {len(host_changes)}")
     for i in unvetted:
         print(f"  unvetted: {i}")
+    for line in host_changes:
+        print(f"  link host changed: {line}")
     _set_output("unvetted", str(len(unvetted)))
-    return 3 if unvetted else 0
+    _set_output("link_changes", str(len(host_changes)))
+    return 3 if unvetted or host_changes else 0
 
 
 def main(argv: list[str] | None = None) -> int:

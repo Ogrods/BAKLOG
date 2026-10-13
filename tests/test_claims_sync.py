@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -107,8 +108,46 @@ def test_sync_aborts_rebase_on_pull_failure(tmp_path: Path, monkeypatch: pytest.
     with pytest.raises(ClaimsSyncError, match="CONFLICT"):
         sync_claims_decisions(repo, runner=fake)
     subs = [c[0] for c in calls]
-    assert subs == ["add", "diff", "commit", "pull", "rebase"]
+    assert subs == ["pull", "rebase"]
     assert calls[-1] == ["rebase", "--abort"]
+
+
+def _scrape(path: Path, fetched_at: str, ids: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"fetched_at": fetched_at, "items": [{"id": i} for i in ids]}) + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_resolve_scrape_path_picks_newer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(claims_paths.INTERNAL_REPO_ENV, raising=False)
+    repo = tmp_path / "steam-backlog"
+    local = repo / "curated" / "free_claims.auto.json"
+    shared_scrape = tmp_path / "baklog-internal" / "claims" / "free_claims.auto.json"
+    _scrape(local, "2026-10-13T07:00:00+00:00", ["a"])
+    assert claims_paths.resolve_scrape_path(repo) == local
+    _scrape(shared_scrape, "2026-10-13T13:00:00Z", ["a", "b"])
+    assert claims_paths.resolve_scrape_path(repo) == shared_scrape
+    _scrape(local, "2026-10-13T14:00:00+00:00", ["a"])
+    assert claims_paths.resolve_scrape_path(repo) == local
+    local.unlink()
+    assert claims_paths.resolve_scrape_path(repo) == shared_scrape
+
+
+def test_sync_shares_newer_local_scrape(internal_clone) -> None:
+    repo, internal, origin = internal_clone
+    _scrape(internal / "claims" / "free_claims.auto.json", "2026-10-13T07:00:00Z", ["a"])
+    _git(internal, "add", ".")
+    _git(internal, "commit", "-q", "-m", "ci scrape")
+    _git(internal, "push", "-q")
+    _scrape(repo / "curated" / "free_claims.auto.json", "2026-10-13T09:00:00Z", ["a", "b"])
+    result = sync_claims_decisions(repo)
+    assert result["changed"] is True
+    files = _git(origin, "show", "--name-only", "--format=", "main").splitlines()
+    assert files == ["claims/free_claims.auto.json"]
+    _scrape(repo / "curated" / "free_claims.auto.json", "2026-10-13T06:00:00Z", ["old"])
+    assert sync_claims_decisions(repo)["changed"] is False
 
 
 def test_dispatch_targets_public_repo_explicitly(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -137,6 +137,31 @@ def test_dupe_splits_break_a_false_positive() -> None:
     assert group_claims(items, splits=[["gamerpower-1", "itad-1"]]) == []
 
 
+def test_dupe_split_holds_when_a_third_copy_matches_both() -> None:
+    items = [
+        _row("gamerpower-a", "gamerpower", "Doom"),
+        _row("itad-b", "itad", "Doom"),
+        _row("epic-c", "epic", "Doom"),
+    ]
+    groups = group_claims(items, splits=[["gamerpower-a", "itad-b"]])
+    strong = [g for g in groups if g.tier == "strong"]
+    for g in strong:
+        assert not {"gamerpower-a", "itad-b"} <= set(g.member_ids)
+    assert len(strong) == 1 and "epic-c" in strong[0].member_ids
+
+
+def test_dupe_split_grouping_ignores_scrape_order() -> None:
+    a = _row("gamerpower-a", "gamerpower", "Doom")
+    b = _row("itad-b", "itad", "Doom")
+    c = _row("epic-c", "epic", "Doom")
+    splits = [["gamerpower-a", "itad-b"]]
+
+    def strong_sets(items):
+        return {frozenset(g.member_ids) for g in group_claims(items, splits=splits) if g.tier == "strong"}
+
+    assert strong_sets([a, b, c]) == strong_sets([b, a, c]) == strong_sets([c, b, a])
+
+
 def test_winner_prefers_ends_at_then_appid_within_same_source() -> None:
     items = [
         _row("itad-1", "itad", "Foo"),

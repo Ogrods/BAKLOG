@@ -34,6 +34,13 @@ def _approved_path(s, root):
     return resolve_approved_path(root, root / s.FREE_CLAIMS_APPROVED_PATH)
 
 
+def _scrape_path(s, root):
+    """Claims scrape for admin views: newer of local curated/ and the private CI scrape."""
+    from shared.claims_paths import resolve_scrape_path
+
+    return resolve_scrape_path(root, root / s.FREE_CLAIMS_AUTO_PATH)
+
+
 def validate_free_claims_payload(doc: dict[str, Any]) -> str | None:
     s = _srv()
     items = doc.get("items")
@@ -317,7 +324,7 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
         manual_doc = s._read_optional_json(root / s.FREE_CLAIMS_INPUT_PATH) or {}
         manual_items = manual_doc.get("items") or []
     if auto_items is None:
-        auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH) or {}
+        auto_doc = s._read_optional_json(_scrape_path(s, root)) or {}
         auto_items = auto_doc.get("items") or []
     if approved is None:
         approved_doc = s._read_optional_json(_approved_path(s, root)) or {}
@@ -454,7 +461,7 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
     from shared.claims_dedupe import group_claims
 
     dupe_splits = normalize_dupe_splits(approved_doc.get("dupe_splits"))
-    auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH)
+    auto_doc = s._read_optional_json(_scrape_path(s, root))
     auto_items = [
         it for it in ((auto_doc or {}).get("items") or []) if isinstance(it, dict)
     ]
@@ -524,7 +531,7 @@ def handle_internal_free_claims_approved_put(handler: SimpleHTTPRequestHandler) 
     if "dupe_splits" not in payload:
         prior_doc = s._read_optional_json(_approved_path(s, root)) or {}
         parsed["dupe_splits"] = prior_doc.get("dupe_splits") or []
-    auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH) or {}
+    auto_doc = s._read_optional_json(_scrape_path(s, root)) or {}
     auto_items = [it for it in (auto_doc.get("items") or []) if isinstance(it, dict)]
     built_doc = s._read_optional_json(root / s.FREE_CLAIMS_BUILT_PATH) or {}
     prior_rows = {

@@ -155,13 +155,28 @@ def group_claims(
     strong_uf = _UnionFind(n)
     edge_reasons: dict[tuple[int, int], set[str]] = {}
     possible_edges: list[tuple[int, int, str]] = []
+    comp_members: dict[int, list[int]] = {i: [i] for i in range(n)}
+
+    def split_between(ri: int, rj: int) -> bool:
+        """A split pair across two components is a cannot-link: a third copy
+        matching both must not pull them back into one group."""
+        if not split_pairs:
+            return False
+        return any(
+            frozenset((ids[a], ids[b])) in split_pairs
+            for a in comp_members[ri]
+            for b in comp_members[rj]
+        )
 
     by_key: dict[str, list[int]] = {}
     for idx, row in enumerate(rows):
         for key in strong_keys(row):
             by_key.setdefault(key, []).append(idx)
 
-    for key, members in by_key.items():
+    # Id order, not scrape order: with a split pair, whichever copy links to a
+    # third row first wins it, and that must not change between scrapes.
+    for key in sorted(by_key):
+        members = sorted(by_key[key], key=lambda k: ids[k])
         for a_pos, i in enumerate(members):
             for j in members[a_pos + 1 :]:
                 if not allowed(i, j):
@@ -169,7 +184,14 @@ def group_claims(
                 if key.startswith("appid:") and _is_spinoff_pair(rows[i], rows[j]):
                     possible_edges.append((i, j, key))
                     continue
+                ri, rj = strong_uf.find(i), strong_uf.find(j)
+                if ri != rj and split_between(ri, rj):
+                    possible_edges.append((i, j, key))
+                    continue
                 strong_uf.union(i, j)
+                if ri != rj:
+                    root = strong_uf.find(i)
+                    comp_members[root] = comp_members.pop(ri) + comp_members.pop(rj)
                 edge_reasons.setdefault((min(i, j), max(i, j)), set()).add(key)
 
     weak_by_key: dict[str, list[int]] = {}
@@ -177,7 +199,8 @@ def group_claims(
         wk = weak_key(row)
         if wk:
             weak_by_key.setdefault(wk, []).append(idx)
-    for key, members in weak_by_key.items():
+    for key in sorted(weak_by_key):
+        members = sorted(weak_by_key[key], key=lambda k: ids[k])
         for a_pos, i in enumerate(members):
             for j in members[a_pos + 1 :]:
                 if allowed(i, j) and strong_uf.find(i) != strong_uf.find(j):

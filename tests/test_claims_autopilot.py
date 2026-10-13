@@ -176,3 +176,76 @@ def test_verify_added_trusts_manual_rows(tmp_path: Path) -> None:
         "--manual", str(manual),
     ])
     assert rc == 0
+
+
+def _verify_links(tmp_path: Path, old: dict, new: dict) -> int:
+    approved = tmp_path / "a.json"
+    approved.write_text(json.dumps({"ids": []}), encoding="utf-8")
+    decisions = tmp_path / "d.json"
+    decisions.write_text("{}", encoding="utf-8")
+    before = tmp_path / "b.json"
+    before.write_text(json.dumps({"items": [{"id": "x", "title": "Game", **old}]}), encoding="utf-8")
+    after = tmp_path / "c.json"
+    after.write_text(json.dumps({"items": [{"id": "x", "title": "Game", **new}]}), encoding="utf-8")
+    return ap.main([
+        "verify-added",
+        "--before", str(before),
+        "--after", str(after),
+        "--approved", str(approved),
+        "--decisions", str(decisions),
+    ])
+
+
+def test_verify_added_holds_on_link_host_change(tmp_path: Path, capsys) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.epicgames.com/p/game"},
+        {"claim_url": "https://evil.example/p/game"},
+    )
+    assert rc == 3
+    assert "link host changed: Game (x)" in capsys.readouterr().out
+
+
+def test_verify_added_holds_on_new_host_in_claim_urls(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.steampowered.com/app/1"},
+        {"claim_url": "https://store.steampowered.com/app/1", "claim_urls": {"epic": "https://other.example/x"}},
+    )
+    assert rc == 3
+
+
+def test_verify_added_holds_on_ambiguous_link(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.epicgames.com/p/game"},
+        {"claim_url": "https://evil.example\\@store.epicgames.com/p/game"},
+    )
+    assert rc == 3
+
+
+def test_verify_added_holds_on_malformed_link(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.epicgames.com/p/game"},
+        {"claim_url": "http://[evil"},
+    )
+    assert rc == 3
+
+
+def test_verify_added_holds_on_link_without_parsed_host(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.epicgames.com/p/game"},
+        {"claim_url": "https:////evil.example/p/game"},
+    )
+    assert rc == 3
+
+
+def test_verify_added_allows_same_host_path_change(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://www.gog.com/en/game/old"},
+        {"claim_url": "https://gog.com/en/game/new?utm=1"},
+    )
+    assert rc == 0

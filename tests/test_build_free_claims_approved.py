@@ -831,6 +831,54 @@ def test_build_prunes_expired_approved_and_manual_items(
     assert "epic-expired" not in (approved.get("field_overrides") or {})
 
 
+def test_build_keeps_undated_gamerpower_approval_during_outage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+    input_path.write_text('{"items": []}', encoding="utf-8")
+    old = "2026-01-01T00:00:00Z"
+    auto_path.write_text(
+        json.dumps({"items": [
+            {"id": "gamerpower-1", "store": "other", "title": "Outage Game", "source": "gamerpower",
+             "claim_url": "https://www.gamerpower.com/open/x", "ends_at": None,
+             "first_seen": old, "last_seen": old},
+            {"id": "itad-old", "store": "other", "title": "Old Itad", "source": "itad",
+             "claim_url": "https://example.com/itad", "ends_at": None, "first_seen": old},
+            {"id": "epic-live", "store": "epic", "title": "Live Epic", "source": "epic",
+             "claim_url": "https://store.epicgames.com/p/live", "ends_at": "2099-01-01T00:00:00Z"},
+        ]}),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps({"ids": ["gamerpower-1", "itad-old", "epic-live"]}), encoding="utf-8"
+    )
+    monkeypatch.delenv("BAKLOG_FREE_CLAIMS_APPROVED", raising=False)
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            k: raw.get(k) for k in ("id", "store", "title", "claim_url", "ends_at")
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert {item["id"] for item in built["items"]} == {"epic-live"}
+    approved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert approved["ids"] == ["gamerpower-1", "epic-live"]
+
+
 def test_enrich_item_resolves_steam_appid_and_review(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1456,7 +1504,8 @@ def test_select_approved_keeps_old_gamerpower_row_while_listed() -> None:
         now=now,
     )
     assert [r["id"] for r in kept] == ["gamerpower-1"]
-    assert expired == {"gamerpower-2", "itad-3"}
+    # gamerpower-2 is not published, but may be an outage: its approval is kept.
+    assert expired == {"itad-3"}
     assert bfc._resolve_ends_at(listed, now=now) is None
     assert not bfc._is_expired_for_publish(listed, now)
     assert bfc._is_expired_for_publish(delisted, now)

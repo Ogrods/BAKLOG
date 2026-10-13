@@ -220,3 +220,35 @@ def test_draft_dispatch_builds_private_draft_from_main_only() -> None:
     publish = steps[_index(steps, "gh release create")]
     assert "--draft --target $env:GITHUB_SHA" in publish
     assert publish.index("RELEASE_DRAFT") < publish.index("--latest")
+
+
+def test_draft_and_tag_runs_share_a_concurrency_group() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    group = next(line for line in text.splitlines() if line.strip().startswith("group: release-"))
+    assert "github.ref }}" not in group
+    assert "inputs.version" in group and "github.ref_name" in group
+
+
+def test_draft_uploads_recheck_is_draft_and_uploads_check_exit_codes() -> None:
+    steps = _steps(_windows_job())
+    publish = steps[_index(steps, "gh release create")]
+    draft_block = publish.split("RELEASE_DRAFT", 1)[1].split("Hyphenated tags", 1)[0]
+    assert "isDraft" in draft_block
+    lines = publish.splitlines()
+    for i, line in enumerate(lines):
+        if "gh release upload" in line:
+            assert "LASTEXITCODE" in lines[i + 1], f"no exit check after: {line.strip()}"
+    text = WORKFLOW.read_text(encoding="utf-8")
+    for name in ("Upload macOS assets to GitHub Release", "Upload Linux assets to GitHub Release"):
+        block = text.split(f"- name: {name}", 1)[1].split("\n      - name:", 1)[0]
+        assert "RELEASE_DRAFT" in block and "isDraft" in block, name
+
+
+def test_local_build_scripts_fail_fast() -> None:
+    preflight = (ROOT / "scripts" / "release_preflight.ps1").read_text(encoding="utf-8")
+    assert "Windows_NT" in preflight
+    build = BUILD_SCRIPT.read_text(encoding="utf-8").splitlines()
+    for needle in ("pip install -r requirements.txt", "pip install pyinstaller", "PyInstaller packaging/baklog.spec"):
+        idx = next(i for i, line in enumerate(build) if needle in line and line.strip().startswith("&"))
+        following = "\n".join(build[idx + 1 : idx + 3])
+        assert "LASTEXITCODE" in following, needle

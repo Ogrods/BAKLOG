@@ -42,7 +42,9 @@ $TrayExe = Join-Path $OutDir "BAKLOG Tray.exe"
 if ($Stage -ne "Package") {
     Write-Host "Installing Python dependencies..."
     & $Python -m pip install -r requirements.txt
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $Python -m pip install pyinstaller
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host "Building production frontend (esbuild dist/)..."
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
@@ -67,6 +69,8 @@ if ($Stage -ne "Package") {
 
     Write-Host "Building BAKLOG.exe + BAKLOG Tray.exe (onedir)..."
     & $Python -m PyInstaller packaging/baklog.spec --noconfirm --distpath $ReleaseDir
+    # A failed build can leave the previous release\BAKLOG\ exes in place.
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     if (-not (Test-Path $ServerExe)) {
         Write-Error "Build failed: $ServerExe not found"

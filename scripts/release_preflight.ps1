@@ -65,11 +65,13 @@ Write-Host "==> CI parity (test-all -Full)"
 & (Join-Path $Root "scripts\test-all.ps1") -Full
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-if ($IsWindows -and (Test-Path (Join-Path $Root "scripts\verify_inno_script.ps1"))) {
+# $IsWindows does not exist in Windows PowerShell 5.1.
+$onWindows = $IsWindows -or $env:OS -eq 'Windows_NT'
+if ($onWindows -and (Test-Path (Join-Path $Root "scripts\verify_inno_script.ps1"))) {
     Write-Host "==> verify_inno_script (ISCC compile against stub bundle)"
     powershell -ExecutionPolicy Bypass -File (Join-Path $Root "scripts\verify_inno_script.ps1") -AppVersion $pyVer
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-} elseif (-not $IsWindows) {
+} elseif (-not $onWindows) {
     Write-Warning "Skipping verify_inno_script (Windows + Inno Setup 6 only). CI python-windows job must be green before tagging."
 }
 

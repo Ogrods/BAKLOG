@@ -44,7 +44,9 @@ permissions:
   attestations: write   # store the build-provenance attestation
 
 concurrency:
-  group: release-${{ github.ref }}
+  # Keyed on the release tag, not the ref, so a draft dispatch (refs/heads/main)
+  # and the tag push for the same version queue instead of running together.
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -341,7 +343,12 @@ jobs:
             "release/BAKLOG-Setup.exe"
           )
           if ($env:RELEASE_DRAFT -eq 'true') {
-            if (gh release view $tag 2>$null) {
+            $isDraft = gh release view $tag --json isDraft -q .isDraft 2>$null
+            if ($LASTEXITCODE -eq 0 -and $isDraft -ne 'true') {
+              Write-Error "$tag was published while this draft build ran; not touching it."
+              exit 1
+            }
+            if ($isDraft -eq 'true') {
               Write-Host "Draft $tag exists; replacing assets and retargeting to $env:GITHUB_SHA."
               gh release upload $tag @assets --clobber
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -357,6 +364,7 @@ jobs:
           if (gh release view $tag 2>$null) {
             Write-Host "Release $tag exists; uploading replacement assets (--clobber)."
             gh release upload $tag @assets --clobber
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if ($pre) {
               gh release edit $tag --title "BAKLOG $tag" --notes-file release-notes.md --draft=false --prerelease --latest=false
             } else {
@@ -416,6 +424,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="$RELEASE_TAG"
+          if [ "$RELEASE_DRAFT" = "true" ] && [ "$(gh release view "$tag" --json isDraft -q .isDraft)" != "true" ]; then
+            echo "::error::$tag is not a draft; a draft build must not upload to a published release."
+            exit 1
+          fi
           gh release upload "$tag" release/BAKLOG-macos.zip release/BAKLOG-macos.sha256 --clobber
 
   build-linux:
@@ -568,6 +580,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="$RELEASE_TAG"
+          if [ "$RELEASE_DRAFT" = "true" ] && [ "$(gh release view "$tag" --json isDraft -q .isDraft)" != "true" ]; then
+            echo "::error::$tag is not a draft; a draft build must not upload to a published release."
+            exit 1
+          fi
           gh release upload "$tag" \
             release/BAKLOG-linux64.zip \
             release/BAKLOG-linux64.sha256 \

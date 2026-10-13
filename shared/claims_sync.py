@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import tempfile
 from collections.abc import Callable
 from pathlib import Path
 

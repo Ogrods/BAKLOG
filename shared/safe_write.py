@@ -79,6 +79,25 @@ def rotate_backup(
     return backup_path
 
 
+def atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Bytes twin of :func:`atomic_write_text` (same ``<path>.tmp`` + fsync + replace)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
     """Write ``text`` to ``path`` via tmp file + fsync + os.replace.
 

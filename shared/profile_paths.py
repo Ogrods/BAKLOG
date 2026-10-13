@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from shared.install_paths import data_root
+from shared.safe_write import atomic_write_text
 
 _request_profile_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "_request_profile_id",
@@ -135,9 +136,7 @@ def _validate_index_doc(doc: dict[str, Any]) -> None:
 def _save_index_unlocked(doc: dict[str, Any]) -> None:
     _validate_index_doc(doc)
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = INDEX_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, INDEX_FILE)
+    atomic_write_text(INDEX_FILE, json.dumps(doc, ensure_ascii=False, indent=2))
 
 
 def save_index(doc: dict[str, Any]) -> None:

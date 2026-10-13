@@ -968,8 +968,8 @@ export function renderCustomListFilterChips() {
     const label = formatCustomListFilterLabel(name);
     const resolved = (list?.keys || []).filter(k => !!findGameByKey(k)).length;
     const title = resolved
-      ? `${name} (${resolved} in library) — click again to clear`
-      : `${name} — click again to clear`;
+      ? `${name} (${resolved} in library) - click again to clear`
+      : `${name} - click again to clear`;
     const on = active === i;
     return `<button type="button" class="custom-list-filter-chip px-2 py-1 rounded border border-slate-600 text-xs ${on ? "active" : "bg-slate-700 text-slate-300"}" data-custom-list-filter="${i}" title="${escapeAttr(title)}">${escapeHtml(label)}</button>`;
   }).filter(Boolean);

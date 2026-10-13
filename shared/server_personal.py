@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import threading
 import time
 from typing import Any
 
 from shared.profile_paths import personal_backup_dir, personal_dir, personal_path
+from shared.safe_write import atomic_write_text
 
 PERSONAL_BACKUP_KEEP = 10
 PERSONAL_MAX_BYTES = 32 * 1024 * 1024  # 32 MB hard cap on the PUT body
@@ -179,7 +179,7 @@ def _rebind_after_save() -> None:
 
 
 def save_personal_doc(payload: dict[str, Any], *, allow_empty: bool = False) -> dict[str, Any]:
-    """Atomic write: temp file + os.replace(). Never partial; never corrupted."""
+    """Atomic write: fsync'd temp file + os.replace(). Never partial; never corrupted."""
     with _personal_lock:
         validated = _validate_personal_payload(payload)
         if not allow_empty and _personal_payload_is_empty(validated):
@@ -199,9 +199,6 @@ def save_personal_doc(payload: dict[str, Any], *, allow_empty: bool = False) -> 
         pdir.mkdir(parents=True, exist_ok=True)
         path = personal_path()
         _rotate_personal_backup()
-        tmp = path.with_suffix(".json.tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(doc, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
+        atomic_write_text(path, json.dumps(doc, ensure_ascii=False, indent=2))
         _rebind_after_save()
         return doc

@@ -268,15 +268,9 @@ def main() -> int:
     )
     if empty_priced is not None:
         return stats.finish("fetch_itad", t0, exit_code=empty_priced)
-    drift = refuse_drift_result(
-        len(by_key),
-        label="ITAD priced rows",
-        allow_drift=args.allow_drift,
-        output_path=out,
-    )
-    if drift is not None:
-        return stats.finish("fetch_itad", t0, exit_code=drift)
 
+    # Drift is judged on the merged map: a run that only priced a few deferred
+    # lookups still keeps every prior row, so it is not a shrink.
     merged_by_key: dict[str, dict] = {}
     if out.exists():
         try:
@@ -287,6 +281,14 @@ def main() -> int:
         except (OSError, json.JSONDecodeError):
             pass
     merged_by_key.update(by_key)
+    drift = refuse_drift_result(
+        len(merged_by_key),
+        label="ITAD priced rows",
+        allow_drift=args.allow_drift,
+        output_path=out,
+    )
+    if drift is not None:
+        return stats.finish("fetch_itad", t0, exit_code=drift)
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),

@@ -83,6 +83,7 @@ def tray_env(monkeypatch, tmp_path):
     monkeypatch.setattr(tray_app, "_deal_alerts_request", fake_request)
     monkeypatch.setattr(tray_app, "data_root", lambda: tmp_path)
     monkeypatch.setattr(tray_app, "_deal_alerts_enabled", False)
+    monkeypatch.setattr(tray_app, "_notified_alert_ids", set())
     return calls, responses, tmp_path
 
 
@@ -103,6 +104,36 @@ def test_cycle_acks_even_when_notify_fails(tray_env):
     icon.notify.side_effect = RuntimeError("no toasts")
     assert tray_app._deal_alerts_cycle(icon) == 1
     assert calls[-1][0] == "/api/deal-alerts/ack"
+
+
+def test_failed_ack_does_not_retoast_same_alerts(tray_env):
+    calls, responses, _ = tray_env
+    responses["/api/deal-alerts/pending"] = {"enabled": True, "alerts": [_drop()]}
+    responses["/api/deal-alerts/ack"] = None
+    icon = MagicMock()
+    assert tray_app._deal_alerts_cycle(icon) == 1
+    assert tray_app._deal_alerts_cycle(icon) == 1
+    icon.notify.assert_called_once()
+    assert [c for c in calls if c[0] == "/api/deal-alerts/ack"] == [
+        ("/api/deal-alerts/ack", {"ids": ["drop:Elden Ring"]}),
+    ] * 2
+
+    responses["/api/deal-alerts/pending"] = {"enabled": True, "alerts": [_drop(), _drop("Hades")]}
+    responses["/api/deal-alerts/ack"] = {"ok": True}
+    assert tray_app._deal_alerts_cycle(icon) == 2
+    assert icon.notify.call_count == 2
+    assert "Hades" in icon.notify.call_args[0][0]
+    assert tray_app._notified_alert_ids == set()
+
+
+def test_confirmed_ack_lets_a_returning_id_toast_again(tray_env):
+    _, responses, _ = tray_env
+    responses["/api/deal-alerts/pending"] = {"enabled": True, "alerts": [_drop()]}
+    responses["/api/deal-alerts/ack"] = {"ok": True}
+    icon = MagicMock()
+    tray_app._deal_alerts_cycle(icon)
+    tray_app._deal_alerts_cycle(icon)
+    assert icon.notify.call_count == 2
 
 
 def test_cycle_disabled_or_empty_is_silent(tray_env):

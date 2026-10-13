@@ -1275,7 +1275,7 @@ export function renderDashboardCharts(games, aggIn) {
       reviewHeadlineEl.innerHTML = `<strong>${positivePct}%</strong> positive`;
       reviewHeadlineEl.title = `${positivePct}% of rated games are Mostly Positive or better`;
     } else {
-      reviewHeadlineEl.innerHTML = '<strong>—</strong> no rated games';
+      reviewHeadlineEl.innerHTML = '<strong>-</strong> no rated games';
       reviewHeadlineEl.title = 'No Steam review scores in library yet';
     }
   }

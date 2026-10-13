@@ -13,8 +13,10 @@ PRO_CHECKOUT_YEARLY = (
 
 
 def pro_checkout_enabled() -> bool:
-    """True when Polar checkout CTAs should be live (set BAKLOG_PRO_CHECKOUT=1)."""
-    raw = os.environ.get("BAKLOG_PRO_CHECKOUT", "0").strip().lower()
+    """True when Polar checkout CTAs should be live (default on; BAKLOG_PRO_CHECKOUT=0 hides them)."""
+    raw = os.environ.get("BAKLOG_PRO_CHECKOUT", "").strip().lower()
+    if not raw:
+        return True
     return raw in ("1", "true", "yes", "on")
 
 

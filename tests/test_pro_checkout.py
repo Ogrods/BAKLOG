@@ -19,7 +19,8 @@ from shared.pro_checkout import (
         ("true", True),
         ("yes", True),
         ("on", True),
-        ("", False),
+        ("off", False),
+        ("", True),
     ],
 )
 def test_pro_checkout_enabled_env(monkeypatch: pytest.MonkeyPatch, value: str, expected: bool) -> None:
@@ -31,8 +32,13 @@ def test_pro_checkout_enabled_env(monkeypatch: pytest.MonkeyPatch, value: str, e
 
 
 def test_public_checkout_urls_empty_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("BAKLOG_PRO_CHECKOUT", raising=False)
+    monkeypatch.setenv("BAKLOG_PRO_CHECKOUT", "0")
     assert public_checkout_urls() == {"monthly": "", "yearly": ""}
+
+
+def test_checkout_on_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BAKLOG_PRO_CHECKOUT", raising=False)
+    assert public_checkout_urls()["monthly"] == PRO_CHECKOUT_MONTHLY
 
 
 def test_public_checkout_urls_populated_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:

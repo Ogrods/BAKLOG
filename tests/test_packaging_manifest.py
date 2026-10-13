@@ -91,6 +91,27 @@ def test_pyinstaller_hiddenimports_include_tray_deps() -> None:
         assert mod in text, f"packaging/baklog.spec tray_hiddenimports missing {mod}"
 
 
+def test_tray_only_smoke_modules_are_in_server_hiddenimports() -> None:
+    """frozen_import_smoke runs every check through BAKLOG.exe, but MERGE puts
+    modules only tray_app.py imports into BAKLOG Tray.exe."""
+    from scripts.frozen_import_smoke import CRITICAL_IMPORTS
+
+    spec = SPEC.read_text(encoding="utf-8")
+    server_block = spec[spec.index("hiddenimports = [") : spec.index("tray_hiddenimports")]
+    tray_src = (ROOT / "tray_app.py").read_text(encoding="utf-8")
+    server_src = (ROOT / "server.py").read_text(encoding="utf-8")
+    tray_only = [
+        mod
+        for mod in CRITICAL_IMPORTS
+        if mod.startswith("shared.")
+        and re.search(rf"\b{re.escape(mod)}\b", tray_src)
+        and not re.search(rf"\b{re.escape(mod)}\b", server_src)
+    ]
+    assert "shared.deal_alert_tray" in tray_only
+    missing = [mod for mod in tray_only if f'"{mod}"' not in server_block]
+    assert not missing, f"packaging/baklog.spec hiddenimports missing tray-only smoke modules: {missing}"
+
+
 def test_pyinstaller_hiddenimports_include_chromium_runtime() -> None:
     text = SPEC.read_text(encoding="utf-8")
     assert "shared.chromium_runtime" in text

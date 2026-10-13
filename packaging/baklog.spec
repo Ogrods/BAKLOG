@@ -96,6 +96,8 @@ hiddenimports = [
     "shared.update_messages",
     "shared.update_api",
     "shared.update_ready_state",
+    # Tray-only, but frozen_import_smoke checks every module through BAKLOG.exe.
+    "shared.deal_alert_tray",
     *_keyring_backends,
     "cryptography.hazmat.primitives.ciphers.aead",
     "certifi",

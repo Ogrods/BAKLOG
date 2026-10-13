@@ -586,6 +586,14 @@ function renderConnPrefs() {
 }
 
 let _cloudMirrorStatusRequest = 0;
+const CLOUD_MIRROR_STATUS_HOLD_MS = 8000;
+/** One-shot result line (e.g. after Clear) that the periodic status refresh must not blank. */
+let _cloudMirrorStatusHold = null;
+
+function holdCloudMirrorStatus(text, isError) {
+  _cloudMirrorStatusHold = { text, isError, until: Date.now() + CLOUD_MIRROR_STATUS_HOLD_MS };
+  ++_cloudMirrorStatusRequest;
+}
 
 async function refreshCloudMirrorUploadStatus() {
   const el = document.getElementById("cloudMirrorUploadStatus");
@@ -595,6 +603,14 @@ async function refreshCloudMirrorUploadStatus() {
     isAccountAuthMode() &&
     !!getAccessToken() &&
     capabilityStatus("cloud_sync_mirror") === "live";
+  const hold = _cloudMirrorStatusHold;
+  if (hold && Date.now() >= hold.until) _cloudMirrorStatusHold = null;
+  if (showCloudMirror && _cloudMirrorStatusHold) {
+    el.hidden = false;
+    el.textContent = hold.text;
+    el.classList.toggle("conn-prefs-note--error", hold.isError);
+    return;
+  }
   const enabled = getProSettings().cloudMirrorEnabled === true;
   if (!showCloudMirror || !enabled) {
     ++_cloudMirrorStatusRequest;
@@ -647,6 +663,7 @@ async function saveProSetting(key, enabled) {
 async function handleCloudMirrorSyncNow() {
   const btn = document.getElementById("cloudMirrorSyncBtn");
   const statusEl = document.getElementById("cloudMirrorUploadStatus");
+  _cloudMirrorStatusHold = null;
   if (btn) btn.disabled = true;
   try {
     const res = await baklogFetch("/api/mirror/sync", {
@@ -726,6 +743,7 @@ async function handleCloudMirrorToggle(ev) {
       }
     }
     await saveCloudMirrorEnabled(toggle.checked);
+    _cloudMirrorStatusHold = null;
     renderConnPrefs();
     void refreshCloudMirrorUploadStatus();
   } catch (err) {
@@ -783,20 +801,15 @@ async function handleCloudMirrorClear() {
       throw new Error(data.error || `Clear failed (${res.status})`);
     }
     const count = Number(data.count || 0);
-    if (statusEl) {
-      statusEl.hidden = false;
-      statusEl.textContent =
-        count > 0
-          ? `Cloud library cleared (${count} file${count === 1 ? "" : "s"} deleted). Credentials stayed local.`
-          : "Cloud library already empty.";
-      statusEl.classList.remove("conn-prefs-note--error");
-    }
-    void refreshCloudMirrorUploadStatus();
+    holdCloudMirrorStatus(
+      count > 0
+        ? `Cloud library cleared (${count} file${count === 1 ? "" : "s"} deleted). Credentials stayed local.`
+        : "Cloud library already empty.",
+      false,
+    );
   } catch (err) {
     if (statusEl) {
-      statusEl.hidden = false;
-      statusEl.textContent = err?.message || "Could not clear cloud library.";
-      statusEl.classList.add("conn-prefs-note--error");
+      holdCloudMirrorStatus(err?.message || "Could not clear cloud library.", true);
     } else {
       window.alert(err?.message || "Could not clear cloud library.");
     }

@@ -35,6 +35,7 @@ from shared.profile_paths import (
     personal_dir,
     runs_dir,
 )
+from shared.safe_write import atomic_write_text
 
 SCHEDULER_INTERVAL_SEC = 60.0
 DEFAULT_STALE_AGE_SEC = 24 * 60 * 60
@@ -46,6 +47,10 @@ AUTH_COOLDOWN_SEC = 60 * 60
 DEFAULT_ALERT_STALE_SEC = 12 * 60 * 60
 # Fetcher key -> the profile file whose ``fetched_at`` marks freshness.
 ALERT_SOURCES = {"itad": "itad_prices.json", "claims": "free_claims.json"}
+
+
+def _alert_attempt_field(key: str) -> str:
+    return f"last_alert_attempt:{key}"
 
 
 def _alerts_enabled(profile_id: str) -> bool:
@@ -177,7 +182,10 @@ class BackgroundScheduler:
         if alert_due:
             key = self._pick_stale_alert_source(profile_id, cfg, now, history)
             if key is not None:
-                return self._submit(key, profile_id, now, "last_alert_run", "deal alert refresh")
+                queued = self._submit(key, profile_id, now, "last_alert_run", "deal alert refresh")
+                if queued is not None:
+                    self._save_state(profile_id, _alert_attempt_field(key), now)
+                return queued
         return None
 
     def _submit(self, key: str, profile_id: str, now: float, state_field: str, label: str) -> str | None:
@@ -209,6 +217,10 @@ class BackgroundScheduler:
             if spec is None or key in cooldown:
                 continue
             if self._missing_requirements(spec.get("requires") or []):
+                continue
+            # A run that exits 0 without writing (empty wishlist) or is refused
+            # (exit 2/3) leaves the file stale; do not re-queue it every window.
+            if now - self._load_state(profile_id, _alert_attempt_field(key)) < cfg["alert_stale_sec"]:
                 continue
             age = _file_age_sec(filename, profile_id, now)
             eff_age = float("inf") if age is None else age
@@ -354,6 +366,7 @@ class BackgroundScheduler:
         doc[field] = ts
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(doc), encoding="utf-8")
+            # A torn write reads back as {}, resetting every timestamp at once.
+            atomic_write_text(path, json.dumps(doc))
         except OSError:
             pass

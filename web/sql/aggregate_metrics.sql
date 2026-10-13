@@ -14,4 +14,6 @@ create index if not exists aggregate_metrics_created_at_idx
   on public.aggregate_metrics (created_at desc);
 
 alter table public.aggregate_metrics enable row level security;
+-- No policies: anon/authenticated get nothing; service_role bypasses RLS.
+revoke all on table public.aggregate_metrics from public, anon, authenticated;
 grant select, insert on public.aggregate_metrics to service_role;

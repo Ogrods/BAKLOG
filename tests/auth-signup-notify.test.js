@@ -189,6 +189,36 @@ describe("web/api/auth-signup-notify.js", () => {
     });
   });
 
+  it("rejects an oversized declared Content-Length before reading the body", async () => {
+    const text = vi.fn(async () => "{}");
+    const res = await handleAuthSignupNotify({
+      method: "POST",
+      headers: new Headers({ authorization: `Bearer ${WEBHOOK_SECRET}`, "content-length": String(64 * 1024) }),
+      text,
+    });
+    expect(res.status).toBe(413);
+    expect(text).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized body even without a Content-Length header", async () => {
+    const big = { ...INSERT_PAYLOAD, padding: "x".repeat(40 * 1024) };
+    const req = makeRequest(big);
+    expect(req.headers.get("content-length")).toBeNull();
+    const res = await handleAuthSignupNotify(req);
+    expect(res.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 on invalid JSON", async () => {
+    const res = await handleAuthSignupNotify(new Request("https://baklog.app/api/auth-signup-notify", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${WEBHOOK_SECRET}` },
+      body: "{not json",
+    }));
+    expect(res.status).toBe(400);
+  });
+
   it("returns 502 when Resend fails", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, text: async () => "boom" });
     const res = await handleAuthSignupNotify(makeRequest(INSERT_PAYLOAD));

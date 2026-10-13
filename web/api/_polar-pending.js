@@ -49,13 +49,14 @@ export function compActive(meta, now = new Date()) {
  * free: unused comp days at payment time (comp_until - paid_since) are credited
  *       from today, so beta testers who paid keep the free time they skipped.
  *       Pro stays on while the (possibly extended) comp_until covers today.
- * eventAt: events older than meta.polar_event_at are stale and change nothing.
+ * eventAt: events not newer than meta.polar_event_at are stale and change nothing,
+ *          so a Polar retry of an applied event does not write or email again.
  */
 export function applyPaidEntitlement(meta, plan, { eventAt = "", now = new Date() } = {}) {
   const before = { ...(meta || {}) };
   const lastAt = Date.parse(before.polar_event_at || "");
   const thisAt = Date.parse(eventAt || "");
-  if (Number.isFinite(lastAt) && Number.isFinite(thisAt) && thisAt < lastAt) {
+  if (Number.isFinite(lastAt) && Number.isFinite(thisAt) && thisAt <= lastAt) {
     return { meta: before, stale: true, creditedDays: 0 };
   }
   const next = { ...before };

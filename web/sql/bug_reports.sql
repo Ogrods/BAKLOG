@@ -15,6 +15,7 @@ create table if not exists public.bug_reports (
 );
 
 alter table public.bug_reports enable row level security;
+revoke all on table public.bug_reports from public, anon, authenticated;
 -- Required: service_role must have table grants (RLS alone is not enough).
 grant select, insert on public.bug_reports to service_role;
 -- No policies: anon/public have no access; service_role bypasses RLS.

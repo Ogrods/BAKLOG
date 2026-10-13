@@ -38,6 +38,11 @@ const INSERT_PAYLOAD = {
   },
 };
 
+const CONFIRMED_PAYLOAD = {
+  ...INSERT_PAYLOAD,
+  record: { ...INSERT_PAYLOAD.record, email_confirmed_at: "2026-06-25T12:01:00.000Z" },
+};
+
 describe("web/api/auth-signup-notify.js", () => {
   /** @type {import('vitest').Mock} */
   let fetchMock;
@@ -131,15 +136,27 @@ describe("web/api/auth-signup-notify.js", () => {
         pending: { email: "newplayer@example.com", plan: "pro", applied_at: null, last_event_type: "order.paid" },
       });
       global.fetch = fetchMock;
-      const res = await handleAuthSignupNotify(makeRequest(INSERT_PAYLOAD));
+      const res = await handleAuthSignupNotify(makeRequest(CONFIRMED_PAYLOAD));
       expect(res.status).toBe(200);
       const put = callsMatching("/auth/v1/admin/users/", "PUT");
       expect(put).toHaveLength(1);
-      expect(JSON.parse(put[0][1].body).app_metadata).toEqual({ provider: "email", plan: "pro", paid: true });
+      expect(JSON.parse(put[0][1].body).app_metadata).toMatchObject({ provider: "email", plan: "pro", paid: true });
       const patch = callsMatching("/rest/v1/polar_pending_entitlements", "PATCH");
       expect(patch).toHaveLength(1);
       expect(JSON.parse(patch[0][1].body).applied_user_id).toBe(USER_ID);
       expect(resendPayload().text).toContain("Pro applied from pending Polar purchase (order.paid)");
+    });
+
+    it("defers a pending purchase until the email is confirmed", async () => {
+      fetchMock = supabaseFetch({
+        pending: { email: "newplayer@example.com", plan: "pro", applied_at: null, last_event_type: "order.paid" },
+      });
+      global.fetch = fetchMock;
+      const res = await handleAuthSignupNotify(makeRequest(INSERT_PAYLOAD));
+      expect(res.status).toBe(200);
+      expect(callsMatching("/auth/v1/admin/users/", "PUT")).toHaveLength(0);
+      expect(callsMatching("/rest/v1/polar_pending_entitlements", "PATCH")).toHaveLength(0);
+      expect(resendPayload().text).toContain("applies once this email is confirmed");
     });
 
     it("leaves the account alone when there is no pending row", async () => {

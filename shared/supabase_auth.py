@@ -245,6 +245,29 @@ def verify_bearer_plan(authorization: str | None) -> str | None:
     return _extract_plan(payload)
 
 
+def verify_bearer_plan_details(authorization: str | None) -> dict[str, Any]:
+    """Return ``{"compUntil", "paid"}`` from signed ``app_metadata`` (never ``user_metadata``).
+
+    ``compUntil`` is the free Pro end date (YYYY-MM-DD or ""); ``paid`` is True while
+    a Polar subscription is live (set by web/api/polar-webhook.js).
+    """
+    empty: dict[str, Any] = {"compUntil": "", "paid": False}
+    if not auth_enabled():
+        return empty
+    raw = _parse_bearer(authorization)
+    if not raw:
+        return empty
+    payload = _decode_access_token(raw)
+    if not payload:
+        return empty
+    app_meta = payload.get("app_metadata")
+    if not isinstance(app_meta, dict):
+        return empty
+    comp_until = app_meta.get("comp_until")
+    comp = comp_until.strip()[:10] if isinstance(comp_until, str) else ""
+    return {"compUntil": comp, "paid": app_meta.get("paid") is True}
+
+
 def reset_jwks_client_for_tests() -> None:
     """Clear cached JWKS client (tests only)."""
     global _cached_jwks_client

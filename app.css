@@ -11548,6 +11548,24 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
 .pro-view-card--active {
   border-color: color-mix(in srgb, var(--accent, #38bdf8) 55%, var(--border));
 }
+.pro-view-card--dev {
+  margin-bottom: 1rem;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warning, #f59e0b) 60%, var(--border));
+  background: color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--bg-panel));
+}
+.pro-view-card--dev .pro-view-eyebrow {
+  color: var(--warning, #f59e0b);
+}
+.pro-view-plan-status {
+  margin: 0.25rem 0 0.75rem;
+  font-weight: 600;
+}
+.pro-view-plan-support {
+  margin: 0.75rem 0 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
 .pro-view-eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.7rem;

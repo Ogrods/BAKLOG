@@ -12,6 +12,14 @@ PRO_CHECKOUT_YEARLY = (
 )
 
 
+PRO_PORTAL_URL = "https://polar.sh/baklog/portal"
+
+
+def polar_portal_url() -> str:
+    """Polar customer portal (manage/cancel subscription); BAKLOG_POLAR_PORTAL_URL overrides."""
+    return os.environ.get("BAKLOG_POLAR_PORTAL_URL", "").strip() or PRO_PORTAL_URL
+
+
 def pro_checkout_enabled() -> bool:
     """True when Polar checkout CTAs should be live (default on; BAKLOG_PRO_CHECKOUT=0 hides them)."""
     raw = os.environ.get("BAKLOG_PRO_CHECKOUT", "").strip().lower()

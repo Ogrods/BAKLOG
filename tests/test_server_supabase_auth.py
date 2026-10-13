@@ -132,6 +132,61 @@ def test_auth_session_returns_profile(auth_server) -> None:
     assert data["ok"] is True
     assert data["profile"] == sub.lower()
     assert data["email"] == ""
+    assert data["compUntil"] == ""
+    assert data["paid"] is False
+
+
+@pytest.mark.parametrize(
+    "app_metadata,plan,comp_until,paid",
+    [
+        pytest.param({"plan": "free"}, "free", "", False, id="free"),
+        pytest.param({"plan": "pro", "comp_until": "2027-03-31"}, "pro", "2027-03-31", False, id="beta"),
+        pytest.param(
+            {"plan": "pro", "paid": True, "paid_since": "2026-11-01"}, "pro", "", True, id="paid"
+        ),
+        pytest.param({"plan": "pro"}, "pro", "", False, id="permanent"),
+        pytest.param({"plan": "pro", "paid": "yes"}, "pro", "", False, id="paid-flag-must-be-bool"),
+    ],
+)
+def test_auth_session_account_types(auth_server, app_metadata, plan, comp_until, paid) -> None:
+    base, secret, _tmp = auth_server
+    token = jwt.encode(
+        {
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "tester@example.com",
+            "aud": "authenticated",
+            "iss": "https://test.supabase.co/auth/v1",
+            "exp": int(time.time()) + 3600,
+            "app_metadata": app_metadata,
+        },
+        secret,
+        algorithm="HS256",
+    )
+    status, data = _get_json(base, "/api/auth/session", auth=f"Bearer {token}")
+    assert status == 200
+    assert data["plan"] == plan
+    assert data["compUntil"] == comp_until
+    assert data["paid"] is paid
+
+
+def test_auth_session_returns_signed_plan_details(auth_server) -> None:
+    base, secret, _tmp = auth_server
+    token = jwt.encode(
+        {
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "aud": "authenticated",
+            "iss": "https://test.supabase.co/auth/v1",
+            "exp": int(time.time()) + 3600,
+            "app_metadata": {"plan": "pro", "comp_until": "2027-03-31", "paid": True},
+            "user_metadata": {"comp_until": "2099-01-01", "paid": True},
+        },
+        secret,
+        algorithm="HS256",
+    )
+    status, data = _get_json(base, "/api/auth/session", auth=f"Bearer {token}")
+    assert status == 200
+    assert data["compUntil"] == "2027-03-31"
+    assert data["paid"] is True
 
 
 def test_auth_session_comp_pro_upgrades(auth_server, monkeypatch: pytest.MonkeyPatch) -> None:

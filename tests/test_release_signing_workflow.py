@@ -89,7 +89,7 @@ def test_bundle_signed_before_installer_and_installer_signed_before_upload() -> 
     verify_setup = _index(steps, 'Verify = $true; Path = "release/BAKLOG-Setup.exe"')
     install_smoke = _index(steps, "verify_inno_install_smoke.ps1")
     attest = _index(steps, "attest-build-provenance")
-    publish = _index(steps, "gh release")
+    publish = _index(steps, "gh release create")
 
     assert "steps.bundle_files.outputs.files" in steps[sign_bundle]
     assert "BAKLOG-Setup.exe" in steps[sign_setup]
@@ -206,3 +206,17 @@ def test_sign_script_rejects_missing_mode(tmp_path: Path) -> None:
         timeout=120,
     )
     assert result.returncode != 0
+
+
+def test_draft_dispatch_builds_private_draft_from_main_only() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in text
+    assert "RELEASE_TAG:" in text and "RELEASE_DRAFT:" in text
+    assert "${{ github.ref_name }}\"" not in text.split("\nenv:\n", 1)[1]
+    steps = _steps(_windows_job())
+    guard = steps[_index(steps, "Guard draft dispatch")]
+    assert "refs/heads/main" in guard
+    assert "already published" in guard
+    publish = steps[_index(steps, "gh release create")]
+    assert "--draft --target $env:GITHUB_SHA" in publish
+    assert publish.index("RELEASE_DRAFT") < publish.index("--latest")

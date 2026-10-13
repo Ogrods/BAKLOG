@@ -13,12 +13,30 @@
 # re-tags HEAD, re-runs this workflow). Do not bump patch solely for a broken
 # public build. release.yml uploads assets with --clobber when the release
 # already exists (same tag re-run).
+#
+# Draft test builds: run this workflow manually from main with input
+# version=X.Y.Z (`gh workflow run release.yml --ref main -f version=X.Y.Z`).
+# It runs the same gates and builds, then uploads everything to a DRAFT release
+# vX.Y.Z targeting the dispatched commit. Drafts are visible only to repo
+# collaborators, create no git tag, and never reach releases/latest, so the
+# in-app update check ignores them. Pushing the real vX.Y.Z tag later rebuilds
+# from the tag and publishes that same draft.
 name: Release
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version for the draft release, X.Y.Z (must match pyproject.toml)"
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+  RELEASE_DRAFT: ${{ github.event_name == 'workflow_dispatch' }}
 
 permissions:
   contents: write       # create the GitHub Release
@@ -45,6 +63,28 @@ jobs:
       SIGNING_ENABLED: ${{ vars.SIGNING_ENABLED }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Guard draft dispatch
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -ne "refs/heads/main") {
+            Write-Error "Draft builds must be dispatched from main (got ${{ github.ref }})."
+            exit 1
+          }
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') {
+            Write-Error "Draft version must be X.Y.Z (got '$env:RELEASE_TAG')."
+            exit 1
+          }
+          $isDraft = gh release view $env:RELEASE_TAG --json isDraft -q .isDraft 2>$null
+          if ($LASTEXITCODE -eq 0 -and $isDraft -ne 'true') {
+            Write-Error "$env:RELEASE_TAG is already published; draft builds cannot touch it."
+            exit 1
+          }
+          $global:LASTEXITCODE = 0
+          Write-Host "Draft build for $env:RELEASE_TAG from $env:GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # Signing is off until the owner sets SIGNING_ENABLED=true (repo or
       # release-environment variable). Unsigned builds still publish, with a warning.
@@ -78,7 +118,7 @@ jobs:
       - name: Verify tag matches pyproject version
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $tag = $env:RELEASE_TAG.TrimStart("v")
           $m = Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"([^"]+)"'
           if (-not $m) { Write-Error "Could not read version from pyproject.toml"; exit 1 }
           $proj = $m.Matches[0].Groups[1].Value
@@ -91,7 +131,7 @@ jobs:
       - name: Verify version stamps and CHANGELOG section
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}".TrimStart("v")
+          $tag = $env:RELEASE_TAG.TrimStart("v")
           python scripts/release_notes.py versions
           if ($LASTEXITCODE -ne 0) { exit 1 }
           python scripts/release_notes.py notes $tag --out release-notes.md
@@ -293,13 +333,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = $env:RELEASE_TAG
           $assets = @(
             "release/BAKLOG-win64.zip",
             "release/BAKLOG-win64.sha256",
             "release/BAKLOG-win64.sbom.spdx.json",
             "release/BAKLOG-Setup.exe"
           )
+          if ($env:RELEASE_DRAFT -eq 'true') {
+            if (gh release view $tag 2>$null) {
+              Write-Host "Draft $tag exists; replacing assets and retargeting to $env:GITHUB_SHA."
+              gh release upload $tag @assets --clobber
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              gh release edit $tag --title "BAKLOG $tag (draft test build)" --notes-file release-notes.md --target $env:GITHUB_SHA --draft=true
+            } else {
+              gh release create $tag @assets --draft --target $env:GITHUB_SHA --title "BAKLOG $tag (draft test build)" --notes-file release-notes.md
+            }
+            exit $LASTEXITCODE
+          }
           # Hyphenated tags (v1.2.3-rc1) are dry runs: prerelease, never "latest",
           # so releases/latest/download URLs keep pointing at the stable build.
           $pre = $tag.Contains("-")
@@ -364,7 +415,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ github.ref_name }}"
+          tag="$RELEASE_TAG"
           gh release upload "$tag" release/BAKLOG-macos.zip release/BAKLOG-macos.sha256 --clobber
 
   build-linux:
@@ -516,7 +567,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ github.ref_name }}"
+          tag="$RELEASE_TAG"
           gh release upload "$tag" \
             release/BAKLOG-linux64.zip \
             release/BAKLOG-linux64.sha256 \

@@ -17,6 +17,10 @@ Before **tagging or publishing** any release (`vX.Y.Z`, `replace_release_tag.ps1
    - Automated smokes run inside the build: `frozen_bundle_smoke`, `frozen_import_smoke`, `frozen_connect_smoke`.
    - **Manual smoke** on `release\BAKLOG\`: launch `BAKLOG Tray.exe`, confirm version badge, sign-in gate, and one Connect if relevant.
    - Local zip/Setup is for testing only; **do not upload it**. Tagging triggers `release.yml`, which rebuilds on GitHub and publishes authoritative assets (Windows Setup + win64/macos/linux64 zips).
-5. Flow: commit → push → merge to `main` → confirm clean tree + CI green → local frozen build + manual smoke → `git tag -a vX.Y.Z` and `git push origin vX.Y.Z` so `release.yml` builds assets.
+5. **Draft test build on the test machine (NUC)** — only after the owner reviews and says go:
+   - `gh workflow run release.yml --ref main -f version=X.Y.Z` builds the same assets in CI and uploads them to a **draft** release `vX.Y.Z` (collaborators only, no git tag, never `releases/latest`, so installed apps are not prompted).
+   - On the NUC: `gh release download vX.Y.Z --pattern BAKLOG-Setup.exe` (needs `gh auth login`), install, smoke.
+   - Fix on `main` and re-dispatch to replace the draft assets. Never upload local builds to it.
+6. Flow: commit → push → merge to `main` → confirm clean tree + CI green → local frozen build + manual smoke → owner review → draft dispatch + NUC smoke → `git tag -a vX.Y.Z` and `git push origin vX.Y.Z`; `release.yml` rebuilds from the tag and publishes the same draft.
 
 Do **not** tag a dirty tree, an unmerged feature branch, or a commit whose CI failed/is pending.

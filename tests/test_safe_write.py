@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from shared.safe_write import atomic_write_text, rotate_backup, safe_write_text
+from shared.safe_write import atomic_write_bytes, atomic_write_text, rotate_backup, safe_write_text
 
 
 def test_atomic_write_creates_file(tmp_path: Path) -> None:
@@ -38,6 +38,26 @@ def test_atomic_write_cleans_up_tmp_on_failure(
         atomic_write_text(target, "payload")
     assert not target.exists()
     assert not (tmp_path / "out.json.tmp").exists()
+
+
+def test_atomic_write_bytes_replaces_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "sub" / "out.json"
+    atomic_write_bytes(target, b"\x00first")
+    atomic_write_bytes(target, b"second")
+    assert target.read_bytes() == b"second"
+
+    import os
+
+    def fail_replace(*_a, **_kw):
+        raise OSError("boom")
+
+    monkeypatch.setattr(os, "replace", fail_replace)
+    with pytest.raises(OSError, match="boom"):
+        atomic_write_bytes(target, b"third")
+    assert target.read_bytes() == b"second"
+    assert not (target.parent / "out.json.tmp").exists()
 
 
 def test_rotate_backup_noop_when_no_source(tmp_path: Path) -> None:

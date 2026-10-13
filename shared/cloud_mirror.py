@@ -875,15 +875,24 @@ def import_remote_mirror_to_profile(
             batch = import_catalog_payload({"catalogs": catalogs, "profile": pid})
             imported.extend(batch.get("imported") or [])
     except Exception:
+        from shared.safe_write import atomic_write_bytes
+
+        restore_failed: list[str] = []
         for path, prior in backups.items():
             try:
                 if prior is None:
                     if path.is_file():
                         path.unlink()
                 else:
-                    path.write_bytes(prior)
+                    atomic_write_bytes(path, prior)
             except OSError:
-                pass
+                restore_failed.append(str(path))
+        if restore_failed:
+            print(
+                f"[cloud_mirror] import rollback could not restore: {', '.join(restore_failed)}",
+                file=sys.stderr,
+                flush=True,
+            )
         raise
     finally:
         reset_request_profile_id(pin_token)

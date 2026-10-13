@@ -108,6 +108,30 @@ def test_pin_rate_limit_after_failures() -> None:
     assert pin_rate_limit_error("work") is None
 
 
+def test_concurrent_pin_failures_are_all_counted() -> None:
+    from shared import profiles
+
+    clear_pin_failures("race")
+    barrier = threading.Barrier(8)
+
+    def _hammer() -> None:
+        barrier.wait()
+        for _ in range(50):
+            record_pin_failure("race")
+
+    threads = [threading.Thread(target=_hammer) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+    try:
+        assert len(profiles._pin_failures["race"]) == 400
+        assert profiles.pin_rate_limit_error("race") is not None
+    finally:
+        clear_pin_failures("race")
+    assert "race" not in profiles._pin_failures
+
+
 def test_set_pin_rate_limited_on_wrong_current(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Brute-forcing the current PIN via set-PIN must lock out, not just the switch route."""
     prof = tmp_path / "profiles"

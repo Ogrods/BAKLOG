@@ -47,3 +47,25 @@ def test_save_personal_doc_does_not_schedule_mirror_upload(
     )
     assert doc.get("personal", {}).get("steam:a", {}).get("status") == "backlog"
     assert scheduled == []
+
+
+def test_personal_and_index_saves_fsync_before_replace(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shared import safe_write
+
+    synced: list[int] = []
+    real_fsync = safe_write.os.fsync
+    monkeypatch.setattr(safe_write.os, "fsync", lambda fd: (synced.append(fd), real_fsync(fd))[1])
+
+    server_personal.save_personal_doc(
+        {"personal": {"steam:a": {"status": "backlog"}}, "prefs": {}, "manual": [], "libraryFirstSeen": {}},
+        allow_empty=True,
+    )
+    assert len(synced) == 1
+    assert '"steam:a"' in server_personal.personal_path().read_text(encoding="utf-8")
+
+    index = profile_paths.load_index()
+    profile_paths.save_index(index)
+    assert len(synced) == 2
+    assert not list(profile_home.parent.rglob("*.tmp"))

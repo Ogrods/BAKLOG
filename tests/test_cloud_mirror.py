@@ -148,7 +148,9 @@ def test_prefer_mirror_source_profile_order() -> None:
     ) == "default"
 
 
-def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _arrange_failing_import(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, str, list[dict[str, Any]]]:
     catalog = profile_home / "games_steam.json"
     prior = {"games": [{"id": "1", "title": "Keep"}], "store": "steam", "game_count": 1}
     catalog.write_text(json.dumps(prior), encoding="utf-8")
@@ -190,6 +192,11 @@ def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.Monk
 
     monkeypatch.setattr("shared.server_personal.save_personal_doc", _save_personal)
     monkeypatch.setattr("shared.server_catalog_import.import_catalog_payload", _import_then_fail)
+    return catalog, personal, prior_personal, personal_writes
+
+
+def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    catalog, personal, prior_personal, personal_writes = _arrange_failing_import(profile_home, monkeypatch)
 
     with pytest.raises(RuntimeError, match="catalog import failed"):
         import_remote_mirror_to_profile(
@@ -201,6 +208,36 @@ def test_import_rollback_on_failure(profile_home: Path, monkeypatch: pytest.Monk
     assert personal_writes, "personal save must run before the catalog failure"
     restored = json.loads(catalog.read_text(encoding="utf-8"))
     assert restored["games"][0]["id"] == "1"
+    assert personal.read_text(encoding="utf-8") == prior_personal
+    assert not list(profile_home.rglob("*.tmp"))
+
+
+def test_import_rollback_reports_unrestored_paths(
+    profile_home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    catalog, personal, prior_personal, _ = _arrange_failing_import(profile_home, monkeypatch)
+    from shared import safe_write
+
+    real_write = safe_write.atomic_write_bytes
+
+    def _flaky_write(path: Path, data: bytes) -> None:
+        if path.name == "games_steam.json":
+            raise OSError("disk full")
+        real_write(path, data)
+
+    monkeypatch.setattr(safe_write, "atomic_write_bytes", _flaky_write)
+
+    with pytest.raises(RuntimeError, match="catalog import failed"):
+        import_remote_mirror_to_profile(
+            authorization="Bearer x",
+            source_profile_id="default",
+            include_personal=True,
+        )
+
+    err = capsys.readouterr().err
+    assert "import rollback could not restore" in err
+    assert "games_steam.json" in err
+    assert "personal.json" not in err
     assert personal.read_text(encoding="utf-8") == prior_personal
 
 

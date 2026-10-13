@@ -122,3 +122,17 @@ def test_deferred_titles_keep_prior_prices(catalogs: Path, monkeypatch: pytest.M
     by_key = json.loads((catalogs / "itad_prices.json").read_text(encoding="utf-8"))["by_key"]
     assert by_key["wishlist:2"] == {"price": 4.0}
     assert by_key["wishlist:1"]["match"] == "appid"
+
+
+def test_small_run_merged_into_large_prior_is_not_drift(catalogs: Path):
+    _write(catalogs, "games_wishlist.json", [{"appid": 1, "name": "A"}, {"appid": 2, "name": "B"}])
+    prior_map = {f"wishlist:{i}": {"price": float(i)} for i in range(100, 110)}
+    prior = {"count": 10, "by_key": prior_map}
+    (catalogs / "itad_prices.json").write_text(json.dumps(prior), encoding="utf-8")
+
+    assert fetch_itad.main() == 0
+
+    doc = json.loads((catalogs / "itad_prices.json").read_text(encoding="utf-8"))
+    assert set(prior_map) <= set(doc["by_key"])
+    assert {"wishlist:1", "wishlist:2"} <= set(doc["by_key"])
+    assert doc["count"] == 12

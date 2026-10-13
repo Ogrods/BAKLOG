@@ -7,6 +7,7 @@ import hmac
 import os
 import shutil
 import sys
+import threading
 import time
 from datetime import UTC, datetime
 from hashlib import scrypt
@@ -307,6 +308,8 @@ _PIN_SCRYPT_P = 1
 _PIN_MAX_ATTEMPTS = 5
 _PIN_LOCK_SECONDS = 30
 
+# Guards only the two dicts below; never hold it across scrypt or index I/O.
+_pin_state_lock = threading.Lock()
 _pin_failures: dict[str, list[float]] = {}
 _pin_lock_until: dict[str, float] = {}
 
@@ -359,7 +362,8 @@ def verify_profile_pin(profile_id: str, pin: str, doc: dict[str, Any] | None = N
 
 
 def pin_rate_limit_error(profile_id: str) -> str | None:
-    until = _pin_lock_until.get(profile_id, 0.0)
+    with _pin_state_lock:
+        until = _pin_lock_until.get(profile_id, 0.0)
     if time.time() < until:
         return f"too many PIN attempts - try again in {_PIN_LOCK_SECONDS} seconds"
     return None
@@ -367,16 +371,18 @@ def pin_rate_limit_error(profile_id: str) -> str | None:
 
 def record_pin_failure(profile_id: str) -> None:
     now = time.time()
-    failures = _pin_failures.setdefault(profile_id, [])
-    failures[:] = [t for t in failures if now - t < 300]
-    failures.append(now)
-    if len(failures) >= _PIN_MAX_ATTEMPTS:
-        _pin_lock_until[profile_id] = now + _PIN_LOCK_SECONDS
+    with _pin_state_lock:
+        failures = _pin_failures.setdefault(profile_id, [])
+        failures[:] = [t for t in failures if now - t < 300]
+        failures.append(now)
+        if len(failures) >= _PIN_MAX_ATTEMPTS:
+            _pin_lock_until[profile_id] = now + _PIN_LOCK_SECONDS
 
 
 def clear_pin_failures(profile_id: str) -> None:
-    _pin_failures.pop(profile_id, None)
-    _pin_lock_until.pop(profile_id, None)
+    with _pin_state_lock:
+        _pin_failures.pop(profile_id, None)
+        _pin_lock_until.pop(profile_id, None)
 
 
 def set_profile_pin(profile_id: str, pin: str, current_pin: str | None = None) -> None:

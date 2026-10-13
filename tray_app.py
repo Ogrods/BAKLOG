@@ -55,6 +55,9 @@ _TERMINATE_WAIT_SEC = 5.0
 DEAL_ALERT_POLL_SEC = 300.0
 # Set by the poll loop once the server reports alerts on; shows the snooze item.
 _deal_alerts_enabled = False
+# Ids already toasted whose ack has not been confirmed; a failed ack must not re-toast.
+_notified_alert_ids: set[str] = set()
+_NOTIFIED_ALERT_IDS_MAX = 500
 
 
 def server_url() -> str:
@@ -440,11 +443,20 @@ def _deal_alerts_cycle(icon) -> int:
     alerts = payload.get("alerts") if _deal_alerts_enabled else None
     if not isinstance(alerts, list) or not alerts:
         return 0
-    for title, body in compose_notifications(alerts):
+    fresh = [
+        a
+        for a in alerts
+        if not (isinstance(a, dict) and isinstance(a.get("id"), str) and a["id"] in _notified_alert_ids)
+    ]
+    for title, body in compose_notifications(fresh):
         _tray_notify(icon, title, body)
     # Ack even if notify failed, or a backend without toasts would loop forever.
     ids = [a["id"] for a in alerts if isinstance(a, dict) and isinstance(a.get("id"), str)]
-    _deal_alerts_request("/api/deal-alerts/ack", {"ids": ids})
+    if len(_notified_alert_ids) > _NOTIFIED_ALERT_IDS_MAX:
+        _notified_alert_ids.clear()
+    _notified_alert_ids.update(ids)
+    if _deal_alerts_request("/api/deal-alerts/ack", {"ids": ids}) is not None:
+        _notified_alert_ids.difference_update(ids)
     return len(ids)
 
 

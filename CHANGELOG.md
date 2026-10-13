@@ -51,6 +51,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Activating a Pro license key in the desktop app no longer fails with an "Access denied" error.
+- Buying Pro before creating a BAKLOG account now turns Pro on automatically when you create an account with the same email.
 
 ## [0.9.02] - 2026-09-11
 

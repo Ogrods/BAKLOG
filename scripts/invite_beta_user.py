@@ -16,9 +16,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
-from shared.comp_pro import should_grant_pro
-from shared.supabase_admin import (
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from shared.comp_pro import should_grant_pro  # noqa: E402
+from shared.supabase_admin import (  # noqa: E402
     find_user_by_email,
     invite_user_by_email,
     load_maintainer_env,

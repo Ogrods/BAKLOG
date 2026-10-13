@@ -16,6 +16,7 @@ Examples:
   .\\.venv\\Scripts\\python.exe scripts\\grant_beta_pro.py
   .\\.venv\\Scripts\\python.exe scripts\\grant_beta_pro.py --email you@example.com --apply
   .\\.venv\\Scripts\\python.exe scripts\\grant_beta_pro.py --before 2026-07-01 --until 2027-03-31 --apply
+  .\\.venv\\Scripts\\python.exe scripts\\grant_beta_pro.py --until 2027-03-31 --skip-pro --exclude you@example.com
   .\\.venv\\Scripts\\python.exe scripts\\grant_beta_pro.py --expire --apply
   .\\.venv\\Scripts\\python.exe scripts\\grant_beta_pro.py --plan free --apply
 """
@@ -98,6 +99,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Set plan=free only where comp_until is before today (UTC); ignores --plan.",
     )
+    parser.add_argument(
+        "--skip-pro",
+        action="store_true",
+        help="Skip accounts already on plan=pro (owner, existing comps, payers).",
+    )
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="EMAIL",
+        help="Skip this account email (repeatable, case-insensitive).",
+    )
     parser.add_argument("--limit", type=int, default=0, help="Max users to touch (0 = no cap).")
     args = parser.parse_args(argv)
 
@@ -124,14 +137,20 @@ def main(argv: list[str] | None = None) -> int:
     today = _today()
     users = list_users(url, key)
     email_filter = (args.email or "").strip().lower()
+    excluded = {e.strip().lower() for e in args.exclude if e.strip()}
     selected: list[dict] = []
     for user in users:
         mail = str(user.get("email") or "").strip().lower()
+        meta = dict(user.get("app_metadata") or {})
         if email_filter and mail != email_filter:
+            continue
+        if mail in excluded:
             continue
         if not _created_before(user, cutoff):
             continue
-        if args.expire and not _comp_expired(dict(user.get("app_metadata") or {}), today):
+        if args.skip_pro and _normalize_plan(str(meta.get("plan") or "")) == "pro":
+            continue
+        if args.expire and not _comp_expired(meta, today):
             continue
         selected.append(user)
         if args.limit and len(selected) >= args.limit:

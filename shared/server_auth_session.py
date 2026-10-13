@@ -17,7 +17,7 @@ def handle_auth_session_get(handler: SimpleHTTPRequestHandler) -> None:
     from shared.entitlement import PLAN_PRO, current_plan, note_authenticated_plan
     from shared.mirror_session import note_authenticated_mirror_session
     from shared.profile_paths import get_active_profile_id
-    from shared.supabase_auth import verify_bearer_user
+    from shared.supabase_auth import verify_bearer_plan_details, verify_bearer_user
 
     s = _srv()
     authorization = handler.headers.get("Authorization")
@@ -52,6 +52,7 @@ def handle_auth_session_get(handler: SimpleHTTPRequestHandler) -> None:
             "email": email,
             "profile": get_active_profile_id(),
             "plan": plan,
+            **verify_bearer_plan_details(authorization),
             **({"refreshSession": True} if refresh_session else {}),
         },
     )

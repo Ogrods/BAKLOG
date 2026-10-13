@@ -12,8 +12,11 @@
 //   SUPABASE_SERVICE_ROLE_KEY   - service_role key (GoTrue admin + rpc)
 //
 // Buyer matching: the Polar customer's external_id (when passed as a checkout
-// query param) is treated as the Supabase user id; otherwise we match the buyer
-// by email via the get_user_id_by_email RPC (see web/sql/polar_entitlement.sql).
+// query param) is treated as the Supabase user id; when it is missing or not a
+// real user we match the buyer by email via the get_user_id_by_email RPC (see
+// web/sql/polar_entitlement.sql). Entitlement rules (paid flag, beta-day credit,
+// out-of-order events) live in _polar-pending.js applyPaidEntitlement. Every
+// matched change emails the founder.
 // Unmatched buyers are stored in polar_pending_entitlements (applied on signup by
 // auth-signup-notify.js) and the founder is emailed (RESEND_API_KEY, NOTIFY_FROM,
 // NOTIFY_TO; optional - storage still happens without them).
@@ -170,8 +173,12 @@ async function handleUnmatchedBuyer({ url, key, event, email, plan }) {
   return stored;
 }
 
-async function findSupabaseUserId({ url, key, externalId, email }) {
-  if (externalId && UUID_RE.test(externalId)) return externalId;
+function eventTimestamp(event) {
+  const data = event?.data || {};
+  return String(data.modified_at || data.created_at || event?.timestamp || "");
+}
+
+async function findUserIdByEmail({ url, key, email }) {
   if (!email) return null;
   const r = await fetch(`${url}/rest/v1/rpc/get_user_id_by_email`, {
     method: "POST",
@@ -190,6 +197,51 @@ async function findSupabaseUserId({ url, key, externalId, email }) {
   if (typeof out === "string") return out;
   if (Array.isArray(out) && out.length) return out[0]?.id || out[0] || null;
   return out?.id || null;
+}
+
+function fmtMeta(meta) {
+  const parts = [`plan=${meta?.plan || "free"}`];
+  if (meta?.paid) parts.push(`paid since ${meta.paid_since || "?"}`);
+  if (meta?.comp_until) parts.push(`comp_until ${meta.comp_until}`);
+  return parts.join(", ");
+}
+
+async function notifyEntitlementChange({ event, result }) {
+  const type = event?.type || "unknown";
+  const email = result.email || "(unknown email)";
+  await notifyFounder({
+    subject: `Polar ${type}: ${email} now ${result.plan}`,
+    replyTo: result.email || undefined,
+    text: [
+      "A Polar event changed a BAKLOG account.",
+      "",
+      `Event: ${type}`,
+      `Account: ${email}`,
+      `Before: ${fmtMeta(result.before)}`,
+      `After: ${fmtMeta(result.after)}`,
+      ...(result.creditedDays
+        ? [`Credited ${result.creditedDays} unused beta day(s); Pro now runs through ${result.after.comp_until}.`]
+        : []),
+    ].join("\n"),
+  });
+}
+
+/**
+ * Match the buyer and write the entitlement. A checkout external_id that is not a
+ * real user falls back to the email lookup. Returns null when nothing matched.
+ */
+async function applyToMatchedUser({ url, key, externalId, email, plan, eventAt }) {
+  if (externalId && UUID_RE.test(externalId)) {
+    try {
+      return await setUserPlan({ url, key, userId: externalId, plan, eventAt });
+    } catch (err) {
+      if (err?.status !== 404) throw err;
+      console.warn("polar-webhook: external_id is not a Supabase user; trying email");
+    }
+  }
+  const userId = await findUserIdByEmail({ url, key, email });
+  if (!userId) return null;
+  return setUserPlan({ url, key, userId, plan, eventAt });
 }
 
 export default {
@@ -236,15 +288,22 @@ export default {
     }
 
     const { externalId, email } = buyerRef(event);
-    let userId;
+    let result;
     try {
-      userId = await findSupabaseUserId({ url, key, externalId, email });
+      result = await applyToMatchedUser({
+        url,
+        key,
+        externalId,
+        email,
+        plan: entitlement.plan,
+        eventAt: eventTimestamp(event),
+      });
     } catch (err) {
-      console.error("polar-webhook: user lookup failed", err);
-      return Response.json({ error: "Lookup failed" }, { status: 500 });
+      console.error("polar-webhook: matching or setting plan failed", err);
+      return Response.json({ error: "Update failed" }, { status: 500 });
     }
 
-    if (!userId) {
+    if (!result) {
       // No matching BAKLOG account (buyer used a different email, or has no account
       // yet). Store the entitlement so signup applies it, and alert the founder.
       // A storage failure returns 500 so Polar retries.
@@ -259,15 +318,16 @@ export default {
       return Response.json({ ok: true, matched: false, pending: stored }, { status: 202 });
     }
 
-    let written;
-    try {
-      written = await setUserPlan({ url, key, userId, plan: entitlement.plan });
-    } catch (err) {
-      console.error("polar-webhook: setting plan failed", err);
-      return Response.json({ error: "Update failed" }, { status: 500 });
+    if (result.stale) {
+      console.warn(`polar-webhook: ignored out-of-order ${event?.type}`);
+      return Response.json({ ok: true, stale: true }, { status: 202 });
     }
 
-    console.log(`polar-webhook: ${event?.type} -> plan=${written} user=${userId}`);
-    return Response.json({ ok: true, plan: written }, { status: 202 });
+    await notifyEntitlementChange({ event, result });
+    console.log(`polar-webhook: ${event?.type} -> plan=${result.plan}`);
+    return Response.json(
+      { ok: true, plan: result.plan, creditedDays: result.creditedDays },
+      { status: 202 },
+    );
   },
 };

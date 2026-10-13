@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "crons": [{ "path": "/api/comp-expire", "schedule": "0 9 * * *" }],
   "rewrites": [
     { "source": "/auth/confirmed", "destination": "/auth-confirmed" },
     { "source": "/auth/reset", "destination": "/auth-reset" }

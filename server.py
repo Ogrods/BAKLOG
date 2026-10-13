@@ -1651,7 +1651,7 @@ class Handler(SimpleHTTPRequestHandler):
         from shared.entitlement import current_plan, maybe_refresh_local_license
         from shared.polar_license import polar_configured
         from shared.pro_capabilities import resolve_capabilities
-        from shared.pro_checkout import pro_checkout_enabled, public_checkout_urls
+        from shared.pro_checkout import polar_portal_url, pro_checkout_enabled, public_checkout_urls
         from shared.pro_settings import read_pro_settings
         from shared.supabase_auth import auth_enabled, public_auth_config
 
@@ -1673,6 +1673,7 @@ class Handler(SimpleHTTPRequestHandler):
         config["licenseActivation"] = polar_configured() and not auth_enabled()
         config["proCheckoutEnabled"] = pro_checkout_enabled()
         config["proCheckout"] = public_checkout_urls()
+        config["proPortalUrl"] = polar_portal_url()
         config["admin"] = bool(ADMIN_ENABLED)
         config["frozen"] = is_frozen()
         config["version"] = _app_version()

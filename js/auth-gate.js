@@ -39,6 +39,8 @@ let _adminMode = false;
 let _licenseActivation = false;
 let _proCheckoutEnabled = false;
 let _proCheckout = { monthly: "", yearly: "" };
+let _proPortalUrl = "";
+let _planDetails = { compUntil: "", paid: false };
 let _lastSessionProbeStatus = 0;
 const SESSION_PROBE_ATTEMPTS = 6;
 const SESSION_PROBE_DELAY_MS = 500;
@@ -313,12 +315,14 @@ function applyConfigEntitlement(config) {
     monthly: checkout?.monthly || "",
     yearly: checkout?.yearly || "",
   };
+  _proPortalUrl = typeof config.proPortalUrl === "string" ? config.proPortalUrl : "";
   setCapabilitiesFromConfig(config.capabilities);
   setProSettingsFromConfig(config.proSettings);
 }
 
 /** Test helper: apply the same entitlement fields GET /api/config would. */
 export function __applyConfigEntitlementForTest(config) {
+  if (config && "authRequired" in config) _authRequired = !!config.authRequired;
   applyConfigEntitlement(config);
 }
 
@@ -334,6 +338,28 @@ export function proCheckoutUrls() {
   return { ..._proCheckout };
 }
 
+/** Polar customer portal (manage or cancel a subscription). */
+export function proPortalUrl() {
+  return _proPortalUrl;
+}
+
+/** Signed plan details from the session probe: free Pro end date and paid flag. */
+export function getPlanDetails() {
+  return { ..._planDetails };
+}
+
+function applySessionPlanDetails(data) {
+  _planDetails = {
+    compUntil: typeof data?.compUntil === "string" ? data.compUntil : "",
+    paid: data?.paid === true,
+  };
+}
+
+/** Test helper: set the plan details a session probe would. */
+export function __setPlanDetailsForTest(data) {
+  applySessionPlanDetails(data);
+}
+
 /** Re-read plan + capabilities from the server (session probe then /api/config). */
 export async function refreshAccountPlan() {
   try {
@@ -345,6 +371,7 @@ export async function refreshAccountPlan() {
       if (res.ok) {
         const data = await res.json();
         if (typeof data.plan === "string" && data.plan) setPlan(data.plan);
+        applySessionPlanDetails(data);
       }
     }
     const headers = _accessToken
@@ -385,6 +412,7 @@ async function clearStaleAuthSession() {
   }
   _accessToken = null;
   _accountProfileId = "";
+  _planDetails = { compUntil: "", paid: false };
 }
 
 /** Verify the current bearer is accepted by server.py before boot continues. */
@@ -404,6 +432,7 @@ async function probeServerToken() {
     if (data.profile) _accountProfileId = String(data.profile);
     if (data.email) _accountEmail = data.email;
     if (typeof data.plan === "string" && data.plan) setPlan(data.plan);
+    applySessionPlanDetails(data);
     const ok = !!data.ok;
     _lastSessionProbeStatus = ok ? res.status : 401;
     if (ok && data.refreshSession && _supabase) {
@@ -842,6 +871,7 @@ export function handleApiUnauthorized(
   }
   _accessToken = null;
   _accountProfileId = "";
+  _planDetails = { compUntil: "", paid: false };
   setOverlayVisible(true);
   setAuthError(message);
 }
@@ -880,6 +910,7 @@ export async function signOutAccount(opts = {}) {
   if (_supabase) await _supabase.auth.signOut();
   _accessToken = null;
   _accountProfileId = "";
+  _planDetails = { compUntil: "", paid: false };
   try {
     await fetch("/api/auth/sign-out", {
       method: "POST",

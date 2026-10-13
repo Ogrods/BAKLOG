@@ -6,9 +6,18 @@ import pytest
 
 from shared.pro_checkout import (
     PRO_CHECKOUT_MONTHLY,
+    PRO_PORTAL_URL,
+    polar_portal_url,
     pro_checkout_enabled,
     public_checkout_urls,
 )
+
+
+def test_polar_portal_url_default_and_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BAKLOG_POLAR_PORTAL_URL", raising=False)
+    assert polar_portal_url() == PRO_PORTAL_URL == "https://polar.sh/baklog/portal"
+    monkeypatch.setenv("BAKLOG_POLAR_PORTAL_URL", "https://example.test/portal")
+    assert polar_portal_url() == "https://example.test/portal"
 
 
 @pytest.mark.parametrize(

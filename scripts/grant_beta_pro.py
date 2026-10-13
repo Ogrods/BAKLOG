@@ -4,9 +4,11 @@ Uses the GoTrue admin API to set ``app_metadata.plan`` on each user. Safe by
 default: prints the plan and exits unless ``--apply`` is passed.
 
 Comp grants can carry an end date (``--until``), stored as
-``app_metadata.comp_until``. ``--expire`` later sets ``plan=free`` only on
-accounts whose ``comp_until`` has passed, so paying users (``paid`` set by the
-Polar webhook, or no ``comp_until``) and longer grants are never touched.
+``app_metadata.comp_until``. The daily Vercel cron (``web/api/comp-expire.js``)
+is the primary expiry path; ``--expire`` is the manual fallback with the same
+rule: ``plan=free`` only on accounts whose ``comp_until`` has passed, so paying
+users (``paid`` set by the Polar webhook, or no ``comp_until``) and longer
+grants are never touched.
 
 Env (shell or repo ``.env``):
   SUPABASE_URL

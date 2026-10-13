@@ -8,12 +8,14 @@ import { baklogFetch } from './api-client.js';
 import {
   getAccountEmail,
   getAccountProfileId,
+  getPlanDetails,
   isAccountAuthMode,
   isAdminMode,
   isPro,
   licenseActivationEnabled,
   proCheckoutEnabled,
   proCheckoutUrls,
+  proPortalUrl,
   refreshAccountPlan,
 } from './auth-gate.js';
 import { escapeAttr, escapeHtml } from './dom-util.js';
@@ -39,9 +41,9 @@ export function isProActivationPending() {
   return checkoutSuccessPending || licenseActivating;
 }
 
-/** Pro tab / #pro: free users, checkout pending, or local admin preview. */
+/** Pro tab / #pro is always available: free users get the pitch, Pro users their plan card. */
 export function canOpenProView() {
-  return !isPro() || isProActivationPending() || isAdminMode();
+  return true;
 }
 
 function clearActivationPending() {
@@ -216,12 +218,71 @@ function proActivationHtml() {
     </div>`;
 }
 
+function formatPlanDate(day) {
+  const d = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** Which plan card applies: free, paid, comp (has an end date), forever, or license (local install). */
+export function planCardKind({ pro, paid, compUntil, accountMode }) {
+  if (!pro) return 'free';
+  if (!accountMode) return 'license';
+  if (paid) return 'paid';
+  if (compUntil) return 'comp';
+  return 'forever';
+}
+
+function manageSubscriptionHtml() {
+  const portal = proPortalUrl();
+  if (!portal) return '';
+  return `<div class="pro-view-actions">
+      <a class="pro-view-btn pro-view-btn--ghost" href="${escapeAttr(portal)}" target="_blank" rel="noopener noreferrer">Manage subscription</a>
+    </div>`;
+}
+
+function earlySupportHtml() {
+  if (!proCheckoutEnabled()) return '';
+  return `<div class="pro-view-plan-support">
+      <h3 class="pro-view-section-title">Support BAKLOG now</h3>
+      <p class="pro-view-note">Optional. If you subscribe before your free Pro ends, the free days you have left are added after your subscription ends.</p>
+      ${proPricingHtml()}
+    </div>`;
+}
+
+/** Plan line (and actions) for the signed-in account. */
+export function planStatusHtml({ support = true } = {}) {
+  const details = getPlanDetails();
+  const kind = planCardKind({ pro: isPro(), accountMode: isAccountAuthMode(), ...details });
+  const line = (text) => `<p class="pro-view-plan-status">${text}</p>`;
+  if (kind === 'paid') return line('Pro subscription active.') + manageSubscriptionHtml();
+  if (kind === 'license') return line('Pro license active.') + manageSubscriptionHtml();
+  if (kind === 'comp') {
+    return line(`Free beta Pro through ${escapeHtml(formatPlanDate(details.compUntil))}.`)
+      + (support ? earlySupportHtml() : '');
+  }
+  if (kind === 'forever') return line('Pro, no end date.');
+  return line('Free plan.');
+}
+
 function proActiveHtml() {
   return `<div class="pro-view-card pro-view-card--active" role="region" aria-label="BAKLOG Pro">
     <p class="pro-view-eyebrow">${escapeHtml(PRO_PROMO.label)}</p>
     <h2 class="pro-view-title">You&apos;re on Pro</h2>
+    ${planStatusHtml()}
     <p class="pro-view-lead">Sponsored deal slots are off. Perks roll out on the same open codebase - more conveniences land over time.</p>
     <ul class="pro-view-features">${proFeaturesListHtml({ compact: true })}</ul>
+  </div>`;
+}
+
+function devServerCardHtml() {
+  return `<div class="pro-view-card pro-view-card--dev" role="note" aria-label="Dev server">
+    <p class="pro-view-eyebrow">Dev server</p>
+    <h2 class="pro-view-title">Pro features on for testing</h2>
+    <p class="pro-view-lead">This server runs with <code>BAKLOG_ADMIN=1</code>, so Pro features are switched on here. Ads and sponsored slots stay visible on purpose so you can check them. This is not a real plan.</p>
+    <h3 class="pro-view-section-title">Your account</h3>
+    ${planStatusHtml({ support: false })}
+    <p class="pro-view-note">The free-user Pro page is shown below for preview.</p>
   </div>`;
 }
 
@@ -278,14 +339,16 @@ function applyProPlanToggle(root, plan) {
 export function renderProView({ showSuccess = false } = {}) {
   const el = document.getElementById('proViewRoot');
   if (!el) return;
-  // Confirmed Pro: active card only - unless local admin is previewing the pitch.
+  // Confirmed Pro: plan card. Dev server: dev card, then the pitch preview.
   if (isPro() && !isAdminMode()) {
     el.innerHTML = proActiveHtml();
+    applyProPlanToggle(el, selectedProPlan);
     return;
   }
   // Keep checkoutSuccessPending, but show waiting-for-activation until isPro().
   const pending = showSuccess || checkoutSuccessPending;
-  el.innerHTML = proPitchHtml({ showPending: pending && !isPro() });
+  const devCard = isAdminMode() ? devServerCardHtml() : '';
+  el.innerHTML = devCard + proPitchHtml({ showPending: pending && !isPro() });
   applyProPlanToggle(el, selectedProPlan);
 }
 
@@ -300,16 +363,11 @@ export function applyProTabVisibility() {
   reconcileStaleCheckoutPending();
   const tab = document.querySelector('.view-tab[data-view="pro"]');
   if (!tab) return;
-  const pending = isProActivationPending();
-  const show = canOpenProView();
-  tab.classList.toggle('hidden', !show);
-  tab.hidden = !show;
-  tab.setAttribute('aria-hidden', show ? 'false' : 'true');
-  if (show) tab.removeAttribute('hidden');
+  tab.classList.remove('hidden');
+  tab.hidden = false;
+  tab.removeAttribute('hidden');
+  tab.setAttribute('aria-hidden', 'false');
   document.documentElement.toggleAttribute('data-pro-tier', isPro());
-  if (!show && !pending && state.activeView === 'pro') {
-    switchView('dashboard');
-  }
 }
 
 export function goToProView() {

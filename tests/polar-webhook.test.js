@@ -38,6 +38,7 @@ async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {}, appMeta =
       }
       return { ok: true, json: async () => ({}) };
     }
+    if (String(url) === 'https://api.resend.com/emails') return { ok: true, text: async () => '' };
     throw new Error(`unexpected fetch ${url} ${init?.method || ''}`);
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -173,7 +174,9 @@ describe('polar-webhook', () => {
       { appMeta: { plan: 'pro', comp_until: '2027-03-31' } },
     );
     expect(json.plan).toBe('pro');
-    expect(putMeta(fetchMock)).toEqual({ plan: 'pro', paid: true, comp_until: '2027-03-31' });
+    const meta = putMeta(fetchMock);
+    expect(meta).toMatchObject({ plan: 'pro', paid: true, comp_until: '2027-03-31' });
+    expect(meta.paid_since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('keeps Pro on cancel while the comp grant is still running', async () => {
@@ -190,6 +193,75 @@ describe('polar-webhook', () => {
     });
     expect(json.plan).toBe('free');
     expect(putMeta(fetchMock)).toEqual({ plan: 'free', comp_until: '2020-01-01' });
+  });
+
+  it('ignores an event older than the last applied one', async () => {
+    const { res, json, fetchMock } = await postWebhook(
+      { type: 'order.paid', data: { created_at: '2026-10-01T00:00:00Z', product: {}, customer: { email: 'b@example.com' } } },
+      { appMeta: { plan: 'free', polar_event_at: '2026-10-05T00:00:00.000Z' } },
+    );
+    expect(res.status).toBe(202);
+    expect(json.stale).toBe(true);
+    const puts = fetchMock.mock.calls.filter(([, init]) => String(init?.method || '').toUpperCase() === 'PUT');
+    expect(puts).toHaveLength(0);
+  });
+
+  it('falls back to email when external_id is not a real user', async () => {
+    vi.resetModules();
+    process.env.POLAR_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.SUPABASE_URL = SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
+    const ghost = '33333333-3333-4333-8333-333333333333';
+    const real = '11111111-1111-4111-8111-111111111111';
+    const body = JSON.stringify({
+      type: 'order.paid',
+      data: { product: {}, customer: { external_id: ghost, email: 'buyer@example.com' } },
+    });
+    const sig = signBody(body);
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.endsWith(`/admin/users/${ghost}`)) return { ok: false, status: 404, text: async () => 'not found' };
+      if (u.includes('/rpc/get_user_id_by_email')) return { ok: true, json: async () => real };
+      if (u.endsWith(`/admin/users/${real}`)) {
+        return method === 'GET'
+          ? { ok: true, json: async () => ({ email: 'buyer@example.com', app_metadata: {} }) }
+          : { ok: true, json: async () => ({}) };
+      }
+      throw new Error(`unexpected fetch ${u}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const mod = await import('../web/api/polar-webhook.js');
+    const res = await mod.default.fetch(new Request('https://baklog.app/api/polar-webhook', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'webhook-id': sig.id,
+        'webhook-timestamp': sig.timestamp,
+        'webhook-signature': sig.signature,
+      },
+      body,
+    }));
+    expect(res.status).toBe(202);
+    expect((await res.json()).plan).toBe('pro');
+    const put = fetchMock.mock.calls.find(([, init]) => String(init?.method || '').toUpperCase() === 'PUT');
+    expect(String(put[0])).toContain(real);
+  });
+
+  it('emails the founder on a matched change', async () => {
+    const { fetchMock } = await postWebhook(
+      { type: 'subscription.revoked', data: { product: {}, customer: { email: 'b@example.com' } } },
+      {
+        appMeta: { plan: 'pro', paid: true, paid_since: '2026-01-01', comp_until: '2026-03-31' },
+        env: { RESEND_API_KEY: 're_test', NOTIFY_FROM: 'n@baklog.app', NOTIFY_TO: 'f@example.com' },
+      },
+    );
+    const mail = fetchMock.mock.calls.find(([u]) => String(u) === 'https://api.resend.com/emails');
+    for (const k of ['RESEND_API_KEY', 'NOTIFY_FROM', 'NOTIFY_TO']) delete process.env[k];
+    expect(mail).toBeTruthy();
+    const text = JSON.parse(mail[1].body).text;
+    expect(text).toContain('Event: subscription.revoked');
+    expect(text).toContain('Credited 89 unused beta day(s)');
   });
 
   async function postUnmatched(event, { pendingOk = true } = {}) {

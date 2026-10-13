@@ -11,7 +11,9 @@
 //
 // Optional SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY: when set, a pending Polar
 // purchase for the new email (polar_pending_entitlements, written by
-// polar-webhook.js) is applied to the account as app_metadata.plan.
+// polar-webhook.js) is applied to the account as app_metadata.plan, but only
+// when the email is already confirmed; otherwise comp-expire.js applies it after
+// confirmation so an unverified signup cannot claim someone else's purchase.
 
 import { notifyConfig, sendEmail } from "./_notify.js";
 import { findPendingEntitlement, markPendingApplied, setUserPlan } from "./_polar-pending.js";
@@ -43,6 +45,9 @@ async function applyPendingPurchase(signup) {
   try {
     const pending = await findPendingEntitlement({ url, key, email: signup.email });
     if (!pending || pending.applied_at || pending.plan !== "pro") return "";
+    if (!signup.confirmedAt) {
+      return "Pending Polar purchase found. Pro applies once this email is confirmed (daily comp-expire cron).";
+    }
     await setUserPlan({ url, key, userId: signup.id, plan: "pro" });
     await markPendingApplied({ url, key, email: signup.email, userId: signup.id });
     return `Pro applied from pending Polar purchase (${pending.last_event_type || "unknown event"}).`;

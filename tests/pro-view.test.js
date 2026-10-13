@@ -13,6 +13,8 @@ vi.mock('../js/auth-gate.js', () => ({
   proCheckoutUrls: vi.fn(() => ({})),
   getAccountEmail: vi.fn(() => ''),
   getAccountProfileId: vi.fn(() => ''),
+  getPlanDetails: vi.fn(() => ({ compUntil: '', paid: false })),
+  proPortalUrl: vi.fn(() => 'https://polar.sh/baklog/portal'),
   refreshAccountPlan: vi.fn(async () => 'free'),
 }));
 
@@ -112,6 +114,64 @@ describe('renderProView', () => {
     const { renderProView } = await import('../js/pro-view.js');
     renderProView();
     expect(document.getElementById('proViewRoot').textContent).toContain("You're on Pro");
+  });
+
+  describe('plan card', () => {
+    async function renderAs({ pro = true, account = true, admin = false, details }) {
+      const authGate = await import('../js/auth-gate.js');
+      authGate.isPro.mockReturnValue(pro);
+      authGate.isAccountAuthMode.mockReturnValue(account);
+      authGate.isAdminMode.mockReturnValue(admin);
+      authGate.getPlanDetails.mockReturnValue(details);
+      const { renderProView } = await import('../js/pro-view.js');
+      renderProView();
+      return document.getElementById('proViewRoot');
+    }
+
+    afterEach(async () => {
+      const authGate = await import('../js/auth-gate.js');
+      authGate.isPro.mockReturnValue(false);
+      authGate.isAccountAuthMode.mockReturnValue(false);
+      authGate.isAdminMode.mockReturnValue(false);
+      authGate.getPlanDetails.mockReturnValue({ compUntil: '', paid: false });
+    });
+
+    it('beta testers see their end date and optional early support', async () => {
+      const root = await renderAs({ details: { compUntil: '2027-03-31', paid: false } });
+      expect(root.textContent).toContain('Free beta Pro through Mar 31, 2027.');
+      expect(root.textContent).toContain('free days you have left are added after');
+      expect(root.querySelector('[data-pro-checkout]')).toBeTruthy();
+      expect(root.textContent).not.toContain('Manage subscription');
+    });
+
+    it('paying users see Manage subscription', async () => {
+      const root = await renderAs({ details: { compUntil: '2027-03-31', paid: true } });
+      expect(root.textContent).toContain('Pro subscription active.');
+      const link = [...root.querySelectorAll('a')].find((a) => a.textContent === 'Manage subscription');
+      expect(link?.getAttribute('href')).toBe('https://polar.sh/baklog/portal');
+      expect(root.querySelector('[data-pro-checkout]')).toBeNull();
+    });
+
+    it('permanent comps see no end date', async () => {
+      const root = await renderAs({ details: { compUntil: '', paid: false } });
+      expect(root.textContent).toContain('Pro, no end date.');
+    });
+
+    it('dev server shows the dev card with the real plan, then the pitch preview', async () => {
+      const root = await renderAs({ admin: true, details: { compUntil: '2027-03-31', paid: false } });
+      const dev = root.querySelector('.pro-view-card--dev');
+      expect(dev.textContent).toContain('Ads and sponsored slots stay visible on purpose');
+      expect(dev.textContent).toContain('Free beta Pro through Mar 31, 2027.');
+      expect(dev.querySelector('[data-pro-checkout]')).toBeNull();
+      expect(root.querySelector('.pro-view-funnel')).toBeTruthy();
+    });
+
+    it('never uses an em dash in plan copy', async () => {
+      for (const details of [{ compUntil: '2027-03-31', paid: false }, { compUntil: '', paid: true }]) {
+        const root = await renderAs({ admin: true, details });
+        expect(root.textContent).not.toContain('\u2014');
+      }
+    });
   });
 
   it('shows waiting-for-activation when checkout pending but not yet Pro', async () => {
@@ -231,16 +291,17 @@ describe('Pro activation UX', () => {
     expect(tab.classList.contains('hidden')).toBe(false);
   });
 
-  it('applyProTabVisibility clears stale checkout pending and hides tab when already Pro', async () => {
+  it('applyProTabVisibility keeps the Pro tab visible for Pro users (plan card)', async () => {
     const authGate = await import('../js/auth-gate.js');
     authGate.isPro.mockReturnValue(true);
+    authGate.isAdminMode.mockReturnValue(false);
     document.body.insertAdjacentHTML('beforeend', '<div id="proContainer"><div id="proViewRoot"></div></div>');
     const { markCheckoutSuccessPending, applyProTabVisibility } = await import('../js/pro-view.js');
     markCheckoutSuccessPending();
     applyProTabVisibility();
     const tab = document.querySelector('.view-tab[data-view="pro"]');
-    expect(tab.classList.contains('hidden')).toBe(true);
-    expect(tab.hidden).toBe(true);
+    expect(tab.classList.contains('hidden')).toBe(false);
+    expect(tab.hidden).toBe(false);
   });
 
   it('applyProTabVisibility keeps Pro tab for admin even when already Pro', async () => {

@@ -12,7 +12,13 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from shared.claims_paths import CLAIMS_SUBDIR, internal_repo_dir
+from shared.claims_paths import (
+    CLAIMS_SUBDIR,
+    CURATED_SCRAPE,
+    SCRAPE_NAME,
+    internal_repo_dir,
+    resolve_scrape_path,
+)
 
 Runner = Callable[..., subprocess.CompletedProcess]
 
@@ -40,6 +46,26 @@ def _check(proc: subprocess.CompletedProcess, what: str) -> None:
         raise ClaimsSyncError(f"{what} failed: {tail}")
 
 
+def _pull_rebase(runner: Runner, internal: Path) -> None:
+    pull = _git(runner, internal, "pull", "-q", "--rebase", "--autostash")
+    if pull.returncode != 0:
+        _git(runner, internal, "rebase", "--abort")
+        _check(pull, "git pull --rebase")
+
+
+def _share_newer_local_scrape(repo_root: Path, internal: Path) -> bool:
+    """Copy the local scrape into ``claims/`` when it is newer than CI's."""
+    local = Path(repo_root) / CURATED_SCRAPE
+    shared = internal / CLAIMS_SUBDIR / SCRAPE_NAME
+    if not local.is_file() or resolve_scrape_path(repo_root, local) != local:
+        return False
+    data = local.read_bytes()
+    if shared.is_file() and shared.read_bytes() == data:
+        return False
+    shared.write_bytes(data)
+    return True
+
+
 def sync_claims_decisions(
     repo_root: Path,
     *,
@@ -57,6 +83,11 @@ def sync_claims_decisions(
     if internal is None or not (internal / CLAIMS_SUBDIR).is_dir():
         raise ClaimsSyncError("baklog-internal/claims not found next to this repo")
 
+    if push:
+        # Pull before touching the scrape: CI commits it every run, so copying ours
+        # onto a stale base would conflict on rebase.
+        _pull_rebase(runner, internal)
+    _share_newer_local_scrape(repo_root, internal)
     _check(_git(runner, internal, "add", "--", CLAIMS_SUBDIR), "git add")
     staged = _git(runner, internal, "diff", "--cached", "--quiet", "--", CLAIMS_SUBDIR)
     changed = staged.returncode == 1
@@ -70,10 +101,7 @@ def sync_claims_decisions(
 
     pushed = False
     if push:
-        pull = _git(runner, internal, "pull", "-q", "--rebase", "--autostash")
-        if pull.returncode != 0:
-            _git(runner, internal, "rebase", "--abort")
-            _check(pull, "git pull --rebase")
+        _pull_rebase(runner, internal)
         # Push even when unchanged: an earlier sync may have committed but failed to push.
         _check(_git(runner, internal, "push", "-q"), "git push")
         pushed = True

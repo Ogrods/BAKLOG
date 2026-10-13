@@ -16,7 +16,9 @@ Resolution order:
 
 from __future__ import annotations
 
+import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 APPROVED_ENV = "BAKLOG_FREE_CLAIMS_APPROVED"
@@ -27,6 +29,8 @@ CLAIMS_SUBDIR = "claims"
 APPROVED_NAME = "free_claims.approved.json"
 AUTO_DECISIONS_NAME = "auto_decisions.json"
 CURATED_APPROVED = Path("curated") / APPROVED_NAME
+SCRAPE_NAME = "free_claims.auto.json"
+CURATED_SCRAPE = Path("curated") / SCRAPE_NAME
 
 
 def internal_repo_dir(repo_root: Path) -> Path | None:
@@ -52,6 +56,38 @@ def resolve_approved_path(repo_root: Path, default: Path | None = None) -> Path:
     if claims is not None:
         return claims / APPROVED_NAME
     return default if default is not None else Path(repo_root) / CURATED_APPROVED
+
+
+def _scrape_stamp(path: Path) -> datetime | None:
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    raw = str(doc.get("fetched_at") or "") if isinstance(doc, dict) else ""
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        stamp = datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    return stamp if stamp.tzinfo else stamp.replace(tzinfo=UTC)
+
+
+def resolve_scrape_path(repo_root: Path, local: Path | None = None) -> Path:
+    """Newer of the local scrape and the private repo's CI scrape (by ``fetched_at``).
+
+    CI pushes its scrape to ``baklog-internal/claims``; digest approvals can name
+    rows only that scrape has, so admin must not judge them against a stale local one.
+    """
+    local = local if local is not None else Path(repo_root) / CURATED_SCRAPE
+    claims = internal_claims_dir(repo_root)
+    shared_scrape = claims / SCRAPE_NAME if claims is not None else None
+    if shared_scrape is None or not shared_scrape.is_file():
+        return local
+    if not local.is_file():
+        return shared_scrape
+    local_at, shared_at = _scrape_stamp(local), _scrape_stamp(shared_scrape)
+    if shared_at is not None and (local_at is None or shared_at > local_at):
+        return shared_scrape
+    return local
 
 
 def resolve_auto_decisions_path(repo_root: Path) -> Path | None:

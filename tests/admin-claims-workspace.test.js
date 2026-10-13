@@ -26,6 +26,7 @@ import {
   normTitleKey,
   pendingNeedsPublishEnrichment,
   pruneDeadOrphanApprovals,
+  isUndatedLiveListingSource,
   reindexToFeedOrder,
   resolveApprovedKeys,
   slugManualId,
@@ -246,6 +247,21 @@ describe('pruneDeadOrphanApprovals', () => {
     const live = [{ id: 'live-1', title: 'L' }];
     const { ids } = pruneDeadOrphanApprovals(new Set(['auto-1', 'live-1']), auto, live);
     expect(ids.has('auto-unapproved')).toBe(false);
+  });
+
+  it('leaves the caller set intact so load can report without saving', () => {
+    const approved = new Set(['auto-1', 'digest-only']);
+    const { removed } = pruneDeadOrphanApprovals(approved, [{ id: 'auto-1' }], []);
+    expect(removed).toEqual(['digest-only']);
+    expect([...approved].sort()).toEqual(['auto-1', 'digest-only']);
+  });
+});
+
+describe('isUndatedLiveListingSource', () => {
+  it('is true only for undated gamerpower rows', () => {
+    expect(isUndatedLiveListingSource({ source: 'gamerpower', ends_at: null })).toBe(true);
+    expect(isUndatedLiveListingSource({ source: 'gamerpower', ends_at: '2026-11-01T00:00:00Z' })).toBe(false);
+    expect(isUndatedLiveListingSource({ source: 'itad', ends_at: null })).toBe(false);
   });
 });
 

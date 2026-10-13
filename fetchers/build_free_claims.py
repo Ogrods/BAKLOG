@@ -673,7 +673,8 @@ def collapse_dupe_groups(
     for it in selected:
         item_id = str(it.get("id") or "").strip()
         group = by_member.get(item_id)
-        bucket = f"group:{group.key}" if group else f"id:{item_id or id(it)}"
+        # Winner id, not group.key: with splits two separate groups can share a key.
+        bucket = f"group:{group.winner_id}" if group else f"id:{item_id or id(it)}"
         if bucket not in buckets:
             buckets[bucket] = []
             order.append(bucket)
@@ -1053,7 +1054,10 @@ def _select_approved_auto_items(
         # dropped later at enrich / carry-forward).
         prune_ends = _ends_at_for_prune({**item, "ends_at": ends_at}, now)
         if _is_expired(prune_ends, now):
-            if item_id in approved_ids:
+            # An undated live-listing row is only "expired" because the source has
+            # not returned it lately (outage or delist): skip it, keep the approval.
+            undated_live = not ends_at and str(item.get("source") or "") in LIVE_LISTING_SOURCES
+            if item_id in approved_ids and not undated_live:
                 expired_approved_ids.add(item_id)
             continue
         auto_items.append(dict(item))

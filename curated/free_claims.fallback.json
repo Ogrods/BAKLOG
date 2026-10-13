@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-13T04:53:37.661416+00:00",
+  "generated_at": "2026-10-13T05:34:57.415707+00:00",
   "items": [
     {
       "id": "epic-out-of-sight-b96ca8",
@@ -13,7 +13,7 @@
       "steam_appid": 2526310,
       "review_percent": 95,
       "source": "epic",
-      "first_seen": "2026-10-13T04:53:12Z"
+      "first_seen": "2026-10-13T05:34:20Z"
     },
     {
       "id": "epic-terrascape-2b12b1",
@@ -27,7 +27,7 @@
       "steam_appid": 2290000,
       "review_percent": 89,
       "source": "epic",
-      "first_seen": "2026-10-13T04:53:12Z"
+      "first_seen": "2026-10-13T05:34:20Z"
     },
     {
       "id": "gamerpower-3328",
@@ -37,11 +37,39 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1166580/header.jpg?t=1707532308",
       "genres": [],
       "blurb": "Ever dreamed of being a plumber? Probably not... but now’s your chance! Grab Best Plumber for free on IndieGala and step into the boots of a young plumber!",
-      "ends_at": "2026-10-27T04:53:12Z",
+      "ends_at": null,
       "steam_appid": 1166580,
       "review_percent": 71,
       "source": "gamerpower",
-      "first_seen": "2026-10-13T04:53:12Z"
+      "first_seen": "2026-10-13T05:34:20Z"
+    },
+    {
+      "id": "gamerpower-3322",
+      "store": "indiegala",
+      "title": "Sausage Hunter (Indiegala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/sausage-hunter-pc-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1296880/f5a9d4ef70e56a884922b29906aa3df96285bbb6/header.jpg?t=1780037913",
+      "genres": [],
+      "blurb": "The hunt for the magic sausage starts now! Download Sausage Hunter for free on IndieGala. Sausage Hunter is a 2D platformer with hand-drawn graphics and intriguing puzzles... plus a kitten and sausages, for some reason.",
+      "ends_at": null,
+      "steam_appid": 1296880,
+      "review_percent": 80,
+      "source": "gamerpower",
+      "first_seen": "2026-10-13T05:34:20Z"
+    },
+    {
+      "id": "gamerpower-3324",
+      "store": "indiegala",
+      "title": "Battle Ram (IndieGala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/battle-ram-pc-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1262060/header.jpg?t=1779411066",
+      "genres": [],
+      "blurb": "Become the battle lamb you were born to be! Battle Ram is free this week on IndieGala, download it now! Battle Ram is a 2d action-packed game with lambs and battling robots.",
+      "ends_at": null,
+      "steam_appid": 1262060,
+      "review_percent": 84,
+      "source": "gamerpower",
+      "first_seen": "2026-10-13T05:34:20Z"
     },
     {
       "id": "gamerpower-3498",
@@ -53,7 +81,28 @@
       "blurb": "Download Primal Slideee Deluxe for free via Stove until October 31!",
       "ends_at": "2026-10-31T23:59:59Z",
       "source": "gamerpower",
-      "first_seen": "2026-10-13T04:53:12Z",
+      "first_seen": "2026-10-13T05:34:20Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-ff087683735c",
+      "store": "steam",
+      "title": "Voidtrain - Big Catch Free DLC",
+      "claim_url": "https://isthereanydeal.com/giveaways/16653/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5007040/32e2576dc44c96f7bfa0dc6cc92f5cc0fb2560ef/header.jpg?t=1791824486",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Indie",
+        "RPG",
+        "Simulation"
+      ],
+      "blurb": "Voidtrain - Big Catch",
+      "ends_at": "2026-10-27T05:34:20Z",
+      "steam_appid": 5007040,
+      "review_percent": 92,
+      "source": "itad",
+      "first_seen": "2026-10-13T05:34:20Z",
       "premium_only": true
     },
     {
@@ -64,11 +113,11 @@
       "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1139280/header.jpg?t=1786075312",
       "genres": [],
       "blurb": "The Big Con",
-      "ends_at": "2026-10-27T04:53:12Z",
+      "ends_at": "2026-10-27T05:34:20Z",
       "steam_appid": 1139280,
       "review_percent": 93,
       "source": "itad",
-      "first_seen": "2026-10-13T04:53:12Z"
+      "first_seen": "2026-10-13T05:34:20Z"
     },
     {
       "id": "itad-f99d00439cb6",
@@ -82,11 +131,11 @@
         "RPG"
       ],
       "blurb": "Rotwood: Drakin Armoury Pack",
-      "ends_at": "2026-10-27T04:53:12Z",
+      "ends_at": "2026-10-27T05:34:20Z",
       "steam_appid": 5067220,
       "review_percent": 100,
       "source": "itad",
-      "first_seen": "2026-10-13T04:53:12Z",
+      "first_seen": "2026-10-13T05:34:20Z",
       "premium_only": true
     },
     {
@@ -101,11 +150,11 @@
         "Sports"
       ],
       "blurb": "MXGP 26 - Scrubdesignz Liveries",
-      "ends_at": "2026-10-27T04:53:12Z",
+      "ends_at": "2026-10-27T05:34:20Z",
       "steam_appid": 4847440,
       "review_percent": 50,
       "source": "itad",
-      "first_seen": "2026-10-13T04:53:12Z",
+      "first_seen": "2026-10-13T05:34:20Z",
       "premium_only": true
     }
   ],

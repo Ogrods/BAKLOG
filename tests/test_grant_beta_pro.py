@@ -108,6 +108,7 @@ def test_expire_only_touches_past_comp_until(monkeypatch, capsys) -> None:
         _user("u2", "paul@example.com", {"plan": "pro", "comp_until": "2027-05-31"}),
         _user("u3", "payer@example.com", {"plan": "pro"}),
         _user("u4", "free@example.com", {"plan": "free"}),
+        _user("u5", "paid-tester@example.com", {"plan": "pro", "paid": True, "comp_until": "2027-03-31"}),
     ]
     writes = _patch_users(monkeypatch, users)
     rc = grant.main(["--expire", "--apply"])
@@ -118,6 +119,7 @@ def test_expire_only_touches_past_comp_until(monkeypatch, capsys) -> None:
     assert writes[0][2]["app_metadata"] == {"plan": "free"}
     assert "paul@example.com" not in out
     assert "payer@example.com" not in out
+    assert "paid-tester@example.com" not in out
 
 
 def test_skip_pro_and_exclude(monkeypatch) -> None:

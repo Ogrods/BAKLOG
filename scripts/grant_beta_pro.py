@@ -5,8 +5,8 @@ default: prints the plan and exits unless ``--apply`` is passed.
 
 Comp grants can carry an end date (``--until``), stored as
 ``app_metadata.comp_until``. ``--expire`` later sets ``plan=free`` only on
-accounts whose ``comp_until`` has passed, so paying users (no ``comp_until``)
-and longer grants are never touched.
+accounts whose ``comp_until`` has passed, so paying users (``paid`` set by the
+Polar webhook, or no ``comp_until``) and longer grants are never touched.
 
 Env (shell or repo ``.env``):
   SUPABASE_URL
@@ -37,6 +37,7 @@ from shared.supabase_admin import admin_request, list_users, load_maintainer_env
 
 PRO_ALIASES = frozenset({"pro", "paid", "premium"})
 COMP_UNTIL_KEY = "comp_until"
+PAID_KEY = "paid"
 
 
 def _normalize_plan(raw: str) -> str:
@@ -62,6 +63,8 @@ def _today() -> date:
 
 
 def _comp_expired(meta: dict, today: date) -> bool:
+    if meta.get(PAID_KEY):
+        return False
     raw = str(meta.get(COMP_UNTIL_KEY) or "").strip()
     if not raw:
         return False

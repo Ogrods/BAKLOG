@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyPaidEntitlement, compActive } from '../web/api/_polar-pending.js';
+import { applyPaidEntitlement, compActive, compExpired, expireCompMeta } from '../web/api/_polar-pending.js';
 
+// GoTrue merges app_metadata on PUT, so removed keys must be sent as null.
+const CLEARED = { paid: null, paid_since: null };
 const at = (day) => new Date(`${day}T12:00:00Z`);
 
 describe('applyPaidEntitlement', () => {
@@ -15,20 +17,20 @@ describe('applyPaidEntitlement', () => {
     const meta = { plan: 'pro', paid: true, paid_since: '2027-01-01', comp_until: '2027-03-31' };
     const out = applyPaidEntitlement(meta, 'free', { now: at('2027-06-01') });
     expect(out.creditedDays).toBe(89);
-    expect(out.meta).toEqual({ plan: 'pro', comp_until: '2027-08-29' });
+    expect(out.meta).toEqual({ plan: 'pro', comp_until: '2027-08-29', ...CLEARED });
   });
 
   it('credits from the cancel date when cancelling during the beta', () => {
     const meta = { plan: 'pro', paid: true, paid_since: '2027-01-01', comp_until: '2027-03-31' };
     const out = applyPaidEntitlement(meta, 'free', { now: at('2027-02-01') });
-    expect(out.meta).toEqual({ plan: 'pro', comp_until: '2027-05-01' });
+    expect(out.meta).toEqual({ plan: 'pro', comp_until: '2027-05-01', ...CLEARED });
   });
 
   it('gives no credit when payment started after the beta ended', () => {
     const meta = { plan: 'pro', paid: true, paid_since: '2027-05-01', comp_until: '2027-03-31' };
     const out = applyPaidEntitlement(meta, 'free', { now: at('2027-07-01') });
     expect(out.creditedDays).toBe(0);
-    expect(out.meta).toEqual({ plan: 'free', comp_until: '2027-03-31' });
+    expect(out.meta).toEqual({ plan: 'free', comp_until: '2027-03-31', ...CLEARED });
   });
 
   it('never double-counts across pay, cancel, pay, cancel', () => {
@@ -38,12 +40,12 @@ describe('applyPaidEntitlement', () => {
     expect(meta.comp_until).toBe('2027-05-01');
     meta = applyPaidEntitlement(meta, 'pro', { now: at('2027-02-15') }).meta;
     meta = applyPaidEntitlement(meta, 'free', { now: at('2027-03-01') }).meta;
-    expect(meta).toEqual({ plan: 'pro', comp_until: '2027-05-15' });
+    expect(meta).toEqual({ plan: 'pro', comp_until: '2027-05-15', ...CLEARED });
   });
 
   it('drops to free on cancel for a payer with no comp', () => {
     const out = applyPaidEntitlement({ plan: 'pro', paid: true, paid_since: '2027-01-01' }, 'free', { now: at('2027-02-01') });
-    expect(out.meta).toEqual({ plan: 'free' });
+    expect(out.meta).toEqual({ plan: 'free', ...CLEARED });
   });
 
   it('treats older events as stale and records the newest event time', () => {
@@ -58,5 +60,21 @@ describe('applyPaidEntitlement', () => {
     expect(compActive({ comp_until: '2027-03-31' }, at('2027-03-31'))).toBe(true);
     expect(compActive({ comp_until: '2027-03-31' }, at('2027-04-01'))).toBe(false);
     expect(compActive({}, at('2027-04-01'))).toBe(false);
+  });
+
+  it('expireCompMeta clears comp_until with an explicit null', () => {
+    expect(expireCompMeta({ plan: 'pro', comp_until: '2027-03-31', beta: true })).toEqual({
+      plan: 'free',
+      comp_until: null,
+      beta: true,
+    });
+  });
+
+  it('null paid and comp_until read as absent', () => {
+    expect(compExpired({ plan: 'free', paid: null, comp_until: null }, at('2027-04-01'))).toBe(false);
+    expect(compExpired({ paid: null, comp_until: '2027-03-31' }, at('2027-04-01'))).toBe(true);
+    expect(compActive({ comp_until: null }, at('2027-01-01'))).toBe(false);
+    const repay = applyPaidEntitlement({ plan: 'free', paid: null, paid_since: null }, 'pro', { now: at('2027-05-01') });
+    expect(repay.meta).toMatchObject({ plan: 'pro', paid: true, paid_since: '2027-05-01' });
   });
 });

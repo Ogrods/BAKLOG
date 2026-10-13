@@ -241,7 +241,8 @@ async function applyToMatchedUser({ url, key, externalId, email, plan, eventAt }
   }
   const userId = await findUserIdByEmail({ url, key, email });
   if (!userId) return null;
-  return setUserPlan({ url, key, userId, plan, eventAt });
+  // Same rule as the pending path: an email match only counts once that email is confirmed.
+  return setUserPlan({ url, key, userId, plan, eventAt, requireConfirmed: true });
 }
 
 export default {

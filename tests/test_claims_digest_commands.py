@@ -65,7 +65,18 @@ def test_publish_creates_issue_and_mentions_owner() -> None:
     [(args, body)] = comment_calls
     assert args[2] == "12"
     assert body.startswith("@Owner Claims autopilot: 1 auto-published, 2 dupes merged, 1 new for review.")
-    assert "`gamerpower-k`" in body
+    assert "- Needs review: gamerpower-k" in body
+
+
+def test_change_comment_shows_titles_with_id_fallback() -> None:
+    summary = {
+        **SUMMARY_CHANGED,
+        "titles": {"epic-a": "Sausage Hunter", "itad-a": "Battle *Ram* @team"},
+    }
+    body = digest.change_comment(summary, None)
+    assert "- Auto-published: Sausage Hunter <sub>(epic-a)</sub>" in body
+    assert "Battle \\*Ram\\* &#64;team <sub>(itad-a)</sub>, gamerpower-a" in body
+    assert "- Needs review: gamerpower-k" in body
 
 
 def test_publish_edits_existing_issue_without_comment_when_unchanged() -> None:
@@ -102,7 +113,24 @@ def test_bot_rewrite_with_all_boxes_clear_is_noop() -> None:
 
 def test_injected_ids_are_rejected() -> None:
     new = "- [x] Remove <!-- cmd:remove:$(rm -rf /) -->\n"
-    assert cmds.newly_checked("", new) == []
+    assert cmds.newly_checked(new.replace("[x]", "[ ]"), new) == []
+
+
+def test_ticked_line_that_was_not_in_old_body_is_ignored() -> None:
+    forged = OLD + "- [x] Approve: **Evil** <!-- cmd:approve:gamerpower-999 -->\n"
+    assert cmds.newly_checked(OLD, forged) == []
+
+
+def test_body_rewrite_with_a_ticked_box_is_ignored() -> None:
+    rewritten = "_Updated now_\n" + OLD.replace("- [ ] Remove", "- [x] Remove")
+    assert cmds.newly_checked("_Updated before_\n" + OLD, rewritten) == []
+
+
+def test_command_titles_reads_bold_title() -> None:
+    titles = cmds.command_titles(OLD)
+    assert titles["epic-a"] == "A"
+    assert titles["gamerpower-b"] == "B"
+    assert cmds.command_titles("- [ ] Remove: no title <!-- cmd:remove:epic-z -->") == {}
 
 
 def test_apply_commands_updates_owner_doc() -> None:
@@ -144,6 +172,50 @@ def test_approve_stale_sets_end_date_override() -> None:
         now=now,
     )
     assert again["field_overrides"]["itad-old"]["ends_at"] == "2026-11-01T00:00:00Z"
+    refreshed, log = cmds.apply_commands(
+        {**updated, "field_overrides": {"itad-old": {"ends_at": "2026-10-01T00:00:00Z"}}},
+        commands,
+        now=now,
+        titles={"itad-old": "Old"},
+    )
+    assert refreshed["field_overrides"]["itad-old"]["ends_at"] == "2026-10-27T05:00:30Z"
+    assert log == ["approved Old <sub>(itad-old)</sub> (end date 2026-10-27)"]
+
+
+def test_plain_approve_drops_a_passed_override_end_date() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 13, tzinfo=UTC)
+    doc = {"ids": [], "field_overrides": {"epic-a": {"ends_at": "2026-10-01T00:00:00Z"}}}
+    updated, _ = cmds.apply_commands(doc, [("approve", ["epic-a"])], now=now)
+    assert updated["ids"] == ["epic-a"]
+    assert "field_overrides" not in updated
+
+
+def test_digest_escapes_titles_and_skips_markers_for_bad_ids() -> None:
+    from datetime import UTC, datetime
+
+    from shared.claims_policy import classify_inbox
+
+    now = datetime(2026, 10, 13, 5, 0, tzinfo=UTC)
+    evil = "Foo\n- [x] Approve: x <!-- cmd:approve:gamerpower-999 -->"
+    items = [
+        {"id": "itad-evil", "source": "itad", "store": "other", "title": evil,
+         "claim_url": "https://example.com/a) [x](https://bad", "ends_at": "2026-10-20T00:00:00Z",
+         "first_seen": "2026-10-12T00:00:00Z"},
+        {"id": "epic-x --> <!-- cmd:approve:victim", "source": "itad", "store": "other",
+         "title": "Slug", "claim_url": "https://example.com/s", "ends_at": "2026-10-20T00:00:00Z",
+         "first_seen": "2026-10-12T00:00:00Z"},
+    ]
+    results = classify_inbox(items, now=now)
+    empty = {"approved_added": [], "approved_removed": [], "dismissed_added": [], "review_added": []}
+    md = autopilot.render_digest(results, items, empty, now=now)
+    parsed = cmds._commands(md)
+    assert set(parsed) <= {("approve", "itad-evil"), ("remove", "itad-evil")}
+    assert "gamerpower-999" not in {a for _, a in parsed}
+    assert not any("victim" in a or "epic-x" in a for _, a in parsed)
+    assert "(https://example.com/a)" not in md and "https://bad" not in md
+    assert "Foo - \\[x\\] Approve: x &lt;\\!-- cmd:approve:gamerpower-999 --&gt;" in md
 
 
 def test_digest_marks_stale_review_rows_approve_stale() -> None:
@@ -220,7 +292,7 @@ def test_main_applies_owner_edit(tmp_path: Path, monkeypatch) -> None:
     doc = json.loads(approved.read_text(encoding="utf-8"))
     assert doc == {"ids": [], "blocked": ["epic-a"]}
     text = out.read_text(encoding="utf-8")
-    assert "applied=true" in text and "summary=removed epic-a" in text
+    assert "applied=true" in text and "summary=removed A <sub>(epic-a)</sub>" in text
 
 
 def test_autopilot_digest_lines_round_trip_through_command_parser() -> None:

@@ -12,6 +12,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from claims_md import md_label  # noqa: E402
+
 # Lean fields users care about for "did claimables change?"
 FINGERPRINT_FIELDS = (
     "id",
@@ -87,7 +93,25 @@ def changed(diff: dict[str, list[str]]) -> bool:
     return bool(diff["added"] or diff["removed"] or diff["changed"])
 
 
-def format_diff_markdown(diff: dict[str, list[str]], *, limit: int = 40) -> str:
+def titles_by_id(*item_lists: list[dict]) -> dict[str, str]:
+    """Later lists win, so pass ``before`` then ``after``."""
+    out: dict[str, str] = {}
+    for items in item_lists:
+        for row in items:
+            item_id = str(row.get("id") or "").strip()
+            title = str(row.get("title") or "").strip()
+            if item_id and title:
+                out[item_id] = title
+    return out
+
+
+def format_diff_markdown(
+    diff: dict[str, list[str]],
+    *,
+    titles: dict[str, str] | None = None,
+    limit: int = 40,
+) -> str:
+    titles = titles or {}
     lines = [
         "## Free-claims fingerprint diff",
         "",
@@ -104,11 +128,13 @@ def format_diff_markdown(diff: dict[str, list[str]], *, limit: int = 40) -> str:
             lines.append("- (none)")
         else:
             for item_id in ids[:limit]:
-                lines.append(f"- `{item_id}`")
+                lines.append(f"- {md_label(titles.get(item_id), item_id)}")
             if len(ids) > limit:
                 lines.append(f"- … and {len(ids) - limit} more")
         lines.append("")
-    lines.append("_New scrape candidates are not auto-approved; this PR only refreshes previously published ids._")
+    lines.append(
+        "_Auto-merge only runs when every added id is owner-approved or autopilot-approved._"
+    )
     lines.append("")
     return "\n".join(lines)
 
@@ -125,17 +151,20 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        before_fp = fingerprint_items(load_items(args.before))
-        after_fp = fingerprint_items(load_items(args.after))
+        before_items = load_items(args.before)
+        after_items = load_items(args.after)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    diff = diff_fingerprints(before_fp, after_fp)
+    diff = diff_fingerprints(fingerprint_items(before_items), fingerprint_items(after_items))
+    titles = titles_by_id(before_items, after_items)
     if args.json_out:
-        args.json_out.write_text(json.dumps(diff, indent=2) + "\n", encoding="utf-8")
+        touched = {i for ids in diff.values() for i in ids}
+        payload = {**diff, "titles": {i: t for i, t in sorted(titles.items()) if i in touched}}
+        args.json_out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    md = format_diff_markdown(diff)
+    md = format_diff_markdown(diff, titles=titles)
     print(md, end="")
     summary = __import__("os").environ.get("GITHUB_STEP_SUMMARY")
     if summary:

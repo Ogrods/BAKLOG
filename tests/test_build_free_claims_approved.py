@@ -692,6 +692,32 @@ def test_rekey_approved_state_migrates_stale_id_to_current_feed_id() -> None:
     assert premium == {"gamerpower-new"}
 
 
+def test_rekey_merges_overrides_when_two_ids_collapse_and_keeps_unapproved() -> None:
+    auto_items = [
+        {"id": "gamerpower-b", "store": "steam", "title": "Doom", "steam_appid": 1,
+         "claim_url": "https://x", "source": "gamerpower"},
+    ]
+    ids, store, fields, _ = bfc.rekey_approved_state(
+        ids=["gamerpower-b", "itad-old"],
+        store_overrides={"itad-old": "steam", "epic-unchecked": "epic"},
+        field_overrides={
+            "gamerpower-b": {"title": "Doom", "ends_at": "2026-10-20T00:00:00Z"},
+            "itad-old": {"title": "Doom", "ends_at": "2026-11-01T00:00:00Z", "claim_url": "https://y"},
+            "epic-unchecked": {"title": "Kept"},
+        },
+        premium_only_ids=set(),
+        auto_items_all=auto_items,
+        prior_rows_by_id={},
+    )
+    assert ids == ["gamerpower-b"]
+    assert fields["gamerpower-b"] == {
+        "title": "Doom", "ends_at": "2026-11-01T00:00:00Z", "claim_url": "https://y",
+    }
+    assert "itad-old" not in fields and "itad-old" not in store
+    assert fields["epic-unchecked"] == {"title": "Kept"}
+    assert store == {"gamerpower-b": "steam", "epic-unchecked": "epic"}
+
+
 def test_build_prunes_expired_approved_and_manual_items(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

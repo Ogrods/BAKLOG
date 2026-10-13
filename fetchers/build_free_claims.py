@@ -22,6 +22,7 @@ from shared.claims_expiry import (
     default_ends_at,
     has_ends_at,
     is_trusted_live_listing,
+    parse_dt,
 )
 from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path
 from shared.free_claims_sources import (
@@ -980,20 +981,11 @@ def _apply_field_overrides(
             field_overrides_by_key=field_overrides_by_key,
         )
         if not overrides:
-            # Fallback: match by normalized title when ID/key lookup failed.
+            # Fallback: exact normalized title only. Substring matching copied one
+            # game's link and end date onto another ("Rage" onto "Outrage").
             item_title = str(item.get("title") or "").strip()
-            item_norm = ""
             if item_title:
-                item_norm = norm_title(item_title)
-                overrides = override_by_norm.get(item_norm)
-            # Substring fallback: if the override title is a cleaned-up
-            # version of the source title (e.g. edit removed "(Stove)"),
-            # the exact norms won't match. Check containment both ways.
-            if not overrides and item_norm:
-                for ov_norm, ov_val in override_by_norm.items():
-                    if ov_norm and (ov_norm in item_norm or item_norm in ov_norm):
-                        overrides = ov_val
-                        break
+                overrides = override_by_norm.get(norm_title(item_title))
         if not overrides:
             continue
         for field, value in overrides.items():
@@ -1524,8 +1516,17 @@ def rekey_approved_state(
     def migrate_maps(old_id: str, new_id: str) -> None:
         if old_id in store_overrides and new_id not in new_store:
             new_store[new_id] = store_overrides[old_id]
-        if old_id in field_overrides and new_id not in new_field:
-            new_field[new_id] = dict(field_overrides[old_id])
+        if old_id in field_overrides:
+            merged = new_field.setdefault(new_id, {})
+            for field, value in field_overrides[old_id].items():
+                # Two approved ids collapsing into one: keep every field, and the
+                # later end date so neither approval gets pruned early.
+                if field == "ends_at" and merged.get("ends_at"):
+                    new_end, cur_end = parse_dt(value), parse_dt(merged["ends_at"])
+                    if new_end and (not cur_end or new_end > cur_end):
+                        merged["ends_at"] = value
+                else:
+                    merged.setdefault(field, value)
         if old_id in premium_only_ids:
             new_premium.add(new_id)
 
@@ -1543,7 +1544,8 @@ def rekey_approved_state(
             if not keys and old_id in prior_rows_by_id:
                 keys = claim_match_keys(prior_rows_by_id[old_id])
             resolved = None
-            for key in keys:
+            # Sorted ("appid:" before "title:") so the result does not depend on set order.
+            for key in sorted(keys):
                 resolved = key_to_auto_id.get(key)
                 if resolved:
                     break
@@ -1562,6 +1564,15 @@ def rekey_approved_state(
         seen_ids.add(new_id)
         new_ids.append(new_id)
         migrate_maps(old_id, new_id)
+
+    # Overrides on ids that are not approved (unchecked rows, digest removes) stay as
+    # they are, like the admin save; dropping them rewrote the file on every build.
+    for old_id, value in store_overrides.items():
+        if old_id not in new_store and old_id not in ids:
+            new_store[old_id] = value
+    for old_id, value in field_overrides.items():
+        if old_id not in new_field and old_id not in ids:
+            new_field[old_id] = dict(value)
 
     return new_ids, new_store, new_field, new_premium
 

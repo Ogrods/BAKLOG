@@ -17,6 +17,9 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from claims_md import md_label  # noqa: E402
+
 LABEL = "claims-digest"
 TITLE = "Free claims autopilot"
 
@@ -59,6 +62,7 @@ def ensure_label(runner: Runner, repo: str) -> None:
 
 def change_comment(summary: dict, mention: str | None) -> str | None:
     diff = summary.get("diff") or {}
+    titles = summary.get("titles") if isinstance(summary.get("titles"), dict) else {}
     parts = []
     if diff.get("approved_added"):
         parts.append(f"{len(diff['approved_added'])} auto-published")
@@ -79,7 +83,7 @@ def change_comment(summary: dict, mention: str | None) -> str | None:
     ):
         ids = diff.get(key) or []
         if ids:
-            shown = ", ".join(f"`{i}`" for i in ids[:15])
+            shown = ", ".join(md_label(titles.get(i), i) for i in ids[:15])
             more = f" and {len(ids) - 15} more" if len(ids) > 15 else ""
             lines.append(f"- {label}: {shown}{more}")
     lines.append("")

@@ -803,7 +803,8 @@ def handle_internal_discord_notify(handler: SimpleHTTPRequestHandler) -> None:
             failures.append({"title": title, "error": "invalid_claim_url"})
             continue
         msg = f"Free game - {title}, claim it here: {url}" if url else f"Free game - {title}"
-        body = json.dumps({"content": msg}).encode("utf-8")
+        # Titles are scraped; a "@everyone" in one must not ping the server.
+        body = json.dumps({"content": msg, "allowed_mentions": {"parse": []}}).encode("utf-8")
         for webhook in webhooks:
             label = redact_discord_webhook_url(webhook)
             try:

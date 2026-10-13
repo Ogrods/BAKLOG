@@ -62,6 +62,29 @@ describe('PRO_PROMO sync with landing', () => {
     expect(feature.desc).not.toMatch(/coming soon/i);
   });
 
+  it('landing deal alerts row is opt-in, not Coming', () => {
+    const tableStart = LANDING_HTML.indexOf('aria-label="Free vs paid tier"');
+    expect(tableStart).toBeGreaterThan(-1);
+    const tableSlice = LANDING_HTML.slice(tableStart, tableStart + 4000);
+    const rowMatch = tableSlice.match(
+      /<th scope="row">Deal\/watchlist alerts<\/th>\s*<td>[^<]*<\/td>\s*<td>([^<]+)<\/td>/,
+    );
+    expect(rowMatch).toBeTruthy();
+    expect(rowMatch[1]).not.toMatch(/coming/i);
+    expect(rowMatch[1]).toMatch(/opt-in/i);
+  });
+
+  it('landing paid tier and feeds no longer call deal alerts coming soon', () => {
+    expect(LANDING_HTML).not.toMatch(/coming soon:?\s*deal/i);
+    expect(LANDING_HTML).not.toMatch(/watchlist alerts \(coming soon\)/i);
+    for (const path of ['web/sponsors.json', 'curated/sponsors.json']) {
+      const feed = JSON.parse(readFileSync(path, 'utf8'));
+      const alerts = feed.ads?.['house-spotlight-pro-alerts'];
+      expect(alerts, path).toBeTruthy();
+      expect(alerts.tagline, path).not.toMatch(/coming soon/i);
+    }
+  });
+
   it('trustPoints use canonical no telemetry by default wording', () => {
     const joined = PRO_PROMO.trustPoints.join(' ');
     expect(joined).toMatch(/no telemetry by default/i);

@@ -1,4 +1,115 @@
 {
-  "generated_at": "2026-10-10T21:47:48.705495+00:00",
-  "items": []
+  "generated_at": "2026-10-13T03:55:36.554019+00:00",
+  "items": [
+    {
+      "id": "epic-out-of-sight-b96ca8",
+      "store": "epic",
+      "title": "Out of Sight",
+      "claim_url": "https://store.epicgames.com/en-US/p/out-of-sight-b96ca8",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2526310/5ac77fa5a0ae808cda04e176a1de28d7fbc48a12/header.jpg?t=1789043494",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-10-15T15:00:00Z",
+      "steam_appid": 2526310,
+      "review_percent": 95,
+      "source": "epic",
+      "first_seen": "2026-10-10T16:05:48Z"
+    },
+    {
+      "id": "epic-terrascape-2b12b1",
+      "store": "epic",
+      "title": "TerraScape",
+      "claim_url": "https://store.epicgames.com/en-US/p/terrascape-2b12b1",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2290000/header.jpg?t=1784796390",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-10-15T15:00:00Z",
+      "steam_appid": 2290000,
+      "review_percent": 89,
+      "source": "epic",
+      "first_seen": "2026-10-10T16:05:48Z"
+    },
+    {
+      "id": "gamerpower-3328",
+      "store": "indiegala",
+      "title": "Best Plumber (IndieGala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/best-plumber-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/68f40b259de93.jpg",
+      "genres": [],
+      "blurb": "Ever dreamed of being a plumber? Probably not... but now’s your chance! Grab Best Plumber for free on IndieGala and step into the boots of a young plumber!",
+      "ends_at": "2026-10-17T20:18:44Z",
+      "steam_appid": 1166580,
+      "review_percent": 70,
+      "source": "gamerpower",
+      "first_seen": "2026-10-03T20:18:44Z"
+    },
+    {
+      "id": "gamerpower-3498",
+      "store": "other",
+      "title": "Primal Slideee Deluxe (Stove) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/primal-slideee-deluxe-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6993208da38c7.jpg",
+      "genres": [],
+      "blurb": "Download Primal Slideee Deluxe for free via Stove until October 31!",
+      "ends_at": "2026-10-31T23:59:59Z",
+      "source": "gamerpower",
+      "first_seen": "2026-10-10T16:05:48Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-6b4a0c098140",
+      "store": "epic",
+      "title": "The Big Con",
+      "claim_url": "https://isthereanydeal.com/giveaways/16646/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1139280/header.jpg?t=1786075312",
+      "genres": [],
+      "blurb": "The Big Con",
+      "ends_at": "2026-10-24T16:05:48Z",
+      "steam_appid": 1139280,
+      "review_percent": 93,
+      "source": "itad",
+      "first_seen": "2026-10-10T16:05:48Z"
+    },
+    {
+      "id": "itad-f99d00439cb6",
+      "store": "steam",
+      "title": "Rotwood: Drakin Armoury Pack - FREE on Steam on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16624/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5067220/96b7698e59ba01a95be5261b12963b21e7a706e7/header.jpg?t=1790874934",
+      "genres": [
+        "Action",
+        "Adventure",
+        "RPG"
+      ],
+      "blurb": "Rotwood: Drakin Armoury Pack",
+      "ends_at": "2026-10-17T20:18:44Z",
+      "steam_appid": 5067220,
+      "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-10-03T20:18:44Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-538f08a31cd9",
+      "store": "steam",
+      "title": "MXGP 26 - Scrubdesignz Liveries Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16623/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4847440/29e3b1f272186cffd9336fef4f8374416d280d97/header.jpg?t=1790841917",
+      "genres": [
+        "Racing",
+        "Simulation",
+        "Sports"
+      ],
+      "blurb": "MXGP 26 - Scrubdesignz Liveries",
+      "ends_at": "2026-10-17T20:18:44Z",
+      "steam_appid": 4847440,
+      "review_percent": 0,
+      "source": "itad",
+      "first_seen": "2026-10-03T20:18:44Z",
+      "premium_only": true
+    }
+  ],
+  "attribution": [
+    "GamerPower.com"
+  ]
 }

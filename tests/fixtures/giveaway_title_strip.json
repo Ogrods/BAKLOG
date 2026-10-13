@@ -11,6 +11,14 @@
   { "input": "Remothered: Tormented Fathers on Steam", "expected": "Remothered: Tormented Fathers" },
   { "input": "Saga - Chapters 1,2,3", "expected": "Saga" },
   { "input": "Hollow Knight Giveaway", "expected": "Hollow Knight" },
+  { "input": "Out of Sight - Free via EGS on Epic Game Store", "expected": "Out of Sight" },
+  { "input": "Bad Cat Sam - FREE on IndieGala on IndieGala Store", "expected": "Bad Cat Sam" },
+  { "input": "Pony Island - FREE on Steam on Steam", "expected": "Pony Island" },
+  { "input": "MXGP 26 - Scrubdesignz Liveries - FREE on Steam on Steam", "expected": "MXGP 26 - Scrubdesignz Liveries" },
+  { "input": "Fireside Feelings on Steam on Steam", "expected": "Fireside Feelings" },
+  { "input": "Wordle on IndieGala Store", "expected": "Wordle" },
+  { "input": "The Big Con free on MOBILE from EGS on Epic Game Store", "expected": "The Big Con" },
+  { "input": "Free Fire Simulator", "expected": "Free Fire Simulator" },
   { "input": "Plain Title", "expected": "Plain Title" },
   { "input": "", "expected": "" }
 ]

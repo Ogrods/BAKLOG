@@ -9,7 +9,9 @@ import {
   diffPublishFeeds,
   formatPublishDiffValue,
   publishDiffFieldChanges,
+  buildDupeIndex,
   dupeBadgeHtml,
+  dupeSplitPairs,
   dupeStampIdSet,
   filterClaimsItems,
   gameMatchKeys,
@@ -405,6 +407,77 @@ describe('dupeBadgeHtml', () => {
   it('renders a red dupe stamp badge', () => {
     expect(dupeBadgeHtml()).toContain('claim-badge--dupe');
     expect(dupeBadgeHtml()).toContain('Dupe');
+  });
+
+  it('shows the group size for server strong groups', () => {
+    const [info] = buildDupeIndex([
+      { key: 'title:foo', tier: 'strong', winner_id: 'a', member_ids: ['a', 'b', 'c'], reasons: ['title:foo'] },
+    ]).values();
+    const html = dupeBadgeHtml(info);
+    expect(html).toContain('Dupe x3');
+    expect(html).toContain('title:foo');
+  });
+
+  it('marks possible groups distinctly', () => {
+    const [info] = buildDupeIndex([
+      { key: 'weak:foo', tier: 'possible', winner_id: 'a', member_ids: ['a', 'b'], reasons: ['weak:foo'] },
+    ]).values();
+    const html = dupeBadgeHtml(info);
+    expect(html).toContain('Possible dupe');
+    expect(html).toContain('claim-badge--dupe-possible');
+  });
+});
+
+describe('buildDupeIndex', () => {
+  it('maps every member to its group and prefers strong over possible', () => {
+    const index = buildDupeIndex([
+      { key: 'weak:foo', tier: 'possible', winner_id: 'a', member_ids: ['a', 'd'] },
+      { key: 'title:foo', tier: 'strong', winner_id: 'a', member_ids: ['a', 'b', 'c'] },
+      { key: 'solo', tier: 'strong', winner_id: 'z', member_ids: ['z'] },
+    ]);
+    expect(index.get('a').tier).toBe('strong');
+    expect(index.get('b').winnerId).toBe('a');
+    expect(index.get('d').tier).toBe('possible');
+    expect(index.has('z')).toBe(false);
+  });
+});
+
+describe('dupeSplitPairs', () => {
+  it('returns every sorted unordered pair once', () => {
+    expect(dupeSplitPairs(['c', 'a', 'b', 'a'])).toEqual([
+      ['a', 'b'],
+      ['a', 'c'],
+      ['b', 'c'],
+    ]);
+  });
+});
+
+describe('dupeStampIdSet with server groups', () => {
+  const dupeIndex = buildDupeIndex([
+    {
+      key: 'title:out of sight',
+      tier: 'strong',
+      winner_id: 'epic-oos',
+      member_ids: ['epic-oos', 'gp-oos', 'itad-oos'],
+    },
+  ]);
+
+  it('stamps a triple whose titles the legacy key misses', () => {
+    const visibleItems = [
+      { id: 'epic-oos', title: 'Out of Sight' },
+      { id: 'gp-oos', title: 'Out of Sight (Epic Games) Giveaway' },
+      { id: 'itad-oos', title: 'Totally Different ITAD Title' },
+    ];
+    const stamped = dupeStampIdSet({ visibleItems, dupeIndex });
+    expect([...stamped].sort()).toEqual(['epic-oos', 'gp-oos', 'itad-oos']);
+  });
+
+  it('drops the stamp once only one member stays visible', () => {
+    const visibleItems = [{ id: 'epic-oos', title: 'Out of Sight' }];
+    const hiddenItems = [{ id: 'gp-oos', title: 'Out of Sight (Epic Games) Giveaway' }];
+    const stamped = dupeStampIdSet({ visibleItems, hiddenItems, dupeIndex });
+    expect(stamped.has('epic-oos')).toBe(false);
+    expect(stamped.has('gp-oos')).toBe(true);
   });
 });
 

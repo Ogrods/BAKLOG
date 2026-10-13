@@ -71,12 +71,20 @@ def _load_json(path: Path) -> dict | list | None:
         return None
 
 
+def _display_path(path: Path) -> str:
+    """Repo-relative when possible; otherwise ``<parent>/<name>`` (no machine paths)."""
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return f"{path.parent.name}/{path.name}"
+
+
 def _file_meta(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        return {"path": str(path.relative_to(ROOT)), "exists": False}
+        return {"path": _display_path(path), "exists": False}
     stat = path.stat()
     return {
-        "path": str(path.relative_to(ROOT)),
+        "path": _display_path(path),
         "exists": True,
         "size_bytes": stat.st_size,
         "mtime_iso": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),

@@ -2,7 +2,9 @@
 #
 # Owner decisions live in the private repo (claims/free_claims.approved.json).
 # The autopilot writes claims/auto_decisions.json there (trusted auto-publish +
-# dupe dismissals) and posts a digest issue with command checkboxes.
+# dupe dismissals) and posts a digest issue with command checkboxes. The last
+# scrape (claims/free_claims.auto.json) is stored there too so first_seen and
+# last_seen survive between runs.
 #
 # Sticky PR chore/claims-feed-refresh auto-merges only when every added id is
 # owner- or autopilot-approved. Without BAKLOG_INTERNAL_TOKEN the job falls
@@ -100,6 +102,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      # The runner starts clean, so seed the previous scrape from the private repo:
+      # it keeps first_seen (14-day default end dates) and last_seen stable across
+      # runs and lets a failed source carry its prior rows forward.
+      - name: Seed previous scrape
+        if: steps.source.outputs.mode == 'internal'
+        run: |
+          if [ -f "$INTERNAL_DIR/claims/free_claims.auto.json" ]; then
+            cp "$INTERNAL_DIR/claims/free_claims.auto.json" curated/free_claims.auto.json
+            echo "Seeded previous scrape from private repo."
+          else
+            echo "::notice::No previous scrape in private repo; first_seen starts now."
+          fi
+
       - name: Fetch claim sources
         run: python fetchers/fetch_claim_sources.py
 
@@ -187,19 +202,20 @@ jobs:
             else echo "auto_merge=false" >> "$GITHUB_OUTPUT"; fi
           fi
 
-      - name: Push autopilot decisions to private repo
-        if: steps.source.outputs.mode == 'internal' && steps.autopilot.outputs.changed == 'true' && env.DRY_RUN != 'true'
+      - name: Push autopilot decisions + scrape to private repo
+        if: steps.source.outputs.mode == 'internal' && env.DRY_RUN != 'true'
         working-directory: ${{ env.INTERNAL_DIR }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- claims/auto_decisions.json
+          cp "$GITHUB_WORKSPACE/curated/free_claims.auto.json" claims/free_claims.auto.json
+          git add -- claims/auto_decisions.json claims/free_claims.auto.json
           if git diff --cached --quiet; then
-            echo "auto_decisions.json unchanged."
+            echo "Decisions and scrape unchanged."
             exit 0
           fi
-          git commit -m "claims: autopilot decisions"
+          git commit -m "claims: autopilot decisions + scrape"
           for attempt in 1 2 3; do
             if git pull --rebase -q && git push -q; then exit 0; fi
             sleep $((attempt * 5))

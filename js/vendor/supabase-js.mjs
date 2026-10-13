@@ -295,7 +295,7 @@ var FunctionsClient = class {
         const hasContentTypeHeader = !!headers && Object.keys(headers).some((key) => key.toLowerCase() === "content-type");
         if (functionArgs && !hasContentTypeHeader) {
           if (typeof Blob !== "undefined" && functionArgs instanceof Blob || functionArgs instanceof ArrayBuffer) {
-            _headers["Content-Type"] = "application/octet-stream";
+            _headers["Content-Type"] = functionArgs.type || "application/octet-stream";
             body = functionArgs;
           } else if (typeof functionArgs === "string") {
             _headers["Content-Type"] = "text/plain";
@@ -377,14 +377,6 @@ var FunctionsClient = class {
 };
 
 // node_modules/@supabase/postgrest-js/dist/index.mjs
-var DEFAULT_MAX_RETRIES = 3;
-var getRetryDelay = (attemptIndex) => Math.min(1e3 * 2 ** attemptIndex, 3e4);
-var RETRYABLE_STATUS_CODES = [520, 503];
-var RETRYABLE_METHODS = [
-  "GET",
-  "HEAD",
-  "OPTIONS"
-];
 var PostgrestError = class extends Error {
   /**
   * @example
@@ -416,6 +408,14 @@ var PostgrestError = class extends Error {
     };
   }
 };
+var DEFAULT_MAX_RETRIES = 3;
+var getRetryDelay = (attemptIndex) => Math.min(1e3 * 2 ** attemptIndex, 3e4);
+var RETRYABLE_STATUS_CODES = [520, 503];
+var RETRYABLE_METHODS = [
+  "GET",
+  "HEAD",
+  "OPTIONS"
+];
 function _typeof(o) {
   "@babel/helpers - typeof";
   return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o$1) {
@@ -489,6 +489,43 @@ function shouldRetry(method, status, attemptCount, retryEnabled) {
   if (!RETRYABLE_METHODS.includes(method)) return false;
   if (!RETRYABLE_STATUS_CODES.includes(status)) return false;
   return true;
+}
+async function fetchWithRetry(fetchImpl, url, request, retryEnabled) {
+  let attemptCount = 0;
+  while (true) {
+    const headers = _objectSpread2({}, request.headers);
+    if (attemptCount > 0) headers["X-Retry-Count"] = String(attemptCount);
+    let res;
+    try {
+      res = await fetchImpl(url, {
+        method: request.method,
+        headers,
+        body: request.body,
+        signal: request.signal
+      });
+    } catch (fetchError) {
+      var _request$signal;
+      if ((fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) === "AbortError" || (fetchError === null || fetchError === void 0 ? void 0 : fetchError.code) === "ABORT_ERR" || (fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) === "TimeoutError" && ((_request$signal = request.signal) === null || _request$signal === void 0 ? void 0 : _request$signal.aborted)) throw fetchError;
+      if (!RETRYABLE_METHODS.includes(request.method)) throw fetchError;
+      if (retryEnabled && attemptCount < DEFAULT_MAX_RETRIES) {
+        const delay = getRetryDelay(attemptCount);
+        attemptCount++;
+        await sleep(delay, request.signal);
+        continue;
+      }
+      throw fetchError;
+    }
+    if (shouldRetry(request.method, res.status, attemptCount, retryEnabled)) {
+      var _res$headers$get, _res$headers;
+      const retryAfterHeader = (_res$headers$get = (_res$headers = res.headers) === null || _res$headers === void 0 ? void 0 : _res$headers.get("Retry-After")) !== null && _res$headers$get !== void 0 ? _res$headers$get : null;
+      const delay = retryAfterHeader !== null ? Math.max(0, parseInt(retryAfterHeader, 10) || 0) * 1e3 : getRetryDelay(attemptCount);
+      await res.text();
+      attemptCount++;
+      await sleep(delay, request.signal);
+      continue;
+    }
+    return res;
+  }
 }
 var PostgrestBuilder = class {
   /**
@@ -659,43 +696,17 @@ var PostgrestBuilder = class {
     }
     const _fetch = this.fetch;
     const executeWithRetry = async () => {
-      let attemptCount = 0;
-      while (true) {
-        const headers = {};
-        _this.headers.forEach((value, key) => {
-          headers[key] = value;
-        });
-        if (attemptCount > 0) headers["X-Retry-Count"] = String(attemptCount);
-        let res$1;
-        try {
-          res$1 = await _fetch(_this.url.toString(), {
-            method: _this.method,
-            headers,
-            body: JSON.stringify(_this.body, (_, value) => typeof value === "bigint" ? value.toString() : value),
-            signal: _this.signal
-          });
-        } catch (fetchError) {
-          if ((fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) === "AbortError" || (fetchError === null || fetchError === void 0 ? void 0 : fetchError.code) === "ABORT_ERR") throw fetchError;
-          if (!RETRYABLE_METHODS.includes(_this.method)) throw fetchError;
-          if (_this.retryEnabled && attemptCount < DEFAULT_MAX_RETRIES) {
-            const delay = getRetryDelay(attemptCount);
-            attemptCount++;
-            await sleep(delay, _this.signal);
-            continue;
-          }
-          throw fetchError;
-        }
-        if (shouldRetry(_this.method, res$1.status, attemptCount, _this.retryEnabled)) {
-          var _res$headers$get, _res$headers;
-          const retryAfterHeader = (_res$headers$get = (_res$headers = res$1.headers) === null || _res$headers === void 0 ? void 0 : _res$headers.get("Retry-After")) !== null && _res$headers$get !== void 0 ? _res$headers$get : null;
-          const delay = retryAfterHeader !== null ? Math.max(0, parseInt(retryAfterHeader, 10) || 0) * 1e3 : getRetryDelay(attemptCount);
-          await res$1.text();
-          attemptCount++;
-          await sleep(delay, _this.signal);
-          continue;
-        }
-        return await _this.processResponse(res$1);
-      }
+      const headers = {};
+      _this.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      const res$1 = await fetchWithRetry(_fetch, _this.url.toString(), {
+        method: _this.method,
+        headers,
+        body: JSON.stringify(_this.body, (_, value) => typeof value === "bigint" ? value.toString() : value),
+        signal: _this.signal
+      }, _this.retryEnabled);
+      return await _this.processResponse(res$1);
     };
     let res = executeWithRetry();
     if (!this.shouldThrowOnError) res = res.catch((fetchError) => {
@@ -756,7 +767,7 @@ ${cause.stack}`;
     let status = res.status;
     let statusText = res.statusText;
     if (res.ok) {
-      var _this$headers$get2, _res$headers$get2;
+      var _this$headers$get2, _res$headers$get;
       if (_this2.method !== "HEAD") {
         var _this$headers$get;
         const body = await res.text();
@@ -777,7 +788,7 @@ ${cause.stack}`;
         }
       }
       const countHeader = (_this$headers$get2 = _this2.headers.get("Prefer")) === null || _this$headers$get2 === void 0 ? void 0 : _this$headers$get2.match(/count=(exact|planned|estimated)/);
-      const contentRange = (_res$headers$get2 = res.headers.get("content-range")) === null || _res$headers$get2 === void 0 ? void 0 : _res$headers$get2.split("/");
+      const contentRange = (_res$headers$get = res.headers.get("content-range")) === null || _res$headers$get === void 0 ? void 0 : _res$headers$get.split("/");
       if (countHeader && contentRange && contentRange.length > 1) count = parseInt(contentRange[1]);
       if (_this2.isMaybeSingle && Array.isArray(data)) if (data.length > 1) {
         error = {
@@ -3860,6 +3871,44 @@ var PostgrestQueryBuilder = class {
     });
   }
 };
+function toOpenApiError(body, statusText) {
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      var _parsed$message, _parsed$details, _parsed$hint, _parsed$code;
+      return new PostgrestError({
+        message: String((_parsed$message = parsed.message) !== null && _parsed$message !== void 0 ? _parsed$message : body),
+        details: (_parsed$details = parsed.details) !== null && _parsed$details !== void 0 ? _parsed$details : "",
+        hint: (_parsed$hint = parsed.hint) !== null && _parsed$hint !== void 0 ? _parsed$hint : "",
+        code: (_parsed$code = parsed.code) !== null && _parsed$code !== void 0 ? _parsed$code : ""
+      });
+    }
+  } catch (_unused) {
+  }
+  return new PostgrestError({
+    message: body || statusText,
+    details: "",
+    hint: "",
+    code: ""
+  });
+}
+function toTransportFailure(cause, status, statusText) {
+  var _err$name;
+  const err = cause;
+  return {
+    success: false,
+    error: new PostgrestError({
+      message: `${(_err$name = err === null || err === void 0 ? void 0 : err.name) !== null && _err$name !== void 0 ? _err$name : "FetchError"}: ${err === null || err === void 0 ? void 0 : err.message}`,
+      details: "",
+      hint: "",
+      code: ""
+    }),
+    data: null,
+    count: null,
+    status,
+    statusText
+  };
+}
 var PostgrestClient = class PostgrestClient2 {
   /**
   * Creates a PostgREST client.
@@ -3957,6 +4006,74 @@ var PostgrestClient = class PostgrestClient2 {
       urlLengthLimit: this.urlLengthLimit,
       retry: this.retry
     });
+  }
+  /**
+  * Fetch the OpenAPI description PostgREST publishes for this client's schema.
+  *
+  * The document lists only the tables, views and functions the caller's role
+  * holds privileges on; PostgREST applies that filtering server-side. The
+  * schema is the one this client was created with, so call `.schema()` first
+  * to describe a different one. Transient failures are retried according to
+  * the client's `retry` option, like any other idempotent request.
+  *
+  * @example
+  * ```ts
+  * const { data, error } = await supabase.getOpenApiSpec()
+  * ```
+  *
+  * @example Describe a schema other than the client default
+  * ```ts
+  * const { data, error } = await supabase.schema('billing').getOpenApiSpec()
+  * ```
+  *
+  * @category Database
+  */
+  async getOpenApiSpec() {
+    var _this = this;
+    var _this$fetch;
+    const headers = new Headers(_this.headers);
+    headers.set("Accept", "application/openapi+json");
+    if (_this.schemaName) headers.set("Accept-Profile", _this.schemaName);
+    const requestHeaders = {};
+    headers.forEach((value, key) => {
+      requestHeaders[key] = value;
+    });
+    const fetchImpl = (_this$fetch = _this.fetch) !== null && _this$fetch !== void 0 ? _this$fetch : globalThis.fetch;
+    let res;
+    try {
+      var _this$retry;
+      res = await fetchWithRetry(fetchImpl, `${_this.url}/`, {
+        method: "GET",
+        headers: requestHeaders
+      }, (_this$retry = _this.retry) !== null && _this$retry !== void 0 ? _this$retry : true);
+    } catch (fetchError) {
+      return toTransportFailure(fetchError, 0, "");
+    }
+    let body;
+    try {
+      body = await res.text();
+    } catch (readError) {
+      return toTransportFailure(readError, res.status, res.statusText);
+    }
+    if (res.ok) try {
+      return {
+        success: true,
+        error: null,
+        data: JSON.parse(body),
+        count: null,
+        status: res.status,
+        statusText: res.statusText
+      };
+    } catch (_unused2) {
+    }
+    return {
+      success: false,
+      error: toOpenApiError(body, res.statusText),
+      data: null,
+      count: null,
+      status: res.status,
+      statusText: res.statusText
+    };
   }
   /**
   * Perform a function call.
@@ -4124,7 +4241,7 @@ var PostgrestClient = class PostgrestClient2 {
   * ```
   */
   rpc(fn, args = {}, { head: head2 = false, get: get2 = false, count } = {}) {
-    var _this$fetch;
+    var _this$fetch2;
     let method;
     const url = new URL(`${this.url}/rpc/${fn}`);
     let body;
@@ -4151,7 +4268,7 @@ var PostgrestClient = class PostgrestClient2 {
       headers,
       schema: this.schemaName,
       body,
-      fetch: (_this$fetch = this.fetch) !== null && _this$fetch !== void 0 ? _this$fetch : fetch,
+      fetch: (_this$fetch2 = this.fetch) !== null && _this$fetch2 !== void 0 ? _this$fetch2 : fetch,
       urlLengthLimit: this.urlLengthLimit,
       retry: this.retry
     });
@@ -4262,7 +4379,7 @@ Suggested solution: ${env.workaround}`;
 var websocket_factory_default = WebSocketFactory;
 
 // node_modules/@supabase/realtime-js/dist/module/lib/version.js
-var version = "2.112.3";
+var version = "2.117.3";
 
 // node_modules/@supabase/realtime-js/dist/module/lib/constants.js
 var DEFAULT_VERSION = `realtime-js/${version}`;
@@ -4270,6 +4387,8 @@ var VSN_1_0_0 = "1.0.0";
 var VSN_2_0_0 = "2.0.0";
 var DEFAULT_VSN = VSN_2_0_0;
 var DEFAULT_TIMEOUT = 1e4;
+var DEFAULT_POSTGRES_CHANGES_WAIT_TIMEOUT = 15e3;
+var POSTGRES_CHANGES_WAIT_ERROR_GRACE = 1e4;
 var MAX_PUSH_BUFFER_SIZE = 100;
 var CHANNEL_STATES = {
   closed: "closed",
@@ -6896,21 +7015,16 @@ var RealtimeChannel = class _RealtimeChannel {
    * ```
    */
   subscribe(callback, timeout = this.timeout) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (!this.socket.isConnected()) {
       this.socket.connect();
     }
     if (this.channelAdapter.isClosed()) {
-      const { config: { broadcast, presence, private: isPrivate } } = this.params;
+      const { config: { broadcast, presence, private: isPrivate, postgres_changes_options } } = this.params;
       const postgres_changes = (_b = (_a = this.bindings.postgres_changes) === null || _a === void 0 ? void 0 : _a.map((r) => r.filter)) !== null && _b !== void 0 ? _b : [];
       const presence_enabled = !!this.bindings[REALTIME_LISTEN_TYPES.PRESENCE] && this.bindings[REALTIME_LISTEN_TYPES.PRESENCE].length > 0 || ((_c = this.params.config.presence) === null || _c === void 0 ? void 0 : _c.enabled) === true;
       const accessTokenPayload = {};
-      const config = {
-        broadcast,
-        presence: Object.assign(Object.assign({}, presence), { enabled: presence_enabled }),
-        postgres_changes,
-        private: isPrivate
-      };
+      const config = Object.assign({ broadcast, presence: Object.assign(Object.assign({}, presence), { enabled: presence_enabled }), postgres_changes, private: isPrivate }, postgres_changes_options ? { postgres_changes_options } : {});
       if (this.socket.accessTokenValue) {
         accessTokenPayload.access_token = this.socket.accessTokenValue;
       }
@@ -6920,7 +7034,8 @@ var RealtimeChannel = class _RealtimeChannel {
       this._onClose(() => callback === null || callback === void 0 ? void 0 : callback(REALTIME_SUBSCRIBE_STATES.CLOSED));
       this.updateJoinPayload(Object.assign({ config }, accessTokenPayload));
       this._updateFilterMessage();
-      this.channelAdapter.subscribe(timeout).receive("ok", async ({ postgres_changes: postgres_changes2 }) => {
+      const joinTimeout = (postgres_changes_options === null || postgres_changes_options === void 0 ? void 0 : postgres_changes_options.wait) && postgres_changes.length > 0 ? Math.max(timeout, ((_d = postgres_changes_options.timeout) !== null && _d !== void 0 ? _d : DEFAULT_POSTGRES_CHANGES_WAIT_TIMEOUT) + POSTGRES_CHANGES_WAIT_ERROR_GRACE) : timeout;
+      this.channelAdapter.subscribe(joinTimeout).receive("ok", async ({ postgres_changes: postgres_changes2 }) => {
         if (!this.socket._isManualToken()) {
           this.socket.setAuth();
         }
@@ -7279,7 +7394,12 @@ var RealtimeChannel = class _RealtimeChannel {
   async send(args, opts = {}) {
     var _a, _b;
     if (!this.channelAdapter.canPush() && args.type === "broadcast") {
-      console.warn("Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.");
+      const fallbackWarning = "Realtime send() is automatically falling back to REST API. This behavior will be deprecated in the future. Please use httpSend() explicitly for REST delivery.";
+      if (this.socket.hasLogger()) {
+        this.socket.log("channel", fallbackWarning);
+      } else {
+        console.warn(fallbackWarning);
+      }
       const { event, payload: endpoint_payload } = args;
       const headers = {
         apikey: this.socket.apiKey ? this.socket.apiKey : "",
@@ -7579,6 +7699,9 @@ var SocketAdapter = class {
   }
   log(kind, msg, data) {
     this.socket.log(kind, msg, data);
+  }
+  hasLogger() {
+    return this.socket.hasLogger();
   }
   makeRef() {
     return this.socket.makeRef();
@@ -7887,6 +8010,14 @@ var RealtimeClient = class {
     this.socketAdapter.log(kind, msg, data);
   }
   /**
+   * Returns true if a custom `logger` has been configured on this client.
+   *
+   * @category Realtime
+   */
+  hasLogger() {
+    return this.socketAdapter.hasLogger();
+  }
+  /**
    * Returns the current state of the socket.
    *
    * @category Realtime
@@ -7963,6 +8094,10 @@ var RealtimeClient = class {
    * When an `accessToken` callback IS configured, the callback is the source of truth:
    * the client remains in callback mode and continues to refresh from it on heartbeat,
    * even after a bootstrap/override `setAuth(token)` call.
+   *
+   * The callback is called on connect and on every heartbeat (`heartbeatIntervalMs`,
+   * default 25000ms). Its token must stay valid past the next call, or the server closes
+   * the channel at expiry with no automatic resubscribe.
    *
    * @param token A JWT string to override the token set on the client.
    *
@@ -9212,16 +9347,8 @@ var StorageFileApi = class extends BaseApiClient {
       const options = _objectSpread22(_objectSpread22({}, DEFAULT_FILE_OPTIONS), fileOptions);
       let headers = _objectSpread22(_objectSpread22({}, _this.headers), method === "POST" && { "x-upsert": String(options.upsert) });
       const metadata = options.metadata;
-      if (typeof Blob !== "undefined" && fileBody instanceof Blob) {
-        body = new FormData();
-        body.append("cacheControl", options.cacheControl);
-        if (metadata) body.append("metadata", _this.encodeMetadata(metadata));
-        body.append("", fileBody);
-      } else if (typeof FormData !== "undefined" && fileBody instanceof FormData) {
-        body = fileBody;
-        if (!body.has("cacheControl")) body.append("cacheControl", options.cacheControl);
-        if (metadata && !body.has("metadata")) body.append("metadata", _this.encodeMetadata(metadata));
-      } else {
+      if (typeof Blob !== "undefined" && fileBody instanceof Blob || typeof FormData !== "undefined" && fileBody instanceof FormData) body = _this.prepareUploadFormData(fileBody, options);
+      else {
         body = fileBody;
         headers["cache-control"] = `max-age=${options.cacheControl}`;
         headers["content-type"] = options.contentType;
@@ -9358,16 +9485,8 @@ var StorageFileApi = class extends BaseApiClient {
       const options = _objectSpread22(_objectSpread22({}, DEFAULT_FILE_OPTIONS), fileOptions);
       let headers = _objectSpread22(_objectSpread22({}, _this3.headers), { "x-upsert": String(options.upsert) });
       const metadata = options.metadata;
-      if (typeof Blob !== "undefined" && fileBody instanceof Blob) {
-        body = new FormData();
-        body.append("cacheControl", options.cacheControl);
-        if (metadata) body.append("metadata", _this3.encodeMetadata(metadata));
-        body.append("", fileBody);
-      } else if (typeof FormData !== "undefined" && fileBody instanceof FormData) {
-        body = fileBody;
-        if (!body.has("cacheControl")) body.append("cacheControl", options.cacheControl);
-        if (metadata && !body.has("metadata")) body.append("metadata", _this3.encodeMetadata(metadata));
-      } else {
+      if (typeof Blob !== "undefined" && fileBody instanceof Blob || typeof FormData !== "undefined" && fileBody instanceof FormData) body = _this3.prepareUploadFormData(fileBody, options);
+      else {
         body = fileBody;
         headers["cache-control"] = `max-age=${options.cacheControl}`;
         headers["content-type"] = options.contentType;
@@ -9501,6 +9620,7 @@ var StorageFileApi = class extends BaseApiClient {
   * @param fromPath The original file path, including the current file name. For example `folder/image.png`.
   * @param toPath The new file path, including the new file name. For example `folder/image-new.png`.
   * @param options The destination options.
+  * @param options.sourceVersionId The version id of the source object to move.
   * @returns Promise with response containing success message or error
   *
   * @example Move file
@@ -9534,7 +9654,8 @@ var StorageFileApi = class extends BaseApiClient {
         bucketId: _this6.bucketId,
         sourceKey: fromPath,
         destinationKey: toPath,
-        destinationBucket: options === null || options === void 0 ? void 0 : options.destinationBucket
+        destinationBucket: options === null || options === void 0 ? void 0 : options.destinationBucket,
+        sourceVersionId: options === null || options === void 0 ? void 0 : options.sourceVersionId
       }, { headers: _this6.headers });
     });
   }
@@ -9546,6 +9667,7 @@ var StorageFileApi = class extends BaseApiClient {
   * @param fromPath The original file path, including the current file name. For example `folder/image.png`.
   * @param toPath The new file path, including the new file name. For example `folder/image-copy.png`.
   * @param options The destination options.
+  * @param options.sourceVersionId The version id of the source object to copy.
   * @returns Promise with response containing copied file path or error
   *
   * @example Copy file
@@ -9579,7 +9701,8 @@ var StorageFileApi = class extends BaseApiClient {
         bucketId: _this7.bucketId,
         sourceKey: fromPath,
         destinationKey: toPath,
-        destinationBucket: options === null || options === void 0 ? void 0 : options.destinationBucket
+        destinationBucket: options === null || options === void 0 ? void 0 : options.destinationBucket,
+        sourceVersionId: options === null || options === void 0 ? void 0 : options.sourceVersionId
       }, { headers: _this7.headers })).Key };
     });
   }
@@ -9593,6 +9716,7 @@ var StorageFileApi = class extends BaseApiClient {
   * @param options.download triggers the file as a download if set to true. Set this parameter as the name of the file if you want to trigger the download with a different filename.
   * @param options.transform Transform the asset before serving it to the client.
   * @param options.cacheNonce Append a cache nonce parameter to the URL to invalidate the cache.
+  * @param options.versionId Create a signed URL for a specific object version rather than the current one.
   * @returns Promise with response containing signed URL or error
   *
   * @example Create Signed URL
@@ -9647,7 +9771,7 @@ var StorageFileApi = class extends BaseApiClient {
     return _this8.handleOperation(async () => {
       let _path = _this8._getFinalPath(path);
       const hasTransform = typeof (options === null || options === void 0 ? void 0 : options.transform) === "object" && options.transform !== null && Object.keys(options.transform).length > 0;
-      let data = await post(_this8.fetch, `${_this8.url}/object/sign/${_path}`, _objectSpread22({ expiresIn }, hasTransform ? { transform: options.transform } : {}), { headers: _this8.headers });
+      let data = await post(_this8.fetch, `${_this8.url}/object/sign/${_path}`, _objectSpread22(_objectSpread22({ expiresIn }, hasTransform ? { transform: options.transform } : {}), (options === null || options === void 0 ? void 0 : options.versionId) != null ? { versionId: options.versionId } : {}), { headers: _this8.headers });
       const query = new URLSearchParams();
       if (options === null || options === void 0 ? void 0 : options.download) query.set("download", options.download === true ? "" : options.download);
       if ((options === null || options === void 0 ? void 0 : options.cacheNonce) != null) query.set("cacheNonce", String(options.cacheNonce));
@@ -9721,7 +9845,7 @@ var StorageFileApi = class extends BaseApiClient {
   * @category Storage
   * @subcategory File Buckets
   * @param path The full path and file name of the file to be downloaded. For example `folder/image.png`.
-  * @param options Optional settings: `transform` to transform the asset before serving it to the client, and `cacheNonce` to append a cache nonce parameter to the URL to invalidate the cache.
+  * @param options Optional settings: `transform` to transform the asset before serving it to the client, `cacheNonce` to append a cache nonce parameter to the URL to invalidate the cache, and `versionId` to download a specific object version.
   * @param parameters Additional fetch parameters like signal for cancellation. Supports standard fetch options including cache control.
   * @returns BlobDownloadBuilder instance for downloading the file
   *
@@ -9785,6 +9909,7 @@ var StorageFileApi = class extends BaseApiClient {
     const query = new URLSearchParams();
     if (options === null || options === void 0 ? void 0 : options.transform) this.applyTransformOptsToQuery(query, options.transform);
     if ((options === null || options === void 0 ? void 0 : options.cacheNonce) != null) query.set("cacheNonce", String(options.cacheNonce));
+    if ((options === null || options === void 0 ? void 0 : options.versionId) != null) query.set("versionId", String(options.versionId));
     const queryString = query.toString();
     const _path = this._getFinalPath(path);
     const downloadFn = () => get(this.fetch, `${this.url}/${renderPath}/${_path}${queryString ? `?${queryString}` : ""}`, {
@@ -9802,6 +9927,7 @@ var StorageFileApi = class extends BaseApiClient {
   * @category Storage
   * @subcategory File Buckets
   * @param path The file path, including the file name. For example `folder/image.png`.
+  * @param options Optional settings, including `versionId` to retrieve a specific object version.
   * @returns Promise with response containing file metadata or error
   *
   * @example Get file info
@@ -9817,11 +9943,14 @@ var StorageFileApi = class extends BaseApiClient {
   * }
   * ```
   */
-  async info(path) {
+  async info(path, options) {
     var _this10 = this;
     const _path = _this10._getFinalPath(path);
+    const query = new URLSearchParams();
+    if ((options === null || options === void 0 ? void 0 : options.versionId) != null) query.set("versionId", String(options.versionId));
+    const queryString = query.toString();
     return _this10.handleOperation(async () => {
-      return recursiveToCamel(await get(_this10.fetch, `${_this10.url}/object/info/${_path}`, { headers: _this10.headers }));
+      return recursiveToCamel(await get(_this10.fetch, `${_this10.url}/object/info/${_path}${queryString ? `?${queryString}` : ""}`, { headers: _this10.headers }));
     });
   }
   /**
@@ -9872,6 +10001,7 @@ var StorageFileApi = class extends BaseApiClient {
   * @param options.download Triggers the file as a download if set to true. Set this parameter as the name of the file if you want to trigger the download with a different filename.
   * @param options.transform Transform the asset before serving it to the client.
   * @param options.cacheNonce Append a cache nonce parameter to the URL to invalidate the cache.
+  * @param options.versionId Return the URL for a specific object version rather than the current one.
   * @returns Object with public URL
   *
   * @example Returns the URL for an asset in a public bucket
@@ -9927,6 +10057,7 @@ var StorageFileApi = class extends BaseApiClient {
     if (options === null || options === void 0 ? void 0 : options.download) query.set("download", options.download === true ? "" : options.download);
     if (options === null || options === void 0 ? void 0 : options.transform) this.applyTransformOptsToQuery(query, options.transform);
     if ((options === null || options === void 0 ? void 0 : options.cacheNonce) != null) query.set("cacheNonce", String(options.cacheNonce));
+    if ((options === null || options === void 0 ? void 0 : options.versionId) != null) query.set("versionId", String(options.versionId));
     const queryString = query.toString();
     const renderPath = typeof (options === null || options === void 0 ? void 0 : options.transform) === "object" && options.transform !== null && Object.keys(options.transform).length > 0 ? "render/image" : "object";
     return { data: { publicUrl: encodeURI(`${this.url}/${renderPath}/public/${_path}`) + (queryString ? `?${queryString}` : "") } };
@@ -9939,7 +10070,9 @@ var StorageFileApi = class extends BaseApiClient {
   *
   * @category Storage
   * @subcategory File Buckets
-  * @param paths An array of files to delete, including the path and file name. For example [`'folder/image.png'`].
+  * @param paths An array of files to delete. Each entry is either a path (deletes whichever
+  * version is currently at that path, e.g. `'folder/image.png'`), or `{ path, versionId }` to
+  * delete an exact version current or archived (e.g. `{ path: 'folder/image.png', versionId: '...' }`).
   * @returns Promise with response containing array of deleted file objects or error
   *
   * @example Delete file
@@ -9956,6 +10089,14 @@ var StorageFileApi = class extends BaseApiClient {
   *   "data": [],
   *   "error": null
   * }
+  * ```
+  *
+  * @example Delete a specific object version
+  * ```js
+  * const { data, error } = await supabase
+  *   .storage
+  *   .from('avatars')
+  *   .remove([{ path: 'folder/avatar1.png', versionId: 'noncurrent-version-id' }])
   * ```
   *
   * @remarks
@@ -10177,6 +10318,19 @@ var StorageFileApi = class extends BaseApiClient {
       return await post(_this15.fetch, `${_this15.url}/object/list-v2/${_this15.bucketId}`, body, { headers: _this15.headers }, parameters);
     });
   }
+  prepareUploadFormData(fileBody, options) {
+    const body = new FormData();
+    const files = [];
+    if (fileBody instanceof FormData) fileBody.forEach((value, name) => {
+      if (typeof value === "string") body.append(name, value);
+      else files.push([name, value]);
+    });
+    else files.push(["", fileBody]);
+    if (!body.has("cacheControl")) body.append("cacheControl", options.cacheControl);
+    if (options.metadata && !body.has("metadata")) body.append("metadata", this.encodeMetadata(options.metadata));
+    for (const [name, file] of files) body.append(name, file);
+    return body;
+  }
   encodeMetadata(metadata) {
     return JSON.stringify(metadata);
   }
@@ -10200,7 +10354,7 @@ var StorageFileApi = class extends BaseApiClient {
     return query;
   }
 };
-var version2 = "2.112.3";
+var version2 = "2.117.3";
 var DEFAULT_HEADERS = { "X-Client-Info": `storage-js/${version2}` };
 var StorageBucketApi = class extends BaseApiClient {
   constructor(url, headers = {}, fetch$1, opts) {
@@ -10319,6 +10473,8 @@ var StorageBucketApi = class extends BaseApiClient {
   * Each mime type specified can be a wildcard, e.g. image/*, or a specific mime type, e.g. image/png.
   * @param options.type (private-beta) specifies the bucket type. see `BucketType` for more details.
   *   - default bucket type is `STANDARD`
+  * @param options.versioningStatus the bucket's initial object versioning status.
+  * The default value is `DISABLED`
   * @returns Promise with response containing newly created bucket name or error
   *
   * @example Create bucket
@@ -10357,7 +10513,8 @@ var StorageBucketApi = class extends BaseApiClient {
         type: options.type,
         public: options.public,
         file_size_limit: options.fileSizeLimit,
-        allowed_mime_types: options.allowedMimeTypes
+        allowed_mime_types: options.allowedMimeTypes,
+        versioning_status: options.versioningStatus
       }, { headers: _this3.headers });
     });
   }
@@ -10374,6 +10531,8 @@ var StorageBucketApi = class extends BaseApiClient {
   * @param options.allowedMimeTypes specifies the allowed mime types that this bucket can accept during upload.
   * The default value is null, which allows files with all mime types to be uploaded.
   * Each mime type specified can be a wildcard, e.g. image/*, or a specific mime type, e.g. image/png.
+  * @param options.versioningStatus the bucket's new object versioning status. `DISABLED` is not
+  * valid here, there's no transition back to it once versioning has been touched.
   * @returns Promise with response containing success message or error
   *
   * @example Update bucket
@@ -10411,7 +10570,8 @@ var StorageBucketApi = class extends BaseApiClient {
         name: id,
         public: options.public,
         file_size_limit: options.fileSizeLimit,
-        allowed_mime_types: options.allowedMimeTypes
+        allowed_mime_types: options.allowedMimeTypes,
+        versioning_status: options.versioningStatus
       }, { headers: _this4.headers });
     });
   }
@@ -10491,6 +10651,153 @@ var StorageBucketApi = class extends BaseApiClient {
     });
   }
   /**
+  * Returns the lifecycle policy stored on a bucket.
+  *
+  * Fails with `NoSuchLifecycleConfiguration` when the bucket has no policy.
+  *
+  * These rules expire previous versions of objects, not the current one.
+  * Turn versioning on or there is nothing for the policy to act on.
+  * Standard buckets only. Returns `FeatureNotEnabled` if lifecycle is off
+  * for the project.
+  *
+  * @category Storage
+  * @subcategory File Buckets
+  * @param id The unique identifier of the bucket.
+  * @returns Promise with the lifecycle configuration or error
+  *
+  * @example Get lifecycle configuration
+  * ```js
+  * const { data, error } = await supabase
+  *   .storage
+  *   .getBucketLifecycle('avatars')
+  * ```
+  *
+  * Response:
+  * ```json
+  * {
+  *   "data": {
+  *     "rules": [
+  *       {
+  *         "id": "expire-history",
+  *         "status": "Enabled",
+  *         "filter": {},
+  *         "noncurrentVersionExpiration": {
+  *           "noncurrentDays": 30,
+  *           "newerNoncurrentVersions": 2
+  *         }
+  *       }
+  *     ]
+  *   },
+  *   "error": null
+  * }
+  * ```
+  *
+  * @remarks
+  * - RLS policy permissions required:
+  *   - `buckets` table permissions: `select`
+  *   - `objects` table permissions: none
+  * - Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works
+  */
+  async getBucketLifecycle(id) {
+    var _this7 = this;
+    return _this7.handleOperation(async () => {
+      return await get(_this7.fetch, _this7.bucketLifecycleUrl(id), { headers: _this7.headers });
+    });
+  }
+  /**
+  * Replaces the lifecycle policy on a bucket.
+  *
+  * The `rules` array you send is the whole policy. Anything previously stored
+  * is overwritten. Send at least one rule. Call {@link deleteBucketLifecycle}
+  * to remove the policy.
+  *
+  * Each rule currently supports only `noncurrentVersionExpiration`. `filter`
+  * is required and must be `{}`. Prefix filters, tag filters, and current-object
+  * expiration are rejected. Rule IDs must be unique. Omit `id` and the
+  * server generates one.
+  *
+  * Standard buckets only. Returns `FeatureNotEnabled` if lifecycle is off
+  * for the project.
+  *
+  * @category Storage
+  * @subcategory File Buckets
+  * @param id The unique identifier of the bucket.
+  * @param configuration The full lifecycle configuration to store.
+  * @returns Promise with the stored configuration or error
+  *
+  * @example Replace lifecycle configuration
+  * ```js
+  * const { data, error } = await supabase
+  *   .storage
+  *   .updateBucketLifecycle('avatars', {
+  *     rules: [
+  *       {
+  *         id: 'expire-history',
+  *         status: 'Enabled',
+  *         filter: {},
+  *         noncurrentVersionExpiration: {
+  *           noncurrentDays: 30,
+  *           newerNoncurrentVersions: 2,
+  *         },
+  *       },
+  *     ],
+  *   })
+  * ```
+  *
+  * @remarks
+  * - RLS policy permissions required:
+  *   - `buckets` table permissions: `select` and `update`
+  *   - `objects` table permissions: none
+  * - Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works
+  */
+  async updateBucketLifecycle(id, configuration) {
+    var _this8 = this;
+    return _this8.handleOperation(async () => {
+      return await put(_this8.fetch, _this8.bucketLifecycleUrl(id), configuration, { headers: _this8.headers });
+    });
+  }
+  /**
+  * Removes the lifecycle policy from a bucket.
+  *
+  * Safe to call when no policy is stored. The response is still success.
+  * Standard buckets only. Returns `FeatureNotEnabled` if lifecycle is off
+  * for the project.
+  *
+  * @category Storage
+  * @subcategory File Buckets
+  * @param id The unique identifier of the bucket.
+  * @returns Promise with success message or error
+  *
+  * @example Delete lifecycle configuration
+  * ```js
+  * const { data, error } = await supabase
+  *   .storage
+  *   .deleteBucketLifecycle('avatars')
+  * ```
+  *
+  * Response:
+  * ```json
+  * {
+  *   "data": {
+  *     "message": "Successfully deleted"
+  *   },
+  *   "error": null
+  * }
+  * ```
+  *
+  * @remarks
+  * - RLS policy permissions required:
+  *   - `buckets` table permissions: `select` and `update`
+  *   - `objects` table permissions: none
+  * - Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works
+  */
+  async deleteBucketLifecycle(id) {
+    var _this9 = this;
+    return _this9.handleOperation(async () => {
+      return await remove(_this9.fetch, _this9.bucketLifecycleUrl(id), {}, { headers: _this9.headers });
+    });
+  }
+  /**
   * Purges the CDN cache for an entire bucket.
   *
   * Maps to `DELETE /cdn/{bucket}` on the Storage API. The server
@@ -10527,13 +10834,16 @@ var StorageBucketApi = class extends BaseApiClient {
   * ```
   */
   async purgeBucketCache(id, options, parameters) {
-    var _this7 = this;
-    return _this7.handleOperation(async () => {
+    var _this10 = this;
+    return _this10.handleOperation(async () => {
       const query = new URLSearchParams();
       if (options === null || options === void 0 ? void 0 : options.transformations) query.set("transformations", "true");
       const queryString = query.toString();
-      return await remove(_this7.fetch, `${_this7.url}/cdn/${encodeStoragePath(id)}${queryString ? `?${queryString}` : ""}`, {}, { headers: _this7.headers }, parameters);
+      return await remove(_this10.fetch, `${_this10.url}/cdn/${encodeStoragePath(id)}${queryString ? `?${queryString}` : ""}`, {}, { headers: _this10.headers }, parameters);
     });
+  }
+  bucketLifecycleUrl(id) {
+    return `${this.url}/bucket/${encodeStoragePath(id)}/lifecycle`;
   }
   listBucketOptionsToQueryString(options) {
     const params = {};
@@ -11469,7 +11779,7 @@ var VectorIndexScope = class extends VectorDataApi {
   * @category Storage
   * @subcategory Vector Buckets
   * @param options - Query options (bucket and index names automatically set)
-  * @returns Promise with response containing matches array of similar vectors ordered by distance or error
+  * @returns Promise with response containing vectors ordered by distance, an optional pagination token, or an error
   *
   * @example Query similar vectors
   * ```typescript
@@ -11602,7 +11912,7 @@ var StorageClient = class extends StorageBucketApi {
 };
 
 // node_modules/@supabase/auth-js/dist/module/lib/version.js
-var version3 = "2.112.3";
+var version3 = "2.117.3";
 
 // node_modules/@supabase/auth-js/dist/module/lib/constants.js
 var AUTO_REFRESH_TICK_DURATION_MS = 30 * 1e3;
@@ -12236,9 +12546,9 @@ function validateUUID(str) {
     throw new Error("@supabase/auth-js: Expected parameter to be UUID but is not");
   }
 }
-function assertPasskeyExperimentalEnabled(experimental) {
-  if (!experimental.passkey) {
-    throw new Error("@supabase/auth-js: the passkey API is experimental and disabled by default. Enable it by passing `auth: { experimental: { passkey: true } }` to createClient (or to the GoTrueClient constructor).");
+function assertRecoveryCodesExperimentalEnabled(experimental) {
+  if (!experimental.recoveryCodes) {
+    throw new Error("@supabase/auth-js: the MFA recovery codes API is experimental and disabled by default. Enable it by passing `auth: { experimental: { recoveryCodes: true } }` to createClient (or to the GoTrueClient constructor).");
   }
 }
 function userNotAvailableProxy() {
@@ -13496,11 +13806,8 @@ var GoTrueAdminApi = class {
    * Lists all passkeys for a user.
    *
    * This function should only be called on a server. Never expose your secret key in the browser.
-   *
-   * Requires `auth.experimental.passkey: true`.
    */
   async _adminListPasskeys(params) {
-    assertPasskeyExperimentalEnabled(this.experimental);
     validateUUID(params.userId);
     try {
       return await _request(this.fetch, "GET", `${this.url}/admin/users/${params.userId}/passkeys`, { headers: this.headers, xform: (data) => ({ data, error: null }) });
@@ -13515,11 +13822,8 @@ var GoTrueAdminApi = class {
    * Deletes a user's passkey.
    *
    * This function should only be called on a server. Never expose your secret key in the browser.
-   *
-   * Requires `auth.experimental.passkey: true`.
    */
   async _adminDeletePasskey(params) {
-    assertPasskeyExperimentalEnabled(this.experimental);
     validateUUID(params.userId);
     validateUUID(params.passkeyId);
     try {
@@ -13623,10 +13927,8 @@ async function navigatorLock(name, acquireTimeout, fn) {
       }
     });
   } catch (e) {
-    if (acquireTimeout > 0) {
-      clearTimeout(acquireTimeoutTimer);
-    }
-    if (e !== null && typeof e === "object" && "name" in e && e.name === "AbortError" && acquireTimeout > 0) {
+    clearTimeout(acquireTimeoutTimer);
+    if (e !== null && typeof e === "object" && "name" in e && e.name === "AbortError") {
       if (abortController.signal.aborted) {
         if (internals.debug) {
           console.log("@supabase/gotrue-js: navigatorLock: acquire timeout, recovering by stealing lock", name);
@@ -14463,7 +14765,7 @@ var WebAuthnApi = class {
       if (!factor) {
         await this.client.mfa.listFactors().then((factors) => {
           var _a;
-          return (_a = factors.data) === null || _a === void 0 ? void 0 : _a.all.find((v) => v.factor_type === "webauthn" && v.friendly_name === friendlyName && v.status !== "unverified");
+          return (_a = factors.data) === null || _a === void 0 ? void 0 : _a.all.find((v) => v.factor_type === "webauthn" && v.friendly_name === friendlyName && v.status === "unverified");
         }).then((factor2) => factor2 ? this.client.mfa.unenroll({ factorId: factor2 === null || factor2 === void 0 ? void 0 : factor2.id }) : void 0);
         return { data: null, error: enrollError };
       }
@@ -14519,6 +14821,7 @@ var DEFAULT_OPTIONS = {
   experimental: {}
 };
 var GLOBAL_JWKS = {};
+var deprecatedLockWarned = false;
 var GoTrueClient = class _GoTrueClient {
   /**
    * The JWKS used for verifying asymmetric JWTs
@@ -14614,6 +14917,10 @@ var GoTrueClient = class _GoTrueClient {
     this.lockAcquireTimeout = settings.lockAcquireTimeout;
     if (settings.lock != null) {
       this.lock = settings.lock;
+      if (!deprecatedLockWarned) {
+        deprecatedLockWarned = true;
+        console.warn(`${this._logPrefix()} The "lock" option is deprecated and will be removed in v3. The client now coordinates session refreshes without a lock, so most apps can drop the option. See https://github.com/supabase/supabase-js/blob/master/packages/core/auth-js/migrations/lockless-coordination.md`);
+      }
     }
     if (!this.jwks) {
       this.jwks = { keys: [] };
@@ -14627,7 +14934,14 @@ var GoTrueClient = class _GoTrueClient {
       listFactors: this._listFactors.bind(this),
       challengeAndVerify: this._challengeAndVerify.bind(this),
       getAuthenticatorAssuranceLevel: this._getAuthenticatorAssuranceLevel.bind(this),
-      webauthn: new WebAuthnApi(this)
+      webauthn: new WebAuthnApi(this),
+      recoveryCodes: {
+        getStatus: this._getRecoveryCodesStatus.bind(this),
+        generate: this._generateRecoveryCodes.bind(this),
+        verify: this._verifyRecoveryCode.bind(this),
+        regenerate: this._regenerateRecoveryCodes.bind(this),
+        unenroll: this._unenrollRecoveryCodes.bind(this)
+      }
     };
     this.oauth = {
       getAuthorizationDetails: this._getAuthorizationDetails.bind(this),
@@ -16797,31 +17111,16 @@ var GoTrueClient = class _GoTrueClient {
       const hasExpired = currentSession.expires_at ? currentSession.expires_at * 1e3 - Date.now() < EXPIRY_MARGIN_MS : false;
       this._debug("#__loadSession()", `session has${hasExpired ? "" : " not"} expired`, "expires_at", currentSession.expires_at);
       if (!hasExpired) {
-        if (this.userStorage) {
-          const maybeUser = await getItemAsync(this.userStorage, this.storageKey + "-user");
-          if (maybeUser === null || maybeUser === void 0 ? void 0 : maybeUser.user) {
-            currentSession.user = maybeUser.user;
-          } else {
-            currentSession.user = userNotAvailableProxy();
-          }
-        }
-        if (this.storage.isServer && currentSession.user && !currentSession.user.__isUserNotAvailableProxy) {
-          const suppressWarningRef = { value: this.suppressGetSessionWarning };
-          currentSession.user = insecureUserWarningProxy(currentSession.user, suppressWarningRef);
-          if (suppressWarningRef.value) {
-            this.suppressGetSessionWarning = true;
-          }
-        }
-        return { data: { session: currentSession }, error: null };
+        return { data: { session: await this._hydrateSessionUser(currentSession) }, error: null };
       }
       const { data: session, error } = await this._callRefreshToken(currentSession.refresh_token);
       if (error) {
-        const accessTokenStillValid = !!(currentSession.expires_at && currentSession.expires_at * 1e3 > Date.now());
-        if (accessTokenStillValid) {
-          const stillStored = await getItemAsync(this.storage, this.storageKey);
-          if (stillStored && stillStored.refresh_token === currentSession.refresh_token) {
-            return this._returnResult({ data: { session: currentSession }, error: null });
-          }
+        const stored = await getItemAsync(this.storage, this.storageKey);
+        if (stored && this._isValidSession(stored) && stored.expires_at && stored.expires_at * 1e3 > Date.now()) {
+          return this._returnResult({
+            data: { session: await this._hydrateSessionUser(stored) },
+            error: null
+          });
         }
         return this._returnResult({ data: { session: null }, error });
       }
@@ -16829,6 +17128,26 @@ var GoTrueClient = class _GoTrueClient {
     } finally {
       this._debug("#__loadSession()", "end");
     }
+  }
+  /**
+   * Completes a session read back from storage so it matches what callers of
+   * `getSession()` expect: fills in `session.user` from `userStorage` when the
+   * client keeps the user in split storage, and wraps the user in the
+   * insecure-access warning proxy on the server.
+   */
+  async _hydrateSessionUser(session) {
+    if (this.userStorage) {
+      const maybeUser = await getItemAsync(this.userStorage, this.storageKey + "-user");
+      session.user = (maybeUser === null || maybeUser === void 0 ? void 0 : maybeUser.user) ? maybeUser.user : userNotAvailableProxy();
+    }
+    if (this.storage.isServer && session.user && !session.user.__isUserNotAvailableProxy) {
+      const suppressWarningRef = { value: this.suppressGetSessionWarning };
+      session.user = insecureUserWarningProxy(session.user, suppressWarningRef);
+      if (suppressWarningRef.value) {
+        this.suppressGetSessionWarning = true;
+      }
+    }
+    return session;
   }
   /**
    * Gets the current user details if there is an existing session. This method
@@ -17872,6 +18191,9 @@ var GoTrueClient = class _GoTrueClient {
       } catch (err) {
         await ((_b = this.stateChangeEmitters.get(id)) === null || _b === void 0 ? void 0 : _b.callback("INITIAL_SESSION", null));
         this._debug("INITIAL_SESSION", "callback id", id, "error", err);
+        if (isAuthRefreshDiscardedError(err)) {
+          return;
+        }
         if (isAuthSessionMissingError(err) || isAuthRetryableFetchError(err) || isAuthApiError(err) && (err.code === "refresh_token_not_found" || err.code === "refresh_token_already_used" || err.code === "session_expired")) {
           console.warn(err);
         } else {
@@ -18339,6 +18661,8 @@ var GoTrueClient = class _GoTrueClient {
     this._debug(debugName, "begin");
     try {
       this.refreshingDeferred = new Deferred();
+      this.refreshingDeferred.promise.then(void 0, () => {
+      });
       const storedAtStart = await getItemAsync(this.storage, this.storageKey);
       const { data, error } = await this._refreshAccessToken(refreshToken);
       if (error)
@@ -19002,11 +19326,12 @@ var GoTrueClient = class _GoTrueClient {
       all: [],
       phone: [],
       totp: [],
-      webauthn: []
+      webauthn: [],
+      recovery_code: []
     };
     for (const factor of (_a = user === null || user === void 0 ? void 0 : user.factors) !== null && _a !== void 0 ? _a : []) {
       data.all.push(factor);
-      if (factor.status === "verified") {
+      if (factor.status === "verified" && factor.factor_type in data && Array.isArray(data[factor.factor_type])) {
         ;
         data[factor.factor_type].push(factor);
       }
@@ -19068,6 +19393,158 @@ var GoTrueClient = class _GoTrueClient {
     }
     const currentAuthenticationMethods = payload.amr || [];
     return { data: { currentLevel, nextLevel, currentAuthenticationMethods }, error: null };
+  }
+  /**
+   * {@link AuthMFARecoveryCodesApi#getStatus}
+   */
+  async _getRecoveryCodesStatus() {
+    assertRecoveryCodesExperimentalEnabled(this.experimental);
+    try {
+      return await this._useSession(async (result) => {
+        var _a;
+        const { data: sessionData, error: sessionError } = result;
+        if (sessionError) {
+          return this._returnResult({ data: null, error: sessionError });
+        }
+        const { data, error } = await _request(this.fetch, "GET", `${this.url}/factors/recovery-codes`, {
+          headers: this.headers,
+          jwt: (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.session) === null || _a === void 0 ? void 0 : _a.access_token
+        });
+        if (error) {
+          return this._returnResult({ data: null, error });
+        }
+        return this._returnResult({ data, error: null });
+      });
+    } catch (error) {
+      if (isAuthError(error)) {
+        return this._returnResult({ data: null, error });
+      }
+      throw error;
+    }
+  }
+  /**
+   * {@link AuthMFARecoveryCodesApi#generate}
+   */
+  async _generateRecoveryCodes(params) {
+    assertRecoveryCodesExperimentalEnabled(this.experimental);
+    try {
+      return await this._useSession(async (result) => {
+        var _a;
+        const { data: sessionData, error: sessionError } = result;
+        if (sessionError) {
+          return this._returnResult({ data: null, error: sessionError });
+        }
+        const { data, error } = await _request(this.fetch, "POST", `${this.url}/factors/recovery-codes`, {
+          // The body is optional server-side; only send one when a name was given.
+          body: (params === null || params === void 0 ? void 0 : params.friendlyName) ? { friendly_name: params.friendlyName } : void 0,
+          headers: this.headers,
+          jwt: (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.session) === null || _a === void 0 ? void 0 : _a.access_token
+        });
+        if (error) {
+          return this._returnResult({ data: null, error });
+        }
+        return this._returnResult({ data, error: null });
+      });
+    } catch (error) {
+      if (isAuthError(error)) {
+        return this._returnResult({ data: null, error });
+      }
+      throw error;
+    }
+  }
+  /**
+   * {@link AuthMFARecoveryCodesApi#verify}
+   */
+  async _verifyRecoveryCode(params) {
+    assertRecoveryCodesExperimentalEnabled(this.experimental);
+    const run = async () => {
+      try {
+        return await this._useSession(async (result) => {
+          var _a;
+          const { data: sessionData, error: sessionError } = result;
+          if (sessionError) {
+            return this._returnResult({ data: null, error: sessionError });
+          }
+          const { data, error } = await _request(this.fetch, "POST", `${this.url}/factors/recovery-codes/verify`, {
+            body: { code: params.code },
+            headers: this.headers,
+            jwt: (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.session) === null || _a === void 0 ? void 0 : _a.access_token
+          });
+          if (error) {
+            return this._returnResult({ data: null, error });
+          }
+          const session = Object.assign({ expires_at: expiresAt(data.expires_in) }, data);
+          await this._saveSession(session);
+          await this._notifyAllSubscribers("MFA_CHALLENGE_VERIFIED", session);
+          return this._returnResult({ data, error: null });
+        });
+      } catch (error) {
+        if (isAuthError(error)) {
+          return this._returnResult({ data: null, error });
+        }
+        throw error;
+      }
+    };
+    if (this.lock != null) {
+      return this._acquireLock(this.lockAcquireTimeout, run);
+    }
+    return run();
+  }
+  /**
+   * {@link AuthMFARecoveryCodesApi#regenerate}
+   */
+  async _regenerateRecoveryCodes() {
+    assertRecoveryCodesExperimentalEnabled(this.experimental);
+    try {
+      return await this._useSession(async (result) => {
+        var _a;
+        const { data: sessionData, error: sessionError } = result;
+        if (sessionError) {
+          return this._returnResult({ data: null, error: sessionError });
+        }
+        const { data, error } = await _request(this.fetch, "POST", `${this.url}/factors/recovery-codes/regenerate`, {
+          headers: this.headers,
+          jwt: (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.session) === null || _a === void 0 ? void 0 : _a.access_token
+        });
+        if (error) {
+          return this._returnResult({ data: null, error });
+        }
+        return this._returnResult({ data, error: null });
+      });
+    } catch (error) {
+      if (isAuthError(error)) {
+        return this._returnResult({ data: null, error });
+      }
+      throw error;
+    }
+  }
+  /**
+   * {@link AuthMFARecoveryCodesApi#unenroll}
+   */
+  async _unenrollRecoveryCodes() {
+    assertRecoveryCodesExperimentalEnabled(this.experimental);
+    try {
+      return await this._useSession(async (result) => {
+        var _a;
+        const { data: sessionData, error: sessionError } = result;
+        if (sessionError) {
+          return this._returnResult({ data: null, error: sessionError });
+        }
+        const { data, error } = await _request(this.fetch, "DELETE", `${this.url}/factors/recovery-codes`, {
+          headers: this.headers,
+          jwt: (_a = sessionData === null || sessionData === void 0 ? void 0 : sessionData.session) === null || _a === void 0 ? void 0 : _a.access_token
+        });
+        if (error) {
+          return this._returnResult({ data: null, error });
+        }
+        return this._returnResult({ data, error: null });
+      });
+    } catch (error) {
+      if (isAuthError(error)) {
+        return this._returnResult({ data: null, error });
+      }
+      throw error;
+    }
   }
   /**
    * Retrieves details about an OAuth authorization request.
@@ -19379,13 +19856,35 @@ var GoTrueClient = class _GoTrueClient {
    * 2. Prompts user via navigator.credentials.get()
    * 3. Verifies credential with server and creates session
    *
-   * Requires `auth.experimental.passkey: true`.
+   * Pass `options.mediation: 'conditional'` to use WebAuthn Conditional UI
+   * (passkey autofill) instead of the modal picker; the value is forwarded to
+   * `navigator.credentials.get()` unchanged.
+   *
+   * The challenge fetched in step 1 expires after the server's
+   * GOTRUE_WEBAUTHN_CHALLENGE_EXPIRY_DURATION (5 minutes by default). With
+   * `mediation: 'conditional'` the autofill prompt can stay pending for longer
+   * than that: the browser ceremony then still succeeds, but verification fails
+   * with `error_code: "webauthn_challenge_expired"`. Recover by calling
+   * `signInWithPasskey()` again. It fetches a fresh challenge and, unless you
+   * passed your own `options.signal`, cancels the pending ceremony first, so
+   * the browser never sees two concurrent WebAuthn requests; the earlier call
+   * resolves with a `WebAuthnError` whose code is `ERROR_CEREMONY_ABORTED`. If
+   * you pass your own `signal`, abort it before retrying.
    *
    * @category Auth
+   *
+   * @example Sign in with Conditional UI (passkey autofill)
+   * ```js
+   * // <input autocomplete="username webauthn" /> somewhere on the page
+   * const { data, error } = await supabase.auth.signInWithPasskey({
+   *   options: {
+   *     mediation: 'conditional'
+   *   }
+   * });
+   * ```
    */
   async signInWithPasskey(credentials) {
-    var _a, _b, _c;
-    assertPasskeyExperimentalEnabled(this.experimental);
+    var _a, _b, _c, _d;
     try {
       if (!browserSupportsWebAuthn()) {
         return this._returnResult({
@@ -19403,7 +19902,8 @@ var GoTrueClient = class _GoTrueClient {
       const signal = (_c = (_b = credentials === null || credentials === void 0 ? void 0 : credentials.options) === null || _b === void 0 ? void 0 : _b.signal) !== null && _c !== void 0 ? _c : webAuthnAbortService.createNewAbortSignal();
       const { data: credential, error: credentialError } = await getCredential({
         publicKey: publicKeyOptions,
-        signal
+        signal,
+        mediation: (_d = credentials === null || credentials === void 0 ? void 0 : credentials.options) === null || _d === void 0 ? void 0 : _d.mediation
       });
       if (credentialError || !credential) {
         return this._returnResult({
@@ -19429,13 +19929,12 @@ var GoTrueClient = class _GoTrueClient {
    * 2. Prompts user via navigator.credentials.create()
    * 3. Verifies credential with server
    *
-   * Requires an active session. Requires `auth.experimental.passkey: true`.
+   * Requires an active session.
    *
    * @category Auth
    */
   async registerPasskey(credentials) {
     var _a, _b;
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       if (!browserSupportsWebAuthn()) {
         return this._returnResult({
@@ -19476,7 +19975,6 @@ var GoTrueClient = class _GoTrueClient {
    * Returns WebAuthn credential creation options to pass to navigator.credentials.create().
    */
   async _startPasskeyRegistration() {
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       return await this._useSession(async (result) => {
         const { data: { session }, error: sessionError } = result;
@@ -19508,7 +20006,6 @@ var GoTrueClient = class _GoTrueClient {
    * The credentialResponse should be the serialized output of navigator.credentials.create().
    */
   async _verifyPasskeyRegistration(params) {
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       return await this._useSession(async (result) => {
         const { data: { session }, error: sessionError } = result;
@@ -19544,7 +20041,6 @@ var GoTrueClient = class _GoTrueClient {
    */
   async _startPasskeyAuthentication(params) {
     var _a;
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       const { data, error } = await _request(this.fetch, "POST", `${this.url}/passkeys/authentication/options`, {
         headers: this.headers,
@@ -19568,7 +20064,6 @@ var GoTrueClient = class _GoTrueClient {
    * The credential should be the serialized output of navigator.credentials.get().
    */
   async _verifyPasskeyAuthentication(params) {
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       const { data, error } = await _request(this.fetch, "POST", `${this.url}/passkeys/authentication/verify`, {
         headers: this.headers,
@@ -19597,7 +20092,6 @@ var GoTrueClient = class _GoTrueClient {
    * List all passkeys for the current user.
    */
   async _listPasskeys() {
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       return await this._useSession(async (result) => {
         const { data: { session }, error: sessionError } = result;
@@ -19628,7 +20122,6 @@ var GoTrueClient = class _GoTrueClient {
    * Update a passkey.
    */
   async _updatePasskey(params) {
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       return await this._useSession(async (result) => {
         const { data: { session }, error: sessionError } = result;
@@ -19659,7 +20152,6 @@ var GoTrueClient = class _GoTrueClient {
    * Delete a passkey.
    */
   async _deletePasskey(params) {
-    assertPasskeyExperimentalEnabled(this.experimental);
     try {
       return await this._useSession(async (result) => {
         const { data: { session }, error: sessionError } = result;
@@ -19699,7 +20191,7 @@ var AuthClient = GoTrueClient_default;
 var AuthClient_default = AuthClient;
 
 // node_modules/@supabase/supabase-js/dist/index.mjs
-var version4 = "2.112.3";
+var version4 = "2.117.3";
 var JS_ENV = "";
 var JS_RUNTIME_VERSION;
 if (typeof Deno !== "undefined") {
@@ -19918,6 +20410,13 @@ function normalizeTracePropagation(value) {
 }
 function ensureTrailingSlash(url) {
   return url.endsWith("/") ? url : url + "/";
+}
+var warnedTopLevelSchema = false;
+function checkTopLevelSchemaOption(options) {
+  if (warnedTopLevelSchema) return;
+  if (typeof options !== "object" || options === null || !("schema" in options) || options.schema === void 0) return;
+  warnedTopLevelSchema = true;
+  console.warn(`@supabase/supabase-js: The "schema" option must be nested under "db", e.g. createClient(url, key, { db: { schema: 'myschema' } }). A top-level "schema" is ignored and queries go to the default schema.`);
 }
 function applySettingDefaults(options, defaults) {
   var _DEFAULT_GLOBAL_OPTIO, _globalOptions$header, _ref, _tracePropagationOpti, _ref2, _tracePropagationOpti2;
@@ -20178,6 +20677,7 @@ var SupabaseClient = class {
     const baseUrl = validateSupabaseUrl(supabaseUrl);
     if (!supabaseKey) throw new Error("supabaseKey is required.");
     checkApiKeyFormat(supabaseKey);
+    checkTopLevelSchemaOption(options);
     this.realtimeUrl = new URL("realtime/v1", baseUrl);
     this.realtimeUrl.protocol = this.realtimeUrl.protocol.replace("http", "ws");
     this.authUrl = new URL("auth/v1", baseUrl);
@@ -20249,6 +20749,23 @@ var SupabaseClient = class {
   */
   schema(schema) {
     return this.rest.schema(schema);
+  }
+  /**
+  * Fetch the OpenAPI description PostgREST publishes for this client's schema.
+  *
+  * The document lists only the tables, views and functions the caller's role
+  * holds privileges on. The request carries the same `apikey` and
+  * `Authorization` headers as every other query, so the description is scoped
+  * to the signed-in user. Call `.schema()` first to describe a schema other
+  * than the client default.
+  *
+  * @example
+  * ```ts
+  * const { data, error } = await supabase.getOpenApiSpec()
+  * ```
+  */
+  getOpenApiSpec() {
+    return this.rest.getOpenApiSpec();
   }
   /**
   * Perform a function call.

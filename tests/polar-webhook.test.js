@@ -391,6 +391,133 @@ describe('polar-webhook', () => {
     expect(JSON.parse(callTo(fetchMock, 'api.resend.com')[1].body).text).toContain('Not saved');
   });
 
+  describe('subscription.updated status mapping', () => {
+    const updated = (status) => ({
+      type: 'subscription.updated',
+      data: { status, product: { metadata: { plan: 'pro' } }, customer: { email: 'b@example.com' } },
+    });
+    const puts = (fetchMock) =>
+      fetchMock.mock.calls.filter(([, init]) => String(init?.method || '').toUpperCase() === 'PUT');
+
+    it('keeps Pro on active (including a scheduled cancel)', async () => {
+      const { res, json, fetchMock } = await postWebhook({
+        ...updated('active'),
+        data: { ...updated('active').data, cancel_at_period_end: true },
+      });
+      expect(res.status).toBe(202);
+      expect(json.plan).toBe('pro');
+      expect(putMeta(fetchMock)).toMatchObject({ plan: 'pro', paid: true });
+    });
+
+    for (const status of ['trialing', 'past_due', undefined]) {
+      it(`leaves the plan unchanged on ${status ?? 'missing status'}`, async () => {
+        const { res, json, fetchMock } = await postWebhook(updated(status), {
+          appMeta: { plan: 'pro', paid: true, paid_since: '2026-01-01' },
+        });
+        expect(res.status).toBe(202);
+        expect(json.ignored).toBe('subscription.updated');
+        expect(puts(fetchMock)).toHaveLength(0);
+      });
+    }
+
+    for (const status of ['canceled', 'unpaid', 'paused', 'incomplete', 'incomplete_expired']) {
+      it(`drops to free on ${status}`, async () => {
+        const { res, json, fetchMock } = await postWebhook(updated(status), {
+          appMeta: { plan: 'pro', paid: true, paid_since: '2026-01-01' },
+        });
+        expect(res.status).toBe(202);
+        expect(json.plan).toBe('free');
+        expect(putMeta(fetchMock)).toMatchObject({ plan: 'free', paid: null });
+      });
+    }
+  });
+
+  it('applies a Polar retry with the same event time once (one PUT, one email)', async () => {
+    vi.resetModules();
+    process.env.POLAR_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.SUPABASE_URL = SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
+    Object.assign(process.env, { RESEND_API_KEY: 're_test', NOTIFY_FROM: 'n@baklog.app', NOTIFY_TO: 'f@example.com' });
+    let stored = { beta: true };
+    const fetchMock = vi.fn(async (url, init) => {
+      const u = String(url);
+      const method = (init?.method || 'GET').toUpperCase();
+      if (u.includes('/rpc/get_user_id_by_email')) {
+        return { ok: true, json: async () => '11111111-1111-4111-8111-111111111111' };
+      }
+      if (u.includes('/auth/v1/admin/users/')) {
+        if (method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({ email: 'b@example.com', email_confirmed_at: CONFIRMED_AT, app_metadata: { ...stored } }),
+          };
+        }
+        stored = { ...stored, ...JSON.parse(init.body).app_metadata };
+        return { ok: true, json: async () => ({}) };
+      }
+      if (u === 'https://api.resend.com/emails') return { ok: true, text: async () => '' };
+      throw new Error(`unexpected fetch ${u}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const mod = await import('../web/api/polar-webhook.js');
+    const body = JSON.stringify({
+      type: 'order.paid',
+      data: { created_at: '2026-10-10T00:00:00Z', product: {}, customer: { email: 'b@example.com' } },
+    });
+    const send = () => {
+      const sig = signBody(body);
+      return mod.default.fetch(new Request('https://baklog.app/api/polar-webhook', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'webhook-id': sig.id,
+          'webhook-timestamp': sig.timestamp,
+          'webhook-signature': sig.signature,
+        },
+        body,
+      }));
+    };
+    const first = await (await send()).json();
+    const retry = await (await send()).json();
+    for (const k of ['RESEND_API_KEY', 'NOTIFY_FROM', 'NOTIFY_TO']) delete process.env[k];
+    expect(first.plan).toBe('pro');
+    expect(retry.stale).toBe(true);
+    const putCalls = fetchMock.mock.calls.filter(([, init]) => String(init?.method || '').toUpperCase() === 'PUT');
+    expect(putCalls).toHaveLength(1);
+    const mails = fetchMock.mock.calls.filter(([u]) => String(u) === 'https://api.resend.com/emails');
+    expect(mails).toHaveLength(1);
+  });
+
+  it('routes an external_id match with an unconfirmed email to pending', async () => {
+    const userId = '22222222-2222-4222-8222-222222222222';
+    const { res, json, fetchMock } = await postWebhook(
+      { type: 'order.paid', data: { product: {}, customer: { external_id: userId, email: 'new@example.com' } } },
+      { confirmedAt: null },
+    );
+    expect(res.status).toBe(202);
+    expect(json).toMatchObject({ matched: false, pending: true });
+    expect(fetchMock.mock.calls.some(([, init]) => String(init?.method || '').toUpperCase() === 'PUT')).toBe(false);
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/rpc/get_user_id_by_email'))).toBe(false);
+    const upsert = fetchMock.mock.calls.find(([u]) => String(u).includes('/rest/v1/polar_pending_entitlements'));
+    expect(JSON.parse(upsert[1].body)).toMatchObject({ email: 'new@example.com', plan: 'pro' });
+  });
+
+  it('rejects an oversized Content-Length before reading the body', async () => {
+    vi.resetModules();
+    process.env.POLAR_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.SUPABASE_URL = SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
+    const mod = await import('../web/api/polar-webhook.js');
+    const text = vi.fn(async () => '{}');
+    const res = await mod.default.fetch({
+      method: 'POST',
+      headers: new Headers({ 'content-length': String(1024 * 1024 + 1) }),
+      text,
+    });
+    expect(res.status).toBe(413);
+    expect(text).not.toHaveBeenCalled();
+  });
+
   it('accepts whsec_ prefixed signing secrets', async () => {
     const whsecBody = JSON.stringify({
       type: 'subscription.active',

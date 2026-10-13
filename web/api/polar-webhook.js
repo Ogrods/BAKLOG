@@ -27,6 +27,8 @@ import { normEmail, setUserPlan, upsertPendingEntitlement } from "./_polar-pendi
 const TIMESTAMP_TOLERANCE_SEC = 5 * 60;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PRO_ALIASES = new Set(["pro", "paid", "premium"]);
+const KEEP_PLAN_STATUSES = new Set(["trialing", "past_due"]);
+const MAX_BODY_BYTES = 1024 * 1024;
 
 function bytesToBase64(bytes) {
   let binary = "";
@@ -103,12 +105,12 @@ function resolveEntitlement(event) {
     case "subscription.uncanceled":
       return { plan: planFromProduct(data.product) };
     case "subscription.updated":
-      // "canceled" keeps access until period end; only a non-active status drops it.
-      return data.status === "active"
-        ? { plan: planFromProduct(data.product) }
-        : data.status && data.status !== "trialing"
-          ? { plan: "free" }
-          : null;
+      // A scheduled cancel stays "active" (cancel_at_period_end=true) until the
+      // period ends; "canceled" means it has ended. past_due keeps Pro while Polar
+      // retries the payment (up to 21 days); a failed dunning ends in revoked.
+      if (data.status === "active") return { plan: planFromProduct(data.product) };
+      if (!data.status || KEEP_PLAN_STATUSES.has(data.status)) return null;
+      return { plan: "free" };
     case "subscription.revoked":
       return { plan: "free" };
     case "order.paid":
@@ -228,12 +230,13 @@ async function notifyEntitlementChange({ event, result }) {
 
 /**
  * Match the buyer and write the entitlement. A checkout external_id that is not a
- * real user falls back to the email lookup. Returns null when nothing matched.
+ * real user falls back to the email lookup. Returns null when nothing matched or
+ * the matched account's email is not confirmed (the pending path takes over).
  */
 async function applyToMatchedUser({ url, key, externalId, email, plan, eventAt }) {
   if (externalId && UUID_RE.test(externalId)) {
     try {
-      return await setUserPlan({ url, key, userId: externalId, plan, eventAt });
+      return await setUserPlan({ url, key, userId: externalId, plan, eventAt, requireConfirmed: true });
     } catch (err) {
       if (err?.status !== 404) throw err;
       console.warn("polar-webhook: external_id is not a Supabase user; trying email");
@@ -259,9 +262,14 @@ export default {
       return Response.json({ error: "Server not configured" }, { status: 500 });
     }
 
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > MAX_BODY_BYTES) {
+      return Response.json({ error: "Payload too large" }, { status: 413 });
+    }
+
     // Raw body is required for signature verification — do not parse first.
     const body = await request.text();
-    if (body.length > 1024 * 1024) {
+    if (body.length > MAX_BODY_BYTES) {
       return Response.json({ error: "Payload too large" }, { status: 413 });
     }
     const ok = await verifySignature({

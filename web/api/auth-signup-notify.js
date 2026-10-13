@@ -86,9 +86,14 @@ export default {
       return Response.json({ error: "Payload too large" }, { status: 413 });
     }
 
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+      return Response.json({ error: "Payload too large" }, { status: 413 });
+    }
+
     let body;
     try {
-      body = await request.json();
+      body = JSON.parse(raw);
     } catch {
       return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }

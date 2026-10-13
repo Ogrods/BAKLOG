@@ -164,6 +164,11 @@ def test_fingerprint_cli_exit_codes(tmp_path: Path, capsys) -> None:
     assert doc["titles"] == {"a": "A2"}
 
 
+def test_titles_by_id_blank_after_title_falls_back_to_id() -> None:
+    titles = cff.titles_by_id([{"id": "a", "title": "A"}], [{"id": "a", "title": "  "}])
+    assert titles == {}
+
+
 def test_diff_markdown_shows_titles_escaped_with_id_fallback() -> None:
     diff = {"added": ["gamerpower-3322", "epic-x"], "removed": ["gone"], "changed": []}
     md = cff.format_diff_markdown(

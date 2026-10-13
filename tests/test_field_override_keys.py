@@ -42,3 +42,6 @@ def test_title_fallback_does_not_match_a_substring_title() -> None:
     exact = [{"id": "gamerpower-2", "store": "steam", "title": "Rage", "claim_url": "https://a"}]
     _apply_field_overrides(exact, field_overrides=overrides)
     assert exact[0]["claim_url"] == "https://rage"
+    unapproved = [{"id": "gamerpower-3", "store": "steam", "title": "Rage", "claim_url": "https://a"}]
+    _apply_field_overrides(unapproved, field_overrides=overrides, title_fallback_ids={"gamerpower-3"})
+    assert unapproved[0]["claim_url"] == "https://a"

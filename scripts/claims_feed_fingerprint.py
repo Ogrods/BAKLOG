@@ -102,6 +102,8 @@ def titles_by_id(*item_lists: list[dict]) -> dict[str, str]:
             title = str(row.get("title") or "").strip()
             if item_id and title:
                 out[item_id] = title
+            elif item_id:
+                out.pop(item_id, None)
     return out
 
 

@@ -961,14 +961,20 @@ def _apply_field_overrides(
     items: list[dict],
     field_overrides: dict[str, dict[str, str]],
     field_overrides_by_key: dict[str, dict[str, str]] | None = None,
+    *,
+    title_fallback_ids: set[str] | None = None,
 ) -> None:
+    """``title_fallback_ids`` limits the title fallback to those ids' overrides
+    (approved ones), so a kept override on an unapproved row cannot leak."""
     field_overrides_by_key = field_overrides_by_key or {}
     # Pre-build a reverse lookup: override title norm → override values.
     # Used as a fallback when ID/key-based lookup fails (common when a source
     # feed rekeys its IDs and the user's edited title normalizes differently
     # from the source title, preventing rekey_approved_state from matching).
     override_by_norm: dict[str, dict[str, str]] = {}
-    for fo_val in field_overrides.values():
+    for fo_id, fo_val in field_overrides.items():
+        if title_fallback_ids is not None and fo_id not in title_fallback_ids:
+            continue
         title = str(fo_val.get("title") or "").strip()
         if title:
             norm = norm_title(title)
@@ -1323,6 +1329,7 @@ def preview_publish_items(
             auto_items,
             field_overrides,
             field_overrides_by_key=field_by_key,
+            title_fallback_ids=set(approved_ids),
         )
 
     publish_manual = filter_manual_items_for_publish(
@@ -1567,11 +1574,12 @@ def rekey_approved_state(
 
     # Overrides on ids that are not approved (unchecked rows, digest removes) stay as
     # they are, like the admin save; dropping them rewrote the file on every build.
+    approved_old = {str(i).strip() for i in ids}
     for old_id, value in store_overrides.items():
-        if old_id not in new_store and old_id not in ids:
+        if old_id not in new_store and old_id not in approved_old:
             new_store[old_id] = value
     for old_id, value in field_overrides.items():
-        if old_id not in new_field and old_id not in ids:
+        if old_id not in new_field and old_id not in approved_old:
             new_field[old_id] = dict(value)
 
     return new_ids, new_store, new_field, new_premium
@@ -1952,6 +1960,7 @@ def main() -> int:
             auto_items,
             field_overrides,
             field_overrides_by_key=field_by_key,
+            title_fallback_ids=set(approved_ids),
         )
     if expired_approved_ids:
         stats.warn(f"skipped {len(expired_approved_ids)} expired approved auto item(s)")

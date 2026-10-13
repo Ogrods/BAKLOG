@@ -718,6 +718,21 @@ def test_rekey_merges_overrides_when_two_ids_collapse_and_keeps_unapproved() -> 
     assert store == {"gamerpower-b": "steam", "epic-unchecked": "epic"}
 
 
+def test_rekey_does_not_restore_override_for_padded_approved_id() -> None:
+    auto_items = [{"id": "gamerpower-new", "store": "steam", "title": "Doom", "steam_appid": 1,
+                   "claim_url": "https://x", "source": "gamerpower"}]
+    ids, _, fields, _ = bfc.rekey_approved_state(
+        ids=[" itad-old "],
+        store_overrides={},
+        field_overrides={"itad-old": {"title": "Doom"}},
+        premium_only_ids=set(),
+        auto_items_all=auto_items,
+        prior_rows_by_id={},
+    )
+    assert ids == ["gamerpower-new"]
+    assert fields == {"gamerpower-new": {"title": "Doom"}}
+
+
 def test_build_prunes_expired_approved_and_manual_items(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

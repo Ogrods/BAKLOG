@@ -316,8 +316,12 @@ jobs:
             gh pr merge "$PR_NUMBER" --squash --auto
           else
             # An earlier vetted run may have enabled it; this push must not ride along.
-            echo "Disabling auto-merge on #$PR_NUMBER: unvetted added claim id(s) need review."
-            gh pr merge "$PR_NUMBER" --disable-auto || true
+            echo "Unvetted added claim id(s) on #$PR_NUMBER need review."
+            ENABLED=$(gh pr view "$PR_NUMBER" --json autoMergeRequest --jq '.autoMergeRequest != null')
+            if [ "$ENABLED" = "true" ]; then
+              echo "Disabling auto-merge on #$PR_NUMBER."
+              gh pr merge "$PR_NUMBER" --disable-auto
+            fi
           fi
 
           python scripts/approve_feed_pr_ci.py --sha "$(git rev-parse HEAD)"

@@ -41,6 +41,7 @@ def start_idle_watchdog(
     on_idle: Callable[[], None],
     *,
     check_interval_s: float = DEFAULT_CHECK_INTERVAL_S,
+    stop_event: threading.Event | None = None,
 ) -> threading.Thread | None:
     """Start a daemon thread that calls ``on_idle()`` once the server has been
     idle for ``timeout_s`` seconds AND ``is_idle_ok()`` returns True.
@@ -48,17 +49,21 @@ def start_idle_watchdog(
     Returns ``None`` when disabled (``timeout_s <= 0``). The thread fires
     ``on_idle`` at most once, then exits. A falsy ``is_idle_ok`` probe (e.g. an
     in-flight fetch or an active sign-in) resets the countdown instead of
-    exiting, so long-running work is never interrupted.
+    exiting, so long-running work is never interrupted. Setting ``stop_event``
+    ends the thread without firing.
     """
     if timeout_s <= 0:
         return None
 
     note_activity()  # reset baseline so the countdown starts now
+    # Event.wait, not time.sleep: tests that patch time.sleep must not see this loop.
+    stop = stop_event if stop_event is not None else threading.Event()
 
     def _loop() -> None:
         interval = max(1.0, min(check_interval_s, timeout_s))
         while True:
-            time.sleep(interval)
+            if stop.wait(interval):
+                return
             if seconds_since_activity() < timeout_s:
                 continue
             try:

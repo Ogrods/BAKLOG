@@ -17,6 +17,7 @@ from shared import profile_paths, supabase_auth
 from shared.subprocess_guard import child_pids_of, terminate_pid_tree
 
 _RUN_MANAGER_THREAD_PREFIXES = ("run-worker", "run-watchdog", "run-kill", "run-launch-")
+_FOREVER_LOOP_THREAD_NAMES = ("baklog-idle-watchdog", "cloud-mirror-flush")
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -191,14 +192,38 @@ def _reset_auth_sessions():
         auth_manager._active_sessions.clear()
 
 
+def _forever_loop_threads() -> set[threading.Thread]:
+    return {
+        t
+        for t in threading.enumerate()
+        if t.name in _FOREVER_LOOP_THREAD_NAMES and t.is_alive()
+    }
+
+
+def _fail_on_leaked_loop_threads(baseline: set[threading.Thread]) -> None:
+    """Background loops that never exit spin on any later test's patched sleep."""
+    leaked = _forever_loop_threads() - baseline
+    for t in leaked:
+        t.join(timeout=0.5)
+    still = sorted(t.name for t in leaked if t.is_alive())
+    if still:
+        pytest.fail(
+            f"test leaked background loop thread(s) {still}; pass a stop_event "
+            "and set it on teardown",
+            pytrace=False,
+        )
+
+
 @pytest.fixture(autouse=True)
 def _detect_thread_and_child_leaks(request: pytest.FixtureRequest):
     if request.node.get_closest_marker("no_leak_check"):
         yield
         return
     baseline_threads = {t.name for t in _run_manager_threads()}
+    baseline_loops = _forever_loop_threads()
     baseline_children = child_pids_of()
     yield
+    _fail_on_leaked_loop_threads(baseline_loops)
 
     def _suspected_leak() -> tuple[set[int], list[threading.Thread]]:
         threads = [

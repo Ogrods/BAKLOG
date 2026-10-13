@@ -259,14 +259,15 @@ export default {
       return Response.json({ ok: true, matched: false, pending: stored }, { status: 202 });
     }
 
+    let written;
     try {
-      await setUserPlan({ url, key, userId, plan: entitlement.plan });
+      written = await setUserPlan({ url, key, userId, plan: entitlement.plan });
     } catch (err) {
       console.error("polar-webhook: setting plan failed", err);
       return Response.json({ error: "Update failed" }, { status: 500 });
     }
 
-    console.log(`polar-webhook: ${event?.type} -> plan=${entitlement.plan} user=${userId}`);
-    return Response.json({ ok: true, plan: entitlement.plan }, { status: 202 });
+    console.log(`polar-webhook: ${event?.type} -> plan=${written} user=${userId}`);
+    return Response.json({ ok: true, plan: written }, { status: 202 });
   },
 };

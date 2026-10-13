@@ -16,7 +16,7 @@ function signBody(body, secret = WEBHOOK_SECRET) {
   };
 }
 
-async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {} } = {}) {
+async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {}, appMeta = { beta: true } } = {}) {
   vi.resetModules();
   process.env.POLAR_WEBHOOK_SECRET = secret;
   process.env.SUPABASE_URL = SUPABASE_URL;
@@ -33,7 +33,7 @@ async function postWebhook(event, { secret = WEBHOOK_SECRET, env = {} } = {}) {
       if (method === 'GET') {
         return {
           ok: true,
-          json: async () => ({ id: 'u1', app_metadata: { beta: true } }),
+          json: async () => ({ id: 'u1', app_metadata: { ...appMeta } }),
         };
       }
       return { ok: true, json: async () => ({}) };
@@ -155,6 +155,41 @@ describe('polar-webhook', () => {
     );
     expect(putCall?.[1]?.body).toContain('"plan":"free"');
     expect(putCall?.[1]?.body).toContain('"beta":true');
+  });
+
+  const putMeta = (fetchMock) => {
+    const call = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes('/auth/v1/admin/users/') &&
+        String(init?.method || '').toUpperCase() === 'PUT',
+    );
+    return JSON.parse(call[1].body).app_metadata;
+  };
+  const revoked = { type: 'subscription.revoked', data: { product: {}, customer: { email: 'b@example.com' } } };
+
+  it('marks a paying beta tester paid and keeps their comp date', async () => {
+    const { json, fetchMock } = await postWebhook(
+      { type: 'order.paid', data: { product: {}, customer: { email: 'b@example.com' } } },
+      { appMeta: { plan: 'pro', comp_until: '2027-03-31' } },
+    );
+    expect(json.plan).toBe('pro');
+    expect(putMeta(fetchMock)).toEqual({ plan: 'pro', paid: true, comp_until: '2027-03-31' });
+  });
+
+  it('keeps Pro on cancel while the comp grant is still running', async () => {
+    const { json, fetchMock } = await postWebhook(revoked, {
+      appMeta: { plan: 'pro', paid: true, comp_until: '2999-12-31' },
+    });
+    expect(json.plan).toBe('pro');
+    expect(putMeta(fetchMock)).toEqual({ plan: 'pro', comp_until: '2999-12-31' });
+  });
+
+  it('drops to free on cancel once the comp grant has ended', async () => {
+    const { json, fetchMock } = await postWebhook(revoked, {
+      appMeta: { plan: 'pro', paid: true, comp_until: '2020-01-01' },
+    });
+    expect(json.plan).toBe('free');
+    expect(putMeta(fetchMock)).toEqual({ plan: 'free', comp_until: '2020-01-01' });
   });
 
   async function postUnmatched(event, { pendingOk = true } = {}) {

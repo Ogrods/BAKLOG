@@ -16,6 +16,18 @@ export function normEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+/** True while a comp grant (app_metadata.comp_until, YYYY-MM-DD) still covers today (UTC). */
+export function compActive(meta, now = new Date()) {
+  const raw = String(meta?.comp_until || "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+  return raw >= now.toISOString().slice(0, 10);
+}
+
+/**
+ * Write a paid Polar entitlement. "pro" marks the account paid so
+ * grant_beta_pro.py --expire never drops it; "free" clears paid but keeps Pro
+ * while a comp grant is still running. Returns the plan actually written.
+ */
 export async function setUserPlan({ url, key, userId, plan }) {
   const getR = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
@@ -26,7 +38,13 @@ export async function setUserPlan({ url, key, userId, plan }) {
   }
   const user = await getR.json().catch(() => ({}));
   const meta = { ...(user?.app_metadata || {}) };
-  meta.plan = plan;
+  if (plan === "pro") {
+    meta.plan = "pro";
+    meta.paid = true;
+  } else {
+    delete meta.paid;
+    meta.plan = compActive(meta) ? "pro" : "free";
+  }
   const r = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
     method: "PUT",
     headers: serviceHeaders(key),
@@ -36,6 +54,7 @@ export async function setUserPlan({ url, key, userId, plan }) {
     const detail = await r.text().catch(() => "");
     throw new Error(`Supabase admin ${r.status}: ${detail}`);
   }
+  return meta.plan;
 }
 
 /** Insert or update the pending row for an unmatched buyer (keyed by lowercased email). */

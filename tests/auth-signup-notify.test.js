@@ -135,7 +135,7 @@ describe("web/api/auth-signup-notify.js", () => {
       expect(res.status).toBe(200);
       const put = callsMatching("/auth/v1/admin/users/", "PUT");
       expect(put).toHaveLength(1);
-      expect(JSON.parse(put[0][1].body).app_metadata).toEqual({ provider: "email", plan: "pro" });
+      expect(JSON.parse(put[0][1].body).app_metadata).toEqual({ provider: "email", plan: "pro", paid: true });
       const patch = callsMatching("/rest/v1/polar_pending_entitlements", "PATCH");
       expect(patch).toHaveLength(1);
       expect(JSON.parse(patch[0][1].body).applied_user_id).toBe(USER_ID);

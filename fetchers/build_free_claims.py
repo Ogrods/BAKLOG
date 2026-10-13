@@ -15,6 +15,8 @@ import requests
 
 from fetchers._base import configure_stdout, refuse_empty_result
 from fetchers._progress import HeartbeatTimer, RunStats, started
+from shared.claims_decisions import load_auto_decisions, merge_decisions
+from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
     EPIC_MOBILE_STORE,
@@ -33,6 +35,14 @@ from shared.steam_match import appid_from_steam_url, pick_appid, strip_giveaway_
 INPUT_PATH = Path("free-claims.input.json")
 AUTO_PATH = Path("curated/free_claims.auto.json")
 APPROVED_PATH = Path("curated/free_claims.approved.json")
+_DEFAULT_APPROVED_PATH = APPROVED_PATH
+
+
+def _approved_path() -> Path:
+    """Owner decisions file; a patched ``APPROVED_PATH`` (tests) wins over discovery."""
+    if APPROVED_PATH != _DEFAULT_APPROVED_PATH:
+        return APPROVED_PATH
+    return resolve_approved_path(Path.cwd(), APPROVED_PATH)
 OUTPUT_PATH = Path("web/free-claims.json")
 FALLBACK_PATH = Path("curated/free_claims.fallback.json")
 STORE_DELAY_SEC = 1.5
@@ -1762,6 +1772,18 @@ def main() -> int:
         action="store_true",
         help="Only publish manual rows with approved: true (default: publish unless approved: false)",
     )
+    parser.add_argument(
+        "--approved",
+        type=Path,
+        default=None,
+        help="Owner decisions file (default: env, then baklog-internal/claims, then curated/)",
+    )
+    parser.add_argument(
+        "--auto-decisions",
+        type=Path,
+        default=None,
+        help="Autopilot decisions file merged under owner decisions",
+    )
     args = parser.parse_args()
     require_manual_approval = require_manual_approval_enabled(cli_flag=args.require_manual_approval)
 
@@ -1790,14 +1812,17 @@ def main() -> int:
             src = str(row.get("source") or "unknown")
             by_source[src] = by_source.get(src, 0) + 1
         _debug_claims(f"auto feed: {len(auto_items_all)} item(s) by source {by_source}")
-    approved_ids = _load_approved_ids(APPROVED_PATH)
+    approved_path = args.approved or _approved_path()
+    if approved_path != APPROVED_PATH:
+        stats.warn(f"owner decisions: {approved_path.name} from {approved_path.parent.name}/")
+    approved_ids = _load_approved_ids(approved_path)
     # Blocked ids are a permanent kill list; fold them into the dismissed filter
     # so they are excluded from the feed exactly like a soft-hidden claim.
-    dismissed_ids = _load_dismissed_ids(APPROVED_PATH) | _load_blocked_ids(APPROVED_PATH)
-    dismissed_keys = _load_dismissed_keys(APPROVED_PATH)
-    premium_only_ids = _load_premium_only_ids(APPROVED_PATH)
-    store_overrides = _load_store_overrides(APPROVED_PATH)
-    field_overrides = _load_field_overrides(APPROVED_PATH)
+    dismissed_ids = _load_dismissed_ids(approved_path) | _load_blocked_ids(approved_path)
+    dismissed_keys = _load_dismissed_keys(approved_path)
+    premium_only_ids = _load_premium_only_ids(approved_path)
+    store_overrides = _load_store_overrides(approved_path)
+    field_overrides = _load_field_overrides(approved_path)
     orig_store_overrides = dict(store_overrides)
     orig_field_overrides = {k: dict(v) for k, v in field_overrides.items()}
     orig_premium_only_ids = set(premium_only_ids)
@@ -1823,9 +1848,9 @@ def main() -> int:
         or field_overrides != orig_field_overrides
         or premium_only_ids != orig_premium_only_ids
     )
-    if not args.dry_run and approved_changed and APPROVED_PATH.is_file():
+    if not args.dry_run and approved_changed and approved_path.is_file():
         try:
-            appr_doc = json.loads(APPROVED_PATH.read_text(encoding="utf-8"))
+            appr_doc = json.loads(approved_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             appr_doc = {}
         appr_doc["ids"] = rekeyed_ids
@@ -1841,7 +1866,27 @@ def main() -> int:
             appr_doc["premium_only_ids"] = sorted(premium_only_ids)
         else:
             appr_doc.pop("premium_only_ids", None)
-        safe_write_text(APPROVED_PATH, json.dumps(appr_doc, indent=2, ensure_ascii=False))
+        safe_write_text(approved_path, json.dumps(appr_doc, indent=2, ensure_ascii=False))
+    owner_approved_ids = set(approved_ids)
+    auto_decisions_path = args.auto_decisions or resolve_auto_decisions_path(Path.cwd())
+    if auto_decisions_path is not None and auto_decisions_path.is_file():
+        merged = merge_decisions(
+            owner_approved=approved_ids,
+            owner_dismissed=dismissed_ids,
+            auto=load_auto_decisions(auto_decisions_path),
+            auto_items=auto_items_all,
+            owner_dismissed_item_ids={
+                str(it.get("id") or "").strip()
+                for it in auto_items_all
+                if dismissed_keys and _cover_lookup_key(it.get("title") or "") in dismissed_keys
+            },
+        )
+        approved_ids = merged.approved_ids
+        dismissed_ids = merged.dismissed_ids
+        stats.warn(
+            f"autopilot: +{len(merged.auto_approved)} approved, "
+            f"{len(merged.auto_dismissed)} dismissed"
+        )
     now = datetime.now(UTC)
     auto_by_id = _auto_items_by_id(auto_items_all)
     approved_keys = _resolve_approved_keys(approved_ids, auto_items_all, field_overrides)
@@ -1867,7 +1912,7 @@ def main() -> int:
             if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
     auto_items, dupe_dropped = collapse_dupe_groups(
-        auto_items, auto_items_all, splits=_load_dupe_splits(APPROVED_PATH)
+        auto_items, auto_items_all, splits=_load_dupe_splits(approved_path)
     )
     if dupe_dropped:
         stats.warn(f"collapsed {len(dupe_dropped)} approved dupe row(s): {', '.join(dupe_dropped)}")
@@ -1886,7 +1931,9 @@ def main() -> int:
     if expired_approved_ids:
         stats.warn(f"skipped {len(expired_approved_ids)} expired approved auto item(s)")
         if not args.dry_run:
-            pruned = _prune_expired_from_approved(APPROVED_PATH, expired_approved_ids)
+            pruned = _prune_expired_from_approved(
+                approved_path, expired_approved_ids & owner_approved_ids
+            )
             if pruned:
                 stats.warn(f"pruned {pruned} expired item(s) from approved list")
     if auto_items_all:

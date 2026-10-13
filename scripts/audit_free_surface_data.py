@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.claims_paths import resolve_approved_path
 from shared.free_claims_sources import (
     claim_match_keys,
     is_epic_mobile_store,
@@ -41,7 +42,7 @@ from shared.profile_paths import (
 )
 
 AUTO_PATH = ROOT / "curated" / "free_claims.auto.json"
-APPROVED_PATH = ROOT / "curated" / "free_claims.approved.json"
+APPROVED_PATH = resolve_approved_path(ROOT, ROOT / "curated" / "free_claims.approved.json")
 INPUT_PATH = ROOT / "free-claims.input.json"
 BUILT_PATH = ROOT / "web" / "free-claims.json"
 FALLBACK_PATH = ROOT / "curated" / "free_claims.fallback.json"

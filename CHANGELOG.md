@@ -45,6 +45,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Changed
 
+- You can buy BAKLOG Pro from the Pro tab in the app. Pro switches on for the account you're signed in with.
 - The Windows app and installer are code-signed, so SmartScreen shows the publisher name instead of "Unknown publisher".
 - ITAD prices now cover every connected wishlist (GOG, Epic, PlayStation, Ubisoft, Xbox, Nintendo, Humble), not only Steam. Very large wishlists fill in over a few runs.
 

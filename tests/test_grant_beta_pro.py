@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import scripts.grant_beta_pro as grant
 
 
@@ -64,3 +66,63 @@ def test_main_apply_updates_user(monkeypatch, capsys) -> None:
     assert writes[0][0] == "PUT"
     assert writes[0][2]["app_metadata"]["plan"] == "pro"
     assert writes[0][2]["app_metadata"]["beta"] is True
+
+
+def _patch_users(monkeypatch, users: list[dict]) -> list[tuple]:
+    monkeypatch.setenv("SUPABASE_URL", "https://demo.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-key")
+    writes: list[tuple] = []
+
+    def fake_request(method, url, *, key, body=None):
+        writes.append((method, url, body))
+        return {}
+
+    monkeypatch.setattr(grant, "list_users", lambda _b, _k: users)
+    monkeypatch.setattr(grant, "admin_request", fake_request)
+    monkeypatch.setattr(grant, "_today", lambda: date(2027, 4, 1))
+    return writes
+
+
+def _user(uid: str, email: str, meta: dict) -> dict:
+    return {"id": uid, "email": email, "app_metadata": meta, "created_at": "2026-01-01T00:00:00Z"}
+
+
+def test_until_writes_comp_until(monkeypatch) -> None:
+    writes = _patch_users(monkeypatch, [_user("u1", "beta@example.com", {"plan": "free"})])
+    rc = grant.main(["--email", "beta@example.com", "--until", "2027-05-31", "--apply"])
+    assert rc == 0
+    meta = writes[0][2]["app_metadata"]
+    assert meta == {"plan": "pro", "comp_until": "2027-05-31"}
+
+
+def test_until_rejected_with_free_plan(monkeypatch) -> None:
+    writes = _patch_users(monkeypatch, [_user("u1", "beta@example.com", {"plan": "pro"})])
+    assert grant.main(["--plan", "free", "--until", "2027-05-31", "--apply"]) == 2
+    assert grant.main(["--until", "not-a-date", "--apply"]) == 2
+    assert writes == []
+
+
+def test_expire_only_touches_past_comp_until(monkeypatch, capsys) -> None:
+    users = [
+        _user("u1", "cohort@example.com", {"plan": "pro", "comp_until": "2027-03-31"}),
+        _user("u2", "paul@example.com", {"plan": "pro", "comp_until": "2027-05-31"}),
+        _user("u3", "payer@example.com", {"plan": "pro"}),
+        _user("u4", "free@example.com", {"plan": "free"}),
+    ]
+    writes = _patch_users(monkeypatch, users)
+    rc = grant.main(["--expire", "--apply"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert len(writes) == 1
+    assert writes[0][1].endswith("/u1")
+    assert writes[0][2]["app_metadata"] == {"plan": "free"}
+    assert "paul@example.com" not in out
+    assert "payer@example.com" not in out
+
+
+def test_expire_dry_run_does_not_write(monkeypatch) -> None:
+    writes = _patch_users(
+        monkeypatch, [_user("u1", "cohort@example.com", {"plan": "pro", "comp_until": "2027-03-31"})]
+    )
+    assert grant.main(["--expire"]) == 0
+    assert writes == []

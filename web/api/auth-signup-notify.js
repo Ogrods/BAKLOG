@@ -8,6 +8,13 @@
 // Supabase setup (once): Database → Webhooks → auth.users → Insert → POST
 // https://baklog.app/api/auth-signup-notify with header
 // Authorization: Bearer <AUTH_SIGNUP_WEBHOOK_SECRET>
+//
+// Optional SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY: when set, a pending Polar
+// purchase for the new email (polar_pending_entitlements, written by
+// polar-webhook.js) is applied to the account as app_metadata.plan.
+
+import { notifyConfig, sendEmail } from "./_notify.js";
+import { findPendingEntitlement, markPendingApplied, setUserPlan } from "./_polar-pending.js";
 
 const MAX_BODY_BYTES = 32 * 1024;
 
@@ -28,20 +35,21 @@ function verifyWebhookSecret(request) {
   return provided && constantTimeEqual(provided, expected);
 }
 
-async function sendEmail(apiKey, payload) {
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!r.ok) {
-    const detail = await r.text().catch(() => "");
-    throw new Error(`Resend ${r.status}: ${detail}`);
+/** Apply a pending Polar Pro purchase to the new account. Returns a founder-email line or "". */
+async function applyPendingPurchase(signup) {
+  const url = (process.env.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  if (!url || !key) return "";
+  try {
+    const pending = await findPendingEntitlement({ url, key, email: signup.email });
+    if (!pending || pending.applied_at || pending.plan !== "pro") return "";
+    await setUserPlan({ url, key, userId: signup.id, plan: "pro" });
+    await markPendingApplied({ url, key, email: signup.email, userId: signup.id });
+    return `Pro applied from pending Polar purchase (${pending.last_event_type || "unknown event"}).`;
+  } catch (err) {
+    console.error("auth-signup-notify: applying pending Polar purchase failed", err);
+    return "Pending Polar purchase lookup/apply FAILED - grant manually with scripts/grant_beta_pro.py.";
   }
-  return r;
 }
 
 function parseSignupPayload(body) {
@@ -85,13 +93,14 @@ export default {
       return Response.json({ ok: true, ignored: true });
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.NOTIFY_FROM;
-    const to = process.env.NOTIFY_TO;
-    if (!apiKey || !from || !to) {
+    const proLine = await applyPendingPurchase(signup);
+
+    const cfg = notifyConfig();
+    if (!cfg) {
       console.error("auth-signup-notify: missing RESEND_API_KEY / NOTIFY_FROM / NOTIFY_TO");
       return Response.json({ error: "Server not configured" }, { status: 500 });
     }
+    const { apiKey, from, to } = cfg;
 
     const time = signup.createdAt || new Date().toISOString();
     const confirmLine = signup.confirmedAt
@@ -111,6 +120,7 @@ export default {
           `User id: ${signup.id}`,
           `Created: ${time}`,
           confirmLine,
+          ...(proLine ? ["", proLine] : []),
         ].join("\n"),
       });
     } catch (err) {

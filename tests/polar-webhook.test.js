@@ -157,19 +157,28 @@ describe('polar-webhook', () => {
     expect(putCall?.[1]?.body).toContain('"beta":true');
   });
 
-  it('acknowledges unmatched buyers without updating Supabase', async () => {
+  async function postUnmatched(event, { pendingOk = true } = {}) {
     vi.resetModules();
     process.env.POLAR_WEBHOOK_SECRET = WEBHOOK_SECRET;
     process.env.SUPABASE_URL = SUPABASE_URL;
     process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
-    const body = JSON.stringify({
-      type: 'subscription.active',
-      data: { product: {}, customer: { email: 'unknown@example.com' } },
-    });
+    process.env.RESEND_API_KEY = 're_test';
+    process.env.NOTIFY_FROM = 'BAKLOG <n@baklog.app>';
+    process.env.NOTIFY_TO = 'founder@example.com';
+    const body = JSON.stringify(event);
     const sig = signBody(body);
     const fetchMock = vi.fn(async (url) => {
-      if (String(url).includes('/rpc/get_user_id_by_email')) {
+      const u = String(url);
+      if (u.includes('/rpc/get_user_id_by_email')) {
         return { ok: true, json: async () => null };
+      }
+      if (u.includes('/rest/v1/polar_pending_entitlements')) {
+        return pendingOk
+          ? { ok: true, text: async () => '' }
+          : { ok: false, status: 500, text: async () => 'db down' };
+      }
+      if (u === 'https://api.resend.com/emails') {
+        return { ok: true, text: async () => '' };
       }
       throw new Error(`unexpected fetch ${url}`);
     });
@@ -186,9 +195,70 @@ describe('polar-webhook', () => {
       body,
     }));
     const json = await res.json();
+    for (const k of ['RESEND_API_KEY', 'NOTIFY_FROM', 'NOTIFY_TO']) delete process.env[k];
+    return { res, json, fetchMock };
+  }
+
+  const callTo = (fetchMock, fragment) =>
+    fetchMock.mock.calls.find(([url]) => String(url).includes(fragment));
+
+  it('stores unmatched buyers as pending and alerts the founder', async () => {
+    const { res, json, fetchMock } = await postUnmatched({
+      type: 'order.paid',
+      data: {
+        product: {},
+        customer_id: 'cus_1',
+        subscription_id: 'sub_1',
+        customer: { email: 'Unknown@Example.com' },
+      },
+    });
     expect(res.status).toBe(202);
-    expect(json.matched).toBe(false);
+    expect(json).toMatchObject({ ok: true, matched: false, pending: true });
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/v1/admin/users/'))).toBe(false);
+    const [, upsertInit] = callTo(fetchMock, '/rest/v1/polar_pending_entitlements');
+    expect(upsertInit.method).toBe('POST');
+    const row = JSON.parse(upsertInit.body);
+    expect(row).toMatchObject({
+      email: 'unknown@example.com',
+      plan: 'pro',
+      last_event_type: 'order.paid',
+      polar_customer_id: 'cus_1',
+      polar_subscription_id: 'sub_1',
+    });
+    const [, mailInit] = callTo(fetchMock, 'api.resend.com');
+    const mail = JSON.parse(mailInit.body);
+    expect(mail.subject).toContain('Unmatched Polar buyer: unknown@example.com');
+    expect(mail.text).toContain('applies automatically');
+  });
+
+  it('flips a pending unmatched buyer to free on revoke', async () => {
+    const { res, fetchMock } = await postUnmatched({
+      type: 'subscription.revoked',
+      data: { id: 'sub_9', product: {}, customer: { email: 'gone@example.com' } },
+    });
+    expect(res.status).toBe(202);
+    const row = JSON.parse(callTo(fetchMock, '/rest/v1/polar_pending_entitlements')[1].body);
+    expect(row).toMatchObject({ email: 'gone@example.com', plan: 'free', polar_subscription_id: 'sub_9' });
+  });
+
+  it('returns 500 so Polar retries when the pending store fails', async () => {
+    const { res, fetchMock } = await postUnmatched(
+      { type: 'order.paid', data: { product: {}, customer: { email: 'x@example.com' } } },
+      { pendingOk: false },
+    );
+    expect(res.status).toBe(500);
+    expect(callTo(fetchMock, 'api.resend.com')).toBeUndefined();
+  });
+
+  it('alerts without storing when the unmatched event has no email', async () => {
+    const { res, json, fetchMock } = await postUnmatched({
+      type: 'order.paid',
+      data: { product: {}, customer: {} },
+    });
+    expect(res.status).toBe(202);
+    expect(json.pending).toBe(false);
+    expect(callTo(fetchMock, '/rest/v1/polar_pending_entitlements')).toBeUndefined();
+    expect(JSON.parse(callTo(fetchMock, 'api.resend.com')[1].body).text).toContain('Not saved');
   });
 
   it('accepts whsec_ prefixed signing secrets', async () => {

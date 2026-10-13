@@ -14,6 +14,12 @@
 // Buyer matching: the Polar customer's external_id (when passed as a checkout
 // query param) is treated as the Supabase user id; otherwise we match the buyer
 // by email via the get_user_id_by_email RPC (see web/sql/polar_entitlement.sql).
+// Unmatched buyers are stored in polar_pending_entitlements (applied on signup by
+// auth-signup-notify.js) and the founder is emailed (RESEND_API_KEY, NOTIFY_FROM,
+// NOTIFY_TO; optional - storage still happens without them).
+
+import { notifyFounder } from "./_notify.js";
+import { normEmail, setUserPlan, upsertPendingEntitlement } from "./_polar-pending.js";
 
 const TIMESTAMP_TOLERANCE_SEC = 5 * 60;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -121,6 +127,49 @@ function buyerRef(event) {
   return { externalId: String(externalId || "").trim(), email: String(email || "").trim() };
 }
 
+function polarIds(event) {
+  const data = event?.data || {};
+  const isSubscription = String(event?.type || "").startsWith("subscription.");
+  return {
+    customerId: String(data.customer_id || data.customer?.id || ""),
+    subscriptionId: String((isSubscription ? data.id : data.subscription_id) || ""),
+  };
+}
+
+async function handleUnmatchedBuyer({ url, key, event, email, plan }) {
+  const addr = normEmail(email);
+  const type = event?.type || "unknown";
+  let stored = false;
+  if (addr) {
+    const { customerId, subscriptionId } = polarIds(event);
+    await upsertPendingEntitlement({
+      url,
+      key,
+      email: addr,
+      plan,
+      eventType: type,
+      customerId,
+      subscriptionId,
+    });
+    stored = true;
+  }
+  await notifyFounder({
+    subject: `Unmatched Polar buyer: ${addr || "(no email)"} (${type})`,
+    replyTo: addr || undefined,
+    text: [
+      "A Polar event matched no BAKLOG account.",
+      "",
+      `Event: ${type}`,
+      `Buyer email: ${addr || "(none on event)"}`,
+      `Plan to apply: ${plan}`,
+      stored
+        ? "Saved to polar_pending_entitlements. Pro applies automatically when an account with this email is created."
+        : "Not saved (no email on event). Grant manually with scripts/grant_beta_pro.py.",
+    ].join("\n"),
+  });
+  return stored;
+}
+
 async function findSupabaseUserId({ url, key, externalId, email }) {
   if (externalId && UUID_RE.test(externalId)) return externalId;
   if (!email) return null;
@@ -141,35 +190,6 @@ async function findSupabaseUserId({ url, key, externalId, email }) {
   if (typeof out === "string") return out;
   if (Array.isArray(out) && out.length) return out[0]?.id || out[0] || null;
   return out?.id || null;
-}
-
-async function setUserPlan({ url, key, userId, plan }) {
-  const getR = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-    },
-  });
-  if (!getR.ok) {
-    const detail = await getR.text().catch(() => "");
-    throw new Error(`Supabase admin GET ${getR.status}: ${detail}`);
-  }
-  const user = await getR.json().catch(() => ({}));
-  const meta = { ...(user?.app_metadata || {}) };
-  meta.plan = plan;
-  const r = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
-    method: "PUT",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ app_metadata: meta }),
-  });
-  if (!r.ok) {
-    const detail = await r.text().catch(() => "");
-    throw new Error(`Supabase admin ${r.status}: ${detail}`);
-  }
 }
 
 export default {
@@ -226,10 +246,17 @@ export default {
 
     if (!userId) {
       // No matching BAKLOG account (buyer used a different email, or has no account
-      // yet). Acknowledge so Polar stops retrying; the License Key benefit / manual
-      // license.json paste remains the fallback for pure-local buyers.
+      // yet). Store the entitlement so signup applies it, and alert the founder.
+      // A storage failure returns 500 so Polar retries.
       console.warn(`polar-webhook: no Supabase user for event ${event?.type} (unmatched buyer)`);
-      return Response.json({ ok: true, matched: false }, { status: 202 });
+      let stored;
+      try {
+        stored = await handleUnmatchedBuyer({ url, key, event, email, plan: entitlement.plan });
+      } catch (err) {
+        console.error("polar-webhook: storing unmatched buyer failed", err);
+        return Response.json({ error: "Pending store failed" }, { status: 500 });
+      }
+      return Response.json({ ok: true, matched: false, pending: stored }, { status: 202 });
     }
 
     try {

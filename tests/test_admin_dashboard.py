@@ -316,6 +316,79 @@ def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path],
     }
 
 
+def test_free_claims_get_returns_dupe_groups(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    auto_path = tmp_path / "curated" / "free_claims.auto.json"
+    auto_path.parent.mkdir(parents=True, exist_ok=True)
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {"id": "epic-foo", "source": "epic", "store": "epic", "title": "Foo"},
+                    {"id": "gamerpower-1", "source": "gamerpower", "store": "epic",
+                     "title": "Foo (Epic Games) Giveaway"},
+                    {"id": "itad-1", "source": "itad", "store": "epic",
+                     "title": "Foo - Free via EGS on Epic Game Store"},
+                    {"id": "itad-2", "source": "itad", "store": "steam", "title": "Bar on Steam"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    [group] = data["dupe_groups"]
+    assert group["tier"] == "strong"
+    assert group["winner_id"] == "epic-foo"
+    assert group["size"] == 3
+    assert data["dupe_splits"] == []
+
+
+def test_free_claims_get_honors_dupe_splits(admin_server: tuple[str, Path], tmp_path: Path) -> None:
+    base, _ = admin_server
+    curated = tmp_path / "curated"
+    curated.mkdir(parents=True, exist_ok=True)
+    (curated / "free_claims.auto.json").write_text(
+        json.dumps(
+            {
+                "items": [
+                    {"id": "gamerpower-1", "source": "gamerpower", "title": "Foo (Steam) Giveaway"},
+                    {"id": "itad-1", "source": "itad", "title": "Foo on Steam"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (curated / "free_claims.approved.json").write_text(
+        json.dumps({"ids": [], "dupe_splits": [["itad-1", "gamerpower-1"]]}), encoding="utf-8"
+    )
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data["dupe_groups"] == []
+    assert data["dupe_splits"] == [["gamerpower-1", "itad-1"]]
+
+
+def test_free_claims_approved_put_preserves_dupe_splits(
+    admin_server: tuple[str, Path], tmp_path: Path
+) -> None:
+    base, _ = admin_server
+    approved_path = tmp_path / "curated" / "free_claims.approved.json"
+    approved_path.parent.mkdir(parents=True, exist_ok=True)
+    approved_path.write_text(
+        json.dumps({"ids": [], "dupe_splits": [["a", "b"]]}), encoding="utf-8"
+    )
+    code, _ = _request(base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["epic-x"]})
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert saved["dupe_splits"] == [["a", "b"]]
+    code, _ = _request(
+        base, "PUT", "/api/internal/free-claims/approved", body={"ids": ["epic-x"], "dupe_splits": []}
+    )
+    assert code == 200
+    saved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert "dupe_splits" not in saved
+
+
 def test_free_claims_approved_put_validation(admin_server: tuple[str, Path]) -> None:
     base, _ = admin_server
     code, data = _request(

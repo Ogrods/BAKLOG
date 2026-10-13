@@ -147,10 +147,6 @@ def _steam_storesearch(term: str, last_call: list[float]) -> list[dict]:
         return []
 
 
-def _cover_lookup_key(title: str) -> str:
-    return norm_title(strip_giveaway_decorations(title))
-
-
 def _steam_portrait_cover(appid: int) -> str:
     """2:3 library capsule — fills claim-row portrait slots without letterboxing."""
     return f"https://cdn.akamai.steamstatic.com/steam/apps/{appid}/library_600x900_2x.jpg"
@@ -620,6 +616,63 @@ def _load_dismissed_keys(path: Path) -> set[str]:
         return set()
     keys = doc.get("dismissed_keys") or []
     return {str(k).strip() for k in keys if isinstance(k, str) and k.strip()}
+
+
+def _load_dupe_splits(path: Path) -> list[list[str]]:
+    if not path.is_file():
+        return []
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return normalize_dupe_splits(doc.get("dupe_splits"))
+
+
+def collapse_dupe_groups(
+    selected: list[dict],
+    auto_items_all: list[dict],
+    *,
+    splits: list[list[str]] | None = None,
+) -> tuple[list[dict], list[str]]:
+    """Keep one row per strong dupe group among ``selected``; fill gaps from siblings.
+
+    Returns ``(items, dropped_ids)``. The kept row is the best-ranked *selected*
+    member (owner approval still decides what ships); its missing ``ends_at`` /
+    ``steam_appid`` / ``header_image`` come from every group member in the feed.
+    """
+    from shared.claims_dedupe import group_claims, groups_by_member, merge_group_fields, pick_winner
+
+    if not selected:
+        return selected, []
+    by_member = groups_by_member(
+        group_claims(auto_items_all, splits=normalize_dupe_splits(splits))
+    )
+    if not by_member:
+        return selected, []
+    all_by_id = _auto_items_by_id(auto_items_all)
+    buckets: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for it in selected:
+        item_id = str(it.get("id") or "").strip()
+        group = by_member.get(item_id)
+        bucket = f"group:{group.key}" if group else f"id:{item_id or id(it)}"
+        if bucket not in buckets:
+            buckets[bucket] = []
+            order.append(bucket)
+        buckets[bucket].append(it)
+    out: list[dict] = []
+    dropped: list[str] = []
+    for bucket in order:
+        rows = buckets[bucket]
+        if not bucket.startswith("group:"):
+            out.extend(rows)
+            continue
+        keep = pick_winner(rows)
+        dropped.extend(str(r.get("id") or "") for r in rows if r is not keep)
+        group = by_member[str(keep.get("id") or "").strip()]
+        siblings = [all_by_id[m] for m in group.member_ids if m in all_by_id]
+        out.append(merge_group_fields(keep, siblings))
+    return out, dropped
 
 
 def _load_blocked_ids(path: Path) -> set[str]:
@@ -1215,6 +1268,7 @@ def preview_publish_items(
     premium_only_ids: set[str] | None = None,
     require_manual_approval: bool = False,
     now: datetime | None = None,
+    dupe_splits: list[list[str]] | None = None,
 ) -> list[dict]:
     """Dry-run merge + prune for admin preview (no disk writes, no Steam API)."""
     store_overrides = store_overrides or {}
@@ -1248,6 +1302,7 @@ def preview_publish_items(
             it for it in auto_items
             if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
+    auto_items, _ = collapse_dupe_groups(auto_items, auto_items_all, splits=dupe_splits)
 
     if store_overrides or store_by_key:
         _apply_store_overrides(
@@ -1546,7 +1601,26 @@ def parse_approved_put_payload(payload: dict) -> dict:
         "dismissed": dismissed,
         "dismissed_keys": dismissed_keys,
         "blocked": blocked,
+        "dupe_splits": normalize_dupe_splits(payload.get("dupe_splits")),
     }
+
+
+def normalize_dupe_splits(raw: object) -> list[list[str]]:
+    """Owner "not a dupe" decisions: sorted, de-duplicated id pairs."""
+    seen: set[tuple[str, str]] = set()
+    out: list[list[str]] = []
+    if not isinstance(raw, list):
+        return out
+    for pair in raw:
+        if not isinstance(pair, (list, tuple)):
+            continue
+        ids = sorted({str(x).strip() for x in pair if str(x).strip()})
+        for i, a in enumerate(ids):
+            for b in ids[i + 1 :]:
+                if (a, b) not in seen:
+                    seen.add((a, b))
+                    out.append([a, b])
+    return out
 
 
 def prepare_approved_document(
@@ -1560,6 +1634,7 @@ def prepare_approved_document(
     auto_items: list[dict],
     blocked: list[str] | None = None,
     prior_rows_by_id: dict[str, dict] | None = None,
+    dupe_splits: list[list[str]] | None = None,
 ) -> dict:
     """Re-key approved state and shape the on-disk approved.json document.
 
@@ -1608,6 +1683,9 @@ def prepare_approved_document(
         out["blocked"] = blocked_list
     if premium_list:
         out["premium_only_ids"] = premium_list
+    splits = normalize_dupe_splits(dupe_splits)
+    if splits:
+        out["dupe_splits"] = splits
     return out
 
 
@@ -1788,6 +1866,11 @@ def main() -> int:
             it for it in auto_items
             if _cover_lookup_key(it.get("title") or "") not in dismissed_keys
         ]
+    auto_items, dupe_dropped = collapse_dupe_groups(
+        auto_items, auto_items_all, splits=_load_dupe_splits(APPROVED_PATH)
+    )
+    if dupe_dropped:
+        stats.warn(f"collapsed {len(dupe_dropped)} approved dupe row(s): {', '.join(dupe_dropped)}")
     if store_overrides or store_by_key:
         _apply_store_overrides(
             auto_items,

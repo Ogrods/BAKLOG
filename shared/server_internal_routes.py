@@ -129,6 +129,13 @@ def validate_approved_payload(doc: dict[str, Any]) -> str | None:
         for i, item_id in enumerate(premium_only_ids):
             if not str(item_id or "").strip():
                 return f"premium_only_ids[{i}] must be a non-empty string"
+    dupe_splits = doc.get("dupe_splits")
+    if dupe_splits is not None:
+        if not isinstance(dupe_splits, list):
+            return "dupe_splits must be a list"
+        for i, pair in enumerate(dupe_splits):
+            if not isinstance(pair, list) or len(pair) < 2:
+                return f"dupe_splits[{i}] must be a list of at least two ids"
     return None
 
 
@@ -392,6 +399,9 @@ def handle_internal_free_claims_preview(handler: SimpleHTTPRequestHandler) -> No
         dismissed_keys=set(dismissed_keys or []),
         premium_only_ids=premium_only_ids,
         require_manual_approval=require_manual_approval_enabled(),
+        dupe_splits=payload.get("dupe_splits")
+        if isinstance(payload.get("dupe_splits"), list)
+        else (s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}).get("dupe_splits"),
     )
     from fetchers.build_free_claims import GAMERPOWER_ATTRIBUTION
 
@@ -432,12 +442,23 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
     dismissed_keys = approved_doc.get("dismissed_keys")
     if not isinstance(dismissed_keys, list):
         dismissed_keys = []
+    from fetchers.build_free_claims import normalize_dupe_splits
+    from shared.claims_dedupe import group_claims
+
+    dupe_splits = normalize_dupe_splits(approved_doc.get("dupe_splits"))
+    auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH)
+    auto_items = [
+        it for it in ((auto_doc or {}).get("items") or []) if isinstance(it, dict)
+    ]
+    dupe_groups = [g.to_dict() for g in group_claims(auto_items, splits=dupe_splits)]
     s._send_json(
         handler,
         HTTPStatus.OK,
         {
             "input": s._read_optional_json(root / s.FREE_CLAIMS_INPUT_PATH) or {"items": []},
-            "auto": s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH),
+            "auto": auto_doc,
+            "dupe_groups": dupe_groups,
+            "dupe_splits": dupe_splits,
             "approved": approved_ids,
             "store_overrides": store_overrides,
             "field_overrides": field_overrides,
@@ -492,6 +513,9 @@ def handle_internal_free_claims_approved_put(handler: SimpleHTTPRequestHandler) 
 
     parsed = parse_approved_put_payload(payload)
     root = s.data_root()
+    if "dupe_splits" not in payload:
+        prior_doc = s._read_optional_json(root / s.FREE_CLAIMS_APPROVED_PATH) or {}
+        parsed["dupe_splits"] = prior_doc.get("dupe_splits") or []
     auto_doc = s._read_optional_json(root / s.FREE_CLAIMS_AUTO_PATH) or {}
     auto_items = [it for it in (auto_doc.get("items") or []) if isinstance(it, dict)]
     built_doc = s._read_optional_json(root / s.FREE_CLAIMS_BUILT_PATH) or {}

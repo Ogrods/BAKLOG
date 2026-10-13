@@ -331,13 +331,16 @@ def _link_hosts(item: dict) -> set[str]:
         raw = str(url or "").strip()
         if not raw:
             continue
-        parts = urlsplit(raw)
+        try:
+            parts = urlsplit(raw)
+            host = (parts.hostname or "").lower()
+        except ValueError:
+            parts, host = None, ""
         # Browsers read "\" as "/" and skip userinfo, so such URLs can show one host
         # here and open another; keep the raw URL so any edit to it reads as a change.
-        if "\\" in raw or "@" in parts.netloc or any(ord(ch) < 33 for ch in raw):
+        if parts is None or "\\" in raw or "@" in parts.netloc or any(ord(ch) < 33 for ch in raw):
             hosts.add(f"unparsed:{raw}")
             continue
-        host = (parts.hostname or "").lower()
         if host:
             hosts.add(host.removeprefix("www."))
     return hosts

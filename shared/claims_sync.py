@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -62,9 +63,14 @@ def _share_newer_local_scrape(repo_root: Path, internal: Path) -> bool:
     data = local.read_bytes()
     if shared.is_file() and shared.read_bytes() == data:
         return False
-    tmp = shared.with_name(shared.name + ".tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, shared)
+    fd, tmp_name = tempfile.mkstemp(dir=shared.parent, prefix=shared.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp_name, shared)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
     return True
 
 

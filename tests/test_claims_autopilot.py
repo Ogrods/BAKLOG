@@ -224,6 +224,15 @@ def test_verify_added_holds_on_ambiguous_link(tmp_path: Path) -> None:
     assert rc == 3
 
 
+def test_verify_added_holds_on_malformed_link(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.epicgames.com/p/game"},
+        {"claim_url": "http://[evil"},
+    )
+    assert rc == 3
+
+
 def test_verify_added_allows_same_host_path_change(tmp_path: Path) -> None:
     rc = _verify_links(
         tmp_path,

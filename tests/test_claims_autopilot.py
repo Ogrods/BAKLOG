@@ -215,6 +215,15 @@ def test_verify_added_holds_on_new_host_in_claim_urls(tmp_path: Path) -> None:
     assert rc == 3
 
 
+def test_verify_added_holds_on_ambiguous_link(tmp_path: Path) -> None:
+    rc = _verify_links(
+        tmp_path,
+        {"claim_url": "https://store.epicgames.com/p/game"},
+        {"claim_url": "https://evil.example\\@store.epicgames.com/p/game"},
+    )
+    assert rc == 3
+
+
 def test_verify_added_allows_same_host_path_change(tmp_path: Path) -> None:
     rc = _verify_links(
         tmp_path,

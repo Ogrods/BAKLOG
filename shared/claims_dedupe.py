@@ -173,8 +173,10 @@ def group_claims(
         for key in strong_keys(row):
             by_key.setdefault(key, []).append(idx)
 
+    # Id order, not scrape order: with a split pair, whichever copy links to a
+    # third row first wins it, and that must not change between scrapes.
     for key in sorted(by_key):
-        members = by_key[key]
+        members = sorted(by_key[key], key=lambda k: ids[k])
         for a_pos, i in enumerate(members):
             for j in members[a_pos + 1 :]:
                 if not allowed(i, j):
@@ -198,7 +200,7 @@ def group_claims(
         if wk:
             weak_by_key.setdefault(wk, []).append(idx)
     for key in sorted(weak_by_key):
-        members = weak_by_key[key]
+        members = sorted(weak_by_key[key], key=lambda k: ids[k])
         for a_pos, i in enumerate(members):
             for j in members[a_pos + 1 :]:
                 if allowed(i, j) and strong_uf.find(i) != strong_uf.find(j):

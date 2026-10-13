@@ -62,7 +62,9 @@ def _share_newer_local_scrape(repo_root: Path, internal: Path) -> bool:
     data = local.read_bytes()
     if shared.is_file() and shared.read_bytes() == data:
         return False
-    shared.write_bytes(data)
+    tmp = shared.with_name(shared.name + ".tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, shared)
     return True
 
 

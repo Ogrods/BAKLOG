@@ -328,7 +328,16 @@ def _link_hosts(item: dict) -> set[str]:
         urls += list(item["claim_urls"].values())
     hosts: set[str] = set()
     for url in urls:
-        host = (urlsplit(str(url or "").strip()).hostname or "").lower()
+        raw = str(url or "").strip()
+        if not raw:
+            continue
+        parts = urlsplit(raw)
+        # Browsers read "\" as "/" and skip userinfo, so such URLs can show one host
+        # here and open another; keep the raw URL so any edit to it reads as a change.
+        if "\\" in raw or "@" in parts.netloc or any(ord(ch) < 33 for ch in raw):
+            hosts.add(f"unparsed:{raw}")
+            continue
+        host = (parts.hostname or "").lower()
         if host:
             hosts.add(host.removeprefix("www."))
     return hosts

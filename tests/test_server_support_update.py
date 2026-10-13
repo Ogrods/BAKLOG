@@ -1,6 +1,8 @@
 """Tests for shared/server_support update-check helpers."""
 from __future__ import annotations
 
+import io
+import json
 import sys
 from unittest.mock import patch
 
@@ -8,9 +10,46 @@ import pytest
 
 from shared.server_support import (
     build_update_check_payload,
+    fetch_latest_github_release,
+    github_releases_latest_api_url,
     normalize_version_tag,
     update_available,
 )
+
+
+def _fake_urlopen(payload: dict):
+    def _open(req, timeout=None):
+        return io.BytesIO(json.dumps(payload).encode("utf-8"))
+
+    return _open
+
+
+def test_releases_api_url_is_latest_endpoint() -> None:
+    assert github_releases_latest_api_url().endswith("/releases/latest")
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [{"draft": True}, {"prerelease": True}, {"draft": True, "prerelease": True}],
+)
+def test_fetch_latest_ignores_draft_and_prerelease(flags: dict) -> None:
+    release = {"tag_name": "v99.0.0", **flags}
+    with patch("urllib.request.urlopen", _fake_urlopen(release)):
+        assert fetch_latest_github_release() == {}
+
+
+def test_fetch_latest_returns_stable_release() -> None:
+    release = {"tag_name": "v99.0.0", "draft": False, "prerelease": False}
+    with patch("urllib.request.urlopen", _fake_urlopen(release)):
+        assert fetch_latest_github_release() == release
+
+
+def test_draft_release_never_reports_update() -> None:
+    release = {"tag_name": "v99.0.0", "draft": True, "assets": []}
+    with patch("urllib.request.urlopen", _fake_urlopen(release)):
+        payload = build_update_check_payload("0.9.02")
+    assert payload["update_available"] is False
+    assert payload["latest"] is None
 
 
 def test_normalize_version_tag_strips_v_prefix() -> None:

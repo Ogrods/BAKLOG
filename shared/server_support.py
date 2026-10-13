@@ -153,7 +153,12 @@ def fetch_latest_github_release() -> dict[str, Any]:
         if exc.code == 404:
             return {}
         raise
-    return raw if isinstance(raw, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+    # Draft and prerelease builds are for testers; they must never prompt installs.
+    if raw.get("draft") or raw.get("prerelease"):
+        return {}
+    return raw
 
 
 def tail_text_file(path: Path, *, max_lines: int = 80) -> list[str]:

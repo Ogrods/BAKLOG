@@ -6,7 +6,7 @@
 
 **BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
 
-**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Open beta.** Download at **[baklog.app](https://baklog.app)** or [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
+**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import.** Download at **[baklog.app](https://baklog.app)** or [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
 
 **Reviewing the repo?** See [ARCHITECTURE.md](ARCHITECTURE.md) for an honest map (local vs network, monolith shape, Pro licensing, store ToS).
 
@@ -85,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 # then run dist\baklog\Start BAKLOG (tray).bat
 ```
 
-**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). In dev this launches `tray_app.py`; frozen beta builds use **BAKLOG Tray.exe** (installer or `Start BAKLOG.bat`).
+**Start at login:** the tray menu can register login autostart (Windows registry / macOS LaunchAgent / Linux XDG). In dev this launches `tray_app.py`; packaged builds use **BAKLOG Tray.exe** (installer or `Start BAKLOG.bat`).
 
 **Pro background refresh:** when the server process is alive (tray or `python server.py`), the paid tier scheduler refreshes stale stores without an open browser tab. Under Supabase auth, sign in once in the browser so the server caches your plan for headless refresh.
 
@@ -137,8 +137,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 
 BAKLOG is free forever to import and browse. The optional **$5/mo** (**$50/yr**) paid tier is live (via Polar checkout) and adds power-user conveniences; none of today's free features move behind it:
 
-- **Live:** no sponsored deal cards; scheduled stale-store refresh without keeping the app open; deep achievement/trophy sync (full re-pull; free tier: cached % only); bonus claimables feed (DLC, add-ons, in-game bonuses); queued bulk refresh (every stale store in one sweep from Fetcher health); opt-in cloud sync (catalogs and personal statuses to your account; browse at baklog.app/mirror; credentials stay local)
-- **Coming soon:** deal/watchlist alerts
+- **Live:** no sponsored deal cards; scheduled stale-store refresh without keeping the app open; deep achievement/trophy sync (full re-pull; free tier: cached % only); bonus claimables feed (DLC, add-ons, in-game bonuses); queued bulk refresh (every stale store in one sweep from Fetcher health); opt-in cloud sync (catalogs and personal statuses to your account; browse at baklog.app/mirror; credentials stay local); opt-in deal alerts (the tray tells you when a wishlist game drops in price or a new free game appears)
 
 See [baklog.app](https://baklog.app/) for the full free-vs-paid breakdown.
 

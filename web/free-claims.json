@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-10-15T20:49:38.429920+00:00",
+  "generated_at": "2026-10-15T21:06:55.464907+00:00",
   "items": [
     {
       "id": "epic-bad-cheese-4256d9",
       "store": "epic",
       "title": "Bad Cheese",
       "claim_url": "https://store.epicgames.com/en-US/p/bad-cheese-4256d9",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3094480/e1801746961b88b3cbc43a72d1e77b030876e0a4/header.jpg?t=1778532201",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/6cbb0e3805c4436bafd028cafff48307/bad-cheese-16hj0.png",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-10-22T15:00:00Z",
@@ -20,7 +20,7 @@
       "store": "epic",
       "title": "Agent A: A puzzle in disguise",
       "claim_url": "https://store.epicgames.com/en-US/p/agent-a-a-puzzle-in-disguise-42fe5f",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/801480/header.jpg?t=1724988275",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/45db4fbe68fe43f4b025dec2014d42e7/agent-a-a-puzzle-in-disguise-3cppl.png",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-10-22T15:00:00Z",
@@ -85,6 +85,38 @@
       "premium_only": true
     },
     {
+      "id": "itad-314b49863c52",
+      "store": "steam",
+      "title": "Squad - Weapon Skins - Recon Team Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16676/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4841320/6499eba31da772a3f68b9f73443e16ffe49dd61e/header.jpg?t=1792087188",
+      "genres": [
+        "Action",
+        "Massively Multiplayer",
+        "Strategy"
+      ],
+      "blurb": "Squad Weapon Skins - Recon Team Pack",
+      "ends_at": "2026-10-29T20:49:28Z",
+      "steam_appid": 4841320,
+      "review_percent": 73,
+      "source": "itad",
+      "first_seen": "2026-10-15T20:49:28Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-fe98c22a9a1f",
+      "store": "steam",
+      "title": "Dungeons & Dragons Online: 6 Adventure Packs and 4 D&D Races",
+      "claim_url": "https://isthereanydeal.com/giveaways/16671/",
+      "header_image": null,
+      "genres": [],
+      "blurb": "Dungeons & Dragons Online®",
+      "ends_at": "2026-10-29T03:48:27Z",
+      "source": "itad",
+      "first_seen": "2026-10-15T03:48:27Z",
+      "premium_only": true
+    },
+    {
       "id": "itad-ff087683735c",
       "store": "steam",
       "title": "Voidtrain - Big Catch Free DLC",
@@ -106,25 +138,6 @@
       "premium_only": true
     },
     {
-      "id": "itad-538f08a31cd9",
-      "store": "steam",
-      "title": "MXGP 26 - Scrubdesignz Liveries Pack",
-      "claim_url": "https://isthereanydeal.com/giveaways/16623/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4847440/29e3b1f272186cffd9336fef4f8374416d280d97/header.jpg?t=1790841917",
-      "genres": [
-        "Racing",
-        "Simulation",
-        "Sports"
-      ],
-      "blurb": "MXGP 26 - Scrubdesignz Liveries",
-      "ends_at": "2026-10-17T20:18:44Z",
-      "steam_appid": 4847440,
-      "review_percent": 0,
-      "source": "itad",
-      "first_seen": "2026-10-03T20:18:44Z",
-      "premium_only": true
-    },
-    {
       "id": "itad-f99d00439cb6",
       "store": "steam",
       "title": "Rotwood: Drakin Armoury Pack - FREE on Steam on Steam",
@@ -139,6 +152,25 @@
       "ends_at": "2026-10-17T20:18:44Z",
       "steam_appid": 5067220,
       "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-10-03T20:18:44Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-538f08a31cd9",
+      "store": "steam",
+      "title": "MXGP 26 - Scrubdesignz Liveries Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16623/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4847440/29e3b1f272186cffd9336fef4f8374416d280d97/header.jpg?t=1790841917",
+      "genres": [
+        "Racing",
+        "Simulation",
+        "Sports"
+      ],
+      "blurb": "MXGP 26 - Scrubdesignz Liveries",
+      "ends_at": "2026-10-17T20:18:44Z",
+      "steam_appid": 4847440,
+      "review_percent": 0,
       "source": "itad",
       "first_seen": "2026-10-03T20:18:44Z",
       "premium_only": true

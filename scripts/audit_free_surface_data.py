@@ -296,6 +296,35 @@ def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
     }
 
 
+def _match_keys_for_approved_id(
+    aid: str,
+    *,
+    auto_by_id: dict[str, dict],
+    input_by_id: dict[str, dict],
+    field_overrides: dict[str, dict],
+    prior_by_id: dict[str, dict],
+) -> set[str]:
+    """Stable match keys for an approved id (mirrors build rekey / key-publish paths)."""
+    ref = auto_by_id.get(aid) or input_by_id.get(aid)
+    if ref:
+        keys = set(claim_match_keys(ref))
+        keys.add(stable_key(ref))
+        return keys
+    fo = field_overrides.get(aid) if isinstance(field_overrides, dict) else None
+    if isinstance(fo, dict):
+        title = str(fo.get("title") or "").strip()
+        if title:
+            norm = norm_title(title)
+            if norm:
+                return {f"title:{norm}"}
+    prior = prior_by_id.get(aid)
+    if prior:
+        keys = set(claim_match_keys(prior))
+        keys.add(stable_key(prior))
+        return keys
+    return set()
+
+
 def _is_held_live_listing_approval(aid: str, ref: dict | None) -> bool:
     """True when an approved-not-published id is an intentional live-listing hold.
 
@@ -311,7 +340,13 @@ def _is_held_live_listing_approval(aid: str, ref: dict | None) -> bool:
     return source in LIVE_LISTING_SOURCES and not has_ends_at(ref)
 
 
-def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None, input_doc: dict | None) -> dict[str, Any]:
+def _approved_audit(
+    approved: dict | None,
+    auto: dict | None,
+    built: dict | None,
+    input_doc: dict | None,
+    fallback: dict | None = None,
+) -> dict[str, Any]:
     if not isinstance(approved, dict):
         return {"exists": False}
     ids = [str(x) for x in (approved.get("ids") or []) if str(x).strip()]
@@ -320,7 +355,16 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
     built_items = _items(built)
     built_by_id = {str(it.get("id")): it for it in built_items if it.get("id")}
     built_keys = {stable_key(it) for it in built_items}
+    for it in built_items:
+        built_keys |= claim_match_keys(it)
     input_by_id = {str(it.get("id")): it for it in _items(input_doc) if it.get("id")}
+    field_overrides = approved.get("field_overrides") if isinstance(approved.get("field_overrides"), dict) else {}
+    prior_by_id: dict[str, dict] = {}
+    for doc in (built, fallback, input_doc):
+        for it in _items(doc):
+            row_id = str(it.get("id") or "").strip()
+            if row_id and row_id not in prior_by_id:
+                prior_by_id[row_id] = it
 
     orphans_not_in_auto = []
     orphans_not_in_built = []
@@ -334,9 +378,14 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
                 carry_forward_candidates.append({"id": aid, "via": "input"})
         if aid not in built_by_id and aid not in dismissed:
             # Approved id may publish under a sibling row (Epic wins over ITAD dedup).
-            ref = auto_by_id.get(aid) or input_by_id.get(aid)
-            ref_keys = {stable_key(ref)} if ref else set()
-            ref_keys.update(claim_match_keys(ref) if ref else [])
+            ref = auto_by_id.get(aid) or input_by_id.get(aid) or prior_by_id.get(aid)
+            ref_keys = _match_keys_for_approved_id(
+                aid,
+                auto_by_id=auto_by_id,
+                input_by_id=input_by_id,
+                field_overrides=field_overrides,
+                prior_by_id=prior_by_id,
+            )
             if ref_keys & built_keys:
                 orphans_represented_by_stable_key.append(
                     {"approved_id": aid, "stable_keys": sorted(ref_keys & built_keys)}
@@ -943,6 +992,7 @@ def run_audit(profile_id: str, *, check_urls: bool = False, url_limit: int = 30)
             auto if isinstance(auto, dict) else None,
             built if isinstance(built, dict) else None,
             input_doc if isinstance(input_doc, dict) else None,
+            fallback if isinstance(fallback, dict) else None,
         ),
         "cross_layer": _cross_layer_diff(
             built if isinstance(built, dict) else None,

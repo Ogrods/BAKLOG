@@ -1018,6 +1018,29 @@ def _effective_ends_at(
     return item.get("ends_at")
 
 
+def _approved_ids_for_auto_row(
+    item: dict,
+    *,
+    approved_ids: set[str],
+    auto_by_id: dict[str, dict],
+    field_overrides: dict[str, dict[str, str]] | None,
+) -> set[str]:
+    """Owner-approved ids represented by this auto row (id match or stable keys)."""
+    item_id = str(item.get("id") or "").strip()
+    item_keys = claim_match_keys(item)
+    out: set[str] = set()
+    if item_id in approved_ids:
+        out.add(item_id)
+    fo = field_overrides or {}
+    for aid in approved_ids:
+        if aid in out:
+            continue
+        keys = _keys_for_approved_id(aid, auto_by_id=auto_by_id, field_overrides=fo)
+        if keys & item_keys:
+            out.add(aid)
+    return out
+
+
 def _select_approved_auto_items(
     auto_items_all: list[dict],
     *,
@@ -1032,6 +1055,7 @@ def _select_approved_auto_items(
     dismissed_ids = dismissed_ids or set()
     expired_approved_ids: set[str] = set()
     auto_items: list[dict] = []
+    auto_by_id = _auto_items_by_id(auto_items_all)
     for item in auto_items_all:
         if not isinstance(item, dict):
             continue
@@ -1057,8 +1081,13 @@ def _select_approved_auto_items(
             # An undated live-listing row is only "expired" because the source has
             # not returned it lately (outage or delist): skip it, keep the approval.
             undated_live = not ends_at and str(item.get("source") or "") in LIVE_LISTING_SOURCES
-            if item_id in approved_ids and not undated_live:
-                expired_approved_ids.add(item_id)
+            if not undated_live:
+                expired_approved_ids |= _approved_ids_for_auto_row(
+                    item,
+                    approved_ids=approved_ids,
+                    auto_by_id=auto_by_id,
+                    field_overrides=field_overrides,
+                )
             continue
         auto_items.append(dict(item))
     return auto_items, expired_approved_ids
@@ -1902,15 +1931,40 @@ def main() -> int:
     prior_published_rows = _load_prior_published_rows(
         [args.output, FALLBACK_PATH, free_claims_path()]
     )
-    rekeyed_ids, store_overrides, field_overrides, premium_only_ids = rekey_approved_state(
-        ids=sorted(approved_ids),
-        store_overrides=store_overrides,
-        field_overrides=field_overrides,
-        premium_only_ids=premium_only_ids,
-        auto_items_all=auto_items_all,
-        prior_rows_by_id=prior_published_rows,
-    )
+    def _rekey_current(ids_for_rekey: set[str]) -> tuple[list[str], dict[str, str], dict[str, dict[str, str]], set[str]]:
+        return rekey_approved_state(
+            ids=sorted(ids_for_rekey),
+            store_overrides=store_overrides,
+            field_overrides=field_overrides,
+            premium_only_ids=premium_only_ids,
+            auto_items_all=auto_items_all,
+            prior_rows_by_id=prior_published_rows,
+        )
+
+    rekeyed_ids, store_overrides, field_overrides, premium_only_ids = _rekey_current(approved_ids)
     approved_ids = set(rekeyed_ids)
+    owner_approved_ids = set(orig_approved_ids)
+    auto_decisions_path = args.auto_decisions or resolve_auto_decisions_path(Path.cwd())
+    if auto_decisions_path is not None and auto_decisions_path.is_file():
+        merged = merge_decisions(
+            owner_approved=approved_ids,
+            owner_dismissed=dismissed_ids,
+            auto=load_auto_decisions(auto_decisions_path),
+            auto_items=auto_items_all,
+            owner_dismissed_item_ids={
+                str(it.get("id") or "").strip()
+                for it in auto_items_all
+                if dismissed_keys and _cover_lookup_key(it.get("title") or "") in dismissed_keys
+            },
+        )
+        approved_ids = merged.approved_ids
+        dismissed_ids = merged.dismissed_ids
+        stats.warn(
+            f"autopilot: +{len(merged.auto_approved)} approved, "
+            f"{len(merged.auto_dismissed)} dismissed"
+        )
+        rekeyed_ids, store_overrides, field_overrides, premium_only_ids = _rekey_current(approved_ids)
+        approved_ids = set(rekeyed_ids)
     approved_changed = (
         approved_ids != orig_approved_ids
         or store_overrides != orig_store_overrides
@@ -1936,26 +1990,6 @@ def main() -> int:
         else:
             appr_doc.pop("premium_only_ids", None)
         safe_write_text(approved_path, json.dumps(appr_doc, indent=2, ensure_ascii=False))
-    owner_approved_ids = set(approved_ids)
-    auto_decisions_path = args.auto_decisions or resolve_auto_decisions_path(Path.cwd())
-    if auto_decisions_path is not None and auto_decisions_path.is_file():
-        merged = merge_decisions(
-            owner_approved=approved_ids,
-            owner_dismissed=dismissed_ids,
-            auto=load_auto_decisions(auto_decisions_path),
-            auto_items=auto_items_all,
-            owner_dismissed_item_ids={
-                str(it.get("id") or "").strip()
-                for it in auto_items_all
-                if dismissed_keys and _cover_lookup_key(it.get("title") or "") in dismissed_keys
-            },
-        )
-        approved_ids = merged.approved_ids
-        dismissed_ids = merged.dismissed_ids
-        stats.warn(
-            f"autopilot: +{len(merged.auto_approved)} approved, "
-            f"{len(merged.auto_dismissed)} dismissed"
-        )
     now = datetime.now(UTC)
     auto_by_id = _auto_items_by_id(auto_items_all)
     approved_keys = _resolve_approved_keys(approved_ids, auto_items_all, field_overrides)

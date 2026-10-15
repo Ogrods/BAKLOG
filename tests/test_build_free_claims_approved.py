@@ -879,6 +879,208 @@ def test_build_keeps_undated_gamerpower_approval_during_outage(
     assert approved["ids"] == ["gamerpower-1", "epic-live"]
 
 
+def test_expired_approved_absent_from_auto_helper() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 15, 16, 0, tzinfo=UTC)
+    prior = {
+        "id": "epic-x",
+        "title": "X",
+        "source": "epic",
+        "ends_at": "2026-10-15T15:00:00Z",
+    }
+    assert bfc._expired_approved_absent_from_auto(
+        approved_ids={"epic-x"},
+        selected_ids=set(),
+        auto_by_id={},
+        prior_rows_by_id={"epic-x": prior},
+        now=now,
+    ) == {"epic-x"}
+    # Still in auto: selection path owns prune.
+    assert bfc._expired_approved_absent_from_auto(
+        approved_ids={"epic-x"},
+        selected_ids=set(),
+        auto_by_id={"epic-x": prior},
+        prior_rows_by_id={"epic-x": prior},
+        now=now,
+    ) == set()
+    # No prior: true hiccup, do not prune.
+    assert bfc._expired_approved_absent_from_auto(
+        approved_ids={"epic-x"},
+        selected_ids=set(),
+        auto_by_id={},
+        prior_rows_by_id={},
+        now=now,
+    ) == set()
+
+
+def test_expired_approved_absent_keeps_undated_live_listing() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 10, 15, 16, 0, tzinfo=UTC)
+    prior = {
+        "id": "gamerpower-1",
+        "title": "Held",
+        "source": "gamerpower",
+        "ends_at": None,
+        "first_seen": "2026-01-01T00:00:00Z",
+        "last_seen": "2026-01-01T00:00:00Z",
+    }
+    assert bfc._expired_approved_absent_from_auto(
+        approved_ids={"gamerpower-1"},
+        selected_ids=set(),
+        auto_by_id={},
+        prior_rows_by_id={"gamerpower-1": prior},
+        now=now,
+    ) == set()
+
+
+def test_build_prunes_expired_approved_absent_from_auto(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Epic left the scrape after ends_at; prior landing proves expiry → prune."""
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+    input_path.write_text('{"items": []}', encoding="utf-8")
+    # New weekly free only; the approved expired id is gone from auto.
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-new",
+                        "store": "epic",
+                        "title": "New Epic",
+                        "claim_url": "https://store.epicgames.com/en-US/p/new",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps({"ids": ["epic-expired", "epic-new"]}),
+        encoding="utf-8",
+    )
+    output_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-expired",
+                        "store": "epic",
+                        "title": "Expired Epic",
+                        "claim_url": "https://store.epicgames.com/en-US/p/expired",
+                        "ends_at": "2020-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("BAKLOG_FREE_CLAIMS_APPROVED", raising=False)
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            k: raw.get(k) for k in ("id", "store", "title", "claim_url", "ends_at", "source")
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert {item["id"] for item in built["items"]} == {"epic-new"}
+    approved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert approved["ids"] == ["epic-new"]
+
+
+def test_build_keeps_undated_gamerpower_approval_absent_from_auto(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GP outage: id gone from scrape, prior undated → keep approval, do not publish."""
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+    input_path.write_text('{"items": []}', encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-live",
+                        "store": "epic",
+                        "title": "Live Epic",
+                        "claim_url": "https://store.epicgames.com/en-US/p/live",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps({"ids": ["gamerpower-held", "epic-live"]}),
+        encoding="utf-8",
+    )
+    output_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "gamerpower-held",
+                        "store": "other",
+                        "title": "Held GP",
+                        "claim_url": "https://www.gamerpower.com/open/x",
+                        "ends_at": None,
+                        "source": "gamerpower",
+                        "first_seen": "2026-01-01T00:00:00Z",
+                        "last_seen": "2026-01-01T00:00:00Z",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("BAKLOG_FREE_CLAIMS_APPROVED", raising=False)
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            k: raw.get(k) for k in ("id", "store", "title", "claim_url", "ends_at", "source")
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert {item["id"] for item in built["items"]} == {"epic-live"}
+    approved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert "gamerpower-held" in approved["ids"]
+    assert "epic-live" in approved["ids"]
+
+
 def test_enrich_item_resolves_steam_appid_and_review(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

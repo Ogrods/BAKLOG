@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from shared.claims_expiry import LIVE_LISTING_SOURCES, has_ends_at
 from shared.claims_paths import resolve_approved_path
 from shared.free_claims_sources import (
     claim_match_keys,
@@ -295,6 +296,21 @@ def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
     }
 
 
+def _is_held_live_listing_approval(aid: str, ref: dict | None) -> bool:
+    """True when an approved-not-published id is an intentional live-listing hold.
+
+    Undated GamerPower (etc.) rows still in auto (or input) stay approved during
+    an outage; they must not trip ingest ``--fail-on high``. Require a real row
+    so a dated ``gamerpower-*`` id with no scrape/prior metadata stays a high
+    orphan (same as build: no prior → do not prune).
+    """
+    del aid  # id alone is not enough; see docstring
+    if not isinstance(ref, dict):
+        return False
+    source = str(ref.get("source") or "").strip().lower()
+    return source in LIVE_LISTING_SOURCES and not has_ends_at(ref)
+
+
 def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None, input_doc: dict | None) -> dict[str, Any]:
     if not isinstance(approved, dict):
         return {"exists": False}
@@ -308,6 +324,7 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
 
     orphans_not_in_auto = []
     orphans_not_in_built = []
+    orphans_held_live_listing = []
     orphans_represented_by_stable_key = []
     carry_forward_candidates = []
     for aid in ids:
@@ -324,6 +341,8 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
                 orphans_represented_by_stable_key.append(
                     {"approved_id": aid, "stable_keys": sorted(ref_keys & built_keys)}
                 )
+            elif _is_held_live_listing_approval(aid, ref):
+                orphans_held_live_listing.append(aid)
             else:
                 orphans_not_in_built.append(aid)
 
@@ -351,6 +370,7 @@ def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None
         "field_overrides_count": len(field_overrides) if isinstance(field_overrides, dict) else 0,
         "orphans_not_in_auto": orphans_not_in_auto,
         "orphans_not_in_built": orphans_not_in_built,
+        "orphans_held_live_listing": orphans_held_live_listing,
         "orphans_represented_by_stable_key": orphans_represented_by_stable_key,
         "carry_forward_via_input": carry_forward_candidates,
         "override_drift": override_drift,
@@ -617,6 +637,7 @@ def _write_handoff_md(report: dict[str, Any], path: Path) -> None:
             f"- **built ↔ fallback ids match:** {cross.get('built_vs_fallback', {}).get('ids_match')}",
             f"- **pickNewerFeed profile vs fallback:** `{cross.get('pick_newer_feed', {}).get('profile_vs_fallback_winner')}` wins",
             f"- **Approved id orphans (true gaps):** {len(approved.get('orphans_not_in_built', []))}",
+            f"- **Approved live-listing holds:** {len(approved.get('orphans_held_live_listing', []))}",
             f"- **Approved id → stable-key siblings in built:** {len(approved.get('orphans_represented_by_stable_key', []))}",
             f"- **Personal dismissals now:** {personal.get('dismissed_ids_count')} ids / {personal.get('dismissed_keys_count')} keys",
             f"- **ITAD by_key count:** {report.get('itad', {}).get('by_key_count')} (age {report.get('itad', {}).get('age_hours')}h)",
@@ -766,6 +787,16 @@ def _compile_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
             "Re-run build_free_claims.py; verify carry-forward for ids absent from auto",
             row=oid,
             blocks="p4_claim_approved_dropped_on_source_hiccup",
+        )
+    for oid in approved.get("orphans_held_live_listing", []):
+        add(
+            "low",
+            "maintainer-action",
+            "approved.json",
+            f"Approved live-listing id {oid} held (not publishing; approval kept)",
+            "Returns when the live-only source lists it again",
+            "No action unless the giveaway truly ended - then remove from approved",
+            row=oid,
         )
     for drift in approved.get("override_drift", []):
         add(

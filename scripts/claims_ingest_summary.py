@@ -119,8 +119,27 @@ def fetch_live_doc(url: str) -> tuple[dict | None, str | None]:
     return payload, None
 
 
-def check_live_age(url: str, *, max_age_days: float) -> tuple[str, bool, datetime | None]:
-    """Return (summary line, stale, live_generated_at)."""
+def same_claims(a: list[dict], b: list[dict]) -> bool:
+    """True when both feeds carry the same claims per the refresh-PR fingerprint gate."""
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from claims_feed_fingerprint import fingerprint_items
+
+    return fingerprint_items(a) == fingerprint_items(b)
+
+
+def check_live_age(
+    url: str,
+    *,
+    max_age_days: float,
+    landing_items: list[dict] | None = None,
+) -> tuple[str, bool, datetime | None]:
+    """Return (summary line, stale, live_generated_at).
+
+    generated_at only advances when the published claims change, so an old live
+    feed whose claims match the committed landing feed is unchanged, not stale.
+    """
     payload, err = fetch_live_doc(url)
     if err or payload is None:
         return (f"WARN: {err}", False, None)
@@ -130,12 +149,23 @@ def check_live_age(url: str, *, max_age_days: float) -> tuple[str, bool, datetim
         return ("WARN: live feed has no parseable generated_at", False, None)
 
     age_days = (datetime.now(UTC) - generated).total_seconds() / 86400.0
-    item_count = len(payload.get("items") or []) if isinstance(payload.get("items"), list) else "?"
+    live_items = payload.get("items") if isinstance(payload.get("items"), list) else None
+    item_count = len(live_items) if live_items is not None else "?"
     line = (
         f"live generated_at={_fmt_ts(generated)} "
         f"age={age_days:.2f}d (limit={max_age_days:g}d) items={item_count}"
     )
     if age_days > max_age_days:
+        if (
+            landing_items is not None
+            and live_items is not None
+            and same_claims([r for r in live_items if isinstance(r, dict)], landing_items)
+        ):
+            return (
+                f"OK: {line} - claims unchanged since then, live matches committed feed",
+                False,
+                generated,
+            )
         return (f"WARN: {line} - refresh and republish", True, generated)
     return (f"OK: {line}", False, generated)
 
@@ -299,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
         skew_line = None
     else:
         live_line, live_stale, live_generated = check_live_age(
-            args.live_url, max_age_days=args.max_age_days
+            args.live_url, max_age_days=args.max_age_days, landing_items=landing_items
         )
         skew_line = landing_vs_live_skew_line(
             landing_generated,

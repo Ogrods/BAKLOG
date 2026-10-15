@@ -1883,7 +1883,7 @@ def main() -> int:
         _debug_claims(f"auto feed: {len(auto_items_all)} item(s) by source {by_source}")
     approved_path = args.approved or _approved_path()
     if approved_path != APPROVED_PATH:
-        stats.warn(f"owner decisions: {approved_path.name} from {approved_path.parent.name}/")
+        stats.info(f"owner decisions: {approved_path.name} from {approved_path.parent.name}/")
     approved_ids = _load_approved_ids(approved_path)
     # Blocked ids are a permanent kill list; fold them into the dismissed filter
     # so they are excluded from the feed exactly like a soft-hidden claim.
@@ -1952,7 +1952,7 @@ def main() -> int:
         )
         approved_ids = merged.approved_ids
         dismissed_ids = merged.dismissed_ids
-        stats.warn(
+        stats.info(
             f"autopilot: +{len(merged.auto_approved)} approved, "
             f"{len(merged.auto_dismissed)} dismissed"
         )
@@ -2024,7 +2024,7 @@ def main() -> int:
             if pruned:
                 stats.warn(f"pruned {pruned} expired item(s) from approved list")
     if auto_items_all:
-        stats.warn(
+        stats.info(
             f"auto feed: {len(auto_items)} approved of {len(auto_items_all)} available"
         )
     if DEBUG_CLAIMS:
@@ -2055,7 +2055,7 @@ def main() -> int:
             )
     raw_items = merge_manual_and_auto(publish_manual, auto_items)
     if auto_items:
-        stats.warn(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")
+        stats.info(f"merged {len(auto_items)} auto item(s); {len(raw_items)} total before enrich")
 
     manual_ids = {
         str(it.get("id") or "").strip()
@@ -2137,10 +2137,10 @@ def main() -> int:
         ]
         persisted_auto = merge_enriched_items_into_auto_feed(AUTO_PATH, to_persist_auto)
         if persisted_auto:
-            stats.warn(f"persisted enrichment onto {persisted_auto} auto feed row(s)")
+            stats.info(f"persisted enrichment onto {persisted_auto} auto feed row(s)")
         persisted_manual = merge_enriched_items_into_input_feed(args.input, to_persist_manual)
         if persisted_manual:
-            stats.warn(f"persisted enrichment onto {persisted_manual} manual input row(s)")
+            stats.info(f"persisted enrichment onto {persisted_manual} manual input row(s)")
 
     generated_at = datetime.now(UTC).isoformat()
     has_gamerpower = any(item.get("source") == "gamerpower" for item in items)

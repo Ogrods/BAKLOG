@@ -153,3 +153,17 @@ def test_run_stats_finish_returns_exit_code(capsys):
     assert "demo done" in out.out
     assert "1 warnings" in out.out
     assert "something odd" in out.err
+
+
+def test_run_stats_info_is_not_a_warning(capsys):
+    t0 = started("demo")
+    stats = RunStats()
+    stats.info("routine status")
+    stats.finish("demo", t0)
+    out = capsys.readouterr()
+    assert "  INFO: routine status" in out.out
+    assert "WARNING" not in out.out
+    assert "0 warnings" in out.out
+    assert stats.warnings == 0
+    assert stats.warning_messages == []
+    assert "routine status" not in out.err

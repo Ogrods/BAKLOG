@@ -879,6 +879,26 @@ def test_build_keeps_undated_gamerpower_approval_during_outage(
     assert approved["ids"] == ["gamerpower-1", "epic-live"]
 
 
+def test_approved_ids_for_auto_row_matches_field_override_title() -> None:
+    auto_by_id = {}
+    item = {
+        "id": "epic-live",
+        "title": "Songs of Conquest",
+        "store": "epic",
+        "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
+        "source": "epic",
+    }
+    approved_ids = {"itad-old"}
+    field_overrides = {"itad-old": {"title": "Songs of Conquest"}}
+    matched = bfc._approved_ids_for_auto_row(
+        item,
+        approved_ids=approved_ids,
+        auto_by_id=auto_by_id,
+        field_overrides=field_overrides,
+    )
+    assert matched == {"itad-old"}
+
+
 def test_expired_approved_absent_from_auto_helper() -> None:
     from datetime import UTC, datetime
 

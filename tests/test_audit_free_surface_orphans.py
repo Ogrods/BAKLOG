@@ -58,6 +58,44 @@ def test_audit_gamerpower_absent_without_row_stays_high() -> None:
     assert any(f["severity"] == "high" and f.get("row") == "gamerpower-99" for f in findings)
 
 
+def test_audit_key_matched_sibling_in_built_is_not_high() -> None:
+    """ITAD-approved id may ship as an Epic row; audit must not flag a high orphan."""
+    audit = _load_audit()
+    approved = {
+        "ids": ["itad-073a56345192"],
+        "field_overrides": {"itad-073a56345192": {"title": "Songs of Conquest"}},
+    }
+    auto = {
+        "items": [
+            {
+                "id": "epic-songs-of-conquest",
+                "store": "epic",
+                "title": "Songs of Conquest",
+                "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
+                "ends_at": "2099-01-01T00:00:00Z",
+                "source": "epic",
+            }
+        ]
+    }
+    built = {
+        "items": [
+            {
+                "id": "epic-songs-of-conquest",
+                "store": "epic",
+                "title": "Songs of Conquest",
+                "claim_url": "https://store.epicgames.com/en-US/p/songs-of-conquest",
+                "ends_at": "2099-01-01T00:00:00Z",
+                "source": "epic",
+            }
+        ]
+    }
+    report = {"approved": audit._approved_audit(approved, auto, built, None)}
+    findings = audit._compile_findings(report)
+    assert report["approved"]["orphans_not_in_built"] == []
+    assert report["approved"]["orphans_represented_by_stable_key"]
+    assert not [f for f in findings if f["severity"] == "high"]
+
+
 def test_audit_expired_absent_orphan_is_high_until_pruned() -> None:
     audit = _load_audit()
     approved = {"ids": ["epic-gone"]}

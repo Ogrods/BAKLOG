@@ -32,7 +32,7 @@ permissions:
 
 concurrency:
   group: claims-ingest
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   approve-dry-run:

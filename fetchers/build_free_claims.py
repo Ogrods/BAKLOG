@@ -1931,7 +1931,9 @@ def main() -> int:
     prior_published_rows = _load_prior_published_rows(
         [args.output, FALLBACK_PATH, free_claims_path()]
     )
-    def _rekey_current(ids_for_rekey: set[str]) -> tuple[list[str], dict[str, str], dict[str, dict[str, str]], set[str]]:
+    def _rekey_current(
+        ids_for_rekey: set[str],
+    ) -> tuple[list[str], dict[str, str], dict[str, dict[str, str]], set[str]]:
         return rekey_approved_state(
             ids=sorted(ids_for_rekey),
             store_overrides=store_overrides,

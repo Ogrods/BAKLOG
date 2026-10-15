@@ -1,33 +1,33 @@
 {
-  "generated_at": "2026-10-13T06:52:42.080967+00:00",
+  "generated_at": "2026-10-15T20:49:38.429920+00:00",
   "items": [
     {
-      "id": "epic-out-of-sight-b96ca8",
+      "id": "epic-bad-cheese-4256d9",
       "store": "epic",
-      "title": "Out of Sight",
-      "claim_url": "https://store.epicgames.com/en-US/p/out-of-sight-b96ca8",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/6e1bf54cfa6344c89d41e4e7af036ac9/out-of-sight-1l12n.jpg",
+      "title": "Bad Cheese",
+      "claim_url": "https://store.epicgames.com/en-US/p/bad-cheese-4256d9",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3094480/e1801746961b88b3cbc43a72d1e77b030876e0a4/header.jpg?t=1778532201",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-10-15T15:00:00Z",
-      "steam_appid": 2526310,
-      "review_percent": 95,
+      "ends_at": "2026-10-22T15:00:00Z",
+      "steam_appid": 3094480,
+      "review_percent": 71,
       "source": "epic",
-      "first_seen": "2026-10-10T16:05:48Z"
+      "first_seen": "2026-10-15T20:49:28Z"
     },
     {
-      "id": "epic-terrascape-2b12b1",
+      "id": "epic-agent-a-a-puzzle-in-disguise-42fe5f",
       "store": "epic",
-      "title": "TerraScape",
-      "claim_url": "https://store.epicgames.com/en-US/p/terrascape-2b12b1",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/a740a2eed807469f88b9dff17e7cd3a3/terrascape-j7p8d.png",
+      "title": "Agent A: A puzzle in disguise",
+      "claim_url": "https://store.epicgames.com/en-US/p/agent-a-a-puzzle-in-disguise-42fe5f",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/801480/header.jpg?t=1724988275",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-10-15T15:00:00Z",
-      "steam_appid": 2290000,
-      "review_percent": 89,
+      "ends_at": "2026-10-22T15:00:00Z",
+      "steam_appid": 801480,
+      "review_percent": 95,
       "source": "epic",
-      "first_seen": "2026-10-10T16:05:48Z"
+      "first_seen": "2026-10-15T20:49:28Z"
     },
     {
       "id": "gamerpower-3328",
@@ -106,18 +106,23 @@
       "premium_only": true
     },
     {
-      "id": "itad-6b4a0c098140",
-      "store": "epic",
-      "title": "The Big Con",
-      "claim_url": "https://isthereanydeal.com/giveaways/16646/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1139280/header.jpg?t=1786075312",
-      "genres": [],
-      "blurb": "The Big Con",
-      "ends_at": "2026-10-24T16:05:48Z",
-      "steam_appid": 1139280,
-      "review_percent": 93,
+      "id": "itad-538f08a31cd9",
+      "store": "steam",
+      "title": "MXGP 26 - Scrubdesignz Liveries Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16623/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4847440/29e3b1f272186cffd9336fef4f8374416d280d97/header.jpg?t=1790841917",
+      "genres": [
+        "Racing",
+        "Simulation",
+        "Sports"
+      ],
+      "blurb": "MXGP 26 - Scrubdesignz Liveries",
+      "ends_at": "2026-10-17T20:18:44Z",
+      "steam_appid": 4847440,
+      "review_percent": 0,
       "source": "itad",
-      "first_seen": "2026-10-10T16:05:48Z"
+      "first_seen": "2026-10-03T20:18:44Z",
+      "premium_only": true
     },
     {
       "id": "itad-f99d00439cb6",
@@ -139,23 +144,18 @@
       "premium_only": true
     },
     {
-      "id": "itad-538f08a31cd9",
-      "store": "steam",
-      "title": "MXGP 26 - Scrubdesignz Liveries Pack",
-      "claim_url": "https://isthereanydeal.com/giveaways/16623/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4847440/29e3b1f272186cffd9336fef4f8374416d280d97/header.jpg?t=1790841917",
-      "genres": [
-        "Racing",
-        "Simulation",
-        "Sports"
-      ],
-      "blurb": "MXGP 26 - Scrubdesignz Liveries",
-      "ends_at": "2026-10-17T20:18:44Z",
-      "steam_appid": 4847440,
-      "review_percent": 0,
+      "id": "itad-6b4a0c098140",
+      "store": "epic",
+      "title": "The Big Con",
+      "claim_url": "https://isthereanydeal.com/giveaways/16646/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1139280/header.jpg?t=1786075312",
+      "genres": [],
+      "blurb": "The Big Con",
+      "ends_at": "2026-10-24T16:05:48Z",
+      "steam_appid": 1139280,
+      "review_percent": 93,
       "source": "itad",
-      "first_seen": "2026-10-03T20:18:44Z",
-      "premium_only": true
+      "first_seen": "2026-10-10T16:05:48Z"
     }
   ],
   "attribution": [

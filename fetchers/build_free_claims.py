@@ -24,7 +24,11 @@ from shared.claims_expiry import (
     is_trusted_live_listing,
     parse_dt,
 )
-from shared.claims_paths import resolve_approved_path, resolve_auto_decisions_path
+from shared.claims_paths import (
+    resolve_approved_path,
+    resolve_auto_decisions_path,
+    resolve_scrape_path,
+)
 from shared.free_claims_sources import (
     CLAIM_ENRICH_FIELDS,
     EPIC_MOBILE_STORE,
@@ -1903,7 +1907,11 @@ def main() -> int:
         stats.error("input.items must be a list")
         return stats.finish("build_free_claims", t0, exit_code=1)
 
-    auto_items_all = _load_auto_items(AUTO_PATH)
+    # Same scrape admin uses: newer of local curated vs private CI scrape.
+    auto_scrape_path = resolve_scrape_path(Path.cwd(), AUTO_PATH)
+    auto_items_all = _load_auto_items(auto_scrape_path)
+    if auto_scrape_path.resolve() != AUTO_PATH.resolve():
+        stats.warn(f"auto scrape: {auto_scrape_path.name} from {auto_scrape_path.parent.name}/")
     if DEBUG_CLAIMS:
         by_source: dict[str, int] = {}
         for row in auto_items_all:

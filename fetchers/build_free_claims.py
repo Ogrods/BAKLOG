@@ -1943,9 +1943,14 @@ def main() -> int:
             prior_rows_by_id=prior_published_rows,
         )
 
-    rekeyed_ids, store_overrides, field_overrides, premium_only_ids = _rekey_current(approved_ids)
-    approved_ids = set(rekeyed_ids)
-    owner_approved_ids = set(orig_approved_ids)
+    # Owner file stays owner-only. Autopilot merge expands the in-memory
+    # selection set and may re-key for sibling matching, but never persists
+    # auto ids into free_claims.approved.json.
+    owner_rekeyed_ids, store_overrides, field_overrides, premium_only_ids = _rekey_current(
+        approved_ids
+    )
+    approved_ids = set(owner_rekeyed_ids)
+    owner_approved_ids = set(owner_rekeyed_ids)
     auto_decisions_path = args.auto_decisions or resolve_auto_decisions_path(Path.cwd())
     if auto_decisions_path is not None and auto_decisions_path.is_file():
         merged = merge_decisions(
@@ -1965,10 +1970,10 @@ def main() -> int:
             f"autopilot: +{len(merged.auto_approved)} approved, "
             f"{len(merged.auto_dismissed)} dismissed"
         )
-        rekeyed_ids, store_overrides, field_overrides, premium_only_ids = _rekey_current(approved_ids)
-        approved_ids = set(rekeyed_ids)
+        sel_ids, _, _, _ = _rekey_current(approved_ids)
+        approved_ids = set(sel_ids)
     approved_changed = (
-        approved_ids != orig_approved_ids
+        owner_approved_ids != orig_approved_ids
         or store_overrides != orig_store_overrides
         or field_overrides != orig_field_overrides
         or premium_only_ids != orig_premium_only_ids
@@ -1978,7 +1983,7 @@ def main() -> int:
             appr_doc = json.loads(approved_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             appr_doc = {}
-        appr_doc["ids"] = rekeyed_ids
+        appr_doc["ids"] = owner_rekeyed_ids
         if store_overrides:
             appr_doc["store_overrides"] = store_overrides
         else:

@@ -47,13 +47,15 @@ def test_audit_held_live_listing_is_not_high() -> None:
     assert low_held
 
 
-def test_audit_held_live_listing_by_id_prefix_when_absent_from_auto() -> None:
+def test_audit_gamerpower_absent_without_row_stays_high() -> None:
+    """No auto/input row: cannot prove undated hold; keep high (matches build)."""
     audit = _load_audit()
     approved = {"ids": ["gamerpower-99"]}
     report = {"approved": audit._approved_audit(approved, {"items": []}, {"items": []}, None)}
     findings = audit._compile_findings(report)
-    assert report["approved"]["orphans_held_live_listing"] == ["gamerpower-99"]
-    assert not any(f["severity"] == "high" for f in findings)
+    assert report["approved"]["orphans_held_live_listing"] == []
+    assert report["approved"]["orphans_not_in_built"] == ["gamerpower-99"]
+    assert any(f["severity"] == "high" and f.get("row") == "gamerpower-99" for f in findings)
 
 
 def test_audit_expired_absent_orphan_is_high_until_pruned() -> None:

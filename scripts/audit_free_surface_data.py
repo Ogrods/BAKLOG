@@ -299,14 +299,16 @@ def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
 def _is_held_live_listing_approval(aid: str, ref: dict | None) -> bool:
     """True when an approved-not-published id is an intentional live-listing hold.
 
-    Undated GamerPower (etc.) approvals stay on disk during an outage; they must
-    not trip the ingest ``--fail-on high`` gate as true orphans.
+    Undated GamerPower (etc.) rows still in auto (or input) stay approved during
+    an outage; they must not trip ingest ``--fail-on high``. Require a real row
+    so a dated ``gamerpower-*`` id with no scrape/prior metadata stays a high
+    orphan (same as build: no prior → do not prune).
     """
-    if isinstance(ref, dict):
-        source = str(ref.get("source") or "").strip().lower()
-        return source in LIVE_LISTING_SOURCES and not has_ends_at(ref)
-    prefix = aid.split("-", 1)[0].lower() if "-" in aid else ""
-    return prefix in LIVE_LISTING_SOURCES
+    del aid  # id alone is not enough; see docstring
+    if not isinstance(ref, dict):
+        return False
+    source = str(ref.get("source") or "").strip().lower()
+    return source in LIVE_LISTING_SOURCES and not has_ends_at(ref)
 
 
 def _approved_audit(approved: dict | None, auto: dict | None, built: dict | None, input_doc: dict | None) -> dict[str, Any]:

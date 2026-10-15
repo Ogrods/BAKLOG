@@ -1064,6 +1064,38 @@ def _select_approved_auto_items(
     return auto_items, expired_approved_ids
 
 
+def _expired_approved_absent_from_auto(
+    *,
+    approved_ids: set[str],
+    selected_ids: set[str],
+    auto_by_id: dict[str, dict],
+    prior_rows_by_id: dict[str, dict],
+    now: datetime,
+    dismissed_ids: set[str] | None = None,
+) -> set[str]:
+    """Approved ids gone from auto whose prior published row proves they expired.
+
+    Once a dated giveaway leaves the source API, selection never sees the row and
+    cannot prune it. Use the last published copy's ends_at (same rule as
+    carry-forward) so owner approved.json does not keep dead ids that fail the
+    ingest audit. Undated live-listing holds stay (outage / temporary delist).
+    No prior row means a true source hiccup: leave the id for the high orphan.
+    """
+    dismissed_ids = dismissed_ids or set()
+    out: set[str] = set()
+    for aid in approved_ids:
+        if not aid or aid in dismissed_ids or aid in selected_ids or aid in auto_by_id:
+            continue
+        prior = prior_rows_by_id.get(aid)
+        if not isinstance(prior, dict):
+            continue
+        if not has_ends_at(prior) and str(prior.get("source") or "").strip().lower() in LIVE_LISTING_SOURCES:
+            continue
+        if _is_expired(_ends_at_for_prune(prior, now), now):
+            out.add(aid)
+    return out
+
+
 def _parse_ends_at(ends_at: object) -> datetime | None:
     if ends_at is None:
         return None
@@ -1965,6 +1997,23 @@ def main() -> int:
             field_overrides,
             field_overrides_by_key=field_by_key,
             title_fallback_ids=set(approved_ids),
+        )
+    selected_ids = {
+        str(it.get("id") or "").strip() for it in auto_items if str(it.get("id") or "").strip()
+    }
+    absent_expired = _expired_approved_absent_from_auto(
+        approved_ids=approved_ids,
+        selected_ids=selected_ids,
+        auto_by_id=auto_by_id,
+        prior_rows_by_id=prior_published_rows,
+        now=now,
+        dismissed_ids=dismissed_ids,
+    )
+    if absent_expired:
+        expired_approved_ids |= absent_expired
+        stats.warn(
+            f"expired approved id(s) absent from auto (via prior publish): "
+            f"{', '.join(sorted(absent_expired))}"
         )
     if expired_approved_ids:
         stats.warn(f"skipped {len(expired_approved_ids)} expired approved auto item(s)")

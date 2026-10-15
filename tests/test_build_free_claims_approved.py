@@ -899,6 +899,84 @@ def test_approved_ids_for_auto_row_matches_field_override_title() -> None:
     assert matched == {"itad-old"}
 
 
+def test_build_loads_newer_shared_scrape_via_resolve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local Publish must see the same scrape admin does (private CI copy)."""
+    input_path = tmp_path / "free-claims.input.json"
+    local_auto = tmp_path / "curated" / "free_claims.auto.json"
+    shared_auto = tmp_path / "claims" / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+    local_auto.parent.mkdir(parents=True, exist_ok=True)
+    shared_auto.parent.mkdir(parents=True, exist_ok=True)
+    input_path.write_text('{"items": []}', encoding="utf-8")
+    # Stale local scrape: no new Epic weekly free.
+    local_auto.write_text(
+        json.dumps(
+            {
+                "fetched_at": "2026-10-14T00:00:00Z",
+                "items": [
+                    {
+                        "id": "epic-old",
+                        "store": "epic",
+                        "title": "Old",
+                        "claim_url": "https://store.epicgames.com/en-US/p/old",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    # Newer shared scrape has the autopilot-approved Agent A row.
+    shared_auto.write_text(
+        json.dumps(
+            {
+                "fetched_at": "2026-10-15T20:00:00Z",
+                "items": [
+                    {
+                        "id": "epic-agent-a",
+                        "store": "epic",
+                        "title": "Agent A",
+                        "claim_url": "https://store.epicgames.com/en-US/p/agent-a",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(json.dumps({"ids": ["epic-agent-a"]}), encoding="utf-8")
+    monkeypatch.delenv("BAKLOG_FREE_CLAIMS_APPROVED", raising=False)
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", local_auto)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "resolve_scrape_path",
+        lambda _root, local=None: shared_auto,
+    )
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            k: raw.get(k) for k in ("id", "store", "title", "claim_url", "ends_at", "source")
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert {item["id"] for item in built["items"]} == {"epic-agent-a"}
+
+
 def test_expired_approved_absent_from_auto_helper() -> None:
     from datetime import UTC, datetime
 

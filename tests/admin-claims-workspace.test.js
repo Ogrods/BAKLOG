@@ -31,8 +31,58 @@ import {
   resolveApprovedKeys,
   slugManualId,
   sortClaimsItems,
+  statusBadgeHtml,
   stripClaimTitleDecorations,
 } from '../admin/claims-workspace.js';
+
+describe('statusBadgeHtml autoOnly', () => {
+  it('adds Auto badge for autopilot-only selected rows', () => {
+    const html = statusBadgeHtml({
+      publishState: 'will_publish',
+      missing: [],
+      expiringSoon: false,
+      expired: false,
+      carried: false,
+      autoOnly: true,
+    });
+    expect(html).toContain('Selected');
+    expect(html).toContain('>Auto</span>');
+    expect(html).toContain('claim-badge--info');
+  });
+
+  it('omits Auto badge when owner owns the approval', () => {
+    const html = statusBadgeHtml({
+      publishState: 'will_publish',
+      missing: [],
+      expiringSoon: false,
+      expired: false,
+      carried: false,
+      autoOnly: false,
+    });
+    expect(html).toContain('Selected');
+    expect(html).not.toContain('>Auto</span>');
+  });
+});
+
+describe('claimRowStatus autoOnly', () => {
+  it('marks auto-only when in autoApprovedIds but not ownerApprovedIds', () => {
+    const item = {
+      id: 'epic-a',
+      store: 'epic',
+      title: 'A',
+      claim_url: 'https://store.epicgames.com/p/a',
+      ends_at: '2099-01-01T00:00:00Z',
+    };
+    const st = claimRowStatus(item, {
+      isAuto: true,
+      approvedIds: new Set(['epic-a']),
+      autoApprovedIds: new Set(['epic-a']),
+      ownerApprovedIds: new Set(),
+    });
+    expect(st.publishState).toBe('will_publish');
+    expect(st.autoOnly).toBe(true);
+  });
+});
 
 describe('coverLookupKey', () => {
   it('strips giveaway boilerplate', () => {

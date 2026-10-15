@@ -458,7 +458,9 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
     if not isinstance(dismissed_keys, list):
         dismissed_keys = []
     from fetchers.build_free_claims import normalize_dupe_splits
+    from shared.claims_decisions import load_auto_decisions
     from shared.claims_dedupe import group_claims
+    from shared.claims_paths import resolve_auto_decisions_path
 
     dupe_splits = normalize_dupe_splits(approved_doc.get("dupe_splits"))
     auto_doc = s._read_optional_json(_scrape_path(s, root))
@@ -466,6 +468,13 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
         it for it in ((auto_doc or {}).get("items") or []) if isinstance(it, dict)
     ]
     dupe_groups = [g.to_dict() for g in group_claims(auto_items, splits=dupe_splits)]
+    auto_dec = load_auto_decisions(resolve_auto_decisions_path(root))
+    auto_approved = [
+        str(x).strip() for x in (auto_dec.get("approve") or []) if str(x).strip()
+    ]
+    auto_dismissed = [
+        str(x).strip() for x in (auto_dec.get("dismiss") or []) if str(x).strip()
+    ]
     s._send_json(
         handler,
         HTTPStatus.OK,
@@ -475,6 +484,8 @@ def handle_internal_free_claims_get(handler: SimpleHTTPRequestHandler) -> None:
             "dupe_groups": dupe_groups,
             "dupe_splits": dupe_splits,
             "approved": approved_ids,
+            "auto_approved": auto_approved,
+            "auto_dismissed": auto_dismissed,
             "store_overrides": store_overrides,
             "field_overrides": field_overrides,
             "dismissed": dismissed,

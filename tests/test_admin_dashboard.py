@@ -288,6 +288,30 @@ def test_free_claims_get_returns_approved(admin_server: tuple[str, Path], tmp_pa
     assert data.get("field_overrides") == {}
 
 
+def test_free_claims_get_returns_auto_approved(
+    admin_server: tuple[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base, _ = admin_server
+    decisions = tmp_path / "auto_decisions.json"
+    decisions.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "approve": ["epic-agent-a"],
+                "dismiss": ["gamerpower-dupe"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("BAKLOG_CLAIMS_AUTO_DECISIONS", str(decisions))
+    code, data = _request(base, "GET", "/api/internal/free-claims")
+    assert code == 200
+    assert data.get("auto_approved") == ["epic-agent-a"]
+    assert data.get("auto_dismissed") == ["gamerpower-dupe"]
+    # Owner approved list stays separate (Save must not rewrite autopilot ids).
+    assert "epic-agent-a" not in (data.get("approved") or [])
+
+
 def test_free_claims_get_returns_field_overrides(admin_server: tuple[str, Path], tmp_path: Path) -> None:
     base, _ = admin_server
     approved_path = tmp_path / "curated" / "free_claims.approved.json"

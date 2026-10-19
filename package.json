@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
-    "@supabase/supabase-js": "^2.117.3",
+    "@supabase/supabase-js": "^2.118.0",
     "@tailwindcss/cli": "^4.3.3",
     "axe-core": "^4.14.0",
     "esbuild": "^0.28.2",
@@ -51,9 +51,9 @@
     "globals": "^17.13.0",
     "happy-dom": "^20.14.6",
     "pixelmatch": "^8.0.0",
-    "playwright": "^1.64.0",
+    "playwright": "^1.64.1",
     "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   }
 }

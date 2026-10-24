@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-10-22T16:51:13.353415+00:00",
+  "generated_at": "2026-10-24T20:26:41.253834+00:00",
   "items": [
     {
       "id": "epic-sker-ritual-aac702",
       "store": "epic",
       "title": "Sker Ritual",
       "claim_url": "https://store.epicgames.com/en-US/p/sker-ritual-aac702",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1492070/8e288958e8c203003f00852e73dba95558b94992/header.jpg?t=1792674990",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/43d96f4437e34c87b7eff08831d1b1de/sker-ritual-1tuka.png",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-10-29T15:00:00Z",
@@ -190,20 +190,6 @@
       "source": "itad",
       "first_seen": "2026-10-13T04:56:04Z",
       "premium_only": true
-    },
-    {
-      "id": "itad-6b4a0c098140",
-      "store": "epic",
-      "title": "The Big Con",
-      "claim_url": "https://isthereanydeal.com/giveaways/16646/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1139280/header.jpg?t=1786075312",
-      "genres": [],
-      "blurb": "The Big Con",
-      "ends_at": "2026-10-24T16:05:48Z",
-      "steam_appid": 1139280,
-      "review_percent": 93,
-      "source": "itad",
-      "first_seen": "2026-10-10T16:05:48Z"
     }
   ],
   "attribution": [

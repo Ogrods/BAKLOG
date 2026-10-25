@@ -152,6 +152,12 @@ jobs:
       - name: Stub empty free-claims.input.json
         run: printf '%s\n' '{"items":[]}' > free-claims.input.json
 
+      # Snapshot so we can persist prune-only removals after build without
+      # committing CI rekeys/additions to owner approved.json.
+      - name: Snapshot owner approved.json before build
+        if: steps.source.outputs.mode == 'internal'
+        run: cp "$BAKLOG_FREE_CLAIMS_APPROVED" /tmp/approved-before.json
+
       - name: Build free-claims (no empty publish)
         run: python fetchers/build_free_claims.py --no-profile
 
@@ -162,7 +168,18 @@ jobs:
         run: python scripts/synth_claims_approved_from_landing.py
 
       - name: Audit free-surface data
+        id: audit
         run: python scripts/audit_free_surface_data.py --fail-on high
+
+      - name: Upload audit artifacts on failure
+        if: failure() && steps.audit.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: claims-audit-findings
+          path: |
+            review-findings.yaml
+            review-report.json
+          if-no-files-found: warn
 
       - name: Fingerprint gate
         id: gate
@@ -224,16 +241,33 @@ jobs:
           authgit() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" "$@"; }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # The build may prune/rekey owner decisions in place; CI re-derives that every
-          # run and never owns the file, and an unstaged edit would make pull --rebase refuse.
-          git checkout -- claims/free_claims.approved.json 2>/dev/null || true
+          # Persist prune-only removals (expired/stuck). Never persist CI rekeys/additions.
+          APPROVED_MSG=""
+          if [ -f /tmp/approved-before.json ] && [ -f "$BAKLOG_FREE_CLAIMS_APPROVED" ]; then
+            set +e
+            python "$GITHUB_WORKSPACE/scripts/claims_commit_approved_prunes.py" \
+              --before /tmp/approved-before.json \
+              --after "$BAKLOG_FREE_CLAIMS_APPROVED" \
+              --out /tmp/approved-pruned.json
+            prune_code=$?
+            set -e
+            if [ "$prune_code" -eq 0 ]; then
+              cp /tmp/approved-pruned.json claims/free_claims.approved.json
+              git add -- claims/free_claims.approved.json
+              APPROVED_MSG=" + approved prunes"
+            else
+              git checkout -- claims/free_claims.approved.json 2>/dev/null || true
+            fi
+          else
+            git checkout -- claims/free_claims.approved.json 2>/dev/null || true
+          fi
           cp "$GITHUB_WORKSPACE/curated/free_claims.auto.json" claims/free_claims.auto.json
           git add -- claims/auto_decisions.json claims/free_claims.auto.json
           if git diff --cached --quiet; then
             echo "Decisions and scrape unchanged."
             exit 0
           fi
-          git commit -m "claims: autopilot decisions + scrape"
+          git commit -m "claims: autopilot decisions + scrape${APPROVED_MSG}"
           for attempt in 1 2 3; do
             if authgit pull --rebase -q && authgit push -q; then exit 0; fi
             git rebase --abort 2>/dev/null || true

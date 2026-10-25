@@ -1112,7 +1112,7 @@ def _expired_approved_absent_from_auto(
     cannot prune it. Use the last published copy's ends_at (same rule as
     carry-forward) so owner approved.json does not keep dead ids that fail the
     ingest audit. Undated live-listing holds stay (outage / temporary delist).
-    No prior row means a true source hiccup: leave the id for the high orphan.
+    No prior row is handled by ``_stuck_approved_absent_from_sources``.
     """
     dismissed_ids = dismissed_ids or set()
     out: set[str] = set()
@@ -1126,6 +1126,33 @@ def _expired_approved_absent_from_auto(
             continue
         if _is_expired(_ends_at_for_prune(prior, now), now):
             out.add(aid)
+    return out
+
+
+def _stuck_approved_absent_from_sources(
+    *,
+    approved_ids: set[str],
+    selected_ids: set[str],
+    auto_by_id: dict[str, dict],
+    prior_rows_by_id: dict[str, dict],
+    dismissed_ids: set[str] | None = None,
+) -> set[str]:
+    """Approved ids with no auto row and no prior published row (stuck orphans).
+
+    After an ephemeral CI prune is discarded and a feed PR ships without the id,
+    later runs have nothing to carry and nothing for expired-absent prune. Those
+    approvals fail ingest audit forever unless removed. No row means this cannot
+    be an undated live-listing hold (those need a scrape/prior copy).
+    """
+    dismissed_ids = dismissed_ids or set()
+    out: set[str] = set()
+    for aid in approved_ids:
+        if not aid or aid in dismissed_ids or aid in selected_ids or aid in auto_by_id:
+            continue
+        prior = prior_rows_by_id.get(aid)
+        if isinstance(prior, dict):
+            continue
+        out.add(aid)
     return out
 
 
@@ -2064,14 +2091,27 @@ def main() -> int:
             f"expired approved id(s) absent from auto (via prior publish): "
             f"{', '.join(sorted(absent_expired))}"
         )
+    stuck_absent = _stuck_approved_absent_from_sources(
+        approved_ids=approved_ids,
+        selected_ids=selected_ids,
+        auto_by_id=auto_by_id,
+        prior_rows_by_id=prior_published_rows,
+        dismissed_ids=dismissed_ids,
+    )
+    if stuck_absent:
+        stats.warn(
+            f"stuck approved id(s) absent from auto and prior publish: "
+            f"{', '.join(sorted(stuck_absent))}"
+        )
+    prune_from_approved = (expired_approved_ids | stuck_absent) & owner_approved_ids
     if expired_approved_ids:
         stats.warn(f"skipped {len(expired_approved_ids)} expired approved auto item(s)")
-        if not args.dry_run:
-            pruned = _prune_expired_from_approved(
-                approved_path, expired_approved_ids & owner_approved_ids
-            )
-            if pruned:
-                stats.warn(f"pruned {pruned} expired item(s) from approved list")
+    if prune_from_approved and not args.dry_run:
+        pruned = _prune_expired_from_approved(approved_path, prune_from_approved)
+        if pruned:
+            stats.warn(f"pruned {pruned} expired/stuck item(s) from approved list")
+            approved_ids -= prune_from_approved
+            owner_approved_ids -= prune_from_approved
     if auto_items_all:
         stats.info(
             f"auto feed: {len(auto_items)} approved of {len(auto_items_all)} available"

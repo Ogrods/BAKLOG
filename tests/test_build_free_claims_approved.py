@@ -1002,13 +1002,36 @@ def test_expired_approved_absent_from_auto_helper() -> None:
         prior_rows_by_id={"epic-x": prior},
         now=now,
     ) == set()
-    # No prior: true hiccup, do not prune.
+    # No prior: expired-absent cannot prove expiry (stuck-orphan path owns that).
     assert bfc._expired_approved_absent_from_auto(
         approved_ids={"epic-x"},
         selected_ids=set(),
         auto_by_id={},
         prior_rows_by_id={},
         now=now,
+    ) == set()
+
+
+def test_stuck_approved_absent_from_sources_helper() -> None:
+    assert bfc._stuck_approved_absent_from_sources(
+        approved_ids={"itad-stuck", "epic-live"},
+        selected_ids={"epic-live"},
+        auto_by_id={"epic-live": {"id": "epic-live"}},
+        prior_rows_by_id={},
+    ) == {"itad-stuck"}
+    # Prior exists: not stuck (expired-absent or carry owns it).
+    assert bfc._stuck_approved_absent_from_sources(
+        approved_ids={"itad-stuck"},
+        selected_ids=set(),
+        auto_by_id={},
+        prior_rows_by_id={"itad-stuck": {"id": "itad-stuck", "title": "X"}},
+    ) == set()
+    # Still in auto: not stuck.
+    assert bfc._stuck_approved_absent_from_sources(
+        approved_ids={"itad-stuck"},
+        selected_ids=set(),
+        auto_by_id={"itad-stuck": {"id": "itad-stuck"}},
+        prior_rows_by_id={},
     ) == set()
 
 
@@ -1103,6 +1126,68 @@ def test_build_prunes_expired_approved_absent_from_auto(
     assert {item["id"] for item in built["items"]} == {"epic-new"}
     approved = json.loads(approved_path.read_text(encoding="utf-8"))
     assert approved["ids"] == ["epic-new"]
+
+
+def test_build_prunes_stuck_approved_absent_no_prior(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Approved id with no auto row and no prior landing copy must be pruned."""
+    input_path = tmp_path / "free-claims.input.json"
+    auto_path = tmp_path / "free_claims.auto.json"
+    approved_path = tmp_path / "free_claims.approved.json"
+    output_path = tmp_path / "free-claims.json"
+    input_path.write_text('{"items": []}', encoding="utf-8")
+    auto_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "id": "epic-live",
+                        "store": "epic",
+                        "title": "Live",
+                        "claim_url": "https://store.epicgames.com/en-US/p/live",
+                        "ends_at": "2099-01-01T00:00:00Z",
+                        "source": "epic",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps(
+            {
+                "ids": ["itad-stuck", "epic-live"],
+                "field_overrides": {"itad-stuck": {"title": "Gone"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    # Empty prior landing: stuck id cannot be carried or expired-pruned via prior.
+    output_path.write_text('{"items": []}', encoding="utf-8")
+    monkeypatch.delenv("BAKLOG_FREE_CLAIMS_APPROVED", raising=False)
+    monkeypatch.setattr(bfc, "INPUT_PATH", input_path)
+    monkeypatch.setattr(bfc, "AUTO_PATH", auto_path)
+    monkeypatch.setattr(bfc, "APPROVED_PATH", approved_path)
+    monkeypatch.setattr(bfc, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(bfc, "FALLBACK_PATH", tmp_path / "fallback.json")
+    monkeypatch.setattr(bfc, "free_claims_path", lambda: tmp_path / "profile.json")
+    monkeypatch.setattr(
+        bfc,
+        "_enrich_item",
+        lambda raw, last_call, cover_lookup=None, **kwargs: {
+            k: raw.get(k) for k in ("id", "store", "title", "claim_url", "ends_at", "source")
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["fetchers.build_free_claims.py", "--no-profile"])
+
+    assert bfc.main() == 0
+    built = json.loads(output_path.read_text(encoding="utf-8"))
+    assert {item["id"] for item in built["items"]} == {"epic-live"}
+    approved = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert approved["ids"] == ["epic-live"]
+    assert "itad-stuck" not in (approved.get("field_overrides") or {})
 
 
 def test_build_keeps_undated_gamerpower_approval_absent_from_auto(

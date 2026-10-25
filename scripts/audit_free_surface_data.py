@@ -1095,6 +1095,10 @@ def main() -> int:
                 f"FAIL: {len(bad)} finding(s) at or above {args.fail_on} severity",
                 file=sys.stderr,
             )
+            for finding in bad:
+                row = finding.get("row") or finding.get("id") or "?"
+                observed = finding.get("observed") or finding.get("message") or ""
+                print(f"  [{finding.get('severity')}] {row}: {observed}", file=sys.stderr)
             return 1
     return 0
 

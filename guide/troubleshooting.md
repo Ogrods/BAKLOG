@@ -73,6 +73,21 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 3. Or set `BAKLOG_CHROME_PATH` to the full path of your browser executable.
 4. Offline / air-gapped: install Chrome or Edge (or set `BAKLOG_CHROME_PATH`). `BAKLOG_NO_CHROMIUM_DOWNLOAD=1` disables the auto-download.
 
+## Linux: browser exits immediately (code 127 / bash readline)
+
+**Symptom:** Connect fails with `Browser exited immediately (code 127)` and output like
+`/bin/bash: undefined symbol: rl_trim_arg_from_keyseq` (common on EndeavourOS / Arch with the frozen linux64 zip).
+
+**Cause:** System Chrome is often a small shell script (`/usr/bin/google-chrome`) that runs
+`/bin/bash`. The frozen app's library path can make that bash load the wrong readline.
+
+**Fix:**
+
+1. Update to a BAKLOG build that includes the Connect library-path fix for frozen Linux.
+2. Or set `BAKLOG_CHROME_PATH` to the real Chrome **binary**, for example
+   `/opt/google/chrome/chrome` (not `/usr/bin/google-chrome`).
+3. Or run from source with the project venv (`python server.py`) instead of the frozen zip.
+
 ## Battle.net cookie issues (Windows)
 
 **Symptom:** `--browser edge` fails on Windows with Edge/Chrome v127+.

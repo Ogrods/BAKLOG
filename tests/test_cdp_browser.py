@@ -619,6 +619,17 @@ class TestFindBrowser:
         assert "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" in paths
         assert "/opt/google/chrome/chrome" in paths
 
+    def test_linux_candidates_prefer_elf_over_usr_bin_wrapper(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(sys, "platform", "linux")
+        paths = [p.as_posix() for p in _chromium_executable_candidates()]
+        elf = "/opt/google/chrome/chrome"
+        wrapper = "/usr/bin/google-chrome"
+        assert elf in paths
+        assert wrapper in paths
+        assert paths.index(elf) < paths.index(wrapper)
+
 
 class TestLinuxCiNoSandbox:
     def test_off_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:

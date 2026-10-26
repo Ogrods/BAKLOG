@@ -55,6 +55,9 @@ def test_amazon_signin_url_return_to_my_collection_no_sso_response():
 def test_is_signin_url_detects_ap_signin():
     assert is_signin_url("https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0")
     assert is_signin_url("https://www.amazon.com/ap/register")
+    assert is_signin_url("https://www.amazon.com/ap/cvf/request?arb=abc")
+    assert is_signin_url("https://www.amazon.com/ap/mfa")
+    assert is_signin_url("https://www.amazon.com/ap/challenge")
     assert not is_signin_url("https://luna.amazon.com/claims/my-collection")
 
 
@@ -72,15 +75,27 @@ def test_on_collection_page_luna_and_gaming():
 
 
 def test_needs_collection_redirect_on_luna_hub_when_signed_in():
-    ctx = _FakeCookieJar([{"name": "session-id", "value": "abc", "domain": ".amazon.com"}])
+    ctx = _FakeCookieJar([{"name": "at-main", "value": "abc", "domain": ".amazon.com"}])
     assert needs_collection_redirect("https://luna.amazon.com/", ctx)
 
 
-def test_signed_in_requires_cookies_and_non_signin_url():
-    ctx = _FakeCookieJar([{"name": "session-id", "value": "abc", "domain": ".amazon.com"}])
-    assert signed_in("https://gaming.amazon.com/home", ctx)
-    assert not signed_in("https://www.amazon.com/ap/signin", ctx)
+def test_signed_in_requires_auth_cookies_and_non_signin_url():
+    weak = _FakeCookieJar([{"name": "session-id", "value": "abc", "domain": ".amazon.com"}])
+    strong = _FakeCookieJar([{"name": "at-main", "value": "tok", "domain": ".amazon.com"}])
+    assert signed_in("https://gaming.amazon.com/home", strong)
+    assert not signed_in("https://gaming.amazon.com/home", weak)
+    assert not signed_in("https://www.amazon.com/ap/signin", strong)
     assert not signed_in("https://gaming.amazon.com/home", _FakeCookieJar([]))
+
+
+def test_signed_in_false_on_cvf_even_with_session_id():
+    """Password step often sets session-id before OTP; must not look signed-in."""
+    ctx = _FakeCookieJar([{"name": "session-id", "value": "abc", "domain": ".amazon.com"}])
+    assert is_signin_url("https://www.amazon.com/ap/cvf/request?arb=1")
+    assert not signed_in("https://www.amazon.com/ap/cvf/request?arb=1", ctx)
+    # Even with a strong cookie, challenge URLs stay "signing in".
+    strong = _FakeCookieJar([{"name": "at-main", "value": "tok", "domain": ".amazon.com"}])
+    assert not signed_in("https://www.amazon.com/ap/cvf/request?arb=1", strong)
 
 
 def test_is_luna_error_page():

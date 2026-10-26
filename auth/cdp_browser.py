@@ -367,6 +367,10 @@ _BROWSER_LAUNCH_HINT = (
     "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH to the browser "
     "executable, or let BAKLOG download a one-time browser (~150 MB) on Connect."
 )
+_BROWSER_LAUNCH_HINT_LINUX = (
+    " On Linux, point BAKLOG_CHROME_PATH at the Chrome binary "
+    "(for example /opt/google/chrome/chrome), not a /usr/bin wrapper script."
+)
 
 
 def auth_banner_init_script(message: str) -> str:
@@ -459,6 +463,7 @@ def _chromium_executable_candidates() -> list[Path]:
         ])
         return candidates
 
+    # macOS .app binaries first (this list is shared with Linux).
     candidates.extend([
         Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
         Path("/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta"),
@@ -466,11 +471,22 @@ def _chromium_executable_candidates() -> list[Path]:
         Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
         Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
         Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+        # Linux: prefer ELF binaries over /usr/bin shell wrappers (those are often
+        # #!/bin/bash and break under frozen PyInstaller LD_LIBRARY_PATH).
+        Path("/opt/google/chrome/chrome"),
+        Path("/opt/google/chrome-beta/chrome"),
+        Path("/opt/google/chrome-unstable/chrome"),
+        Path("/usr/lib/chromium/chrome"),
+        Path("/usr/lib/chromium-browser/chromium"),
+        Path("/usr/lib64/chromium/chromium"),
+        Path("/usr/lib/brave-browser/brave"),
+        Path("/opt/brave.com/brave/brave"),
+        Path("/opt/microsoft/msedge/msedge"),
+        # Wrappers / PATH shims (may be scripts).
         Path("/usr/bin/google-chrome"),
         Path("/usr/bin/google-chrome-stable"),
         Path("/usr/bin/chromium"),
         Path("/usr/bin/chromium-browser"),
-        Path("/opt/google/chrome/chrome"),
         Path("/usr/bin/microsoft-edge"),
         Path("/usr/bin/microsoft-edge-stable"),
         Path("/usr/bin/brave-browser"),
@@ -1764,11 +1780,15 @@ def launch_persistent_profile(
         _clear_stale_chromium_profile_lock_files(profile)
         return []
 
+    from shared.frozen_env import browser_child_env
+
+    child_env = browser_child_env()
     for attempt in range(2):
         proc = subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            env=child_env,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
         )
 
@@ -1800,10 +1820,16 @@ def launch_persistent_profile(
                     else "A stale sign-in window was still using this profile; try Reconnect again."
                 )
                 detail = f" (output: {early_output})" if early_output else ""
+                linux_hint = (
+                    _BROWSER_LAUNCH_HINT_LINUX
+                    if sys.platform.startswith("linux")
+                    else ""
+                )
                 raise _browser_launch_error(
                     f"Browser exited immediately (code {exit_code}).{detail} {hint} "
                     "Install Google Chrome or Microsoft Edge, set BAKLOG_CHROME_PATH "
                     "to the browser executable, or try the other installed browser."
+                    f"{linux_hint}"
                 )
             if exit_code == 0:
                 launcher_exited_zero = True

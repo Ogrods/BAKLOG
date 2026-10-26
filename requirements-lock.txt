@@ -29,7 +29,7 @@ multidict==6.9.1
 numpy==2.4.6
 packaging==26.3
 pefile==2024.8.26
-pillow==12.3.0
+pillow==13.0.0
 pluggy==1.7.0
 propcache==0.5.4
 psnawp==3.0.3

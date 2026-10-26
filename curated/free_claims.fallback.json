@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-25T22:52:29.545211+00:00",
+  "generated_at": "2026-10-26T02:22:38.770256+00:00",
   "items": [
     {
       "id": "epic-sker-ritual-aac702",
@@ -26,6 +26,32 @@
       "ends_at": "2026-10-29T15:00:00Z",
       "source": "epic",
       "first_seen": "2026-10-22T16:51:03Z"
+    },
+    {
+      "id": "gamerpower-3825",
+      "store": "epic",
+      "title": "MAFIA HOTEL (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/mafia-hotel-epic-games-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5090990/a830b71e3c7a793d5ece3dc0fb3e8121a77f8840/header.jpg?t=1792911184",
+      "genres": [],
+      "blurb": "Claim MAFIA HOTEL for free via Epic Games Store! MAFIA HOTEL is a 3d multiplayer social deduction game for up to 16 players.",
+      "ends_at": "2026-11-01T23:59:00Z",
+      "steam_appid": 5090990,
+      "source": "gamerpower",
+      "first_seen": "2026-10-25T22:52:24Z"
+    },
+    {
+      "id": "gamerpower-3822",
+      "store": "epic",
+      "title": "Terraspace (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/terraspace-epic-games-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3535330/5fc62a33f3e2507937b2047f60da765153afd82b/header.jpg?t=1772902523",
+      "genres": [],
+      "blurb": "Download Terraspace for free via Epic Games Store! Terraspace is a casual city builder game about creating conditions for life on unsuitable planets.",
+      "ends_at": "2026-10-27T23:59:00Z",
+      "steam_appid": 3535330,
+      "source": "gamerpower",
+      "first_seen": "2026-10-21T21:24:44Z"
     },
     {
       "id": "gamerpower-3331",
@@ -125,6 +151,23 @@
       "premium_only": true
     },
     {
+      "id": "itad-7b49c7f0886f",
+      "store": "steam",
+      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
+      "genres": [
+        "Simulation",
+        "Strategy"
+      ],
+      "blurb": "Popcorn & Premieren - Ausgehviertel",
+      "ends_at": "2026-11-05T19:22:33Z",
+      "steam_appid": 5340370,
+      "source": "itad",
+      "first_seen": "2026-10-22T19:22:33Z",
+      "premium_only": true
+    },
+    {
       "id": "itad-fe98c22a9a1f",
       "store": "steam",
       "title": "Dungeons & Dragons Online: 6 Adventure Packs and 4 D&D Races",
@@ -133,6 +176,25 @@
       "genres": [],
       "blurb": "Dungeons & Dragons Online®",
       "ends_at": "2026-11-04T18:37:40Z",
+      "source": "itad",
+      "first_seen": "2026-10-21T18:37:40Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-314b49863c52",
+      "store": "steam",
+      "title": "Squad - Weapon Skins - Recon Team Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16676/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4841320/6499eba31da772a3f68b9f73443e16ffe49dd61e/header.jpg?t=1792087188",
+      "genres": [
+        "Action",
+        "Massively Multiplayer",
+        "Strategy"
+      ],
+      "blurb": "Squad Weapon Skins - Recon Team Pack",
+      "ends_at": "2026-11-04T18:37:40Z",
+      "steam_appid": 4841320,
+      "review_percent": 81,
       "source": "itad",
       "first_seen": "2026-10-21T18:37:40Z",
       "premium_only": true
@@ -156,25 +218,6 @@
       "review_percent": 92,
       "source": "itad",
       "first_seen": "2026-10-13T04:56:04Z",
-      "premium_only": true
-    },
-    {
-      "id": "itad-314b49863c52",
-      "store": "steam",
-      "title": "Squad - Weapon Skins - Recon Team Pack",
-      "claim_url": "https://isthereanydeal.com/giveaways/16676/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4841320/6499eba31da772a3f68b9f73443e16ffe49dd61e/header.jpg?t=1792087188",
-      "genres": [
-        "Action",
-        "Massively Multiplayer",
-        "Strategy"
-      ],
-      "blurb": "Squad Weapon Skins - Recon Team Pack",
-      "ends_at": "2026-11-04T18:37:40Z",
-      "steam_appid": 4841320,
-      "review_percent": 81,
-      "source": "itad",
-      "first_seen": "2026-10-21T18:37:40Z",
       "premium_only": true
     }
   ],

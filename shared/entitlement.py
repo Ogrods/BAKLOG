@@ -19,9 +19,12 @@ resolution matrix is:
   first, then a local ``license.json``. That file is trivially editable by
   anyone with the source (MIT) — honor-system, by design. No DRM / anti-tamper.
 
-Background work (the pro scheduler) has no per-request bearer, so authenticated
-plan resolutions are cached process-side via :func:`note_authenticated_plan`
-and read back by :func:`is_pro_background`.
+Background work (the pro scheduler / tray deal alerts) has no per-request
+bearer, so authenticated plan resolutions are cached via
+:func:`note_authenticated_plan` (process memory + ``cache/auth_plan.json``)
+and read back by :func:`is_pro_background`. Sign-out clears both. The TTL is
+long enough that a tray-only Pro session keeps working for days without
+opening the dashboard; a free JWT or sign-out still drops Pro immediately.
 """
 
 from __future__ import annotations
@@ -40,12 +43,18 @@ PLAN_PRO = "pro"
 # Strings (env or license file) that count as the paid tier.
 _PRO_ALIASES = ("pro", "paid", "premium")
 
-# Last plan resolved from a verified JWT this process, for request-less
-# background work (the scheduler). ``(epoch_seconds, plan)``.
+# Last plan resolved from a verified JWT, for request-less background work
+# (scheduler + tray deal alerts). ``(epoch_seconds, plan)``.
 _LAST_AUTH_PLAN: tuple[float, str] | None = None
-_AUTH_PLAN_TTL_SEC = 24 * 60 * 60
+# 14d: tray-only Pro users often leave the app running without opening the
+# dashboard; 24h was cutting deal alerts and Pro scheduler refreshes short.
+_AUTH_PLAN_TTL_SEC = 14 * 24 * 60 * 60
 _LICENSE_REFRESH_AT: float = 0.0
 _LICENSE_REFRESH_INTERVAL_SEC = 60 * 60
+
+
+def _auth_plan_cache_path() -> Path:
+    return data_root() / "cache" / "auth_plan.json"
 
 
 def _env_plan() -> str | None:
@@ -187,20 +196,60 @@ def _verify_jwt_plan(authorization: str | None) -> str | None:
         return None
 
 
+def _persist_authenticated_plan(noted_at: float, plan: str) -> None:
+    """Write the background plan cache so tray/scheduler survive a server restart."""
+    try:
+        from shared.safe_write import atomic_write_text
+
+        path = _auth_plan_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(
+            path,
+            json.dumps({"noted_at": noted_at, "plan": plan}, indent=2) + "\n",
+        )
+    except Exception as exc:  # noqa: BLE001 - background cache must never break auth
+        if os.environ.get("BAKLOG_DEBUG"):
+            print(f"[entitlement] persist auth plan failed: {exc!r}", file=sys.stderr)
+
+
+def _load_authenticated_plan() -> tuple[float, str] | None:
+    """Read a still-fresh disk cache, or None."""
+    try:
+        doc = json.loads(_auth_plan_cache_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(doc, dict):
+        return None
+    noted_at = doc.get("noted_at")
+    plan = doc.get("plan")
+    if not isinstance(noted_at, (int, float)) or not isinstance(plan, str):
+        return None
+    norm = PLAN_PRO if plan.strip().lower() in _PRO_ALIASES else PLAN_FREE
+    if time.time() - float(noted_at) > _AUTH_PLAN_TTL_SEC:
+        return None
+    return (float(noted_at), norm)
+
+
 def note_authenticated_plan(plan: str) -> None:
     """Record a plan resolved from a verified JWT, for request-less background work."""
     global _LAST_AUTH_PLAN
     norm = PLAN_PRO if plan in _PRO_ALIASES else PLAN_FREE
-    _LAST_AUTH_PLAN = (time.time(), norm)
+    noted_at = time.time()
+    _LAST_AUTH_PLAN = (noted_at, norm)
+    _persist_authenticated_plan(noted_at, norm)
 
 
 def clear_authenticated_plan_cache() -> None:
     global _LAST_AUTH_PLAN
     _LAST_AUTH_PLAN = None
+    try:
+        _auth_plan_cache_path().unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def clear_background_auth_caches() -> None:
-    """Drop process-local JWT plan + mirror session (sign-out / profile switch)."""
+    """Drop JWT plan cache (memory + disk) + mirror session (sign-out / profile switch)."""
     clear_authenticated_plan_cache()
     try:
         from shared.mirror_session import clear_mirror_session
@@ -282,16 +331,23 @@ def pro_features_unlocked(authorization: str | None = None) -> bool:
 def is_pro_background() -> bool:
     """Best-effort pro check for server-side background work (no request context).
 
-    Under hosted auth uses the last JWT-verified plan seen this process (within
-    a TTL); in pure-local mode honors ``BAKLOG_PLAN`` then ``license.json``.
-    Local overrides are ignored under hosted auth (same as ``current_plan``).
-    Local ``BAKLOG_ADMIN`` Pro-sim also unlocks background Pro work.
+    Under hosted auth uses the last JWT-verified plan (memory, else
+    ``cache/auth_plan.json``) within the TTL; in pure-local mode honors
+    ``BAKLOG_PLAN`` then ``license.json``. Local overrides are ignored under
+    hosted auth (same as ``current_plan``). Local ``BAKLOG_ADMIN`` Pro-sim also
+    unlocks background Pro work.
     """
+    global _LAST_AUTH_PLAN
     if _admin_enabled():
         return True
     if _auth_enabled():
-        if _LAST_AUTH_PLAN is not None:
-            ts, plan = _LAST_AUTH_PLAN
+        cached = _LAST_AUTH_PLAN
+        if cached is None:
+            cached = _load_authenticated_plan()
+            if cached is not None:
+                _LAST_AUTH_PLAN = cached
+        if cached is not None:
+            ts, plan = cached
             if time.time() - ts <= _AUTH_PLAN_TTL_SEC:
                 return plan == PLAN_PRO
         return False

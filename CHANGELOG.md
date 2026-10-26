@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.04] - 2026-10-26
+
 ### Fixed
 
 - Linux Connect no longer fails when system Chrome is a shell wrapper under the
@@ -51,6 +53,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Managed Connect browser downloads on Linux keep helper binaries executable.
 - Snap-only Chrome is no longer preferred over a downloaded Connect browser
   (set `BAKLOG_ALLOW_SNAP_CHROME=1` to force Snap/Flatpak).
+- A Polar Pro purchase that was later refunded or revoked is no longer re-applied
+  by the daily entitlement check when an earlier unmatched checkout row was still
+  open.
+- Pro deal alerts keep working when the tray runs for more than a day without
+  opening the dashboard (and after a server restart) until you sign out.
 
 ## [0.9.03] - 2026-10-13
 

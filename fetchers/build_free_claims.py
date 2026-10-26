@@ -1058,6 +1058,7 @@ def _select_approved_auto_items(
     """Return live approved auto rows and expired approved ids eligible for pruning."""
     dismissed_ids = dismissed_ids or set()
     expired_approved_ids: set[str] = set()
+    live_represented: set[str] = set()
     auto_items: list[dict] = []
     auto_by_id = _auto_items_by_id(auto_items_all)
     for item in auto_items_all:
@@ -1093,8 +1094,16 @@ def _select_approved_auto_items(
                     field_overrides=field_overrides,
                 )
             continue
+        live_represented |= _approved_ids_for_auto_row(
+            item,
+            approved_ids=approved_ids,
+            auto_by_id=auto_by_id,
+            field_overrides=field_overrides,
+        )
         auto_items.append(dict(item))
-    return auto_items, expired_approved_ids
+    # A live sibling with the same stable key still represents the approval;
+    # do not prune it just because an expired scrape row matched first.
+    return auto_items, expired_approved_ids - live_represented
 
 
 def _expired_approved_absent_from_auto(

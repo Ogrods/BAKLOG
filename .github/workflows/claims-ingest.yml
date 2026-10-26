@@ -31,7 +31,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: claims-ingest
+  # Dry-run dispatches must not cancel a scheduled/normal ingest (or each other
+  # via the same group). Real ingest stays on claims-ingest; dry paths get a
+  # separate group keyed by which dry input is set.
+  group: >-
+    ${{ (inputs.dry_run || inputs.dry_run_approve)
+        && format('claims-ingest-dry-{0}-{1}', inputs.dry_run, inputs.dry_run_approve)
+        || 'claims-ingest' }}
   cancel-in-progress: true
 
 jobs:

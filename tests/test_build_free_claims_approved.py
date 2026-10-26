@@ -1911,6 +1911,47 @@ def test_select_approved_keeps_stale_row_with_owner_end_date() -> None:
     assert expired == set()
 
 
+def test_select_approved_does_not_prune_when_live_sibling_represents() -> None:
+    """Expired scrape row + live same-title sibling: keep the approval.
+
+    Without subtracting live-represented ids, the expired row would mark the
+    owner approval for prune while the live sibling is still selected to publish.
+    """
+    from datetime import UTC, datetime
+
+    from shared.free_claims_sources import claim_match_keys
+
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    expired_row = {
+        "id": "itad-old",
+        "store": "steam",
+        "source": "itad",
+        "title": "Sibling Keep",
+        "claim_url": "https://example.com/itad-old",
+        "ends_at": "2026-01-01T00:00:00Z",
+        "first_seen": "2025-12-01T00:00:00Z",
+    }
+    live_row = {
+        "id": "epic-new",
+        "store": "epic",
+        "source": "epicgames",
+        "title": "Sibling Keep",
+        "claim_url": "https://example.com/epic-new",
+        "ends_at": "2026-12-01T00:00:00Z",
+        "first_seen": "2026-06-01T00:00:00Z",
+    }
+    approved_ids = {"itad-old"}
+    approved_keys = claim_match_keys(expired_row)
+    kept, expired = bfc._select_approved_auto_items(
+        [expired_row, live_row],
+        approved_ids=approved_ids,
+        approved_keys=approved_keys,
+        now=now,
+    )
+    assert [r["id"] for r in kept] == ["epic-new"]
+    assert expired == set()
+
+
 def test_preview_publish_items_publishes_listed_gamerpower_without_end_date() -> None:
     from datetime import UTC, datetime
 

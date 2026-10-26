@@ -225,15 +225,15 @@ We skip paid signing for now; future releases may add certificates. Verify SHA-2
 
 **Ready after restart:** If you downloaded an update but did not install yet, BAKLOG restores the **Install & restart** banner after a server or tray restart. Use **Discard download** to remove the verified package from disk.
 
-**Apply failure:** If install fails mid-copy, the updater restores your previous build from a backup when possible and writes `%TEMP%\\BAKLOG-update\\apply-result.json`. The UI shows the error; if BAKLOG does not restart automatically, open **BAKLOG Tray** from the Start Menu (or run `BAKLOG Tray.exe`).
+**Apply failure:** If install fails mid-copy, the updater restores your previous build from a backup when possible and writes apply results under the BAKLOG-update workspace (`%TEMP%\\BAKLOG-update` on Windows; `$TMPDIR/BAKLOG-update` or `/tmp/BAKLOG-update` on macOS/Linux). The UI shows the error; if BAKLOG does not restart automatically, open **BAKLOG Tray** from the Start Menu on Windows/macOS, or re-run `Start BAKLOG.sh` on Linux.
 
-**In-app update vs Setup.exe:** Use in-app **Update now** for routine binary updates on Windows, macOS, and Linux frozen builds. Re-run **BAKLOG-Setup.exe** when Add/Remove Programs version drifts, shortcuts break, or `apply_update.ps1` / `apply_update.sh` is missing from the install folder.
+**In-app update vs Setup.exe (Windows):** Use in-app **Update now** for routine binary updates on frozen builds. Re-run **BAKLOG-Setup.exe** when Add/Remove Programs version drifts, shortcuts break, or `apply_update.ps1` is missing from the install folder. **Linux and macOS are zip-only** - there is no Setup.exe; re-download the platform zip if `apply_update.sh` is missing.
 
-**Zip-only uninstall:** Portable zip installs include **Uninstall BAKLOG.bat** beside the exes. Run it to clear login autostart and optionally wipe library data, then delete the install folder.
+**Zip-only uninstall (Windows portable):** Portable Windows zip installs include **Uninstall BAKLOG.bat** beside the exes. Run it to clear login autostart and optionally wipe library data, then delete the install folder. On Linux/macOS, stop the app and delete the install folder plus your data directory (`~/.local/share/baklog` or `~/Library/Application Support/BAKLOG`).
 
 **Version:** Your current build version appears at the bottom of the **⋮** menu on installed builds.
 
-**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1`. macOS uses `BAKLOG-macos.zip` + `apply_update.sh`. Linux uses `BAKLOG-linux64.zip` + `apply_update.sh` (no tray relaunch - the Start script keeps the server in the terminal).
+**Platforms:** Windows uses `BAKLOG-win64.zip` + `apply_update.ps1` (and optionally Setup.exe). macOS uses `BAKLOG-macos.zip` + `apply_update.sh`. Linux uses `BAKLOG-linux64.zip` + `apply_update.sh` (no tray - Start script keeps the server in the terminal; after Install & restart the dashboard should reopen in the browser).
 
 **Add/Remove Programs vs in-app version:** On Windows Setup installs, zip-based in-app updates replace app files but do not refresh the Inno uninstall registry version. Use **Copy diagnostics** or `GET /api/diagnostics` (`install_source`, `arp_version`, `arp_version_mismatch`, `trust_note`) to compare; re-run **BAKLOG-Setup.exe** when Settings → Apps should match the running build.
 

@@ -59,3 +59,48 @@ def browser_child_env(
 ) -> dict[str, str]:
     """Environment for a Chrome/Edge CDP child of the BAKLOG process."""
     return scrub_pyinstaller_library_path(dict(base) if base is not None else None)
+
+
+def open_url_in_system_browser(url: str) -> bool:
+    """Open ``url`` in the desktop browser with a scrubbed child env.
+
+    On Linux/macOS the system opener (``xdg-open`` / ``open``) often runs through
+    ``/bin/bash``; inheriting PyInstaller ``LD_LIBRARY_PATH`` can crash it the
+    same way Chrome wrappers do. Windows keeps ``webbrowser.open``.
+    """
+    import shutil
+    import subprocess
+    import sys
+
+    target = (url or "").strip()
+    if not target:
+        return False
+
+    if sys.platform == "win32":
+        import webbrowser
+
+        return bool(webbrowser.open(target))
+
+    env = scrub_pyinstaller_library_path()
+    if sys.platform == "darwin":
+        cmd = ["open", target]
+    else:
+        opener = shutil.which("xdg-open")
+        if not opener:
+            import webbrowser
+
+            return bool(webbrowser.open(target))
+        cmd = [opener, target]
+
+    try:
+        subprocess.Popen(  # noqa: S603
+            cmd,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except OSError:
+        return False

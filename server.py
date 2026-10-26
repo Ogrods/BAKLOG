@@ -2738,12 +2738,14 @@ def _maybe_open_browser() -> None:
     if os.environ.get("BAKLOG_TRAY_PID", "").strip():
         return
     try:
-        import webbrowser
+        from shared.frozen_env import open_url_in_system_browser
 
         # Defer 300ms so httpd.serve_forever() is actively accepting requests
-        # before the browser navigates — prevents a blank tab from a race where
-        # the TCP socket is bound but no accept loop is running yet.
-        threading.Timer(0.3, lambda: webbrowser.open(f"http://{HOST}:{PORT}/")).start()
+        # before the browser navigates. Scrub frozen LD_LIBRARY_PATH so Linux
+        # xdg-open/bash wrappers do not crash under the packaged app.
+        threading.Timer(
+            0.3, lambda: open_url_in_system_browser(f"http://{HOST}:{PORT}/")
+        ).start()
     except Exception:
         pass
 

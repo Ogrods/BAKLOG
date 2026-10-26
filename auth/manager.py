@@ -639,7 +639,7 @@ def set_form_credentials(provider: str, fields: dict[str, str]) -> dict[str, Any
 
 def open_manual_signin(provider: str) -> dict[str, str]:
     """Open the provider settings page in the user's default browser (not Playwright)."""
-    import webbrowser
+    from shared.frozen_env import open_url_in_system_browser
 
     spec = spec_for(provider)
     if spec.kind != "manual":
@@ -647,7 +647,7 @@ def open_manual_signin(provider: str) -> dict[str, str]:
     url = spec.login_url
     if not url:
         raise ValueError(f"{provider} has no sign-in URL configured")
-    webbrowser.open(url)
+    open_url_in_system_browser(url)
     return {"ok": True, "url": url}
 
 

@@ -187,7 +187,12 @@ def _zip_member_is_safe(member_name: str) -> bool:
 
 
 def safe_extract_cft_zip(zip_path: Path, dest_dir: Path) -> None:
-    """Extract a CfT zip with path-traversal guards."""
+    """Extract a CfT zip with path-traversal guards.
+
+    Restores Unix execute bits from the zip central directory. ``extractall``
+    does not, and Chromium helpers (crashpad, sandbox, …) then fail with exit
+    126 under a managed Linux download.
+    """
     dest_resolved = dest_dir.resolve()
     dest_resolved.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as archive:
@@ -198,6 +203,19 @@ def safe_extract_cft_zip(zip_path: Path, dest_dir: Path) -> None:
             if dest_resolved not in target.parents and target != dest_resolved:
                 raise ChromiumRuntimeError(f"zip member escapes target dir: {info.filename}")
         archive.extractall(dest_resolved)
+        if sys.platform != "win32":
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                mode = (info.external_attr >> 16) & 0o777
+                if not (mode & 0o111):
+                    continue
+                target = dest_resolved / info.filename
+                try:
+                    cur = target.stat().st_mode
+                    target.chmod(cur | 0o111)
+                except OSError:
+                    pass
 
 
 def clear_macos_quarantine(app_bundle: Path) -> None:

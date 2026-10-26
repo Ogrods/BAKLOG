@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import tempfile
 import time
 from datetime import UTC, datetime
@@ -24,8 +26,20 @@ APPLYING_LOCK_MAX_AGE_SEC = 120
 APPLY_STARTED_WAIT_SEC = 8.0
 
 
+def posix_update_temp_base() -> Path:
+    """Match ``packaging/apply_update.sh``: ``${TMPDIR:-/tmp}``.
+
+    Python's ``tempfile.gettempdir()`` also honors ``TEMP``/``TMP``, which the
+    bash helper does not - using that alone can put the zip outside the
+    trusted update workspace and fail apply.
+    """
+    return Path(os.environ.get("TMPDIR") or "/tmp")
+
+
 def default_work_root() -> Path:
-    return (Path(tempfile.gettempdir()) / "BAKLOG-update").resolve()
+    if sys.platform == "win32":
+        return (Path(tempfile.gettempdir()) / "BAKLOG-update").resolve()
+    return (posix_update_temp_base() / "BAKLOG-update").resolve()
 
 
 def write_applying_lock(work_root: Path | None = None, *, version: str = "") -> None:

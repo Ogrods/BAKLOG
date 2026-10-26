@@ -629,6 +629,33 @@ class TestFindBrowser:
         assert elf in paths
         assert wrapper in paths
         assert paths.index(elf) < paths.index(wrapper)
+        assert "/snap/bin/chromium" not in paths
+
+    def test_linux_skips_snap_which_unless_allowed(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.delenv("BAKLOG_CHROME_PATH", raising=False)
+        monkeypatch.delenv("BAKLOG_ALLOW_SNAP_CHROME", raising=False)
+        monkeypatch.setattr(sys, "platform", "linux")
+        import auth.cdp_browser as cdp
+
+        snap = tmp_path / "snap" / "bin" / "chromium"
+        snap.parent.mkdir(parents=True)
+        snap.write_bytes(b"")
+        monkeypatch.setattr(cdp, "_chromium_executable_candidates", lambda: [])
+        monkeypatch.setattr(
+            cdp.shutil,
+            "which",
+            lambda name: str(snap) if name == "chromium" else None,
+        )
+        monkeypatch.setattr(
+            "shared.chromium_runtime.find_managed_chromium", lambda: None
+        )
+        with pytest.raises(RuntimeError, match="No Chrome"):
+            find_chromium_executable()
+
+        monkeypatch.setenv("BAKLOG_ALLOW_SNAP_CHROME", "1")
+        assert find_chromium_executable() == snap
 
 
 class TestLinuxCiNoSandbox:

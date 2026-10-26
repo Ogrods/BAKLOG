@@ -58,6 +58,7 @@ CRITICAL_IMPORTS = [
     "shared.platform_support",
     "shared.profile_paths",
     "shared.subprocess_guard",
+    "shared.frozen_env",
     # Lazy/try/except imports
     "shared.supabase_auth",
     "shared.server_support",

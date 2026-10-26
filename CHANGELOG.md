@@ -43,6 +43,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
   frozen app (browser launch could exit immediately with a bash readline error).
 - Amazon Web Connect waits through 2FA instead of jumping to My Collection right
   after the password step.
+- Linux Start script waits for the server before opening the dashboard (avoids a
+  blank early tab).
+- In-app updates on Linux/macOS use the same temp folder as the apply script
+  (`$TMPDIR` or `/tmp`), so Install & restart no longer fails when Windows-style
+  TEMP vars differ.
+- Managed Connect browser downloads on Linux keep helper binaries executable.
+- Snap-only Chrome is no longer preferred over a downloaded Connect browser
+  (set `BAKLOG_ALLOW_SNAP_CHROME=1` to force Snap/Flatpak).
 
 ## [0.9.03] - 2026-10-13
 

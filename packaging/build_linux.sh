@@ -70,12 +70,7 @@ if [[ -z "${BAKLOG_SUPABASE_URL:-}" || -z "${BAKLOG_SUPABASE_ANON_KEY:-}" ]]; th
 fi
 "${PYTHON}" "${ROOT}/scripts/write_bundle_auth_env.py" "${OUT_DIR}"
 
-cat > "${OUT_DIR}/Start BAKLOG.sh" <<'EOF'
-#!/usr/bin/env bash
-cd "$(dirname "$0")"
-xdg-open "http://127.0.0.1:8765" >/dev/null 2>&1 || true
-exec "./BAKLOG"
-EOF
+cp -f "${ROOT}/packaging/Start BAKLOG.sh" "${OUT_DIR}/Start BAKLOG.sh"
 chmod +x "${OUT_DIR}/Start BAKLOG.sh"
 
 VERSION="0.0.0"

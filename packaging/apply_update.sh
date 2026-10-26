@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Apply a verified BAKLOG release zip over an existing install (macOS).
-# Invoked by the local server after security checks — not for manual arbitrary use.
+# Apply a verified BAKLOG release zip over an existing install (macOS + Linux).
+# Invoked by the local server after security checks - not for manual arbitrary use.
+# Workspace must match shared.update_ready_state.default_work_root: ${TMPDIR:-/tmp}/BAKLOG-update
 set -uo pipefail
 
 UPDATE_ROOT="${TMPDIR:-/tmp}/BAKLOG-update"
@@ -134,14 +135,27 @@ start_app_if_present() {
       exec "./BAKLOG Tray" >/dev/null 2>&1 &
     )
   elif is_linux && [[ -x "$INSTALL_DIR/BAKLOG" ]]; then
-    # Linux MVP ships without a tray; relaunch the server in a new session.
+    # Linux MVP ships without a tray; relaunch the server in a new session and
+    # open the dashboard once (Start BAKLOG.sh sets BAKLOG_NO_BROWSER=1).
     write_apply_log "relaunching server (linux MVP, no tray)"
     (
       cd "$INSTALL_DIR"
+      export BAKLOG_NO_BROWSER=1
       if command -v setsid >/dev/null 2>&1; then
         setsid ./BAKLOG >/dev/null 2>&1 &
       else
         ./BAKLOG >/dev/null 2>&1 &
+      fi
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        if command -v curl >/dev/null 2>&1; then
+          curl -sf "http://127.0.0.1:8765/api/config" >/dev/null 2>&1 && break
+        elif (echo >/dev/tcp/127.0.0.1/8765) >/dev/null 2>&1; then
+          break
+        fi
+        sleep 0.5
+      done
+      if command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "http://127.0.0.1:8765/" >/dev/null 2>&1 || true
       fi
     )
   else
@@ -216,12 +230,14 @@ write_apply_log "validate install=$INSTALL_DIR version=$VERSION"
 [[ -n "$ZIP_PATH" && -f "$ZIP_PATH" ]] || fail "Update zip missing"
 [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{64}$ ]] || fail "Expected sha256 invalid"
 
-if command -v shasum >/dev/null 2>&1; then
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL_SHA="$(sha256sum "$ZIP_PATH" | awk '{print tolower($1)}')"
+elif command -v shasum >/dev/null 2>&1; then
   ACTUAL_SHA="$(shasum -a 256 "$ZIP_PATH" | awk '{print tolower($1)}')"
 elif command -v openssl >/dev/null 2>&1; then
   ACTUAL_SHA="$(openssl dgst -sha256 "$ZIP_PATH" | awk '{print tolower($2)}')"
 else
-  fail "shasum or openssl required"
+  fail "sha256sum, shasum, or openssl required"
 fi
 [[ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || fail "Update zip sha256 mismatch"
 
@@ -318,6 +334,9 @@ fi
 
 chmod +x "$INSTALL_DIR/BAKLOG" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/BAKLOG Tray" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/Start BAKLOG.sh" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/Start BAKLOG.command" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/apply_update.sh" 2>/dev/null || true
 remove_old_backups "$INSTALL_PARENT" "$BACKUP_DIR"
 write_apply_result true "" "$VERSION" false
 # Drop ready package so the relaunched app does not rehydrate Install & restart.

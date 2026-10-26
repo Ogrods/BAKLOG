@@ -139,6 +139,8 @@ def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: P
                 stderr=subprocess.STDOUT,
             )
         if platform in ("darwin", "linux"):
+            from shared.frozen_env import scrub_pyinstaller_library_path
+
             cmd = [
                 "/bin/bash",
                 str(script),
@@ -151,6 +153,7 @@ def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: P
                 stdin=subprocess.DEVNULL,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
+                env=scrub_pyinstaller_library_path(),
             )
     except Exception:
         log_file.close()

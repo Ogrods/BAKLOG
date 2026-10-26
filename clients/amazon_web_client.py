@@ -43,6 +43,23 @@ _AMAZON_SESSION_COOKIE_NAMES = frozenset({
     "x-main",
 })
 
+# Strong auth cookies - weak ones (session-id / ubid-main) appear before 2FA.
+_AMAZON_AUTH_COOKIE_NAMES = frozenset({
+    "at-main",
+    "sess-at-main",
+    "session-token",
+    "x-main",
+})
+
+# Challenge / OTP pages after password; still signing in (do not nudge to collection).
+_AMAZON_AUTH_CHALLENGE_MARKERS = (
+    "/ap/cvf",
+    "/ap/mfa",
+    "/ap/challenge",
+    "/ap/verify",
+    "/ap/accountfix",
+)
+
 _AMAZON_HOST_MARKERS = ("amazon.com", "luna.amazon.com", "gaming.amazon.com")
 
 # External launcher targets from Prime Gaming key drops (user DevTools sample: EPIC).
@@ -163,11 +180,13 @@ def is_signin_url(url: str) -> bool:
         return True
     if "/ap/signin" in u or "/ap/register" in u:
         return True
+    if any(marker in u for marker in _AMAZON_AUTH_CHALLENGE_MARKERS):
+        return True
     return "/ap/" in u and "sign" in u
 
 
 def has_amazon_session_cookies(context: Any) -> bool:
-    """True when the profile has Amazon session cookies (post sign-in)."""
+    """True when the profile has any Amazon session cookie (may predate 2FA)."""
     try:
         cookies = context.cookies()
     except Exception:
@@ -183,11 +202,31 @@ def has_amazon_session_cookies(context: Any) -> bool:
     return False
 
 
+def has_amazon_auth_cookies(context: Any) -> bool:
+    """True when strong post-auth cookies are present (not bare session-id)."""
+    try:
+        cookies = context.cookies()
+    except Exception:
+        return False
+    for c in cookies:
+        name = (c.get("name") or "").lower()
+        domain = (c.get("domain") or "").lower()
+        if "amazon" not in domain:
+            continue
+        if name in _AMAZON_AUTH_COOKIE_NAMES and c.get("value"):
+            return True
+    return False
+
+
 def signed_in(url: str, context: Any) -> bool:
-    """True when the user appears signed in to Amazon (not on a sign-in page)."""
+    """True when the user appears signed in to Amazon (not on a sign-in page).
+
+    Requires strong auth cookies so password + weak session-id on a 2FA/CVF
+    page does not look complete (Connect would otherwise jump to My Collection).
+    """
     if is_signin_url(url):
         return False
-    if not has_amazon_session_cookies(context):
+    if not has_amazon_auth_cookies(context):
         return False
     u = (url or "").lower()
     return any(marker in u for marker in _AMAZON_HOST_MARKERS)

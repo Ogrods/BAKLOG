@@ -37,6 +37,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux Connect no longer fails when system Chrome is a shell wrapper under the
+  frozen app (browser launch could exit immediately with a bash readline error).
+- Amazon Web Connect waits through 2FA instead of jumping to My Collection right
+  after the password step.
+
 ## [0.9.03] - 2026-10-13
 
 ### Added

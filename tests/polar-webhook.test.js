@@ -92,6 +92,53 @@ describe('polar-webhook', () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it('marks pending applied after a matched Pro grant so cron cannot re-grant after refund', async () => {
+    const { res, json, fetchMock } = await postWebhook({
+      type: 'order.paid',
+      data: {
+        product: {},
+        customer: { email: 'Buyer@Example.com' },
+      },
+    });
+    expect(res.status).toBe(202);
+    expect(json.plan).toBe('pro');
+    const pendingCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/rest/v1/polar_pending_entitlements'),
+    );
+    expect(pendingCalls).toHaveLength(1);
+    const [pendingUrl, pendingInit] = pendingCalls[0];
+    expect(String(pendingUrl)).toContain('email=eq.buyer%40example.com');
+    expect(String(pendingInit.method || '').toUpperCase()).toBe('PATCH');
+    const body = JSON.parse(pendingInit.body);
+    expect(body.applied_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(body.applied_user_id).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('flips pending to free after a matched revoke', async () => {
+    const { res, json, fetchMock } = await postWebhook({
+      type: 'subscription.revoked',
+      data: {
+        id: 'sub_matched',
+        product: {},
+        customer: { email: 'buyer@example.com' },
+      },
+    }, { appMeta: { plan: 'pro', paid: true, paid_since: '2026-01-01' } });
+    expect(res.status).toBe(202);
+    expect(json.plan).toBe('free');
+    const pendingCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('/rest/v1/polar_pending_entitlements'),
+    );
+    expect(pendingCalls.length).toBeGreaterThanOrEqual(2);
+    const patch = pendingCalls.find(([, init]) => String(init?.method || '').toUpperCase() === 'PATCH');
+    const upsert = pendingCalls.find(([, init]) => String(init?.method || '').toUpperCase() === 'POST');
+    expect(patch).toBeTruthy();
+    expect(JSON.parse(upsert[1].body)).toMatchObject({
+      email: 'buyer@example.com',
+      plan: 'free',
+      polar_subscription_id: 'sub_matched',
+    });
+  });
+
   it('rejects bad signatures', async () => {
     vi.resetModules();
     process.env.POLAR_WEBHOOK_SECRET = 'server-secret';
@@ -251,6 +298,9 @@ describe('polar-webhook', () => {
           }
           : { ok: true, json: async () => ({}) };
       }
+      if (u.includes('/rest/v1/polar_pending_entitlements')) {
+        return { ok: true, text: async () => '' };
+      }
       throw new Error(`unexpected fetch ${u}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -408,12 +458,26 @@ describe('polar-webhook', () => {
     process.env.POLAR_WEBHOOK_SECRET = `whsec_${Buffer.from(rawSecret).toString('base64')}`;
     process.env.SUPABASE_URL = SUPABASE_URL;
     process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
-    const fetchMock = vi.fn(async (url) => {
+    const fetchMock = vi.fn(async (url, init) => {
       if (String(url).includes('/rpc/get_user_id_by_email')) {
         return { ok: true, json: async () => '11111111-1111-4111-8111-111111111111' };
       }
       if (String(url).includes('/auth/v1/admin/users/')) {
-        return { ok: true, json: async () => ({ email_confirmed_at: CONFIRMED_AT }) };
+        const method = (init?.method || 'GET').toUpperCase();
+        if (method === 'GET') {
+          return {
+            ok: true,
+            json: async () => ({
+              email: 'buyer@example.com',
+              email_confirmed_at: CONFIRMED_AT,
+              app_metadata: {},
+            }),
+          };
+        }
+        return { ok: true, json: async () => ({}) };
+      }
+      if (String(url).includes('/rest/v1/polar_pending_entitlements')) {
+        return { ok: true, text: async () => '' };
       }
       throw new Error(`unexpected fetch ${url}`);
     });

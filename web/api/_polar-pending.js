@@ -130,8 +130,8 @@ export async function putAppMetadata({ url, key, userId, meta }) {
 /**
  * Apply a paid Polar entitlement to a Supabase user. Throws SupabaseAdminError
  * (status 404 when the user id does not exist). Returns
- * { plan, before, after, email, stale, creditedDays }, or null without writing
- * when requireConfirmed is set and the account email is not confirmed.
+ * { plan, before, after, email, userId, stale, creditedDays }, or null without
+ * writing when requireConfirmed is set and the account email is not confirmed.
  */
 export async function setUserPlan({
   url,
@@ -154,6 +154,7 @@ export async function setUserPlan({
     before,
     after: result.meta,
     email: String(user?.email || ""),
+    userId,
     stale: result.stale,
     creditedDays: result.creditedDays,
   };

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
@@ -17,7 +18,8 @@ def _clean_env(tmp_path, monkeypatch):
     monkeypatch.delenv("BAKLOG_SUPABASE_URL", raising=False)
     monkeypatch.delenv("BAKLOG_SUPABASE_ANON_KEY", raising=False)
     monkeypatch.delenv("BAKLOG_AUTH_DISABLED", raising=False)
-    # Point the license file somewhere empty by default.
+    # Isolate license + durable auth-plan cache from the real data root.
+    monkeypatch.setenv("BAKLOG_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("BAKLOG_LICENSE_FILE", str(tmp_path / "license.json"))
     # Reset the process-level authenticated-plan cache between tests.
     monkeypatch.setattr(ent, "_LAST_AUTH_PLAN", None)
@@ -105,6 +107,41 @@ def test_background_plan_caches_last_authenticated(monkeypatch):
     assert ent.is_pro_background() is False  # nothing verified yet
     ent.current_plan("Bearer x")  # caches a verified pro plan
     assert ent.is_pro_background() is True
+
+
+def test_background_plan_survives_memory_clear_via_disk(monkeypatch):
+    """Tray deal alerts must keep Pro after a server restart without a new JWT."""
+    _enable_auth(monkeypatch)
+    monkeypatch.setattr("shared.supabase_auth.verify_bearer_plan", lambda auth: "pro")
+    ent.current_plan("Bearer x")
+    assert ent._auth_plan_cache_path().is_file()
+    monkeypatch.setattr(ent, "_LAST_AUTH_PLAN", None)
+    assert ent.is_pro_background() is True
+    # Hydrates memory from disk so later polls do not re-read every time.
+    assert ent._LAST_AUTH_PLAN is not None
+    assert ent._LAST_AUTH_PLAN[1] == "pro"
+
+
+def test_background_plan_disk_cleared_on_sign_out(monkeypatch):
+    _enable_auth(monkeypatch)
+    monkeypatch.setattr("shared.supabase_auth.verify_bearer_plan", lambda auth: "pro")
+    ent.current_plan("Bearer x")
+    ent.clear_authenticated_plan_cache()
+    assert not ent._auth_plan_cache_path().exists()
+    assert ent.is_pro_background() is False
+
+
+def test_background_plan_disk_expires(monkeypatch):
+    _enable_auth(monkeypatch)
+    monkeypatch.setattr("shared.supabase_auth.verify_bearer_plan", lambda auth: "pro")
+    ent.current_plan("Bearer x")
+    monkeypatch.setattr(ent, "_LAST_AUTH_PLAN", None)
+    stale = time.time() - ent._AUTH_PLAN_TTL_SEC - 1
+    ent._auth_plan_cache_path().write_text(
+        json.dumps({"noted_at": stale, "plan": "pro"}),
+        encoding="utf-8",
+    )
+    assert ent.is_pro_background() is False
 
 
 def test_background_plan_pure_local_reads_license():

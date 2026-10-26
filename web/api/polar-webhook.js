@@ -22,7 +22,12 @@
 // NOTIFY_TO; optional - storage still happens without them).
 
 import { notifyFounder } from "./_notify.js";
-import { normEmail, setUserPlan, upsertPendingEntitlement } from "./_polar-pending.js";
+import {
+  markPendingApplied,
+  normEmail,
+  setUserPlan,
+  upsertPendingEntitlement,
+} from "./_polar-pending.js";
 
 const TIMESTAMP_TOLERANCE_SEC = 5 * 60;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -322,6 +327,35 @@ export default {
     if (result.stale) {
       console.warn(`polar-webhook: ignored out-of-order ${event?.type}`);
       return Response.json({ ok: true, stale: true }, { status: 202 });
+    }
+
+    // Retire any prior pending row for this email so daily comp-expire cannot
+    // re-apply an old unmatched Pro after a later matched refund/revoke.
+    const pendingEmail = normEmail(result.email || email);
+    if (pendingEmail && result.userId) {
+      try {
+        await markPendingApplied({
+          url,
+          key,
+          email: pendingEmail,
+          userId: result.userId,
+        });
+        if (entitlement.plan === "free") {
+          const { customerId, subscriptionId } = polarIds(event);
+          await upsertPendingEntitlement({
+            url,
+            key,
+            email: pendingEmail,
+            plan: "free",
+            eventType: event?.type || "unknown",
+            customerId,
+            subscriptionId,
+          });
+        }
+      } catch (err) {
+        console.error("polar-webhook: retiring pending entitlement failed", err);
+        return Response.json({ error: "Pending retire failed" }, { status: 500 });
+      }
     }
 
     await notifyEntitlementChange({ event, result });

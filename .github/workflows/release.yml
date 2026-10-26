@@ -573,11 +573,20 @@ jobs:
           test -f release/BAKLOG-linux64.sha256
           test -x release/BAKLOG/BAKLOG
           test -x "release/BAKLOG/Start BAKLOG.sh"
+          test -x release/BAKLOG/apply_update.sh
           test ! -e "release/BAKLOG/BAKLOG Tray"
+          grep -q 'BAKLOG_NO_BROWSER=1' "release/BAKLOG/Start BAKLOG.sh"
           (
             cd release
             sha256sum -c BAKLOG-linux64.sha256
           )
+          # Re-extract zip and confirm +x bits survive zip round-trip
+          rm -rf /tmp/baklog-linux-zip-smoke
+          mkdir -p /tmp/baklog-linux-zip-smoke
+          unzip -q release/BAKLOG-linux64.zip -d /tmp/baklog-linux-zip-smoke
+          test -x /tmp/baklog-linux-zip-smoke/BAKLOG/BAKLOG
+          test -x "/tmp/baklog-linux-zip-smoke/BAKLOG/Start BAKLOG.sh"
+          test -x /tmp/baklog-linux-zip-smoke/BAKLOG/apply_update.sh
           ls -lh release/BAKLOG-linux64.zip release/BAKLOG-linux64.sha256
 
       - name: Generate SBOM

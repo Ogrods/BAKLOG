@@ -107,6 +107,8 @@ def test_launch_apply_subprocess_darwin(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert calls[0]["cmd"][0] == "/bin/bash"
     assert str(script) in calls[0]["cmd"]
     assert calls[0]["kwargs"].get("start_new_session") is True
+    env = calls[0]["kwargs"].get("env") or {}
+    assert "LD_LIBRARY_PATH" not in env or "_internal" not in str(env.get("LD_LIBRARY_PATH", ""))
 
 
 @pytest.mark.no_leak_check
@@ -130,12 +132,16 @@ def test_launch_apply_subprocess_linux(monkeypatch: pytest.MonkeyPatch, tmp_path
         def __exit__(self, *args):
             return False
 
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/opt/BAKLOG/_internal")
+    monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
     monkeypatch.setattr("shared.update_platform.subprocess.Popen", FakePopen)
     launch_apply_subprocess(script=script, manifest_path=manifest, install_dir=install)
     assert calls
     assert calls[0]["cmd"][0] == "/bin/bash"
     assert str(script) in calls[0]["cmd"]
     assert calls[0]["kwargs"].get("start_new_session") is True
+    env = calls[0]["kwargs"].get("env") or {}
+    assert "LD_LIBRARY_PATH" not in env
 
 
 @pytest.mark.no_leak_check

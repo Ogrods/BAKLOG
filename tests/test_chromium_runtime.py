@@ -72,6 +72,34 @@ def test_safe_extract_rejects_zip_slip(tmp_path: Path) -> None:
         crt.safe_extract_cft_zip(bad, tmp_path / "out")
 
 
+def test_safe_extract_restores_unix_execute_bits(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(crt.sys, "platform", "linux")
+    zpath = tmp_path / "cft.zip"
+    helper_name = "chrome-linux64/chrome_crashpad_handler"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        info = zipfile.ZipInfo(helper_name)
+        # Unix mode 0755 in high 16 bits of external_attr
+        info.external_attr = 0o100755 << 16
+        zf.writestr(info, b"#!/bin/true\n")
+    out = tmp_path / "out"
+    chmod_calls: list[int] = []
+    real_chmod = Path.chmod
+
+    def tracking_chmod(self: Path, mode: int, *args, **kwargs):
+        chmod_calls.append(mode)
+        return real_chmod(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "chmod", tracking_chmod)
+    crt.safe_extract_cft_zip(zpath, out)
+    helper = out / helper_name
+    assert helper.is_file()
+    # Windows may not persist Unix +x; assert we requested execute bits.
+    assert chmod_calls
+    assert any(mode & 0o111 for mode in chmod_calls)
+
+
 def test_find_managed_requires_marker_and_exe(
     monkeypatch: pytest.MonkeyPatch, data_dir: Path
 ) -> None:

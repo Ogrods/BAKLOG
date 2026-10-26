@@ -96,9 +96,9 @@ def tray_binary_name(platform: str | None = None) -> str:
 
 def apply_log_path() -> Path:
     """Shared apply helper log under the trusted update workspace."""
-    import tempfile
+    from shared.update_ready_state import default_work_root
 
-    return Path(tempfile.gettempdir()) / "BAKLOG-update" / "apply.log"
+    return default_work_root() / "apply.log"
 
 
 def launch_apply_subprocess(*, script: Path, manifest_path: Path, install_dir: Path) -> subprocess.Popen:

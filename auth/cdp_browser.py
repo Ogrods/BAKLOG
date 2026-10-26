@@ -490,23 +490,48 @@ def _chromium_executable_candidates() -> list[Path]:
         Path("/usr/bin/microsoft-edge"),
         Path("/usr/bin/microsoft-edge-stable"),
         Path("/usr/bin/brave-browser"),
+        # Snap/Flatpak are last-resort only (see find_chromium_executable); they
+        # often break custom --user-data-dir under ~/.local/share/baklog.
+    ])
+    return candidates
+
+
+def _confined_chromium_candidates() -> list[Path]:
+    """Snap/Flatpak export bins - opt-in via BAKLOG_ALLOW_SNAP_CHROME=1."""
+    home = Path(os.path.expanduser("~"))
+    return [
         Path("/snap/bin/chromium"),
         Path("/snap/bin/google-chrome"),
         Path("/var/lib/flatpak/exports/bin/org.chromium.Chromium"),
         Path("/var/lib/flatpak/exports/bin/com.google.Chrome"),
-    ])
-    home = Path(os.path.expanduser("~"))
-    candidates.extend([
-        Path(os.path.join(home, ".local/share/flatpak/exports/bin/org.chromium.Chromium")),
-        Path(os.path.join(home, ".local/share/flatpak/exports/bin/com.google.Chrome")),
-    ])
-    return candidates
+        Path(home / ".local/share/flatpak/exports/bin/org.chromium.Chromium"),
+        Path(home / ".local/share/flatpak/exports/bin/com.google.Chrome"),
+    ]
+
+
+def _is_confined_chrome_path(path: Path) -> bool:
+    text = path.as_posix().lower()
+    return (
+        "/snap/" in text
+        or "/flatpak/" in text
+        or text.startswith("/var/lib/flatpak/")
+    )
+
+
+def _allow_snap_chrome() -> bool:
+    return os.getenv("BAKLOG_ALLOW_SNAP_CHROME", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def find_chromium_executable() -> Path:
     """Return path to Chrome/Edge or a previously downloaded managed build.
 
     Does not download. Soft probes (``/api/config``) use this so boot stays offline.
+    Snap/Flatpak paths are skipped unless ``BAKLOG_ALLOW_SNAP_CHROME=1`` so Connect
+    can fall through to a managed Chrome for Testing download instead.
     """
     override = os.getenv("BAKLOG_CHROME_PATH", "").strip()
     if override:
@@ -523,7 +548,9 @@ def find_chromium_executable() -> Path:
         found = shutil.which(name)
         if found:
             p = Path(found)
-            if p.is_file():
+            if p.is_file() and (
+                _allow_snap_chrome() or not _is_confined_chrome_path(p)
+            ):
                 return p
 
     try:
@@ -534,6 +561,11 @@ def find_chromium_executable() -> Path:
             return managed
     except Exception:
         pass
+
+    if _allow_snap_chrome():
+        for path in _confined_chromium_candidates():
+            if path.is_file():
+                return path
 
     raise RuntimeError(
         "No Chrome or Edge browser found. Install Google Chrome or Microsoft Edge, "

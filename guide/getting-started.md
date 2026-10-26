@@ -41,19 +41,19 @@ Portable zip builds work too: unzip to a normal folder, then run `Start BAKLOG.b
 
 ## Beta (Linux)
 
-Experimental packaged zip (no tray icon yet). Prefer a desktop session or GUI VM - Connect needs a headed browser. Needs a modern glibc (2.35+), same baseline as Ubuntu 22.04.
+Experimental **zip only** (no `.deb` / AppImage / Setup.exe, no tray icon yet). Prefer a desktop session or GUI VM - Connect needs a headed browser. Needs **x86_64** with a modern glibc (2.35+), same baseline as Ubuntu 22.04.
 
 1. Download **BAKLOG-linux64.zip** from [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest).
-2. Unzip to a normal folder, then run:
+2. Unzip to a normal folder (not a temp extract). Some GUI unzippers strip execute bits - always re-run `chmod` after extract:
 
    ```bash
-   chmod +x "BAKLOG/Start BAKLOG.sh" BAKLOG/BAKLOG
+   chmod +x "BAKLOG/Start BAKLOG.sh" BAKLOG/BAKLOG BAKLOG/apply_update.sh
    ./BAKLOG/Start\ BAKLOG.sh
    ```
 
-3. Your browser should open **http://127.0.0.1:8765**. Closing the terminal stops the server (there is no tray menu on Linux yet).
-4. Library data lives in `~/.local/share/baklog` (or `$XDG_DATA_HOME/baklog`). Optional login autostart uses `~/.config/autostart/BAKLOG.desktop` when enabled from the app.
-5. Install Google Chrome or Chromium for Connections, or set `BAKLOG_CHROME_PATH`. If neither is installed, first Connect can download a one-time browser (~150 MB) when online.
+3. Your browser should open **http://127.0.0.1:8765** once the server is ready. Closing the terminal stops the server (there is no tray menu on Linux yet).
+4. Library data lives in `~/.local/share/baklog` (or `$XDG_DATA_HOME/baklog`). Start-at-login is tray-only on Windows/macOS - not available on the Linux zip yet.
+5. Install Google Chrome or Chromium as a normal package (prefer `/opt/google/chrome/chrome` over Snap-only installs), or set `BAKLOG_CHROME_PATH` to that binary. If neither is installed, first Connect can download a one-time browser (~150 MB) when online. Containers may need `BAKLOG_CHROMIUM_NO_SANDBOX=1`.
 6. Use **GOG (web)** and **Amazon (Prime Gaming, web)** - Galaxy local and Amazon launcher DB are not available on Linux.
 
 ## Install (from source)

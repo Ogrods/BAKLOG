@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -67,7 +66,9 @@ class UpdateManager:
         self._current_version = current_version
         self._has_in_flight_runs = has_in_flight_runs
         self._has_active_sessions = has_active_sessions or (lambda: False)
-        self._work_root = (work_root or Path(tempfile.gettempdir()) / "BAKLOG-update").resolve()
+        from shared.update_ready_state import default_work_root
+
+        self._work_root = (work_root or default_work_root()).resolve()
         self._lock = threading.Lock()
         self._status = UpdateStatus()
         self._thread: threading.Thread | None = None
@@ -328,7 +329,8 @@ class UpdateManager:
             clear_apply_started(self._work_root)
             msg = (
                 "Updater helper did not start (no apply-started handshake). "
-                "The app was left running; check %TEMP%\\BAKLOG-update\\apply.log."
+                "The app was left running; check the apply log under "
+                "BAKLOG-update (Windows: %TEMP%; Linux/macOS: $TMPDIR or /tmp)."
             )
             self._set_status(phase="ready", ready=True, can_apply=True, error=msg)
             return {"ok": False, "error": msg}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-26T02:22:38.770256+00:00",
+  "generated_at": "2026-10-27T11:48:30.177208+00:00",
   "items": [
     {
       "id": "epic-sker-ritual-aac702",
@@ -32,7 +32,7 @@
       "store": "epic",
       "title": "MAFIA HOTEL (Epic Games) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/mafia-hotel-epic-games-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5090990/a830b71e3c7a793d5ece3dc0fb3e8121a77f8840/header.jpg?t=1792911184",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5090990/a830b71e3c7a793d5ece3dc0fb3e8121a77f8840/header.jpg?t=1793073597",
       "genres": [],
       "blurb": "Claim MAFIA HOTEL for free via Epic Games Store! MAFIA HOTEL is a 3d multiplayer social deduction game for up to 16 players.",
       "ends_at": "2026-11-01T23:59:00Z",
@@ -197,27 +197,6 @@
       "review_percent": 81,
       "source": "itad",
       "first_seen": "2026-10-21T18:37:40Z",
-      "premium_only": true
-    },
-    {
-      "id": "itad-ff087683735c",
-      "store": "steam",
-      "title": "Voidtrain - Big Catch Free DLC",
-      "claim_url": "https://isthereanydeal.com/giveaways/16653/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5007040/32e2576dc44c96f7bfa0dc6cc92f5cc0fb2560ef/header.jpg?t=1791824486",
-      "genres": [
-        "Action",
-        "Adventure",
-        "Indie",
-        "RPG",
-        "Simulation"
-      ],
-      "blurb": "Voidtrain - Big Catch",
-      "ends_at": "2026-10-27T04:56:04Z",
-      "steam_appid": 5007040,
-      "review_percent": 92,
-      "source": "itad",
-      "first_seen": "2026-10-13T04:56:04Z",
       "premium_only": true
     }
   ],

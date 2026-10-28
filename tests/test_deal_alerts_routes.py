@@ -110,6 +110,8 @@ def test_hosted_auth_without_recent_pro_plan_is_disabled(alerts_server, monkeypa
     monkeypatch.setattr(ent, "_admin_enabled", lambda: False)
     monkeypatch.setattr(ent, "_auth_enabled", lambda: True)
     monkeypatch.setattr(ent, "_LAST_AUTH_PLAN", None)
+    # Disk-backed auth_plan.json on a maintainer machine must not count as "recent".
+    monkeypatch.setattr(ent, "_load_authenticated_plan", lambda: None)
     _, body = _call(alerts_server, "/api/deal-alerts/pending")
     assert body["enabled"] is False
 

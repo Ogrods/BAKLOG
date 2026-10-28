@@ -193,3 +193,61 @@ def test_subprocess_env_scopes_credentials_to_fetcher(
     assert all_env.get("STEAM_API_KEY") == "steam-key"
     assert all_env.get("ITAD_API_KEY") == "itad-key"
     assert all_env.get("PSN_NPSSO") == "npsso-secret"
+
+
+def test_subprocess_env_passes_linux_display_session_vars(
+    isolated_profiles: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fetcher children must keep DISPLAY so headed CDP retries can open Chrome.
+
+    Regression: whitelist omitted DISPLAY/WAYLAND/… so Amazon Dashboard fetch on
+    Linux failed with Missing X server after Connect (in-process) succeeded.
+    """
+    create_profile("Work")
+    set_active_profile("work")
+    monkeypatch.setenv("BAKLOG_PROFILE", "work")
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    monkeypatch.setenv("XAUTHORITY", "/tmp/.Xauthority")
+    monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/1000")
+    monkeypatch.setenv("XDG_SESSION_TYPE", "x11")
+    monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus")
+    # Credentials still least-privilege: process Steam key must not leak.
+    monkeypatch.setenv("STEAM_API_KEY", "leaked-in-parent")
+
+    env = subprocess_env_for_profile("work", fetcher_key="amazon")
+    assert env.get("DISPLAY") == ":0"
+    assert env.get("WAYLAND_DISPLAY") == "wayland-0"
+    assert env.get("XAUTHORITY") == "/tmp/.Xauthority"
+    assert env.get("XDG_RUNTIME_DIR") == "/run/user/1000"
+    assert env.get("XDG_SESSION_TYPE") == "x11"
+    assert env.get("DBUS_SESSION_BUS_ADDRESS") == "unix:path=/run/user/1000/bus"
+    assert "STEAM_API_KEY" not in env
+
+
+def test_subprocess_env_omits_unset_display_vars(
+    isolated_profiles: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_profile("Work")
+    for key in (
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XAUTHORITY",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_TYPE",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    env = subprocess_env_for_profile("work")
+    for key in (
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XAUTHORITY",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_TYPE",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ):
+        assert key not in env

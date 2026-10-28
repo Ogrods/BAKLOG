@@ -1,16 +1,28 @@
 """Steam Web API and Store API client with on-disk caching."""
 
+from __future__ import annotations
+
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import requests
 
 STORE_DELAY_SEC = 1.5
-# Lighter throttle for appreviews only (storesearch uses SEARCH_DELAY_SEC).
+# Lighter throttle for review summary fetches (storesearch uses SEARCH_DELAY_SEC).
 REVIEW_DELAY_SEC = 0.75
 _STORE_RETRY_BACKOFF = (2, 5, 10)
 _RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
+
+# Replaces store.steampowered.com/appreviews/?json=1 (retired ~2026-10-22).
+_GET_APP_REVIEWS_URL = (
+    "https://api.steampowered.com/IUserReviewsService/GetAppReviews/v1/"
+)
+# IUserReviewsService enums (int values; string names return wrong totals).
+_REVIEW_FILTER_HELPFUL = 0
+_REVIEW_TYPE_ALL = 0
+_PURCHASE_TYPE_ALL = 1
 
 
 def _get_with_retry(
@@ -46,6 +58,82 @@ def _get_with_retry(
     raise RuntimeError("retry loop exited without response")
 
 
+def _parse_json_object(resp: requests.Response) -> dict[str, Any]:
+    """Parse a JSON object body; raise ValueError on HTML or non-object JSON."""
+    ctype = (resp.headers.get("content-type") or "").lower()
+    text = resp.text or ""
+    if "html" in ctype or text.lstrip().startswith("<"):
+        raise ValueError(
+            f"Steam returned HTML instead of JSON from {resp.url} "
+            "(review endpoint may be blocked or retired)"
+        )
+    try:
+        raw = resp.json()
+    except ValueError as exc:
+        raise ValueError(f"Steam returned non-JSON from {resp.url}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"Steam JSON was not an object from {resp.url}")
+    return raw
+
+
+def query_summary_present(raw: dict[str, Any]) -> bool:
+    """True when the payload includes a query_summary object (even if totals are 0).
+
+    Empty envelopes like ``{"response": {}}`` must not be treated as a confirmed
+    zero-review result - caching those would poison later enrich runs.
+    """
+    envelope = raw.get("response") if isinstance(raw.get("response"), dict) else raw
+    if not isinstance(envelope, dict):
+        return False
+    return isinstance(envelope.get("query_summary"), dict)
+
+
+def review_summary_from_payload(raw: dict[str, Any]) -> dict[str, Any]:
+    """Normalize GetAppReviews (or legacy flat) JSON into the on-disk cache shape."""
+    envelope = raw.get("response") if isinstance(raw.get("response"), dict) else raw
+    summary = envelope.get("query_summary") if isinstance(envelope, dict) else None
+    if not isinstance(summary, dict):
+        summary = {}
+    result: dict[str, Any] = {
+        "total_reviews": summary.get("total_reviews", 0) or 0,
+        "total_positive": summary.get("total_positive", 0) or 0,
+        "total_negative": summary.get("total_negative", 0) or 0,
+        "review_score": summary.get("review_score", 0) or 0,
+        "review_score_desc": summary.get("review_score_desc", "") or "",
+    }
+    if result["total_reviews"] > 0:
+        result["percent_positive"] = round(
+            100 * result["total_positive"] / result["total_reviews"], 1
+        )
+    else:
+        result["percent_positive"] = None
+    return result
+
+
+def fetch_review_summary_payload(
+    appid: int,
+    *,
+    api_key: str = "",
+    timeout: int = 30,
+) -> dict[str, Any]:
+    """Fetch public review totals via IUserReviewsService/GetAppReviews."""
+    payload: dict[str, Any] = {
+        "appid": int(appid),
+        "filter": _REVIEW_FILTER_HELPFUL,
+        "review_type": _REVIEW_TYPE_ALL,
+        "purchase_type": _PURCHASE_TYPE_ALL,
+        # Summary fields arrive on the first page; keep the reviews array small.
+        "num_per_page": 1,
+        "cursor": "*",
+        "languages": ["all"],
+    }
+    params: dict[str, Any] = {"input_json": json.dumps(payload, separators=(",", ":"))}
+    if api_key:
+        params["key"] = api_key
+    resp = _get_with_retry(_GET_APP_REVIEWS_URL, params, timeout=timeout)
+    return _parse_json_object(resp)
+
+
 def _default_steam_cache_dir() -> Path:
     from shared.profile_paths import profile_cache_dir
 
@@ -67,9 +155,17 @@ class SteamClient:
 
     def _read_cache(self, kind: str, key: str) -> dict | None:
         path = self._cache_path(kind, key)
-        if path.exists():
+        if not path.exists():
+            return None
+        try:
             return json.loads(path.read_text(encoding="utf-8"))
-        return None
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            # Corrupt / truncated cache: treat as miss so the next fetch can heal.
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return None
 
     def _write_cache(self, kind: str, key: str, data: dict) -> None:
         path = self._cache_path(kind, key)
@@ -147,29 +243,9 @@ class SteamClient:
                 return cached
 
         self._throttle_store(REVIEW_DELAY_SEC)
-        url = f"https://store.steampowered.com/appreviews/{appid}"
-        params = {
-            "json": 1,
-            "language": "all",
-            "purchase_type": "all",
-            "num_per_page": 0,
-        }
-        resp = _get_with_retry(url, params)
-        raw = resp.json()
-        summary = raw.get("query_summary", {})
-        result = {
-            "total_reviews": summary.get("total_reviews", 0),
-            "total_positive": summary.get("total_positive", 0),
-            "total_negative": summary.get("total_negative", 0),
-            "review_score": summary.get("review_score", 0),
-            "review_score_desc": summary.get("review_score_desc", ""),
-        }
-        if result["total_reviews"] > 0:
-            result["percent_positive"] = round(
-                100 * result["total_positive"] / result["total_reviews"], 1
-            )
-        else:
-            result["percent_positive"] = None
-
-        self._write_cache("reviews", cache_key, result)
+        raw = fetch_review_summary_payload(appid, api_key=self.api_key or "")
+        result = review_summary_from_payload(raw)
+        # Only persist confirmed summaries. Empty envelopes must not poison cache.
+        if query_summary_present(raw):
+            self._write_cache("reviews", cache_key, result)
         return result

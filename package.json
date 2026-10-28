@@ -1,6 +1,6 @@
 {
   "name": "steam-backlog",
-  "version": "0.9.04",
+  "version": "0.9.05",
   "license": "MIT",
   "private": true,
   "type": "module",

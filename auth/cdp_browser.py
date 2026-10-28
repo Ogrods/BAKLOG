@@ -971,18 +971,27 @@ class CdpPage:
         window state (minimize then restore via ``Browser.setWindowBounds``)
         forces the OS to raise and focus the window past the foreground lock, then
         we re-activate the tab so the login page is the one shown on top.
+
+        Retries briefly when CDP has not yet assigned a windowId (cold Edge launch)
+        and forces ``normal`` if a restore leaves the window minimized.
         """
-        try:
-            result = self._context._send(
-                "Browser.getWindowForTarget", {"targetId": self._target_id}
-            )
-        except Exception:
-            result = {}
-        window_id = result.get("windowId")
+        window_id = None
+        bounds: dict = {}
+        for _ in range(5):
+            try:
+                result = self._context._send(
+                    "Browser.getWindowForTarget", {"targetId": self._target_id}
+                )
+            except Exception:
+                result = {}
+            window_id = result.get("windowId")
+            bounds = result.get("bounds") or {}
+            if window_id is not None:
+                break
+            time.sleep(0.15)
         if window_id is None:
             self.bring_to_front()
             return
-        bounds = result.get("bounds") or {}
         restore_state = bounds.get("windowState") or "normal"
         if restore_state == "minimized":
             restore_state = "normal"
@@ -995,6 +1004,22 @@ class CdpPage:
                 "Browser.setWindowBounds",
                 {"windowId": window_id, "bounds": {"windowState": restore_state}},
             )
+            # If restore failed silently, force a visible state.
+            try:
+                after = self._context._send(
+                    "Browser.getWindowForTarget", {"targetId": self._target_id}
+                )
+                after_state = (after.get("bounds") or {}).get("windowState")
+                if after_state == "minimized":
+                    self._context._send(
+                        "Browser.setWindowBounds",
+                        {
+                            "windowId": window_id,
+                            "bounds": {"windowState": "normal"},
+                        },
+                    )
+            except Exception:
+                pass
         except Exception:
             pass
         self.bring_to_front()

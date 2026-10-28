@@ -13,12 +13,18 @@ Filter (codeless / Amazon-fulfilled only):
 from __future__ import annotations
 
 import json
+import os
+import sys
 import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
 
 from shared.profile_paths import profile_cache_dir
+
+# Off-screen headed retry (Epic/Humble wishlist pattern) - real Chrome fingerprint
+# without stealing focus when DISPLAY is available.
+_HEADED_FETCH_WINDOW_POS = (-32000, -32000)
 
 LUNA_CLAIMS_URL = "https://luna.amazon.com/claims/my-collection"
 GAMING_HOME_URL = "https://gaming.amazon.com/home"
@@ -137,6 +143,17 @@ def classify_sniff_capture(*, capture_ok: bool, signed_in: bool) -> str:
     if capture_ok:
         return "claims_captured"
     return "signed_out" if not signed_in else "signed_in_no_claims"
+
+
+def graphical_display_available() -> bool:
+    """True when a headed Chrome launch can attach to a desktop session.
+
+    Windows/macOS do not use DISPLAY; Linux needs DISPLAY or WAYLAND_DISPLAY
+    (passed through from the server via subprocess_env_for_profile).
+    """
+    if sys.platform in ("win32", "darwin"):
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
 def _now_s() -> float:
@@ -759,7 +776,12 @@ def sniff_claims(
         outcome["final_url"] = None
 
         deadline = _now_s() + run_timeout_s
-        ctx = launch_persistent_profile(str(profile), headless=headless)
+        launch_kw: dict[str, Any] = {"headless": headless}
+        if not headless:
+            # Prefer off-screen headed over --start-maximized so a successful
+            # DISPLAY path does not steal focus during Dashboard fetch.
+            launch_kw["window_position"] = _HEADED_FETCH_WINDOW_POS
+        ctx = launch_persistent_profile(str(profile), **launch_kw)
         try:
             # Parity with Connections-headed auth.
             from auth.cdp_browser import STEALTH_INIT_SCRIPT
@@ -825,7 +847,16 @@ def sniff_claims(
             "Reconnect “Amazon (Prime Gaming, web)” on Connections."
         )
 
-    # 3) Visible retry (diagnostic parity). This may pop a window.
+    # 3) Visible retry (diagnostic parity). Skip when Linux has no display —
+    # headed Chrome would ozone-crash with Missing X / $DISPLAY.
+    if not graphical_display_available():
+        raise AmazonWebAuthError(
+            "Could not capture Prime Gaming claims without a graphical display. "
+            "Start BAKLOG from your desktop session (Start BAKLOG.sh) so store "
+            "fetch can open a browser, or reconnect “Amazon (Prime Gaming, web)” "
+            "on Connections and try again."
+        )
+
     headed_outcome = _run_once(headless=False, run_timeout_s=headed_timeout_s)
     if headed_outcome["capture_ok"]:
         # Preserve headed capture; overwrite raw dump with real payload.

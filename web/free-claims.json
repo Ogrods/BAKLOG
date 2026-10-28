@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-27T11:48:30.177208+00:00",
+  "generated_at": "2026-10-28T04:44:02.407605+00:00",
   "items": [
     {
       "id": "epic-sker-ritual-aac702",
@@ -39,19 +39,6 @@
       "steam_appid": 5090990,
       "source": "gamerpower",
       "first_seen": "2026-10-25T22:52:24Z"
-    },
-    {
-      "id": "gamerpower-3822",
-      "store": "epic",
-      "title": "Terraspace (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/terraspace-epic-games-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3535330/5fc62a33f3e2507937b2047f60da765153afd82b/header.jpg?t=1772902523",
-      "genres": [],
-      "blurb": "Download Terraspace for free via Epic Games Store! Terraspace is a casual city builder game about creating conditions for life on unsuitable planets.",
-      "ends_at": "2026-10-27T23:59:00Z",
-      "steam_appid": 3535330,
-      "source": "gamerpower",
-      "first_seen": "2026-10-21T21:24:44Z"
     },
     {
       "id": "gamerpower-3331",

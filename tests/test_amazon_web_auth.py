@@ -7,21 +7,26 @@ import tempfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+
 from clients.amazon_web_client import (
     COLLECTION_URLS,
     GAMING_HOME_URL,
     LUNA_CLAIMS_URL,
+    AmazonWebAuthError,
     amazon_signin_url,
     classify_sniff_capture,
     collection_page_ready,
     collection_urls,
     filter_codeless_claims,
+    graphical_display_available,
     is_luna_error_page,
     is_luna_hub,
     is_signin_url,
     needs_collection_redirect,
     on_collection_page,
     signed_in,
+    sniff_claims,
     try_parse_claims_from_html,
     try_parse_claims_from_text,
 )
@@ -181,3 +186,103 @@ def test_raw_dump_fallback_builds_records() -> None:
         records = filter_codeless_claims(fallback_claims)
         assert len(records) == 1
         assert records[0]["name"] == "Lake"
+
+
+def test_graphical_display_available_linux_needs_display_or_wayland(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("clients.amazon_web_client.sys.platform", "linux")
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    assert graphical_display_available() is False
+
+    monkeypatch.setenv("DISPLAY", ":0")
+    assert graphical_display_available() is True
+
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    assert graphical_display_available() is True
+
+
+def test_graphical_display_available_win32_without_display(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("clients.amazon_web_client.sys.platform", "win32")
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    assert graphical_display_available() is True
+
+
+def test_sniff_claims_skips_headed_when_no_display(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Signed-in headless no_claims must not launch headed Chrome without X."""
+    profile = tmp_path / "amazon_web"
+    profile.mkdir()
+    monkeypatch.setattr(
+        "auth.secrets.profile_dir",
+        lambda _key: profile,
+    )
+    monkeypatch.setattr(
+        "clients.amazon_web_client.graphical_display_available",
+        lambda: False,
+    )
+
+    launches: list[dict] = []
+
+    class _FakePage:
+        url = "https://luna.amazon.com/claims/my-collection"
+
+        def on(self, *_a, **_k) -> None:
+            return None
+
+        def wait_for_timeout(self, *_a, **_k) -> None:
+            return None
+
+    class _FakeCtx:
+        pages = [_FakePage()]
+
+        def add_init_script(self, *_a, **_k) -> None:
+            return None
+
+        def new_page(self) -> _FakePage:
+            return _FakePage()
+
+    def fake_launch(user_data_dir, **kwargs):  # type: ignore[no-untyped-def]
+        launches.append({"user_data_dir": str(user_data_dir), **kwargs})
+        return _FakeCtx()
+
+    def fake_poll(
+        page,
+        ctx,
+        *,
+        deadline,
+        candidates,
+        raw_claims,
+        captured,
+        **_kwargs,
+    ) -> None:
+        # Headless path: signed in, but no claims payload.
+        captured["done"] = True
+        captured["claims_captured"] = False
+        captured["session_only_captured"] = False
+
+    monkeypatch.setattr("auth.cdp_browser.launch_persistent_profile", fake_launch)
+    monkeypatch.setattr("auth.cdp_browser.close_browser_bounded", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "clients.amazon_web_client._poll_prime_collection",
+        fake_poll,
+    )
+    monkeypatch.setattr(
+        "clients.amazon_web_client.signed_in",
+        lambda *_a, **_k: True,
+    )
+
+    with pytest.raises(AmazonWebAuthError, match="graphical display") as exc:
+        sniff_claims(timeout_s=5)
+
+    assert "Start BAKLOG" in str(exc.value) or "desktop" in str(exc.value).lower()
+    assert len(launches) == 1
+    assert launches[0].get("headless") is True
+    assert all(launch.get("headless") is not False for launch in launches)

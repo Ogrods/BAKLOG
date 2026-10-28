@@ -37,6 +37,18 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.05] - 2026-10-28
+
+### Fixed
+
+- Linux store fetch keeps the desktop display env for child processes, so Amazon
+  (Prime Gaming) Dashboard refresh after Connect no longer fails with a missing
+  `$DISPLAY` / X server error. If BAKLOG was started without a graphical session,
+  the error now asks you to launch from the desktop instead of crashing Chrome.
+- Steam review scores for non-Steam libraries (GOG and others) work again after
+  Steam retired the old store review URL.
+- GOG Connect raises the sign-in window more reliably on the first click.
+
 ## [0.9.04] - 2026-10-26
 
 ### Fixed

@@ -131,22 +131,18 @@ def _steam_app_details(appid: int, last_call: list[float]) -> dict | None:
 
 
 def _steam_review_percent(appid: int, last_call: list[float]) -> int | None:
-    from clients.steam_client import _get_with_retry
+    from clients.steam_client import (
+        fetch_review_summary_payload,
+        review_summary_from_payload,
+    )
 
     _throttle(last_call)
     try:
-        resp = _get_with_retry(
-            f"https://store.steampowered.com/appreviews/{appid}",
-            {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0},
-            timeout=30,
-        )
-        summary = resp.json().get("query_summary") or {}
-        total = summary.get("total_reviews") or 0
-        pos = summary.get("total_positive") or 0
-        if total <= 0:
-            return None
-        return round(100 * pos / total)
-    except requests.RequestException:
+        raw = fetch_review_summary_payload(int(appid), timeout=30)
+        summary = review_summary_from_payload(raw)
+        pct = summary.get("percent_positive")
+        return int(round(pct)) if pct is not None else None
+    except (requests.RequestException, ValueError, TypeError):
         return None
 
 

@@ -1040,3 +1040,37 @@ class TestBrowserSessionGone:
             pages = [_Page()]
 
         assert browser_session_gone(_Ctx()) is False
+
+
+class TestFocusWindow:
+    def test_forces_normal_when_restore_stays_minimized(self) -> None:
+        ctx = _bare_context()
+        calls: list[tuple[str, dict]] = []
+        states = iter(
+            [
+                {"windowId": 7, "bounds": {"windowState": "normal"}},
+                {"windowId": 7, "bounds": {"windowState": "minimized"}},
+            ]
+        )
+
+        def _send(method: str, params: dict | None = None, **_kwargs):  # type: ignore[no-untyped-def]
+            params = params or {}
+            calls.append((method, params))
+            if method == "Browser.getWindowForTarget":
+                return next(states)
+            return {}
+
+        ctx._send = _send  # type: ignore[method-assign]
+        page = CdpPage.__new__(CdpPage)
+        page._context = ctx
+        page._target_id = "t1"
+        page._session_id = "s1"
+        page.bring_to_front = lambda: None  # type: ignore[method-assign]
+        page.focus_window()
+        bound_states = [
+            p["bounds"]["windowState"]
+            for m, p in calls
+            if m == "Browser.setWindowBounds"
+        ]
+        assert "minimized" in bound_states
+        assert bound_states[-1] == "normal"

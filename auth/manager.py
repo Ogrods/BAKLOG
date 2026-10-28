@@ -211,6 +211,15 @@ def subprocess_env_for_profile(
         "COMSPEC",
         "LANG",
         "LC_ALL",
+        # Linux/desktop session: headed CDP fetchers (Amazon retry, etc.) need the
+        # same display as the server started from Start BAKLOG.sh. Whitelist stays
+        # tight otherwise - credentials are still least-privilege below.
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XAUTHORITY",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_TYPE",
+        "DBUS_SESSION_BUS_ADDRESS",
     ):
         v = os.environ.get(k)
         if v:

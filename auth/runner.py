@@ -533,6 +533,12 @@ def _extract_gog_inline(page, context, session: AuthSession | None = None) -> di
         page.goto("https://www.gog.com/", wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
+    # Raise again after navigation — the pre-extract focus often hits a blank
+    # Edge window that is still behind the dashboard on the first Connect click.
+    try:
+        page.focus_window()
+    except Exception:  # noqa: BLE001
+        pass
 
     def _on_signed_in(creds: dict[str, str]) -> None:
         if session:
@@ -1908,7 +1914,9 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
     with launch_persistent_profile(
         user_data,
         headless=False,
-        initial_url=spec.login_url if provider == "ea" else None,
+        # EA + GOG: load the login page during CDP attach so the first raised
+        # window is not about:blank (GOG previously navigated only inside extract).
+        initial_url=spec.login_url if provider in ("ea", "gog") else None,
     ) as context:
         try:
             # Epic: skip heavy STEALTH_INIT — fake plugins/permissions/hardware

@@ -993,11 +993,11 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
     ):
         return True
     # /api/proxy/* endpoints proxy public third-party APIs (Steam storesearch,
-    # appreviews). They accept any search term but only proxy to read-only
-    # endpoints on store.steampowered.com — no credentials forwarded, no write
+    # IUserReviewsService GetAppReviews). They accept any search term but only
+    # proxy to read-only Steam endpoints - no credentials forwarded, no write
     # access. Unauthenticated because the add-game modal calls them via bare
     # fetch() (no Bearer token), and the proxy does not expose the server to
-    # SSRF (fixed target host, read-only search endpoints only).
+    # SSRF (fixed target hosts, read-only endpoints only).
     if path.startswith("/api/proxy/"):
         return True
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
@@ -1624,8 +1624,13 @@ class Handler(SimpleHTTPRequestHandler):
             _api_error(self, HTTPStatus.BAD_GATEWAY, "steam_search_failed", exc)
 
     def _handle_proxy_steam_reviews(self) -> None:
-        """Proxy Steam appreviews (CORS workaround for add-game modal)."""
+        """Proxy Steam review summary (CORS workaround for add-game modal)."""
         from urllib.parse import parse_qs
+
+        from clients.steam_client import (
+            fetch_review_summary_payload,
+            review_summary_from_payload,
+        )
 
         qs = parse_qs(urlparse(self.path).query)
         appid = (qs.get("appid") or [""])[0].strip()
@@ -1635,15 +1640,26 @@ class Handler(SimpleHTTPRequestHandler):
         if not re.fullmatch(r"\d{1,10}", appid):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid appid"})
             return
-        import urllib.request
-
-        url = f"https://store.steampowered.com/appreviews/{appid}?json=1&language=all&purchase_type=all&num_per_page=0"
         try:
-            req = urllib.request.Request(
-                url, headers={"User-Agent": self._STEAM_UA}
+            raw = fetch_review_summary_payload(int(appid), timeout=10)
+            summary = review_summary_from_payload(raw)
+            # Keep the legacy flat shape the add-game modal expects
+            # (success + query_summary; old /appreviews envelope).
+            _send_json(
+                self,
+                HTTPStatus.OK,
+                {
+                    "success": 1,
+                    "query_summary": {
+                        "num_reviews": 0,
+                        "total_reviews": summary.get("total_reviews", 0),
+                        "total_positive": summary.get("total_positive", 0),
+                        "total_negative": summary.get("total_negative", 0),
+                        "review_score": summary.get("review_score", 0),
+                        "review_score_desc": summary.get("review_score_desc", ""),
+                    },
+                },
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                _send_json(self, HTTPStatus.OK, json.loads(resp.read().decode("utf-8")))
         except Exception as exc:
             _api_error(self, HTTPStatus.BAD_GATEWAY, "steam_reviews_failed", exc)
 

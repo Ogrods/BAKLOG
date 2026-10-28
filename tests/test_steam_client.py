@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -123,8 +124,7 @@ def test_get_review_summary_uses_get_app_reviews(tmp_path) -> None:
     ok.status_code = 200
     ok.headers = {"content-type": "application/json"}
     ok.url = sc._GET_APP_REVIEWS_URL
-    ok.text = '{"response":{"query_summary":{"total_reviews":10,"total_positive":9,"total_negative":1,"review_score":8,"review_score_desc":"Very Positive"}}}'
-    ok.json.return_value = {
+    payload = {
         "response": {
             "query_summary": {
                 "total_reviews": 10,
@@ -135,6 +135,8 @@ def test_get_review_summary_uses_get_app_reviews(tmp_path) -> None:
             }
         }
     }
+    ok.text = json.dumps(payload)
+    ok.json.return_value = payload
     ok.raise_for_status = MagicMock()
     with patch("clients.steam_client.requests.get", return_value=ok) as get:
         with patch.object(SteamClient, "_throttle_store"):
@@ -191,8 +193,7 @@ def test_get_review_summary_caches_zero_review_summary(tmp_path) -> None:
     ok.status_code = 200
     ok.headers = {"content-type": "application/json"}
     ok.url = "https://api.steampowered.com/IUserReviewsService/GetAppReviews/v1/"
-    ok.text = '{"response":{"query_summary":{"total_reviews":0,"total_positive":0,"total_negative":0}}}'
-    ok.json.return_value = {
+    payload = {
         "response": {
             "query_summary": {
                 "total_reviews": 0,
@@ -203,6 +204,8 @@ def test_get_review_summary_caches_zero_review_summary(tmp_path) -> None:
             }
         }
     }
+    ok.text = json.dumps(payload)
+    ok.json.return_value = payload
     ok.raise_for_status = MagicMock()
     with patch("clients.steam_client.requests.get", return_value=ok):
         with patch.object(SteamClient, "_throttle_store"):

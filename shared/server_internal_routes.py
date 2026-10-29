@@ -584,12 +584,13 @@ def handle_internal_free_claims_sync(handler: SimpleHTTPRequestHandler) -> None:
 
 
 def handle_internal_free_claims_dispatch(handler: SimpleHTTPRequestHandler) -> None:
-    """Start Claims ingest on GitHub so a local Publish goes live via the feed PR."""
+    """Push the local built free-claims feed to the sticky refresh PR."""
     s = _srv()
-    from shared.claims_sync import ClaimsSyncError, dispatch_claims_ingest
+    from shared.claims_feed_publish import publish_public_feed
+    from shared.claims_sync import ClaimsSyncError
 
     try:
-        result = dispatch_claims_ingest()
+        result = publish_public_feed(s.data_root())
     except ClaimsSyncError as exc:
         s._send_json(handler, HTTPStatus.BAD_GATEWAY, {"ok": False, "error": str(exc)})
         return

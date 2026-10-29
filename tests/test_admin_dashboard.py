@@ -1157,32 +1157,35 @@ def test_claims_sync_route_reports_conflict(
     assert "CONFLICT" in data["error"]
 
 
-def test_claims_dispatch_route_starts_ingest(
+def test_claims_dispatch_route_publishes_local_feed(
     admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from shared import claims_sync
+    from shared import claims_feed_publish
+    from shared.claims_sync import ClaimsSyncError
 
     monkeypatch.setattr(
-        claims_sync,
-        "dispatch_claims_ingest",
-        lambda: {"workflow": "claims-ingest.yml", "url": "https://example.com/run"},
+        claims_feed_publish,
+        "publish_public_feed",
+        lambda root: {
+            "changed": True,
+            "sha": "abc1234",
+            "pr_url": "https://github.com/Ogrods/BAKLOG/pull/1",
+            "url": "https://github.com/Ogrods/BAKLOG/pull/1",
+            "auto_merge": True,
+            "pushed": True,
+        },
     )
     base, _ = admin_server
     code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
     assert code == 200, data
-    assert data == {"ok": True, "workflow": "claims-ingest.yml", "url": "https://example.com/run"}
+    assert data["ok"] is True
+    assert data["pr_url"].endswith("/pull/1")
+    assert data["changed"] is True
 
+    def boom(root):
+        raise ClaimsSyncError("GitHub CLI (gh) not found on PATH")
 
-def test_claims_dispatch_route_reports_gh_failure(
-    admin_server: tuple[str, Path], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from shared import claims_sync
-
-    def boom():
-        raise claims_sync.ClaimsSyncError("GitHub CLI (gh) not found on PATH")
-
-    monkeypatch.setattr(claims_sync, "dispatch_claims_ingest", boom)
-    base, _ = admin_server
+    monkeypatch.setattr(claims_feed_publish, "publish_public_feed", boom)
     code, data = _request(base, "POST", "/api/internal/free-claims/dispatch", body={})
     assert code == 502
     assert "gh" in data["error"]

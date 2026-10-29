@@ -1,4 +1,4 @@
-// Vercel serverless function: logs each open-beta signup (optional Supabase),
+// Vercel serverless function: logs each download signup (optional Supabase),
 // emails the founder via Resend, then sends the signer a confirmation with the
 // GitHub Releases download link.
 // Requires env vars: RESEND_API_KEY, NOTIFY_TO, NOTIFY_FROM.
@@ -93,11 +93,11 @@ async function sendEmail(apiKey, payload) {
 
 const RELEASE_URL = "https://github.com/Ogrods/BAKLOG/releases/latest";
 
-const CONFIRM_SUBJECT = "Your BAKLOG open beta download";
+const CONFIRM_SUBJECT = "Your BAKLOG download";
 
 const CONFIRM_TEXT = `Thanks for signing up for BAKLOG.
 
-The open beta is available now. Download it here:
+Download it here:
 ${RELEASE_URL}
 
 Quick start:
@@ -108,7 +108,7 @@ Quick start:
 A quick refresher:
 - One honest backlog across every store - 12 libraries and 8 wishlists, all on your machine.
 - Local-first: no project-owned server for your catalog; credentials encrypt to disk with your OS keychain; store fetches run from your IP.
-- MIT source on GitHub if you want to verify before install; the beta is packaged builds on the same tree.
+- MIT source on GitHub if you want to verify before install; packaged builds come from the same tree.
 - Claimable Now surfaces free giveaways; importing your library stays free forever.
 
 Hit a snag? Reply to this email or use Report a bug in the app menu.
@@ -120,10 +120,10 @@ const CONFIRM_HTML = `<!doctype html>
 <html>
   <body style="margin:0;background:#0f172a;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e2e8f0;">
     <div style="max-width:520px;margin:0 auto;padding:32px 24px;">
-      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">Your BAKLOG open beta download</h1>
-      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for signing up. The open beta is available now.</p>
+      <h1 style="font-size:20px;margin:0 0 16px;color:#f8fafc;">Your BAKLOG download</h1>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">Thanks for signing up.</p>
       <p style="margin:0 0 20px;">
-        <a href="${RELEASE_URL}" style="display:inline-block;background:#38bdf8;color:#0f172a;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Download the beta</a>
+        <a href="${RELEASE_URL}" style="display:inline-block;background:#38bdf8;color:#0f172a;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;">Download BAKLOG</a>
       </p>
       <p style="font-size:15px;line-height:1.6;margin:0 0 8px;">Quick start:</p>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
@@ -135,7 +135,7 @@ const CONFIRM_HTML = `<!doctype html>
       <ul style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px;">
         <li>One honest backlog across every store - 12 libraries and 8 wishlists, all on your machine.</li>
         <li>Local-first: no project-owned server for your catalog; credentials encrypt to disk with your OS keychain; store fetches run from your IP.</li>
-        <li>MIT source on GitHub if you want to verify before install; the beta is packaged builds on the same tree.</li>
+        <li>MIT source on GitHub if you want to verify before install; packaged builds come from the same tree.</li>
         <li>Claimable Now surfaces free giveaways; importing your library stays free forever.</li>
       </ul>
       <p style="font-size:15px;line-height:1.6;margin:0 0 24px;">Hit a snag? Reply to this email or use Report a bug in the app menu.</p>
@@ -237,7 +237,7 @@ export default {
         from,
         to,
         reply_to: email,
-        subject: `New BAKLOG open beta signup: ${email}`,
+        subject: `New BAKLOG signup: ${email}`,
         text: `New signup: ${email}\nTime: ${signupTime}\nDurable log: ${durableLog}`,
       });
     } catch (err) {

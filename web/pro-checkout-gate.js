@@ -4,7 +4,7 @@
  */
 (function proCheckoutGate() {
   const BETA_NOTE =
-    "Checkout is closed during beta. Pro perks will roll out to beta testers before public launch.";
+    "Checkout is not open yet. Pro perks are enabled per account in the meantime.";
 
   function stripCheckoutLinks(root) {
     root.querySelectorAll("a.pro-checkout-link").forEach((a) => {
@@ -32,7 +32,7 @@
         enabled = !!data.proCheckoutEnabled;
       }
     } catch (_) {
-      /* offline preview: treat as beta (checkout off) */
+      /* offline preview: treat checkout as off */
     }
     apply(enabled);
   }

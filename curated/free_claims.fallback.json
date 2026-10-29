@@ -1,19 +1,102 @@
 {
-  "generated_at": "2026-10-29T20:28:56.382716+00:00",
+  "generated_at": "2026-10-29T23:19:33.267569+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
       "store": "epic",
       "title": "Sorry We're Closed",
       "claim_url": "https://store.epicgames.com/en-US/p/sorry-were-closed-724c86",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1796580/header.jpg?t=1788536861",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/9ab7eaaeb2f041969b350955b789f0f7/sorry-were-closed-1orqh.png",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-11-05T16:00:00Z",
       "steam_appid": 1796580,
       "review_percent": 98,
       "source": "epic",
-      "first_seen": "2026-10-29T20:28:45Z"
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3834",
+      "store": "steam",
+      "title": "Hexologic (Steam) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/hexologic-steam-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae37c96c0b45.jpg",
+      "genres": [
+        "Casual",
+        "Indie",
+        "Strategy"
+      ],
+      "blurb": "Fall in love in with Sudoku again! Grab Hexologic for free via Steam! Hexologic is a Sudoku-like puzzle game with nice visuals and relaxing music. Don´t miss it!",
+      "ends_at": "2026-10-31T23:59:00Z",
+      "steam_appid": 785890,
+      "review_percent": 96,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3830",
+      "store": "itch",
+      "title": "Free itch.io Games Bundle",
+      "claim_url": "https://www.gamerpower.com/open/free-itch-io-games-bundle",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae264e50edb5.jpg",
+      "genres": [],
+      "blurb": "Claim this bundle (worth $384) and download 116 games for free on itch.io! No strings attached!",
+      "ends_at": "2026-11-22T23:59:00Z",
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3829",
+      "store": "itch",
+      "title": "MOLOKAUST (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/molokaust-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4503570/72bfd849533ef8af5e78bc7d7db4ee2b33e2594b/header.jpg?t=1792341544",
+      "genres": [],
+      "blurb": "Download MOLOKAUST for free via itch.io! MOLOKAUST is a 3d first-person survival game with realistic graphics and unforgiving gameplay.",
+      "ends_at": "2026-11-04T23:59:00Z",
+      "steam_appid": 4503570,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3828",
+      "store": "itch",
+      "title": "Octane100 (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/octane100-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3471070/b853b27b73ec8b1795d5ee073f4a0c791e3948f0/header.jpg?t=1789774408",
+      "genres": [],
+      "blurb": "Join the war against the oil corporation! Grab Octane100 for free via itch.io! Octane100 is a cool 2d turn-based action game with roguelike elements.",
+      "ends_at": "2026-11-03T23:59:00Z",
+      "steam_appid": 3471070,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3827",
+      "store": "itch",
+      "title": "Heirloom (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/heirloom-itch-io-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2567320/3482b636a201d3eb2d754f0b54cbf049d977d656/header.jpg?t=1793264895",
+      "genres": [],
+      "blurb": "Download Heirloom for free via itch.io! Heirloom is a small 2D platformer with retro pixel graphics.",
+      "ends_at": "2026-11-04T23:59:00Z",
+      "steam_appid": 2567320,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3340",
+      "store": "indiegala",
+      "title": "ANCIENT EVIL (IndieGala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/ancient-evil-pc-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/69024dade7c16.jpg",
+      "genres": [],
+      "blurb": "Download ANCIENT EVIL for free via IndieGala! Ancient Evil is a 2d tactical RPG with puzzle elements. Don´t miss it!",
+      "ends_at": null,
+      "steam_appid": 1341620,
+      "review_percent": 59,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "gamerpower-3825",
@@ -26,7 +109,7 @@
       "ends_at": "2026-11-01T23:59:00Z",
       "steam_appid": 5090990,
       "source": "gamerpower",
-      "first_seen": "2026-10-25T22:52:24Z"
+      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "gamerpower-3331",
@@ -99,6 +182,20 @@
       "first_seen": "2026-09-24T18:07:35Z"
     },
     {
+      "id": "gamerpower-3771",
+      "store": "itch",
+      "title": "Liminal Space Holiday (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/liminal-space-holiday-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6aa2ad0a69420.jpg",
+      "genres": [],
+      "blurb": "Enjoy a Liminal Space Holiday! Score Liminal Space Holiday for free via Itch.io! Liminal Space Holiday is a retro nostalgic adventure game with 3d graphics.",
+      "ends_at": "2026-10-31T23:59:00Z",
+      "steam_appid": 5041880,
+      "review_percent": 92,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
       "id": "gamerpower-3324",
       "store": "indiegala",
       "title": "Battle Ram (IndieGala) Giveaway",
@@ -126,6 +223,160 @@
       "premium_only": true
     },
     {
+      "id": "gamerpower-3553",
+      "store": "itch",
+      "title": "Sleep Demon (Itchio) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/69ca788f5d0d4.jpg",
+      "genres": [],
+      "blurb": "Download Sleep Demon for free on Itch.io until November 1, a indie single player walking simulator game about sleep paralysis.",
+      "ends_at": "2026-10-31T23:59:00Z",
+      "steam_appid": 4465030,
+      "review_percent": 86,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3628",
+      "store": "itch",
+      "title": "Liminal Lane (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/liminal-lane-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/69fe517a04b6a.jpg",
+      "genres": [],
+      "blurb": "Ready for a short walk? Grab Liminal Lane for free on itch.io until November 1. Liminal Lane is a very short 3d first person walking simulator.",
+      "ends_at": "2026-10-31T23:59:00Z",
+      "steam_appid": 3542420,
+      "review_percent": 76,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3421",
+      "store": "itch",
+      "title": "Very Realistic Game Dev Simulator (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/very-realistic-game-dev-simulator-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6946b7c157bca.jpg",
+      "genres": [],
+      "blurb": "Are you planning on getting into game dev? Then this might be for you! Very Realistic Game Dev Simulator is free on Itch.io for a limited time!",
+      "ends_at": "2026-11-05T23:59:35Z",
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3496",
+      "store": "itch",
+      "title": "Cherophobia (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/cherophobia-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/698fa7369c1f5.jpg",
+      "genres": [],
+      "blurb": "Download Cherophobia for free via Itch.io! Cherophobia is a short 3D psychological horror game.",
+      "ends_at": "2026-11-05T23:59:00Z",
+      "steam_appid": 2994800,
+      "review_percent": 76,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3422",
+      "store": "itch",
+      "title": "Do You Have a Moment to Talk About Our Lord and Savior? (Itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/do-you-have-a-moment-to-talk-about-our-lord-and-savior-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6946b8c46bc9b.jpg",
+      "genres": [],
+      "blurb": "Grab “Do You Have a Moment to Talk About Our Lord and Savior?” for free on itch.io! A short 3D roguelike deckbuilder with retro PSX-style graphics.",
+      "ends_at": "2026-11-05T23:59:00Z",
+      "steam_appid": 3063960,
+      "review_percent": 75,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-1669",
+      "store": "itch",
+      "title": "Assassin at Crimson Keep (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/assassin-at-crimson-keep",
+      "header_image": "https://www.gamerpower.com/offers/1b/62e41a3c35b09.jpg",
+      "genres": [],
+      "blurb": "Download Assassin at Crimson Keep for free via itch.io! Assassin at Crimson Keep is a short visual novel set in a dark world! Check it out!",
+      "ends_at": "2026-11-04T23:59:59Z",
+      "steam_appid": 1773460,
+      "review_percent": 88,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-2089",
+      "store": "itch",
+      "title": "Project Malice (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/project-malice-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/639e763b0c618.jpg",
+      "genres": [],
+      "blurb": "Score Project Malice for free on itch.io! Project Malice is an indie isometric roguelike third-person shooter game about a ruined Earth.",
+      "ends_at": "2026-11-05T23:59:59Z",
+      "steam_appid": 2157060,
+      "review_percent": 90,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-2091",
+      "store": "itch",
+      "title": "Buckler 2 (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/buckler-2-itch-io-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/639f704bc35bc.jpg",
+      "genres": [],
+      "blurb": "Download Buckler 2 for free via itch.io! Buckler 2 is a 2d retro-styled roguelite platformer with unique levels and a diverse cast of characters. Check it out!",
+      "ends_at": "2026-11-05T23:59:59Z",
+      "steam_appid": 1039910,
+      "review_percent": 75,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-1329",
+      "store": "itch",
+      "title": "Roseblight (itch.io) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/roseblight",
+      "header_image": "https://www.gamerpower.com/offers/1b/61c3b92ec8e9f.jpg",
+      "genres": [],
+      "blurb": "Grab Roseblight for free on itch.io! Roseblight is an RPG about a gardener with a dark secret...",
+      "ends_at": "2026-11-05T23:59:59Z",
+      "steam_appid": 1728080,
+      "review_percent": 82,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3180",
+      "store": "itch",
+      "title": "Solace Inc. (itchio) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/solace-inc-itchio-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/684151ffd5fd6.jpg",
+      "genres": [],
+      "blurb": "Hack, slash, shoot, and blast! Download Solace Inc. for free on itchi.o. Solace Inc. is a 2D survivors-like game where you recruit your employees against endless hordes of enemies.",
+      "ends_at": "2026-11-05T23:59:00Z",
+      "steam_appid": 2778250,
+      "review_percent": 91,
+      "source": "gamerpower",
+      "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "itad-c52e531ef849",
+      "store": "steam",
+      "title": "Hunting Simulator 3 - Classic American Hunter Pack - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16742/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4693960/d37423b5b7941444dfe63d8b185ed680ff03009d/header.jpg?t=1793269525",
+      "genres": [
+        "Simulation"
+      ],
+      "blurb": "Hunting Simulator 3 - Classic American Hunter Pack",
+      "ends_at": "2026-11-12T23:12:10Z",
+      "steam_appid": 4693960,
+      "source": "itad",
+      "first_seen": "2026-10-29T23:12:10Z",
+      "premium_only": true
+    },
+    {
       "id": "itad-fe98c22a9a1f",
       "store": "steam",
       "title": "Dungeons & Dragons Online: 6 Adventure Packs and 4 D&D Races",
@@ -136,23 +387,6 @@
       "ends_at": "2026-11-04T18:37:40Z",
       "source": "itad",
       "first_seen": "2026-10-21T18:37:40Z",
-      "premium_only": true
-    },
-    {
-      "id": "itad-7b49c7f0886f",
-      "store": "steam",
-      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
-      "genres": [
-        "Simulation",
-        "Strategy"
-      ],
-      "blurb": "Popcorn & Premieren - Ausgehviertel",
-      "ends_at": "2026-11-05T19:22:33Z",
-      "steam_appid": 5340370,
-      "source": "itad",
-      "first_seen": "2026-10-22T19:22:33Z",
       "premium_only": true
     },
     {
@@ -172,6 +406,23 @@
       "review_percent": 81,
       "source": "itad",
       "first_seen": "2026-10-21T18:37:40Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-7b49c7f0886f",
+      "store": "steam",
+      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
+      "genres": [
+        "Simulation",
+        "Strategy"
+      ],
+      "blurb": "Popcorn & Premieren - Ausgehviertel",
+      "ends_at": "2026-11-05T19:22:33Z",
+      "steam_appid": 5340370,
+      "source": "itad",
+      "first_seen": "2026-10-22T19:22:33Z",
       "premium_only": true
     }
   ],

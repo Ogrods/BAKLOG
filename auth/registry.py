@@ -276,6 +276,7 @@ PROVIDERS: dict[str, ProviderSpec] = {
             "itch blocks automated sign-in, so the API key is the supported web path.",
             "With the itch desktop app installed, the local source below is preferred.",
             "Bundle items you haven't claimed yet won't show up until you claim them on itch.io.",
+            "Ctrl+click claim on a bundle download page only works if you donated - free bundles you did not pay for will not add to your library that way.",
         ),
     ),
     "itch_local": ProviderSpec(

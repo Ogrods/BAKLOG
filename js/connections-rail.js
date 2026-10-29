@@ -203,7 +203,7 @@ export function groupConnectNote(groupKey, members) {
       ? 'Ready to pull - itch app and/or API key detected.'
       : 'Install the itch desktop app, or paste an API key below.';
     const bundleNote = 'Heads up: games from itch.io bundles only sync after you claim them. Bundle items stay out of your library (and the itch app, so BAKLOG cannot see them) until you open each one from the bundle download page.';
-    const bundleTip = 'Fast way to claim a whole bundle: open your bundle download page (itch.io my-purchases bundles), Ctrl+click (Cmd+click on Mac) every download button to open each in its own tab - that claims it to your library - then close all the tabs at once. Repeat per page.';
+    const bundleTip = 'Fast way to claim a whole bundle you donated to: open your bundle download page (itch.io my-purchases bundles), Ctrl+click (Cmd+click on Mac) every download button to open each in its own tab - that claims it to your library - then close all the tabs at once. Repeat per page. Ctrl+click does not add games from a free bundle you did not pay for.';
     return `<div class="conn-group-note"><p><strong>${escapeHtml(lead)}</strong></p><p>You only need one itch.io source. Run the itch fetcher and BAKLOG reads butler.db from the itch app first when present, then falls back to your API key.</p><p>${escapeHtml(bundleNote)}</p><p>${escapeHtml(bundleTip)}</p></div>`;
   }
   return '';

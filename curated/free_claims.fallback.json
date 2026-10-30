@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-29T23:19:33.267569+00:00",
+  "generated_at": "2026-10-30T22:03:03.371730+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
@@ -14,6 +14,39 @@
       "review_percent": 98,
       "source": "epic",
       "first_seen": "2026-10-29T23:12:10Z"
+    },
+    {
+      "id": "gamerpower-3836",
+      "store": "steam",
+      "title": "Asleep: Act 1 (Steam) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/asleep-act-1-steam-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1583850/b0106b8af875bcac09ab575d8e704d4d50ebafb3/header_alt_assets_1.jpg?t=1793381725",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Indie",
+        "Simulation"
+      ],
+      "blurb": "Claim Asleep: Act 1 for free via Steam until 2 Nov! Asleep is a 2d adventure game with dark atmosphere and challenging puzzles.",
+      "ends_at": "2026-11-02T23:59:00Z",
+      "steam_appid": 1583850,
+      "review_percent": 93,
+      "source": "gamerpower",
+      "first_seen": "2026-10-30T17:40:15Z"
+    },
+    {
+      "id": "gamerpower-3835",
+      "store": "gog",
+      "title": "A New Beginning: Final Cut (GOG) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/a-new-beginning-final-cut-gog-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/105000/header.jpg?t=1789469040",
+      "genres": [],
+      "blurb": "Score A New Beginning: Final Cut for free via GOG! A New Beginning - Final Cut is a cinematic adventure game with amazing graphics and great characters. Don´t miss it!",
+      "ends_at": "2026-11-02T23:59:00Z",
+      "steam_appid": 105000,
+      "review_percent": 74,
+      "source": "gamerpower",
+      "first_seen": "2026-10-30T17:40:15Z"
     },
     {
       "id": "gamerpower-3834",
@@ -390,23 +423,18 @@
       "premium_only": true
     },
     {
-      "id": "itad-314b49863c52",
-      "store": "steam",
-      "title": "Squad - Weapon Skins - Recon Team Pack",
-      "claim_url": "https://isthereanydeal.com/giveaways/16676/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4841320/6499eba31da772a3f68b9f73443e16ffe49dd61e/header.jpg?t=1792087188",
-      "genres": [
-        "Action",
-        "Massively Multiplayer",
-        "Strategy"
-      ],
-      "blurb": "Squad Weapon Skins - Recon Team Pack",
-      "ends_at": "2026-11-04T18:37:40Z",
-      "steam_appid": 4841320,
-      "review_percent": 81,
+      "id": "itad-7d0c90101cb0",
+      "store": "itch",
+      "title": "My Darkest Witch - FREE on IndieGala",
+      "claim_url": "https://isthereanydeal.com/giveaways/15562/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2207120/1a9dd80f0cd22c8e7fb6ad2e9bd31d95762cc146/header.jpg?t=1762268294",
+      "genres": [],
+      "blurb": "My Darkest Witch",
+      "ends_at": "2026-11-13T17:40:15Z",
+      "steam_appid": 2207120,
+      "review_percent": 64,
       "source": "itad",
-      "first_seen": "2026-10-21T18:37:40Z",
-      "premium_only": true
+      "first_seen": "2026-10-30T17:40:15Z"
     },
     {
       "id": "itad-7b49c7f0886f",
@@ -423,6 +451,25 @@
       "steam_appid": 5340370,
       "source": "itad",
       "first_seen": "2026-10-22T19:22:33Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-314b49863c52",
+      "store": "steam",
+      "title": "Squad - Weapon Skins - Recon Team Pack",
+      "claim_url": "https://isthereanydeal.com/giveaways/16676/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4841320/6499eba31da772a3f68b9f73443e16ffe49dd61e/header.jpg?t=1792087188",
+      "genres": [
+        "Action",
+        "Massively Multiplayer",
+        "Strategy"
+      ],
+      "blurb": "Squad Weapon Skins - Recon Team Pack",
+      "ends_at": "2026-11-04T18:37:40Z",
+      "steam_appid": 4841320,
+      "review_percent": 81,
+      "source": "itad",
+      "first_seen": "2026-10-21T18:37:40Z",
       "premium_only": true
     }
   ],

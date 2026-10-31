@@ -1278,17 +1278,25 @@ NINTENDO_WISHLIST_URL = "https://www.nintendo.com/us/wish-list/"
 NINTENDO_WISHLIST_POLL_SEC = 2.5
 
 
-def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any]) -> bool:
-    """True when storefront GraphQL confirms a signed-in wish-list session.
+def _nintendo_wishlist_session_ready(
+    html: str,
+    url: str,
+    api_payloads: list[Any],
+    *,
+    storefront_ok: bool = False,
+    page_session: dict[str, Any] | None = None,
+) -> bool:
+    """True when storefront auth proves a signed-in wish-list session.
 
-    Empty wishlists still count, but only after customer auth is proven — a guest
-    storefront answering ``wishList.items: []`` must not false-complete Connect.
+    Empty wishlists still count once ``customer.id`` appears on a Wishlist GraphQL
+    answer, or when page ``localStorage`` yields non-guest storefront tokens.
+    SSR / marketing product tiles alone must not complete Connect.
     """
     from fetchers.fetch_nintendo_wishlist import (
         _customer_graphql_authed,
+        _is_guest_storefront_auth,
         _signed_out,
         _wishlist_graphql_ok,
-        parse_wishlist_sources,
     )
 
     u = (url or "").lower()
@@ -1296,18 +1304,19 @@ def _nintendo_wishlist_session_ready(html: str, url: str, api_payloads: list[Any
         return False
     if _signed_out(html, url):
         return False
-    # Guest Authorization typename in embedded page state.
-    if "GuestAuthorization" in (html or ""):
-        return False
+
     graphql_ok = any(_wishlist_graphql_ok(p) for p in api_payloads)
     customer_ok = any(_customer_graphql_authed(p) for p in api_payloads)
-    if graphql_ok and not customer_ok:
-        # Wishlist answered without a customer id — treat as guest/anonymous.
-        return False
-    if graphql_ok or customer_ok:
+    # Authenticated Wishlist GraphQL is definitive (incl. empty list + customer id).
+    if graphql_ok and customer_ok:
         return True
-    # HTML-only parse: require items so empty guest SSR cannot complete.
-    return bool(parse_wishlist_sources(html, api_payloads))
+
+    if page_session is not None and _is_guest_storefront_auth(page_session):
+        return False
+    # Fallback when Connect has no page session object yet.
+    if "GuestAuthorization" in (html or ""):
+        return False
+    return bool(storefront_ok)
 
 
 def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
@@ -1318,6 +1327,7 @@ def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
         _customer_graphql_authed,
         _drain_nintendo_candidates,
         _is_nintendo_graphql_url,
+        _issue_storefront_tokens_via_page,
         _signed_out,
         _wishlist_graphql_ok,
     )
@@ -1358,12 +1368,27 @@ def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
         graphql_ok = any(_wishlist_graphql_ok(p) for p in api_payloads)
         customer_ok = any(_customer_graphql_authed(p) for p in api_payloads)
         signed_out = _signed_out(html, url)
-        ready = _nintendo_wishlist_session_ready(html, url, api_payloads)
+        auth_state: dict[str, Any] = {}
+        storefront_ok = False
+        page_session: dict[str, Any] | None = None
+        try:
+            storefront_ok = bool(_issue_storefront_tokens_via_page(page, auth_state))
+            page_session = {"__typename": auth_state.get("session_typename")}
+        except Exception:  # noqa: BLE001
+            storefront_ok = False
+            page_session = None
+        ready = _nintendo_wishlist_session_ready(
+            html,
+            url,
+            api_payloads,
+            storefront_ok=storefront_ok,
+            page_session=page_session,
+        )
         connect_log(
             "nintendo_wishlist",
             f"poll url={_safe_connect_log_url(url)!r} signed_out={signed_out} graphql_ok={graphql_ok} "
-            f"customer_ok={customer_ok} ready={ready}",
-            key="poll",
+            f"customer_ok={customer_ok} storefront_ok={storefront_ok} ready={ready}",
+            key=f"poll:{ready}",
         )
         if ready:
             try:

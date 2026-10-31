@@ -463,45 +463,53 @@ def _find_wishlist_lists(node: Any) -> list[list]:
     return hits
 
 
-def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[WishlistItem]:
-    """Parse wishlist rows from SSR HTML and captured JSON responses."""
+def _parse_wishlist_graphql_items(api_payloads: list[Any]) -> list[WishlistItem]:
+    """Extract items only from ``data.customer.wishList.items`` GraphQL answers."""
     found: dict[str, WishlistItem] = {}
-
-    def _add_items(items: list[WishlistItem]) -> None:
-        for it in items:
+    for payload in api_payloads:
+        if not isinstance(payload, dict):
+            continue
+        wl_items = (
+            ((payload.get("data") or {}).get("customer") or {}).get("wishList") or {}
+        ).get("items")
+        if not isinstance(wl_items, list):
+            continue
+        for it in _collect_from_list(wl_items):
             found.setdefault(it.product_id, it)
+    return sorted(found.values(), key=lambda x: x.title.lower())
 
+
+def _parse_wishlist_html_structured(html: str) -> list[WishlistItem]:
+    """SSR ``__NEXT_DATA__`` / ``__PRELOADED_STATE__`` wishlist-shaped arrays only."""
+    found: dict[str, WishlistItem] = {}
     next_data = _extract_next_data(html)
     if next_data:
         for lst in _find_wishlist_lists(next_data):
-            _add_items(_collect_from_list(lst))
-
+            for it in _collect_from_list(lst):
+                found.setdefault(it.product_id, it)
     preloaded = _parse_json_assignment(html, "window.__PRELOADED_STATE__")
     if preloaded:
         for lst in _find_wishlist_lists(preloaded):
-            _add_items(_collect_from_list(lst))
+            for it in _collect_from_list(lst):
+                found.setdefault(it.product_id, it)
+    return sorted(found.values(), key=lambda x: x.title.lower())
 
-    for payload in api_payloads:
-        if isinstance(payload, dict):
-            wl_items = (
-                ((payload.get("data") or {}).get("customer") or {}).get("wishList") or {}
-            ).get("items")
-            if isinstance(wl_items, list):
-                _add_items(_collect_from_list(wl_items))
-            for lst in _find_wishlist_lists(payload):
-                _add_items(_collect_from_list(lst))
-        elif isinstance(payload, list):
-            _add_items(_collect_from_list(payload))
 
-    # Link href fallback: product tiles in SSR shell
+def _parse_wishlist_html_href_scrape(html: str) -> list[WishlistItem]:
+    """Product-tile ``href`` scrape — dump/debug only, not used for live import."""
+    found: dict[str, WishlistItem] = {}
     for m in re.finditer(
         r'href="(/us/store/products/[^"]+)"[^>]*>(?:[^<]*<[^>]+>)*[^<]*<[^>]*>([^<]{2,120})</',
-        html,
+        html or "",
         re.IGNORECASE,
     ):
         path, title = m.group(1), m.group(2).strip()
         pid_match = re.search(r"7\d{12,14}", path)
-        pid = pid_match.group(0) if pid_match else re.sub(r"[^a-z0-9]+", "-", path.lower()).strip("-")[:40]
+        pid = (
+            pid_match.group(0)
+            if pid_match
+            else re.sub(r"[^a-z0-9]+", "-", path.lower()).strip("-")[:40]
+        )
         if pid in found:
             continue
         found[pid] = WishlistItem(
@@ -516,8 +524,19 @@ def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[WishlistI
             discount_percent=None,
             currency=None,
         )
-
     return sorted(found.values(), key=lambda x: x.title.lower())
+
+
+def parse_wishlist_sources(html: str, api_payloads: list[Any]) -> list[WishlistItem]:
+    """GraphQL-first wishlist rows; structured SSR only when no Wishlist GraphQL.
+
+    When any payload has ``customer.wishList.items`` (including ``[]``), HTML must
+    not backfill. Href product-tile scrape is dump/debug only
+    (``_parse_wishlist_html_href_scrape``).
+    """
+    if any(_wishlist_graphql_ok(p) for p in api_payloads):
+        return _parse_wishlist_graphql_items(api_payloads)
+    return _parse_wishlist_html_structured(html)
 
 
 def _signed_out(html: str, url: str) -> bool:
@@ -538,9 +557,9 @@ def _is_nintendo_capture_url(url: str) -> bool:
 
 
 def _wishlist_capture_complete(html: str, api_payloads: list[Any]) -> bool:
-    if any(_wishlist_graphql_ok(p) for p in api_payloads):
-        return True
-    return bool(parse_wishlist_sources(html, api_payloads))
+    """True once Wishlist GraphQL has answered (empty list still counts)."""
+    _ = html  # HTML alone must not end the capture poll early.
+    return any(_wishlist_graphql_ok(p) for p in api_payloads)
 
 
 def _is_stale_nintendo_tab(url: str) -> bool:
@@ -939,7 +958,8 @@ def _fetch_with_profile(
 
         url = WISHLIST_URL
         page_html = ""
-        cookie_parsed = parse_wishlist_sources(req_html, [])
+        # Structured SSR only — marketing href tiles must not skip headed GraphQL.
+        cookie_parsed = _parse_wishlist_html_structured(req_html)
         cookie_signed_out = _signed_out(req_html, WISHLIST_URL)
         need_render = (
             len(req_html) < 2000

@@ -5,7 +5,9 @@ from pathlib import Path
 
 from fetchers.fetch_nintendo_wishlist import (
     _build_row,
+    _parse_wishlist_html_href_scrape,
     _signed_out,
+    _wishlist_capture_complete,
     _wishlist_graphql_ok,
     _wishlist_session_authenticated,
     parse_wishlist_sources,
@@ -210,3 +212,157 @@ def test_nintendo_wishlist_session_ready_rejects_signed_out_html() -> None:
         "https://accounts.nintendo.com/login",
         [],
     )
+
+
+def test_nintendo_wishlist_session_ready_rejects_ssr_html_without_auth() -> None:
+    """SSR / __NEXT_DATA__ tiles alone must not complete Connect before sign-in."""
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    html = FIXTURE.read_text(encoding="utf-8")
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert parse_wishlist_sources(html, [])  # parser still finds items
+    assert not _nintendo_wishlist_session_ready(html, url, [])
+
+
+def test_nintendo_wishlist_session_ready_rejects_marketing_tiles() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    marketing = (
+        "<html><body>"
+        '<a href="/us/store/products/zelda-switch/">The Legend of Zelda</a>'
+        '<a href="/us/store/products/mario-71000000012345/">Super Mario</a>'
+        "</body></html>"
+    )
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert parse_wishlist_sources(marketing, []) == []
+    assert not _nintendo_wishlist_session_ready(marketing, url, [])
+
+
+def test_nintendo_wishlist_session_ready_rejects_customer_id_alone() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    customer_only = {"data": {"customer": {"id": "cust-1"}}}
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert not _nintendo_wishlist_session_ready("", url, [customer_only])
+
+
+def test_nintendo_wishlist_session_ready_accepts_storefront_tokens() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert _nintendo_wishlist_session_ready(
+        "",
+        url,
+        [],
+        storefront_ok=True,
+        page_session={"__typename": "CustomerAuthorization"},
+    )
+
+
+def test_nintendo_wishlist_session_ready_rejects_guest_storefront() -> None:
+    from auth.runner import _nintendo_wishlist_session_ready
+
+    url = "https://www.nintendo.com/us/wish-list/"
+    assert not _nintendo_wishlist_session_ready(
+        "",
+        url,
+        [],
+        storefront_ok=True,
+        page_session={"__typename": "GuestAuthorization"},
+    )
+
+
+def test_parse_wishlist_graphql_precedence_over_ssr() -> None:
+    html = FIXTURE.read_text(encoding="utf-8")
+    payload = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {
+                    "items": [
+                        {
+                            "product": {
+                                "nsUid": "71000000099999",
+                                "title": "GraphQL Only Title",
+                                "url": "/us/store/products/graphql-only-switch/",
+                            }
+                        }
+                    ],
+                    "hasNextPage": False,
+                },
+            }
+        }
+    }
+    items = parse_wishlist_sources(html, [payload])
+    assert len(items) == 1
+    assert items[0].title == "GraphQL Only Title"
+    assert items[0].product_id == "71000000099999"
+
+
+def test_parse_wishlist_empty_graphql_blocks_ssr_backfill() -> None:
+    html = FIXTURE.read_text(encoding="utf-8")
+    empty_auth = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {"items": [], "hasNextPage": False},
+            }
+        }
+    }
+    assert parse_wishlist_sources(html, [])  # SSR alone still works
+    assert parse_wishlist_sources(html, [empty_auth]) == []
+
+
+def test_parse_wishlist_marketing_href_not_on_import_path() -> None:
+    marketing = (
+        "<html><body>"
+        '<a href="/us/store/products/zelda-switch/">The Legend of Zelda</a>'
+        '<a href="/us/store/products/mario-71000000012345/">Super Mario</a>'
+        "</body></html>"
+    )
+    assert parse_wishlist_sources(marketing, []) == []
+    scraped = _parse_wishlist_html_href_scrape(marketing)
+    assert scraped  # dump/debug helper still extracts tiles
+
+
+def test_toast_only_graphql_does_not_suppress_ssr_fallback() -> None:
+    html = FIXTURE.read_text(encoding="utf-8")
+    toast = {"data": {"toast": {"message": "ok"}}, "errors": None}
+    assert not _wishlist_graphql_ok(toast)
+    items = parse_wishlist_sources(html, [toast])
+    assert len(items) == 2
+    titles = {it.title for it in items}
+    assert "Test Adventure" in titles
+
+
+def test_wishlist_capture_complete_requires_graphql() -> None:
+    html = FIXTURE.read_text(encoding="utf-8")
+    assert not _wishlist_capture_complete(html, [])
+    empty_auth = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {"items": [], "hasNextPage": False},
+            }
+        }
+    }
+    assert _wishlist_capture_complete(html, [empty_auth])
+    with_items = {
+        "data": {
+            "customer": {
+                "id": "cust-1",
+                "wishList": {
+                    "items": [
+                        {
+                            "product": {
+                                "nsUid": "71000000012345",
+                                "title": "GraphQL Adventure",
+                            }
+                        }
+                    ],
+                    "hasNextPage": False,
+                },
+            }
+        }
+    }
+    assert _wishlist_capture_complete("", [with_items])

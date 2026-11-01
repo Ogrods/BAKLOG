@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-30T22:03:03.371730+00:00",
+  "generated_at": "2026-11-01T05:02:28.156647+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
@@ -20,7 +20,7 @@
       "store": "steam",
       "title": "Asleep: Act 1 (Steam) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/asleep-act-1-steam-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1583850/b0106b8af875bcac09ab575d8e704d4d50ebafb3/header_alt_assets_1.jpg?t=1793381725",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae4ceb2e38bb.jpg",
       "genres": [
         "Action",
         "Adventure",
@@ -39,7 +39,7 @@
       "store": "gog",
       "title": "A New Beginning: Final Cut (GOG) Giveaway",
       "claim_url": "https://www.gamerpower.com/open/a-new-beginning-final-cut-gog-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/105000/header.jpg?t=1789469040",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae4af4cbf862.jpg",
       "genres": [],
       "blurb": "Score A New Beginning: Final Cut for free via GOG! A New Beginning - Final Cut is a cinematic adventure game with amazing graphics and great characters. Don´t miss it!",
       "ends_at": "2026-11-02T23:59:00Z",
@@ -47,24 +47,6 @@
       "review_percent": 74,
       "source": "gamerpower",
       "first_seen": "2026-10-30T17:40:15Z"
-    },
-    {
-      "id": "gamerpower-3834",
-      "store": "steam",
-      "title": "Hexologic (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/hexologic-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ae37c96c0b45.jpg",
-      "genres": [
-        "Casual",
-        "Indie",
-        "Strategy"
-      ],
-      "blurb": "Fall in love in with Sudoku again! Grab Hexologic for free via Steam! Hexologic is a Sudoku-like puzzle game with nice visuals and relaxing music. Don´t miss it!",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 785890,
-      "review_percent": 96,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "gamerpower-3830",
@@ -173,20 +155,6 @@
       "first_seen": "2026-10-21T18:37:40Z"
     },
     {
-      "id": "gamerpower-3690",
-      "store": "itch",
-      "title": "The Green Light (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/the-green-light-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a369af2d25aa.jpg",
-      "genres": [],
-      "blurb": "Download The Green Light for free via itch.io. The Green Light is a indie first person game with a creepy atmosphere. Check it out!",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 1962950,
-      "review_percent": 78,
-      "source": "gamerpower",
-      "first_seen": "2026-10-21T18:37:40Z"
-    },
-    {
       "id": "gamerpower-3328",
       "store": "indiegala",
       "title": "Best Plumber (IndieGala) Giveaway",
@@ -215,20 +183,6 @@
       "first_seen": "2026-09-24T18:07:35Z"
     },
     {
-      "id": "gamerpower-3771",
-      "store": "itch",
-      "title": "Liminal Space Holiday (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/liminal-space-holiday-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aa2ad0a69420.jpg",
-      "genres": [],
-      "blurb": "Enjoy a Liminal Space Holiday! Score Liminal Space Holiday for free via Itch.io! Liminal Space Holiday is a retro nostalgic adventure game with 3d graphics.",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 5041880,
-      "review_percent": 92,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
       "id": "gamerpower-3324",
       "store": "indiegala",
       "title": "Battle Ram (IndieGala) Giveaway",
@@ -241,47 +195,6 @@
       "review_percent": 84,
       "source": "gamerpower",
       "first_seen": "2026-09-07T21:47:23Z"
-    },
-    {
-      "id": "gamerpower-3498",
-      "store": "other",
-      "title": "Primal Slideee Deluxe (Stove) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/primal-slideee-deluxe-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6993208da38c7.jpg",
-      "genres": [],
-      "blurb": "Download Primal Slideee Deluxe for free via Stove until October 31!",
-      "ends_at": "2026-10-31T23:59:59Z",
-      "source": "gamerpower",
-      "first_seen": "2026-10-10T16:05:48Z",
-      "premium_only": true
-    },
-    {
-      "id": "gamerpower-3553",
-      "store": "itch",
-      "title": "Sleep Demon (Itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/69ca788f5d0d4.jpg",
-      "genres": [],
-      "blurb": "Download Sleep Demon for free on Itch.io until November 1, a indie single player walking simulator game about sleep paralysis.",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 4465030,
-      "review_percent": 86,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-3628",
-      "store": "itch",
-      "title": "Liminal Lane (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/liminal-lane-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/69fe517a04b6a.jpg",
-      "genres": [],
-      "blurb": "Ready for a short walk? Grab Liminal Lane for free on itch.io until November 1. Liminal Lane is a very short 3d first person walking simulator.",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 3542420,
-      "review_percent": 76,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "gamerpower-3421",
@@ -437,23 +350,6 @@
       "first_seen": "2026-10-30T17:40:15Z"
     },
     {
-      "id": "itad-7b49c7f0886f",
-      "store": "steam",
-      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
-      "genres": [
-        "Simulation",
-        "Strategy"
-      ],
-      "blurb": "Popcorn & Premieren - Ausgehviertel",
-      "ends_at": "2026-11-05T19:22:33Z",
-      "steam_appid": 5340370,
-      "source": "itad",
-      "first_seen": "2026-10-22T19:22:33Z",
-      "premium_only": true
-    },
-    {
       "id": "itad-314b49863c52",
       "store": "steam",
       "title": "Squad - Weapon Skins - Recon Team Pack",
@@ -470,6 +366,23 @@
       "review_percent": 81,
       "source": "itad",
       "first_seen": "2026-10-21T18:37:40Z",
+      "premium_only": true
+    },
+    {
+      "id": "itad-7b49c7f0886f",
+      "store": "steam",
+      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
+      "genres": [
+        "Simulation",
+        "Strategy"
+      ],
+      "blurb": "Popcorn & Premieren - Ausgehviertel",
+      "ends_at": "2026-11-05T19:22:33Z",
+      "steam_appid": 5340370,
+      "source": "itad",
+      "first_seen": "2026-10-22T19:22:33Z",
       "premium_only": true
     }
   ],

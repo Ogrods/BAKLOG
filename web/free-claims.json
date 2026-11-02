@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-29T23:19:33.267569+00:00",
+  "generated_at": "2026-11-02T22:10:08.106543+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
@@ -16,22 +16,18 @@
       "first_seen": "2026-10-29T23:12:10Z"
     },
     {
-      "id": "gamerpower-3834",
-      "store": "steam",
-      "title": "Hexologic (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/hexologic-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ae37c96c0b45.jpg",
-      "genres": [
-        "Casual",
-        "Indie",
-        "Strategy"
-      ],
-      "blurb": "Fall in love in with Sudoku again! Grab Hexologic for free via Steam! Hexologic is a Sudoku-like puzzle game with nice visuals and relaxing music. Don´t miss it!",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 785890,
-      "review_percent": 96,
+      "id": "gamerpower-3346",
+      "store": "indiegala",
+      "title": "My Darkest Witch (IndieGala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/my-darkest-witch-pc-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2207120/1a9dd80f0cd22c8e7fb6ad2e9bd31d95762cc146/header.jpg?t=1762268294",
+      "genres": [],
+      "blurb": "Score My Darkest Witch for free on IndieGala! My Darkest Witch is a 2d survival arena game with endless waves of enemies.",
+      "ends_at": null,
+      "steam_appid": 2207120,
+      "review_percent": 64,
       "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
+      "first_seen": "2026-11-02T21:59:37Z"
     },
     {
       "id": "gamerpower-3830",
@@ -99,19 +95,6 @@
       "first_seen": "2026-10-29T23:12:10Z"
     },
     {
-      "id": "gamerpower-3825",
-      "store": "epic",
-      "title": "MAFIA HOTEL (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/mafia-hotel-epic-games-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5090990/a830b71e3c7a793d5ece3dc0fb3e8121a77f8840/header.jpg?t=1793299758",
-      "genres": [],
-      "blurb": "Claim MAFIA HOTEL for free via Epic Games Store! MAFIA HOTEL is a 3d multiplayer social deduction game for up to 16 players.",
-      "ends_at": "2026-11-01T23:59:00Z",
-      "steam_appid": 5090990,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
       "id": "gamerpower-3331",
       "store": "indiegala",
       "title": "Last Room (IndieGala) Giveaway",
@@ -122,34 +105,6 @@
       "ends_at": null,
       "steam_appid": 1334010,
       "review_percent": 70,
-      "source": "gamerpower",
-      "first_seen": "2026-10-21T18:37:40Z"
-    },
-    {
-      "id": "gamerpower-3820",
-      "store": "epic",
-      "title": "GetHigh.EXE (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/gethigh-exe-epic-games-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ad63cd807641.jpg",
-      "genres": [],
-      "blurb": "Claim GetHigh.EXE for free via Epic Games Store! GetHigh.EXE is a casual 3d parkour game where you run and jump through an obstacle course to reach the top.",
-      "ends_at": "2026-11-02T23:59:00Z",
-      "steam_appid": 4331890,
-      "review_percent": 100,
-      "source": "gamerpower",
-      "first_seen": "2026-10-21T18:37:40Z"
-    },
-    {
-      "id": "gamerpower-3690",
-      "store": "itch",
-      "title": "The Green Light (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/the-green-light-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6a369af2d25aa.jpg",
-      "genres": [],
-      "blurb": "Download The Green Light for free via itch.io. The Green Light is a indie first person game with a creepy atmosphere. Check it out!",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 1962950,
-      "review_percent": 78,
       "source": "gamerpower",
       "first_seen": "2026-10-21T18:37:40Z"
     },
@@ -182,20 +137,6 @@
       "first_seen": "2026-09-24T18:07:35Z"
     },
     {
-      "id": "gamerpower-3771",
-      "store": "itch",
-      "title": "Liminal Space Holiday (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/liminal-space-holiday-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6aa2ad0a69420.jpg",
-      "genres": [],
-      "blurb": "Enjoy a Liminal Space Holiday! Score Liminal Space Holiday for free via Itch.io! Liminal Space Holiday is a retro nostalgic adventure game with 3d graphics.",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 5041880,
-      "review_percent": 92,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
       "id": "gamerpower-3324",
       "store": "indiegala",
       "title": "Battle Ram (IndieGala) Giveaway",
@@ -208,47 +149,6 @@
       "review_percent": 84,
       "source": "gamerpower",
       "first_seen": "2026-09-07T21:47:23Z"
-    },
-    {
-      "id": "gamerpower-3498",
-      "store": "other",
-      "title": "Primal Slideee Deluxe (Stove) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/primal-slideee-deluxe-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6993208da38c7.jpg",
-      "genres": [],
-      "blurb": "Download Primal Slideee Deluxe for free via Stove until October 31!",
-      "ends_at": "2026-10-31T23:59:59Z",
-      "source": "gamerpower",
-      "first_seen": "2026-10-10T16:05:48Z",
-      "premium_only": true
-    },
-    {
-      "id": "gamerpower-3553",
-      "store": "itch",
-      "title": "Sleep Demon (Itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/sleep-demon-itchio-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/69ca788f5d0d4.jpg",
-      "genres": [],
-      "blurb": "Download Sleep Demon for free on Itch.io until November 1, a indie single player walking simulator game about sleep paralysis.",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 4465030,
-      "review_percent": 86,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-3628",
-      "store": "itch",
-      "title": "Liminal Lane (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/liminal-lane-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/69fe517a04b6a.jpg",
-      "genres": [],
-      "blurb": "Ready for a short walk? Grab Liminal Lane for free on itch.io until November 1. Liminal Lane is a very short 3d first person walking simulator.",
-      "ends_at": "2026-10-31T23:59:00Z",
-      "steam_appid": 3542420,
-      "review_percent": 76,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "gamerpower-3421",
@@ -361,6 +261,176 @@
       "first_seen": "2026-10-29T23:12:10Z"
     },
     {
+      "id": "itad-4e08566b4c8b",
+      "store": "epic",
+      "title": "Balloon Strike - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16764/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/855030/header.jpg?t=1526665750",
+      "genres": [],
+      "blurb": "Balloon Strike",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 855030,
+      "review_percent": 50,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-175470cfaf8d",
+      "store": "epic",
+      "title": "Math Fun - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16763/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/890220/header.jpg?t=1533404522",
+      "genres": [],
+      "blurb": "Math Fun",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 890220,
+      "review_percent": 80,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-0427a91be52b",
+      "store": "epic",
+      "title": "Funtoon's World on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16757/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/681090/header.jpg?t=1501886526",
+      "genres": [],
+      "blurb": "Funtoon&#039;s World",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 681090,
+      "review_percent": 53,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-b2dc4abeb6d9",
+      "store": "epic",
+      "title": "Mountain Racing - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16762/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/833820/header.jpg?t=1526368279",
+      "genres": [],
+      "blurb": "Mountain Racing",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 833820,
+      "review_percent": 15,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-76e8e7317ba6",
+      "store": "epic",
+      "title": "Super Kids Racing - Mini Edition - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16760/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2248920/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Super Kids Racing : Mini Edition",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 2248920,
+      "review_percent": 0,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-b20c5c2002a2",
+      "store": "epic",
+      "title": "Horror Adventure on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16758/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2292610/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Horror Adventure",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 2292610,
+      "review_percent": 25,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-0dedc9b68551",
+      "store": "epic",
+      "title": "Highway Driving free on EGS",
+      "claim_url": "https://isthereanydeal.com/giveaways/16753/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2016980/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "Highway Driving",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 2016980,
+      "review_percent": 75,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-62144c889e7b",
+      "store": "epic",
+      "title": "Maze - The Amazing Labyrinth free on EGS",
+      "claim_url": "https://isthereanydeal.com/giveaways/16754/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2293210/header.jpg?t=1676713019",
+      "genres": [],
+      "blurb": "Maze-The Amazing Labyrinth",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 2293210,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-601c88d557e8",
+      "store": "epic",
+      "title": "Horse Racing free on EGS on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16755/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/655610/header.jpg?t=1521695436",
+      "genres": [],
+      "blurb": "Horse Racing 2016",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 655610,
+      "review_percent": 37,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-91429cf4948d",
+      "store": "epic",
+      "title": "Gladiator: Blades of Fury free on EGS",
+      "claim_url": "https://isthereanydeal.com/giveaways/16751/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1007490/header.jpg?t=1551984386",
+      "genres": [],
+      "blurb": "Gladiator: Blades of Fury",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 1007490,
+      "review_percent": 33,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-1ec008ec3d18",
+      "store": "epic",
+      "title": "Epic World - Hunt for Quest",
+      "claim_url": "https://isthereanydeal.com/giveaways/16750/",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae74d1a29ca6.jpg",
+      "genres": [],
+      "blurb": "Epic World - Hunt For Quest",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-80d26ce907ef",
+      "store": "steam",
+      "title": "Last Gambit - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16749/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4983490/2171750b5ae85c27e16f9939e4fc8fc68e25e5be/header.jpg?t=1793549442",
+      "genres": [
+        "Indie",
+        "Strategy",
+        "Free To Play",
+        "Early Access"
+      ],
+      "blurb": "Last Gambit",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 4983490,
+      "review_percent": 78,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
       "id": "itad-c52e531ef849",
       "store": "steam",
       "title": "Hunting Simulator 3 - Classic American Hunter Pack - FREE on Steam",
@@ -390,6 +460,23 @@
       "premium_only": true
     },
     {
+      "id": "itad-7b49c7f0886f",
+      "store": "steam",
+      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
+      "genres": [
+        "Simulation",
+        "Strategy"
+      ],
+      "blurb": "Popcorn & Premieren - Ausgehviertel",
+      "ends_at": "2026-11-05T19:22:33Z",
+      "steam_appid": 5340370,
+      "source": "itad",
+      "first_seen": "2026-10-22T19:22:33Z",
+      "premium_only": true
+    },
+    {
       "id": "itad-314b49863c52",
       "store": "steam",
       "title": "Squad - Weapon Skins - Recon Team Pack",
@@ -409,21 +496,51 @@
       "premium_only": true
     },
     {
-      "id": "itad-7b49c7f0886f",
+      "id": "gamerpower-3820",
+      "store": "epic",
+      "title": "GetHigh.EXE (Epic Games) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/gethigh-exe-epic-games-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ad63cd807641.jpg",
+      "genres": [],
+      "blurb": "Claim GetHigh.EXE for free via Epic Games Store! GetHigh.EXE is a casual 3d parkour game where you run and jump through an obstacle course to reach the top.",
+      "ends_at": "2026-11-02T23:59:00Z",
+      "steam_appid": 4331890,
+      "review_percent": 100,
+      "source": "gamerpower",
+      "first_seen": "2026-10-21T18:37:40Z"
+    },
+    {
+      "id": "gamerpower-3835",
+      "store": "gog",
+      "title": "A New Beginning: Final Cut (GOG) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/a-new-beginning-final-cut-gog-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae4af4cbf862.jpg",
+      "genres": [],
+      "blurb": "Score A New Beginning: Final Cut for free via GOG! A New Beginning - Final Cut is a cinematic adventure game with amazing graphics and great characters. Don´t miss it!",
+      "ends_at": "2026-11-02T23:59:00Z",
+      "steam_appid": 105000,
+      "review_percent": 74,
+      "source": "gamerpower",
+      "first_seen": "2026-10-30T17:40:15Z"
+    },
+    {
+      "id": "gamerpower-3836",
       "store": "steam",
-      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
+      "title": "Asleep: Act 1 (Steam) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/asleep-act-1-steam-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6ae4ceb2e38bb.jpg",
       "genres": [
-        "Simulation",
-        "Strategy"
+        "Action",
+        "Adventure",
+        "Indie",
+        "Simulation"
       ],
-      "blurb": "Popcorn & Premieren - Ausgehviertel",
-      "ends_at": "2026-11-05T19:22:33Z",
-      "steam_appid": 5340370,
-      "source": "itad",
-      "first_seen": "2026-10-22T19:22:33Z",
-      "premium_only": true
+      "blurb": "Claim Asleep: Act 1 for free via Steam until 2 Nov! Asleep is a 2d adventure game with dark atmosphere and challenging puzzles.",
+      "ends_at": "2026-11-02T23:59:00Z",
+      "steam_appid": 1583850,
+      "review_percent": 93,
+      "source": "gamerpower",
+      "first_seen": "2026-10-30T17:40:15Z"
     }
   ],
   "attribution": [

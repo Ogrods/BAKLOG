@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T22:10:08.106543+00:00",
+  "generated_at": "2026-11-03T00:44:16.136233+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
@@ -460,23 +460,6 @@
       "premium_only": true
     },
     {
-      "id": "itad-7b49c7f0886f",
-      "store": "steam",
-      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
-      "genres": [
-        "Simulation",
-        "Strategy"
-      ],
-      "blurb": "Popcorn & Premieren - Ausgehviertel",
-      "ends_at": "2026-11-05T19:22:33Z",
-      "steam_appid": 5340370,
-      "source": "itad",
-      "first_seen": "2026-10-22T19:22:33Z",
-      "premium_only": true
-    },
-    {
       "id": "itad-314b49863c52",
       "store": "steam",
       "title": "Squad - Weapon Skins - Recon Team Pack",
@@ -496,51 +479,21 @@
       "premium_only": true
     },
     {
-      "id": "gamerpower-3820",
-      "store": "epic",
-      "title": "GetHigh.EXE (Epic Games) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/gethigh-exe-epic-games-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ad63cd807641.jpg",
-      "genres": [],
-      "blurb": "Claim GetHigh.EXE for free via Epic Games Store! GetHigh.EXE is a casual 3d parkour game where you run and jump through an obstacle course to reach the top.",
-      "ends_at": "2026-11-02T23:59:00Z",
-      "steam_appid": 4331890,
-      "review_percent": 100,
-      "source": "gamerpower",
-      "first_seen": "2026-10-21T18:37:40Z"
-    },
-    {
-      "id": "gamerpower-3835",
-      "store": "gog",
-      "title": "A New Beginning: Final Cut (GOG) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/a-new-beginning-final-cut-gog-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ae4af4cbf862.jpg",
-      "genres": [],
-      "blurb": "Score A New Beginning: Final Cut for free via GOG! A New Beginning - Final Cut is a cinematic adventure game with amazing graphics and great characters. Don´t miss it!",
-      "ends_at": "2026-11-02T23:59:00Z",
-      "steam_appid": 105000,
-      "review_percent": 74,
-      "source": "gamerpower",
-      "first_seen": "2026-10-30T17:40:15Z"
-    },
-    {
-      "id": "gamerpower-3836",
+      "id": "itad-7b49c7f0886f",
       "store": "steam",
-      "title": "Asleep: Act 1 (Steam) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/asleep-act-1-steam-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ae4ceb2e38bb.jpg",
+      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
       "genres": [
-        "Action",
-        "Adventure",
-        "Indie",
-        "Simulation"
+        "Simulation",
+        "Strategy"
       ],
-      "blurb": "Claim Asleep: Act 1 for free via Steam until 2 Nov! Asleep is a 2d adventure game with dark atmosphere and challenging puzzles.",
-      "ends_at": "2026-11-02T23:59:00Z",
-      "steam_appid": 1583850,
-      "review_percent": 93,
-      "source": "gamerpower",
-      "first_seen": "2026-10-30T17:40:15Z"
+      "blurb": "Popcorn & Premieren - Ausgehviertel",
+      "ends_at": "2026-11-05T19:22:33Z",
+      "steam_appid": 5340370,
+      "source": "itad",
+      "first_seen": "2026-10-22T19:22:33Z",
+      "premium_only": true
     }
   ],
   "attribution": [

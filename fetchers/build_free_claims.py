@@ -590,7 +590,11 @@ def _carry_forward_missing_approved(
             continue
         if _is_expired(_ends_at_for_prune(row, now), now):
             continue
-        carried.append(dict(row))
+        # Re-sanitize: carry-forward skips enrich, so a dirty historical blurb
+        # must not skip _clean_blurb.
+        carried_row = dict(row)
+        carried_row["blurb"] = _clean_blurb(carried_row.get("blurb"))
+        carried.append(carried_row)
         seen_keys |= keys or {f"id:{item_id}"}
     return carried
 

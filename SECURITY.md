@@ -1,18 +1,20 @@
 # Security model
 
-BAKLOG is a **local-first** desktop tool. It has no project-owned hosted
-backend and **no telemetry by default.** Opt-in anonymous aggregate metrics are
-available in Settings (Connections). This document is the threat model: what BAKLOG
-defends, what it explicitly does **not**, and the cryptography behind the
-claims. For the plain-language data inventory and network-host list, see
-[PRIVACY.md](PRIVACY.md).
+BAKLOG is a **local-first** desktop tool. Library JSON, credentials, and
+personal data stay on the user's machine by default. The project hosts a
+marketing site and optional Pro APIs on baklog.app (Vercel + Supabase); those
+never receive store credentials. **No telemetry by default.** Opt-in anonymous
+aggregate metrics are available in Settings (Connections). This document is the
+threat model: what BAKLOG defends, what it explicitly does **not**, and the
+cryptography behind the claims. For the plain-language data inventory and
+network-host list, see [PRIVACY.md](PRIVACY.md).
 
 **Optional account sign-in:** When `BAKLOG_SUPABASE_*` is set, Supabase
 hosts login only (email + JWT). Your library and Connections secrets still live
 under `profiles/<user-id>/` on the machine running `server.py`. Configure
 `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`).
 
-Last updated: 2026-06-03.
+Last updated: 2026-11-04.
 
 ## TL;DR
 
@@ -25,8 +27,10 @@ Last updated: 2026-06-03.
 - The credential document is **encrypted at rest** (AES-256-GCM) with a key
   held in your **OS keychain**. An optional master password derives the key
   via scrypt instead.
-- The only thing that ever leaves your machine is traffic **you** initiate to
-  the storefronts themselves, and any file **you** choose to export.
+- Store credentials never leave your machine. Catalog traffic you initiate to
+  storefronts stays yours; optional Pro Cloud sync and deal-alert background
+  refreshes only move allowlisted catalog/personal JSON or call storefronts
+  from your IP - never `secrets.bin`.
 
 ## Trust boundary
 
@@ -66,9 +70,9 @@ Individual objects are capped at **25 MiB** in the app and the `baklog-mirror`
 bucket. Comp-Pro emails on `BAKLOG_COMP_PRO_EMAILS` pass the hosted Vercel gate,
 but Storage RLS still requires a Pro plan claim on the JWT - sign out/in once
 after a grant so `app_metadata.plan` refreshes. Do not weaken Storage RLS to an
-email allowlist without a separate security review. Deleting hosted mirror
-objects is owner-side for now (Supabase dashboard / Storage); an in-app delete
-path is planned.
+email allowlist without a separate security review. Pro users can **Clear cloud library** from Connections (confirm required) to
+delete synced catalog and personal files from their account storage; local
+files and credentials stay on the PC.
 
 Policy: no personal library data is hosted **unless the signed-in Pro user
 opted into Cloud sync**. Default remains local-only.
@@ -124,6 +128,34 @@ Source: [auth/bundle.py](auth/bundle.py).
   (which is a strict field whitelist — see PRIVACY.md).
 - The local server binds to **127.0.0.1**, so it is not reachable from other
   machines on your network by default.
+- Mutating localhost API routes require `X-BAKLOG-Local: 1` (or a verified
+  Supabase bearer when auth is on). Origin/Referer alone is never enough.
+
+## Polar billing (hosted)
+
+Pro checkout runs through Polar. The Vercel route `web/api/polar-webhook.js`
+verifies Standard Webhooks HMAC signatures (constant-time compare, timestamp
+tolerance), rejects oversized bodies, and writes plan into Supabase
+`app_metadata` only (never `user_metadata`, which clients can edit). Unmatched
+checkouts land in a pending-entitlements table and apply on confirmed signup
+with the same email. `past_due` keeps Pro during Polar's payment retry window;
+refund/revoke clears it. Secrets (`POLAR_WEBHOOK_SECRET`, service role key)
+live in Vercel env only.
+
+## Deal alerts (local)
+
+Opt-in Pro deal alerts use localhost routes (`GET /api/deal-alerts/pending`,
+`POST /api/deal-alerts/ack`) gated by Host localhost + `X-BAKLOG-Local: 1`.
+The tray polls those routes; they must not be exposed beyond the machine.
+Wishlist price and free-claims refreshes still run as your local fetchers.
+
+## Cloud mirror allowlist
+
+Uploads and hosted `/api/mirror` reads are limited to
+`games_*.json`, `itad_prices.json`, and `data/personal.json` (shared regex in
+Python, desktop JS, and `web/api/_mirror-helpers.js`). Paths under `cache/`,
+`auth/`, or `secrets.bin` are denied. Supabase Storage RLS requires a Pro JWT
+and isolates objects under `auth.uid()`.
 
 ## How BAKLOG reaches each store
 

@@ -499,11 +499,20 @@ describe('polar-webhook', () => {
         if (method === 'GET') {
           return {
             ok: true,
-            json: async () => ({ email: 'b@example.com', email_confirmed_at: CONFIRMED_AT, app_metadata: { ...stored } }),
+            json: async () => ({
+              id: '11111111-1111-4111-8111-111111111111',
+              email: 'b@example.com',
+              email_confirmed_at: CONFIRMED_AT,
+              app_metadata: { ...stored },
+            }),
           };
         }
         stored = { ...stored, ...JSON.parse(init.body).app_metadata };
         return { ok: true, json: async () => ({}) };
+      }
+      // Matched webhooks retire any prior pending row for this email.
+      if (u.includes('/rest/v1/polar_pending_entitlements')) {
+        return { ok: true, text: async () => '' };
       }
       if (u === 'https://api.resend.com/emails') return { ok: true, text: async () => '' };
       throw new Error(`unexpected fetch ${u}`);

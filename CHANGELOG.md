@@ -37,6 +37,22 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Nintendo wishlist Connect no longer reports ready on an empty guest wishlist
+  before you sign in (GraphQL wishlist proof required).
+- Free-claim title matching ignores leftover "Steam Key" and free-on-EGS wording
+  so cross-store duplicates merge more reliably.
+- itch bundle claim copy clarifies that Ctrl+click claim still needs a donation
+  when the listing requires one.
+- A Polar Pro subscription that is past due (payment retry) keeps Pro access
+  until Polar marks it unpaid or revoked.
+
+### Changed
+
+- Landing and Pro feed copy describe deal and watchlist alerts as live (opt-in),
+  not coming soon.
+
 ## [0.9.05] - 2026-10-28
 
 ### Fixed

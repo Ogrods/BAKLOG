@@ -23,6 +23,7 @@
     "check:spotlight": "node scripts/spotlight-visual-check.mjs --mode=after",
     "vendor:supabase": "esbuild node_modules/@supabase/supabase-js/dist/index.mjs --bundle --format=esm --outfile=js/vendor/supabase-js.mjs && node -e \"import fs from 'node:fs'; fs.mkdirSync('web/vendor',{recursive:true}); fs.copyFileSync('js/vendor/supabase-js.mjs','web/vendor/supabase-js.mjs')\"",
     "invite:beta": "node scripts/send-beta-invites.mjs",
+    "postinstall": "patch-package",
     "lint": "eslint js/",
     "check:module-size": "node scripts/check-module-size.mjs",
     "check:bundle-size": "node scripts/check-bundle-size.mjs",
@@ -50,6 +51,7 @@
     "eslint-plugin-import-x": "^4.16.1",
     "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
+    "patch-package": "^8.0.1",
     "pixelmatch": "^8.0.0",
     "playwright": "^1.64.1",
     "pngjs": "^7.0.0",
@@ -58,5 +60,8 @@
   },
   "dependencies": {
     "vite": "^8.3.5"
+  },
+  "overrides": {
+    "minimatch": ">=11.0.1"
   }
 }

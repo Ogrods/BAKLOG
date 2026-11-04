@@ -1,0 +1,31 @@
+diff --git a/node_modules/eslint-plugin-import-x/lib/rules/no-internal-modules.js b/node_modules/eslint-plugin-import-x/lib/rules/no-internal-modules.js
+index cf36962..940d7fc 100644
+--- a/node_modules/eslint-plugin-import-x/lib/rules/no-internal-modules.js
++++ b/node_modules/eslint-plugin-import-x/lib/rules/no-internal-modules.js
+@@ -1,4 +1,4 @@
+-import { makeRe } from 'minimatch';
++import { Minimatch } from 'minimatch';
+ import { importType, createRule, moduleVisitor, resolve, } from '../utils/index.js';
+ function normalizeSep(somePath) {
+     return somePath.split('\\').join('/');
+@@ -67,16 +67,16 @@ export default createRule({
+     create(context) {
+         const options = context.options[0] || {};
+         const allowRegexps = (options.allow || [])
+-            .map(p => makeRe(p))
++            .map(p => (p ? new Minimatch(p) : null))
+             .filter(Boolean);
+         const forbidRegexps = (options.forbid || [])
+-            .map(p => makeRe(p))
++            .map(p => (p ? new Minimatch(p) : null))
+             .filter(Boolean);
+         function reachingAllowed(importPath) {
+-            return allowRegexps.some(re => re.test(importPath));
++            return allowRegexps.some(m => m.match(importPath));
+         }
+         function reachingForbidden(importPath) {
+-            return forbidRegexps.some(re => re.test(importPath));
++            return forbidRegexps.some(m => m.match(importPath));
+         }
+         function isAllowViolation(importPath) {
+             const steps = toSteps(importPath);

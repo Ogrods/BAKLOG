@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T00:44:16.136233+00:00",
+  "generated_at": "2026-11-04T05:27:11.480501+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
@@ -51,19 +51,6 @@
       "blurb": "Download MOLOKAUST for free via itch.io! MOLOKAUST is a 3d first-person survival game with realistic graphics and unforgiving gameplay.",
       "ends_at": "2026-11-04T23:59:00Z",
       "steam_appid": 4503570,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-3828",
-      "store": "itch",
-      "title": "Octane100 (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/octane100-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3471070/b853b27b73ec8b1795d5ee073f4a0c791e3948f0/header.jpg?t=1789774408",
-      "genres": [],
-      "blurb": "Join the war against the oil corporation! Grab Octane100 for free via itch.io! Octane100 is a cool 2d turn-based action game with roguelike elements.",
-      "ends_at": "2026-11-03T23:59:00Z",
-      "steam_appid": 3471070,
       "source": "gamerpower",
       "first_seen": "2026-10-29T23:12:10Z"
     },
@@ -460,6 +447,23 @@
       "premium_only": true
     },
     {
+      "id": "itad-7b49c7f0886f",
+      "store": "steam",
+      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
+      "genres": [
+        "Simulation",
+        "Strategy"
+      ],
+      "blurb": "Popcorn & Premieren - Ausgehviertel",
+      "ends_at": "2026-11-05T19:22:33Z",
+      "steam_appid": 5340370,
+      "source": "itad",
+      "first_seen": "2026-10-22T19:22:33Z",
+      "premium_only": true
+    },
+    {
       "id": "itad-314b49863c52",
       "store": "steam",
       "title": "Squad - Weapon Skins - Recon Team Pack",
@@ -476,23 +480,6 @@
       "review_percent": 81,
       "source": "itad",
       "first_seen": "2026-10-21T18:37:40Z",
-      "premium_only": true
-    },
-    {
-      "id": "itad-7b49c7f0886f",
-      "store": "steam",
-      "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16701/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/5340370/843485bcea45d0475504553f148de79e2cdf2da8/header.jpg?t=1792688582",
-      "genres": [
-        "Simulation",
-        "Strategy"
-      ],
-      "blurb": "Popcorn & Premieren - Ausgehviertel",
-      "ends_at": "2026-11-05T19:22:33Z",
-      "steam_appid": 5340370,
-      "source": "itad",
-      "first_seen": "2026-10-22T19:22:33Z",
       "premium_only": true
     }
   ],

@@ -26,7 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from shared.claims_expiry import LIVE_LISTING_SOURCES, has_ends_at, is_expired as claims_is_expired
+from shared.claims_expiry import LIVE_LISTING_SOURCES, has_ends_at
+from shared.claims_expiry import is_expired as claims_is_expired
 from shared.claims_paths import resolve_approved_path
 from shared.free_claims_sources import (
     claim_match_keys,

@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.claims_expiry import LIVE_LISTING_SOURCES, has_ends_at
+from shared.claims_expiry import is_expired as claims_is_expired
 from shared.claims_paths import resolve_approved_path
 from shared.free_claims_sources import (
     claim_match_keys,
@@ -173,15 +174,50 @@ def _parse_ends_at(ends_at: object) -> datetime | None:
     return dt
 
 
-def _is_expired(item: dict, now: datetime | None = None) -> bool:
+def _items_by_id(doc: dict | None) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for item in _items(doc):
+        item_id = str(item.get("id") or "").strip()
+        if item_id:
+            out[item_id] = item
+    return out
+
+
+def _is_expired(
+    item: dict,
+    now: datetime | None = None,
+    *,
+    live_by_id: dict[str, dict] | None = None,
+) -> bool:
+    """Expiry for audit rows — same rules as ``shared.claims_expiry.is_expired``.
+
+    Published feeds omit ``last_seen``. For undated live-listing sources
+    (GamerPower), borrow ``last_seen`` from the auto scrape when present so a
+    still-live GP row is not flagged expired solely because first_seen is old.
+    """
     now = now or datetime.now(UTC)
-    parsed = _parse_ends_at(item.get("ends_at"))
-    if parsed is None:
-        return False
-    return parsed < now
+    merged = item
+    item_id = str(item.get("id") or "").strip()
+    if (
+        live_by_id
+        and item_id
+        and not str(item.get("last_seen") or "").strip()
+        and str(item.get("source") or "").strip().lower() in LIVE_LISTING_SOURCES
+        and not has_ends_at(item)
+    ):
+        live = live_by_id.get(item_id)
+        if live and str(live.get("last_seen") or "").strip():
+            merged = {**item, "last_seen": live.get("last_seen")}
+    return claims_is_expired(merged, now)
 
 
-def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "") -> list[str]:
+def _row_issues(
+    item: dict,
+    *,
+    now: datetime | None = None,
+    feed_name: str = "",
+    live_by_id: dict[str, dict] | None = None,
+) -> list[str]:
     issues: list[str] = []
     for field in REQUIRED_ITEM_FIELDS:
         if not str(item.get(field) or "").strip():
@@ -202,7 +238,7 @@ def _row_issues(item: dict, *, now: datetime | None = None, feed_name: str = "")
     img = str(item.get("header_image") or "")
     if STEAM_PORTRAIT_RE.search(img):
         issues.append("steam_portrait_cover")
-    if _is_expired(item, now):
+    if _is_expired(item, now, live_by_id=live_by_id):
         issues.append("expired")
     appid = item.get("steam_appid")
     review = item.get("review_percent")
@@ -261,12 +297,20 @@ def _duplicate_clusters(items: list[dict]) -> list[dict[str, Any]]:
     return clusters
 
 
-def _audit_feed(name: str, doc: dict | None, path: Path) -> dict[str, Any]:
+def _audit_feed(
+    name: str,
+    doc: dict | None,
+    path: Path,
+    *,
+    live_by_id: dict[str, dict] | None = None,
+) -> dict[str, Any]:
     now = datetime.now(UTC)
     items = _items(doc)
+    # Auto already has last_seen; only published layers need the live join.
+    join_live = live_by_id if name in ("built", "fallback", "profile") else None
     rows = []
     for item in items:
-        issues = _row_issues(item, now=now, feed_name=name)
+        issues = _row_issues(item, now=now, feed_name=name, live_by_id=join_live)
         rows.append(
             {
                 "id": item.get("id"),
@@ -973,18 +1017,31 @@ def run_audit(profile_id: str, *, check_urls: bool = False, url_limit: int = 30)
     fallback = _load_json(FALLBACK_PATH)
     profile_fc = _load_json(free_claims_path(profile_id=profile_id))
 
+    auto_dict = auto if isinstance(auto, dict) else None
+    live_by_id = _items_by_id(auto_dict)
     report: dict[str, Any] = {
         "captured_at": datetime.now(UTC).isoformat(),
         "profile_id": profile_id,
         "baseline": build_baseline(profile_id),
         "feeds": {
-            "auto": _audit_feed("auto", auto if isinstance(auto, dict) else None, AUTO_PATH),
-            "built": _audit_feed("built", built if isinstance(built, dict) else None, BUILT_PATH),
-            "fallback": _audit_feed("fallback", fallback if isinstance(fallback, dict) else None, FALLBACK_PATH),
+            "auto": _audit_feed("auto", auto_dict, AUTO_PATH),
+            "built": _audit_feed(
+                "built",
+                built if isinstance(built, dict) else None,
+                BUILT_PATH,
+                live_by_id=live_by_id,
+            ),
+            "fallback": _audit_feed(
+                "fallback",
+                fallback if isinstance(fallback, dict) else None,
+                FALLBACK_PATH,
+                live_by_id=live_by_id,
+            ),
             "profile": _audit_feed(
                 "profile",
                 profile_fc if isinstance(profile_fc, dict) else None,
                 free_claims_path(profile_id=profile_id),
+                live_by_id=live_by_id,
             ),
         },
         "approved": _approved_audit(

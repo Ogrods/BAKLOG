@@ -1837,6 +1837,38 @@ def test_carry_forward_skips_null_ends_at_past_first_seen_default() -> None:
     assert [row["id"] for row in carried] == ["itad-fresh"]
 
 
+def test_carry_forward_re_cleans_dirty_blurb() -> None:
+    """Carry-forward skips enrich; historical HTML blurbs must still be stripped."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 20, 12, 0, 0, tzinfo=UTC)
+    dirty = (
+        '<a href="https://isthereanydeal.com/giveaways/x">Portal 2</a> '
+        "| expires on 2099 | go to giveaway"
+    )
+    carried = bfc._carry_forward_missing_approved(
+        [],
+        approved_ids={"itad-dirty"},
+        dismissed_ids=set(),
+        prior_rows_by_id={
+            "itad-dirty": {
+                "id": "itad-dirty",
+                "store": "steam",
+                "title": "Portal 2",
+                "claim_url": "https://example.com/portal",
+                "ends_at": None,
+                "first_seen": "2026-06-15T00:00:00Z",
+                "blurb": dirty,
+            },
+        },
+        now=now,
+    )
+    assert len(carried) == 1
+    assert carried[0]["blurb"] == "Portal 2"
+    assert "http" not in (carried[0]["blurb"] or "").lower()
+    assert "<a" not in (carried[0]["blurb"] or "").lower()
+
+
 def test_preview_publish_items_does_not_carry_stale_null_ends_at() -> None:
     from datetime import UTC, datetime
 

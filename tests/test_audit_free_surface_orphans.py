@@ -17,6 +17,54 @@ def _load_audit():
     return mod
 
 
+def test_audit_built_expiry_uses_claims_expiry_with_auto_last_seen() -> None:
+    """Published GP rows omit last_seen; audit must join auto before first_seen+14d."""
+    from datetime import UTC, datetime
+
+    audit = _load_audit()
+    now = datetime(2026, 11, 4, 22, 0, 0, tzinfo=UTC)
+    built_row = {
+        "id": "gamerpower-live",
+        "store": "indiegala",
+        "title": "Still Live",
+        "source": "gamerpower",
+        "claim_url": "https://www.gamerpower.com/open/x",
+        "ends_at": None,
+        "first_seen": "2026-10-01T00:00:00Z",
+        "last_seen": None,
+    }
+    live_by_id = {
+        "gamerpower-live": {
+            **built_row,
+            "last_seen": "2026-11-04T19:00:00Z",
+        }
+    }
+    assert audit._is_expired(built_row, now) is True
+    assert audit._is_expired(built_row, now, live_by_id=live_by_id) is False
+    issues = audit._row_issues(
+        built_row, now=now, feed_name="built", live_by_id=live_by_id
+    )
+    assert "expired" not in issues
+
+
+def test_audit_built_itad_null_ends_at_past_first_seen_is_expired() -> None:
+    from datetime import UTC, datetime
+
+    audit = _load_audit()
+    now = datetime(2026, 11, 4, 22, 0, 0, tzinfo=UTC)
+    row = {
+        "id": "itad-stale",
+        "store": "steam",
+        "title": "Stale",
+        "source": "itad",
+        "claim_url": "https://isthereanydeal.com/giveaway/x",
+        "ends_at": None,
+        "first_seen": "2026-10-01T00:00:00Z",
+    }
+    assert audit._is_expired(row, now) is True
+    assert "expired" in audit._row_issues(row, now=now, feed_name="built")
+
+
 def test_audit_held_live_listing_is_not_high() -> None:
     audit = _load_audit()
     approved = {"ids": ["gamerpower-1"]}

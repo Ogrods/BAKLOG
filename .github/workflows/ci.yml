@@ -227,6 +227,9 @@ jobs:
       - name: Build Supabase vendor bundle
         run: npm run vendor:supabase
 
+      - name: Verify committed Supabase vendor bundle is current
+        run: git diff --exit-code -- js/vendor web/vendor
+
       - name: Build production frontend
         run: npm run build
 

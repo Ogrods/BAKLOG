@@ -56,6 +56,13 @@ describe('applyPaidEntitlement', () => {
     expect(old.meta).toEqual(fresh.meta);
   });
 
+  it('treats a retry with the same event time as stale', () => {
+    const first = applyPaidEntitlement({}, 'pro', { eventAt: '2027-01-02T00:00:00Z', now: at('2027-01-02') });
+    const retry = applyPaidEntitlement(first.meta, 'pro', { eventAt: '2027-01-02T00:00:00Z', now: at('2027-01-02') });
+    expect(retry.stale).toBe(true);
+    expect(retry.meta).toEqual(first.meta);
+  });
+
   it('compActive covers comp_until through the end of that day', () => {
     expect(compActive({ comp_until: '2027-03-31' }, at('2027-03-31'))).toBe(true);
     expect(compActive({ comp_until: '2027-03-31' }, at('2027-04-01'))).toBe(false);

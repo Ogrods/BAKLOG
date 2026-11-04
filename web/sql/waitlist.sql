@@ -14,6 +14,7 @@ create table if not exists public.waitlist (
 alter table public.waitlist add column if not exists invited_at timestamptz;
 
 alter table public.waitlist enable row level security;
+revoke all on table public.waitlist from public, anon, authenticated;
 -- Required: service_role must have table grants (RLS alone is not enough).
 -- update is needed so the beta-invite script can stamp invited_at.
 grant select, insert, update on public.waitlist to service_role;

@@ -26,13 +26,13 @@ def strip_giveaway_decorations(title: str) -> str:
     if not t:
         return t
     t = re.sub(r"\s*\([^)]*\)\s*giveaway\s*$", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\s+free\s+(at\s+egs\s+)?on\s+epic\s*games?\s*store.*$", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s+free\s+(at\s+egs\s+|on\s+egs\s+)?on\s+epic\s*games?\s*store.*$", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s+free\s+for\s+mobile\s+on\s+egs.*$", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s+free\s+on\s+mobile\b.*$", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s+in\s+game\s+(items?|currency\s+pack).*$", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s*-\s*free\s+(on|via|at|for|to)\b.*$", "", t, flags=re.IGNORECASE)
     t = re.sub(
-        r"\s+free\s+on\s+(steam|itchio|itch\.io|gog|indiegala).*$",
+        r"\s+free\s+on\s+(steam|egs|itchio|itch\.io|gog|indiegala).*$",
         "",
         t,
         flags=re.IGNORECASE,
@@ -41,12 +41,15 @@ def strip_giveaway_decorations(title: str) -> str:
     n = 1
     while n:
         t, n = re.subn(
-            r"\s+on\s+(steam|gog|itch\.?io|indiegala(\s+store)?|epic\s*games?\s*store)\s*$",
+            r"\s+on\s+(steam|egs|gog|itch\.?io|indiegala(\s+store)?|epic\s*games?\s*store)\s*$",
             "",
             t,
             flags=re.IGNORECASE,
         )
     t = re.sub(r"\s+-\s+chapters?[\s\d,]+.*$", "", t, flags=re.IGNORECASE)
+    # GamerPower "… Steam Key Giveaway" / "(Steam) Key" (before bare giveaway).
+    t = re.sub(r"\s+steam\s+key(?:\s+giveaway)?\s*$", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(steam\)\s+key(?:\s+giveaway)?\s*$", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s+giveaway\s*$", "", t, flags=re.IGNORECASE)
     return t.strip()
 

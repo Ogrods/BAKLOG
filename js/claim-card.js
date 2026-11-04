@@ -46,16 +46,19 @@ export function stripClaimTitleDecorations(title) {
   let t = String(title || '').trim();
   if (!t) return t;
   t = t.replace(/\s*\([^)]*\)\s*giveaway\s*$/i, '');
-  t = t.replace(/\s+free\s+(at\s+egs\s+)?on\s+epic\s*games?\s*store.*$/i, '');
+  t = t.replace(/\s+free\s+(at\s+egs\s+|on\s+egs\s+)?on\s+epic\s*games?\s*store.*$/i, '');
   t = t.replace(/\s+free\s+for\s+mobile\s+on\s+egs.*$/i, '');
   t = t.replace(/\s+free\s+on\s+mobile\b.*$/i, '');
   t = t.replace(/\s+in\s+game\s+(items?|currency\s+pack).*$/i, '');
   t = t.replace(/\s*-\s*free\s+(on|via|at|for|to)\b.*$/i, '');
-  t = t.replace(/\s+free\s+on\s+(steam|itchio|itch\.io|gog|indiegala).*$/i, '');
+  t = t.replace(/\s+free\s+on\s+(steam|egs|itchio|itch\.io|gog|indiegala).*$/i, '');
   // ITAD repeats the store ("X on Steam on Steam"), so strip until stable.
-  const onStore = /\s+on\s+(steam|gog|itch\.?io|indiegala(\s+store)?|epic\s*games?\s*store)\s*$/i;
+  const onStore = /\s+on\s+(steam|egs|gog|itch\.?io|indiegala(\s+store)?|epic\s*games?\s*store)\s*$/i;
   while (onStore.test(t)) t = t.replace(onStore, '');
   t = t.replace(/\s+-\s+chapters?[\s\d,]+.*$/i, '');
+  // GamerPower "… Steam Key Giveaway" / "(Steam) Key" (before bare giveaway).
+  t = t.replace(/\s+steam\s+key(?:\s+giveaway)?\s*$/i, '');
+  t = t.replace(/\s*\(steam\)\s+key(?:\s+giveaway)?\s*$/i, '');
   t = t.replace(/\s+giveaway\s*$/i, '');
   return t.trim();
 }

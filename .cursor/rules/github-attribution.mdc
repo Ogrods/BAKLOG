@@ -1,0 +1,24 @@
+---
+description: Owner publishes GitHub PRs and releases; agents push branches only
+alwaysApply: true
+---
+
+# GitHub attribution (owner only)
+
+The repo owner (`Ogrods`) opens, merges, and publishes pull requests and GitHub Releases. Automated app identities must never appear as the publisher on those surfaces.
+
+## Agents must not
+
+- Open, edit metadata on, merge, close, or reopen pull requests (including forge helper UIs that create PRs under an app account).
+- Create, edit, or publish GitHub Releases, or push version tags meant for release publish.
+- Leave empty or no-op commits whose only purpose is to re-run CI (that attributes the workflow run to the pusher app). Report the failed check and let the owner re-run or push.
+
+## Agents may
+
+- Push commits to an existing branch the owner already opened a PR from.
+- Push a new branch and stop. Tell the owner the branch name so **they** open the PR.
+- Fix code/lockfiles on Dependabot or other bot-authored branches when asked; still do not open a second PR for the same change.
+
+## Commit messages
+
+Keep subjects and bodies about the product or repo change. No tooling or agent names, no "AI"/"LLM"/"bot" framing, no session diary. Prefer short imperative lines (same voice as public changelog: facts only). Do not add `Co-authored-by` trailers that name agent or editor tooling.

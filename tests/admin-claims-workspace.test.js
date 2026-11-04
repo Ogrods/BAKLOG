@@ -33,6 +33,8 @@ import {
   sortClaimsItems,
   statusBadgeHtml,
   stripClaimTitleDecorations,
+  claimableFingerprintsMatch,
+  claimableItemFingerprint,
 } from '../admin/claims-workspace.js';
 
 describe('statusBadgeHtml autoOnly', () => {
@@ -947,5 +949,38 @@ describe('filterClaimsItems premium_only', () => {
       premiumOnlyIds: new Set(['2']),
     });
     expect(filtered.map((it) => it.id)).toEqual(['2']);
+  });
+});
+
+describe('claimableFingerprintsMatch', () => {
+  it('ignores enrich-only cover/review churn', () => {
+    const a = [
+      {
+        id: '1',
+        title: 'Game',
+        store: 'steam',
+        claim_url: 'https://example.com/a',
+        header_image: 'old.webp',
+        review_percent: 80,
+      },
+    ];
+    const b = [
+      {
+        id: '1',
+        title: 'Game',
+        store: 'steam',
+        claim_url: 'https://example.com/a',
+        header_image: 'new.webp',
+        review_percent: 99,
+      },
+    ];
+    expect(claimableFingerprintsMatch(a, b)).toBe(true);
+  });
+
+  it('detects claim_url fingerprint drift', () => {
+    const a = [{ id: '1', title: 'Game', store: 'steam', claim_url: 'https://example.com/a' }];
+    const b = [{ id: '1', title: 'Game', store: 'steam', claim_url: 'https://example.com/b' }];
+    expect(claimableFingerprintsMatch(a, b)).toBe(false);
+    expect(claimableItemFingerprint(a[0])[0]).toBe('1');
   });
 });

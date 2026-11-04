@@ -239,9 +239,9 @@ $env:PYTHONPATH = (Get-Location).Path
 - `curated/free_claims.fallback.json` (bundled offline fallback - **commit this**)
 - active profile `free_claims.json` (local app; use `--no-profile` to skip)
 
-`curated/free_claims.auto.json` (scrape) and `curated/free_claims.approved.json` (Publish/Hide/Block selection) are **gitignored** maintainer ops files. Keep them on disk locally; do not commit them to the public repo.
+`curated/free_claims.auto.json` (scrape) and owner approvals are **gitignored** / private-repo maintainer ops (approvals live in `baklog-internal/claims/` when that sibling clone exists). Do not commit them to the public repo.
 
-**Prod** still needs a commit/push of `web/free-claims.json` (and usually the fallback) or a Vercel deploy hook - publish alone does not update baklog.app.
+**Prod go-live (preferred):** admin **Publish & go live** builds the feed, syncs private decisions, and opens/updates sticky PR `chore/claims-feed-refresh` with the local `web/free-claims.json` + `curated/free_claims.fallback.json` (squash auto-merge when every added id is vetted). Merge deploys via Vercel - no separate manual `git push` of the feed for the owner. **Sync private decisions** only pushes approvals to baklog-internal (for cron / other machines) and does **not** update baklog.app.
 
 **Pre-deploy check** (fetch → dry-run build → audit → optional Vercel hook):
 
@@ -278,7 +278,7 @@ $env:BAKLOG_ADMIN = "1"
 
 If port **8765** is already taken (e.g. a frozen BAKLOG build), use a free port (`$env:PORT = "8766"`) or stop the other process first.
 
-With admin up: **Fetch latest** → review **Publish** / Hide / Block → optional manual rows / enrich → **Publish selected** (same disk writes as the CLI). Selection lives in `curated/free_claims.approved.json`. **GamerPower requires attribution** — the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
+With admin up: **Fetch latest** → review Publish checkboxes / Hide / Block → optional manual rows / enrich → **Publish & go live** (build + sticky feed PR). Use **Sync private decisions** only when you need cron to see approvals without shipping the feed. **GamerPower requires attribution** - the published feed includes `"attribution": ["GamerPower.com"]` when any GamerPower item is included.
 
 Strict manual shops: `build_free_claims.py --require-manual-approval` or `BAKLOG_REQUIRE_MANUAL_APPROVAL=1` (only `approved: true` ships).
 

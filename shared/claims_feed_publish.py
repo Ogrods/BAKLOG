@@ -221,8 +221,12 @@ def _open_or_update_sticky_pr(
     *,
     auto_merge: bool,
     body: str,
-) -> str:
-    """Create or edit the sticky PR; toggle auto-merge. Returns PR URL."""
+) -> dict:
+    """Create or edit the sticky PR; toggle auto-merge.
+
+    Returns ``{"pr_url", "auto_merge", "warning"}``. Auto-merge failures after
+    a successful push are soft (warning only) so Publish still returns the PR.
+    """
     fd, body_name = tempfile.mkstemp(prefix="baklog-feed-pr-", suffix=".md")
     os.close(fd)
     body_file = Path(body_name)
@@ -316,6 +320,7 @@ def _open_or_update_sticky_pr(
                     f"{STICKY_BRANCH}"
                 )
 
+        warning = None
         if auto_merge:
             merge = _gh(
                 runner,
@@ -327,8 +332,13 @@ def _open_or_update_sticky_pr(
                 "--squash",
                 "--auto",
             )
-            # Auto-merge can fail if checks are required and pending; surface that.
-            _check(merge, "gh pr merge --auto")
+            # Sticky branch already has the feed bytes; do not fail the whole
+            # Publish if GitHub refuses --auto (checks pending, branch rules).
+            if merge.returncode != 0:
+                detail = (merge.stderr or merge.stdout or "").strip().splitlines()
+                tail = detail[-1] if detail else f"exit {merge.returncode}"
+                warning = f"gh pr merge --auto failed: {tail}"
+                auto_merge = False
         else:
             view = _gh(
                 runner,
@@ -352,11 +362,14 @@ def _open_or_update_sticky_pr(
                     repo_slug,
                     "--disable-auto",
                 )
-                _check(disabled, "gh pr merge --disable-auto")
+                if disabled.returncode != 0:
+                    detail = (disabled.stderr or disabled.stdout or "").strip().splitlines()
+                    tail = detail[-1] if detail else f"exit {disabled.returncode}"
+                    warning = f"gh pr merge --disable-auto failed: {tail}"
 
         if not pr_url:
             pr_url = f"https://github.com/{repo_slug}/pull/{pr_number}"
-        return pr_url
+        return {"pr_url": pr_url, "auto_merge": auto_merge, "warning": warning}
     finally:
         body_file.unlink(missing_ok=True)
 
@@ -378,8 +391,8 @@ def publish_public_feed(
     """Push local built feed files to the sticky refresh branch + PR.
 
     Returns ``{"changed": bool, "sha": str|None, "pr_url": str|None,
-    "url": str|None, "auto_merge": bool, "pushed": bool}``. ``url`` mirrors
-    ``pr_url`` for admin toast compatibility with the old ingest dispatch.
+    "url": str|None, "auto_merge": bool, "pushed": bool, "warning": str|None}``.
+    ``url`` mirrors ``pr_url`` for admin toast compatibility.
     """
     root = Path(repo_root).resolve()
     for rel in FEED_PATHS:
@@ -393,6 +406,7 @@ def publish_public_feed(
 
     before_dir = Path(tempfile.mkdtemp(prefix="baklog-feed-before-"))
     worktree: Path | None = None
+    warning = None
     try:
         before_web = before_dir / "before-web.json"
         main_blob = _show_origin_main_file(runner, root, FEED_WEB) if push else None
@@ -413,6 +427,7 @@ def publish_public_feed(
                 "url": None,
                 "auto_merge": False,
                 "pushed": False,
+                "warning": None,
             }
 
         auto_merge = _added_ids_vetted(root, before_web, after_web, runner)
@@ -461,6 +476,7 @@ def publish_public_feed(
                 "url": None,
                 "auto_merge": False,
                 "pushed": False,
+                "warning": None,
             }
 
         _check(
@@ -487,12 +503,15 @@ def publish_public_feed(
                 "git push sticky branch",
             )
             pushed = True
-            pr_url = _open_or_update_sticky_pr(
+            pr_meta = _open_or_update_sticky_pr(
                 runner,
                 repo_slug,
                 auto_merge=auto_merge,
                 body=_pr_body(auto_merge=auto_merge),
             )
+            pr_url = pr_meta.get("pr_url")
+            auto_merge = bool(pr_meta.get("auto_merge"))
+            warning = pr_meta.get("warning")
 
         return {
             "changed": True,
@@ -501,6 +520,7 @@ def publish_public_feed(
             "url": pr_url,
             "auto_merge": auto_merge,
             "pushed": pushed,
+            "warning": warning,
         }
     finally:
         shutil.rmtree(before_dir, ignore_errors=True)

@@ -64,7 +64,12 @@ def public_clone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path,
     return repo, origin
 
 
-def _gh_recorder(calls: list[list[str]], *, pr_number: str = "42"):
+def _gh_recorder(
+    calls: list[list[str]],
+    *,
+    pr_number: str = "42",
+    merge_auto_fail: bool = False,
+):
     def runner(cmd, **kwargs):
         if cmd and cmd[0] == "gh":
             calls.append(cmd)
@@ -94,6 +99,10 @@ def _gh_recorder(calls: list[list[str]], *, pr_number: str = "42"):
                 out = f"https://github.com/o/BAKLOG/pull/{pr_number}\n"
             elif sub == ["pr", "view"]:
                 out = "false\n"
+            elif sub == ["pr", "merge"] and "--auto" in cmd and merge_auto_fail:
+                return subprocess.CompletedProcess(
+                    cmd, 1, "", "GraphQL: Pull request is in a non-mergeable state"
+                )
             return subprocess.CompletedProcess(cmd, 0, out, "")
         return subprocess.run(cmd, **kwargs)
 
@@ -161,3 +170,26 @@ def test_publish_without_gh_cli(public_clone) -> None:
 
     with pytest.raises(ClaimsSyncError, match="gh"):
         publish_public_feed(repo, runner=runner)
+
+
+def test_publish_soft_fails_auto_merge_after_push(public_clone) -> None:
+    """Sticky push + PR create succeed even when gh pr merge --auto fails."""
+    repo, origin = public_clone
+    # Same ids, changed claim_url → fingerprint change, no new ids → auto_merge True.
+    _write_feed(
+        repo,
+        [{"id": "a", "title": "A", "claim_url": "https://example.com/a-new"}],
+        generated_at="2026-10-30T12:00:00+00:00",
+    )
+    calls: list[list[str]] = []
+    result = publish_public_feed(
+        repo, runner=_gh_recorder(calls, merge_auto_fail=True)
+    )
+    assert result["changed"] is True
+    assert result["pushed"] is True
+    assert result["pr_url"].endswith("/pull/42")
+    assert result["auto_merge"] is False
+    assert result.get("warning") and "merge --auto" in result["warning"]
+    assert any(c[1:3] == ["pr", "merge"] and "--auto" in c for c in calls)
+    files = _git(origin, "ls-tree", "-r", "--name-only", STICKY_BRANCH).splitlines()
+    assert FEED_WEB.as_posix() in files

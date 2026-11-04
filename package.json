@@ -58,5 +58,8 @@
   },
   "dependencies": {
     "vite": "^8.3.5"
+  },
+  "overrides": {
+    "minimatch": ">=11.0.1"
   }
 }

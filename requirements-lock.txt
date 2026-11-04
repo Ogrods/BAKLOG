@@ -33,7 +33,7 @@ pillow==13.0.0
 pluggy==1.7.0
 propcache==0.5.4
 psnawp==3.1.0
-pycountry==24.6.1
+pycountry==26.2.16
 pycparser==3.12
 pycryptodomex==3.24.1
 Pygments==2.21.0

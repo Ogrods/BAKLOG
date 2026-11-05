@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-04T22:43:46.031052+00:00",
+  "generated_at": "2026-11-05T05:46:14.452234+00:00",
   "items": [
     {
       "id": "epic-sorry-were-closed-724c86",
@@ -20,7 +20,7 @@
       "store": "steam",
       "title": "Letter Quest: Grimm's Journey Remastered Steam Key Giveaway",
       "claim_url": "https://www.gamerpower.com/open/letter-quest-grimm-s-journey-remastered-steam-key-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/373970/header.jpg?t=1593028925",
+      "header_image": "https://www.gamerpower.com/offers/1b/6aeb27dbc0e38.jpg",
       "genres": [
         "Casual",
         "Indie"
@@ -412,19 +412,6 @@
       "premium_only": true
     },
     {
-      "id": "gamerpower-3827",
-      "store": "itch",
-      "title": "Heirloom (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/heirloom-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2567320/3482b636a201d3eb2d754f0b54cbf049d977d656/header.jpg?t=1793264895",
-      "genres": [],
-      "blurb": "Download Heirloom for free via itch.io! Heirloom is a small 2D platformer with retro pixel graphics.",
-      "ends_at": "2026-11-04T23:59:00Z",
-      "steam_appid": 2567320,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
       "id": "itad-7b49c7f0886f",
       "store": "steam",
       "title": "Popcorn & Premieren - Ausgehviertel - FREE on Steam",
@@ -440,33 +427,6 @@
       "source": "itad",
       "first_seen": "2026-10-22T19:22:33Z",
       "premium_only": true
-    },
-    {
-      "id": "gamerpower-3829",
-      "store": "itch",
-      "title": "MOLOKAUST (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/molokaust-itch-io-giveaway",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4503570/72bfd849533ef8af5e78bc7d7db4ee2b33e2594b/header.jpg?t=1792341544",
-      "genres": [],
-      "blurb": "Download MOLOKAUST for free via itch.io! MOLOKAUST is a 3d first-person survival game with realistic graphics and unforgiving gameplay.",
-      "ends_at": "2026-11-04T23:59:00Z",
-      "steam_appid": 4503570,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-1669",
-      "store": "itch",
-      "title": "Assassin at Crimson Keep (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/assassin-at-crimson-keep",
-      "header_image": "https://www.gamerpower.com/offers/1b/62e41a3c35b09.jpg",
-      "genres": [],
-      "blurb": "Download Assassin at Crimson Keep for free via itch.io! Assassin at Crimson Keep is a short visual novel set in a dark world! Check it out!",
-      "ends_at": "2026-11-04T23:59:59Z",
-      "steam_appid": 1773460,
-      "review_percent": 88,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     }
   ],
   "attribution": [

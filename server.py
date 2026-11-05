@@ -1930,49 +1930,19 @@ class Handler(SimpleHTTPRequestHandler):
         _send_json(self, HTTPStatus.OK, {"ticket": ticket})
 
     def _handle_auth_status(self) -> None:
-        try:
-            from auth.manager import get_status
-            from auth.secrets import secrets_store_corrupt
+        from shared.server_auth_routes import handle_auth_status
 
-            _send_json(
-                self,
-                HTTPStatus.OK,
-                {
-                    "server_platform": sys.platform,
-                    "providers": get_status(),
-                    "secrets_corrupt": secrets_store_corrupt(),
-                },
-            )
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_status_failed", exc)
+        handle_auth_status(self)
 
     def _handle_auth_open_url(self, provider: str) -> None:
-        try:
-            from auth.manager import open_manual_signin
+        from shared.server_auth_routes import handle_auth_open_url
 
-            result = open_manual_signin(provider)
-            _send_json(self, HTTPStatus.OK, result)
-        except KeyError:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_open_url_failed", exc)
+        handle_auth_open_url(self, provider)
 
     def _handle_auth_start(self, provider: str) -> None:
-        try:
-            from auth.manager import start_browser_auth
+        from shared.server_auth_routes import handle_auth_start
 
-            params = parse_qs(urlparse(self.path).query)
-            fresh = (params.get("fresh") or ["0"])[0].lower() in ("1", "true", "yes")
-            session_id = start_browser_auth(provider, fresh=fresh)
-            _send_json(self, HTTPStatus.ACCEPTED, {"session_id": session_id, "provider": provider})
-        except KeyError:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_start_failed", exc)
+        handle_auth_start(self, provider)
 
     def _public_callback_url(self, path: str) -> str:
         """Build an absolute callback URL (loopback by default; tunnel via env)."""
@@ -1996,133 +1966,34 @@ class Handler(SimpleHTTPRequestHandler):
             _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "epic_oauth_url_failed", exc)
 
     def _handle_auth_disconnect(self, provider: str) -> None:
-        try:
-            from auth.manager import disconnect
+        from shared.server_auth_routes import handle_auth_disconnect
 
-            disconnect(provider)
-            _send_json(self, HTTPStatus.OK, {"ok": True})
-        except KeyError:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_disconnect_failed", exc)
+        handle_auth_disconnect(self, provider)
 
     def _handle_auth_cancel(self, provider: str) -> None:
-        try:
-            from auth.manager import cancel_browser_auth
+        from shared.server_auth_routes import handle_auth_cancel
 
-            cancelled = cancel_browser_auth(provider)
-            _send_json(self, HTTPStatus.OK, {"ok": True, "cancelled": cancelled})
-        except KeyError:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_cancel_failed", exc)
+        handle_auth_cancel(self, provider)
 
     def _handle_auth_enable(self, provider: str) -> None:
-        try:
-            from auth.manager import enable_local
+        from shared.server_auth_routes import handle_auth_enable
 
-            enable_local(provider)
-            _send_json(self, HTTPStatus.OK, {"ok": True})
-        except KeyError:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "auth_enable_failed", exc)
+        handle_auth_enable(self, provider)
 
     def _handle_auth_credentials(self, provider: str) -> None:
-        try:
-            length = int(self.headers.get("Content-Length") or 0)
-        except ValueError:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid Content-Length"})
-            return
-        if length <= 0 or length > 65536:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "invalid body size"})
-            return
-        try:
-            raw = self.rfile.read(length).decode("utf-8")
-            payload = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"invalid JSON: {exc!r}"})
-            return
-        try:
-            from auth.manager import set_form_credentials
+        from shared.server_auth_routes import handle_auth_credentials
 
-            fields = payload.get("fields") if isinstance(payload, dict) else payload
-            if not isinstance(fields, dict):
-                raise ValueError("fields must be an object")
-            result = set_form_credentials(provider, fields)
-            _send_json(self, HTTPStatus.OK, result)
-        except KeyError:
-            _send_json(self, HTTPStatus.NOT_FOUND, {"error": f"unknown provider: {provider}"})
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "credentials_failed", exc)
+        handle_auth_credentials(self, provider)
 
     def _handle_auth_master_password(self) -> None:
-        payload, err = _read_json_body(self, max_bytes=_AUTH_JSON_MAX_BYTES)
-        if err == "empty body":
-            payload = {}
-        elif err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        try:
-            from auth.manager import set_master_password
+        from shared.server_auth_routes import handle_auth_master_password
 
-            set_master_password(payload.get("password"))
-            _send_json(self, HTTPStatus.OK, {"ok": True})
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "master_password_failed", exc)
+        handle_auth_master_password(self)
 
     def _handle_auth_secrets_import(self) -> None:
-        import base64
+        from shared.server_auth_routes import handle_auth_secrets_import
 
-        # JSON-only: {"passphrase": str, "blob": base64}. The legacy
-        # octet-stream + ?passphrase= query-string fallback is removed — a
-        # passphrase in the URL leaks into request logs / browser history.
-        payload, err = _read_json_body(self, max_bytes=_SECRETS_IMPORT_MAX_BYTES)
-        if err:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": err})
-            return
-        assert payload is not None
-        try:
-            passphrase = str(payload.get("passphrase") or "")
-            blob_b64 = payload.get("blob")
-            if isinstance(blob_b64, str):
-                try:
-                    # binascii.Error subclasses ValueError, so this catch covers
-                    # malformed base64 too.
-                    blob = base64.b64decode(blob_b64, validate=True)
-                except ValueError as exc:
-                    raise ValueError("blob is not valid base64") from exc
-            else:
-                blob = b""
-            from auth.bundle import (
-                BadMagic,
-                BadPassphrase,
-                BundleTooLarge,
-                UnsupportedVersion,
-                import_bundle,
-            )
-
-            summary = import_bundle(blob, passphrase, dry_run=False)
-            _send_json(self, HTTPStatus.OK, summary.as_dict())
-        except BadPassphrase as exc:
-            _send_json(self, HTTPStatus.FORBIDDEN, {"error": str(exc), "code": "bad_passphrase"})
-        except BadMagic as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "bad_magic"})
-        except UnsupportedVersion as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "unsupported_version"})
-        except BundleTooLarge as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "too_large"})
-        except ValueError as exc:
-            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc), "code": "invalid_passphrase"})
-        except Exception as exc:  # noqa: BLE001
-            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "import_failed", exc)
+        handle_auth_secrets_import(self)
 
     def _handle_epic_oauth_callback(self) -> None:
         from shared.server_epic_oauth import handle_epic_oauth_callback

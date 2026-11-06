@@ -12,9 +12,11 @@ network-host list, see [PRIVACY.md](PRIVACY.md).
 **Optional account sign-in:** When `BAKLOG_SUPABASE_*` is set, Supabase
 hosts login only (email + JWT). Your library and Connections secrets still live
 under `profiles/<user-id>/` on the machine running `server.py`. Configure
-`BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (see `.env.example`).
+`BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env` (prefer a
+publishable `sb_publishable_…` key; see `.env.example`). Access tokens verify
+via JWKS. Do not ship `BAKLOG_SUPABASE_JWT_SECRET` in release bundles.
 
-Last updated: 2026-11-04.
+Last updated: 2026-11-06.
 
 ## TL;DR
 

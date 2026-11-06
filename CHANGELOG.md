@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.06] - 2026-11-06
+
 ### Fixed
 
 - Nintendo wishlist Connect no longer reports ready on an empty guest wishlist

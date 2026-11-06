@@ -18,7 +18,12 @@ Nothing else leaves your machine except direct calls to storefronts and
 enrichment services (network hosts below), plus optional `baklog.app` endpoints
 in **Hosted surfaces** when you use those features.
 
-Last updated: 2026-08-18.
+Last updated: 2026-11-06.
+
+**Hosted summary:** https://baklog.app/privacy (`web/privacy.html`). When you change
+this file, update the hosted page in the same change (TikTok / Meta developer
+apps and the landing footer use the baklog.app URL). Deep path inventory stays
+in this markdown; the hosted page is the public summary.
 
 ## Hosted surfaces (baklog.app)
 

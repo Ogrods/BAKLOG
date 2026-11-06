@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy · BAKLOG</title>
+  <meta name="description" content="How BAKLOG handles data: local-first by default, optional baklog.app surfaces, no sale of your library." />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="canonical" href="https://baklog.app/privacy" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/legal.css" />
+</head>
+<body>
+  <main class="legal-wrap">
+    <a class="legal-brand" href="/">
+      <img src="/favicon.svg" alt="" width="28" height="28" />
+      BAKLOG
+    </a>
+    <h1>Privacy</h1>
+    <p class="legal-meta">
+      Last updated: 2026-11-06.
+      Full inventory (paths, bug-bundle whitelist, network hosts):
+      <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" rel="noopener noreferrer">PRIVACY.md on GitHub</a>.
+      Keep this page and that file in sync when either changes.
+    </p>
+
+    <p>BAKLOG is a <strong>local-first</strong> desktop tool. It does not ship telemetry or analytics <strong>by default</strong>. Optional anonymous aggregate metrics are opt-in (Connections: share anonymous stats). Game libraries, personal notes, and store credentials stay on your machine unless you turn on an optional hosted feature.</p>
+
+    <h2>TL;DR</h2>
+    <ul>
+      <li>Library JSON and Connections secrets stay on your computer by default.</li>
+      <li>Store fetches go from your PC to each storefront, as you, from your IP.</li>
+      <li>baklog.app marketing pages never receive your catalog.</li>
+      <li>We do not sell your library data.</li>
+    </ul>
+
+    <h2>Hosted surfaces (baklog.app)</h2>
+    <p>These are optional and separate from the local dashboard:</p>
+    <table>
+      <thead>
+        <tr><th>Surface</th><th>What it collects</th><th>When</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Waitlist / beta email</td><td>Email you submit</td><td>You opt in on the landing page</td></tr>
+        <tr><td>Google Analytics (GA4)</td><td>Anonymous page views on the marketing site</td><td>Browser loads baklog.app (not the desktop app)</td></tr>
+        <tr><td>Bug report</td><td>Whitelisted diagnostic bundle you send</td><td>You confirm <strong>Send report</strong> in the app</td></tr>
+        <tr><td>Free claims / sponsors feeds</td><td>Public curated metadata (no personal library)</td><td>App or site fetches when online</td></tr>
+        <tr><td>Metrics</td><td>Anonymous session/impression counts</td><td>Opt-in only in Connections</td></tr>
+        <tr><td>Pro cloud sync</td><td>Catalogs and personal statuses for your account</td><td>You enable Cloud sync; credentials stay local</td></tr>
+        <tr><td>Account sign-in</td><td>Email and session metadata (Supabase)</td><td>You create or use an account</td></tr>
+      </tbody>
+    </table>
+
+    <h2>What does not happen</h2>
+    <ul>
+      <li>No telemetry by default in the desktop app.</li>
+      <li>No silent crash uploads - you copy or send a scrubbed bug bundle yourself.</li>
+      <li>No third-party ad scripts; affiliate tags may appear on links BAKLOG builds when enrolled.</li>
+      <li>No automatic multi-machine sync unless you enable Pro cloud sync.</li>
+    </ul>
+
+    <h2>Removing your data</h2>
+    <p>Local data lives under your BAKLOG data root (on Windows installs, typically under LocalAppData). Delete profile folders, cache, and browser localStorage for the app origin to remove local data. For hosted account email or Pro cloud objects, contact <a href="mailto:dan@baklog.app">dan@baklog.app</a> or use the account tools we provide.</p>
+
+    <h2>Security</h2>
+    <p>Threat model and store access notes:
+      <a href="https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md" rel="noopener noreferrer">SECURITY.md</a>.
+      Report security issues to the address in <code>pyproject.toml</code> or email dan@baklog.app.</p>
+
+    <p class="legal-foot">
+      <a href="/">Home</a> ·
+      <a href="/terms">Terms</a> ·
+      <a href="https://github.com/Ogrods/BAKLOG/blob/main/PRIVACY.md" rel="noopener noreferrer">Full PRIVACY.md</a>
+    </p>
+  </main>
+</body>
+</html>

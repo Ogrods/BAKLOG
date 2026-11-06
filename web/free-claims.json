@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-05T21:32:37.638461+00:00",
+  "generated_at": "2026-11-06T04:36:01.607820+00:00",
   "items": [
     {
       "id": "epic-idle-champions-of-the-forgotten-realms",
       "store": "epic",
       "title": "Idle Champions of the Forgotten Realms",
       "claim_url": "https://store.epicgames.com/en-US/p/idle-champions-of-the-forgotten-realms",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/627690/6fe095f22f088d7357875448cfb372da4ee6b349/header_alt_assets_39.jpg?t=1793819083",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/a53f91e55c6840018cb5de0b204f1ad9/idle-champions-of-the-forgotten-realms-1cv5z.jpg",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-11-12T16:00:00Z",
@@ -20,7 +20,7 @@
       "store": "epic",
       "title": "Flotsam",
       "claim_url": "https://store.epicgames.com/en-US/p/flotsam-266287",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/821250/018fe10470e32dcafe517e002e271ece69508692/header.jpg?t=1782735785",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/5c36b876e80d4285b9993947efeeaf2b/flotsam-1yczl.jpg",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-11-12T16:00:00Z",
@@ -141,32 +141,6 @@
       "review_percent": 84,
       "source": "gamerpower",
       "first_seen": "2026-09-07T21:47:23Z"
-    },
-    {
-      "id": "gamerpower-3421",
-      "store": "itch",
-      "title": "Very Realistic Game Dev Simulator (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/very-realistic-game-dev-simulator-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6946b7c157bca.jpg",
-      "genres": [],
-      "blurb": "Are you planning on getting into game dev? Then this might be for you! Very Realistic Game Dev Simulator is free on Itch.io for a limited time!",
-      "ends_at": "2026-11-05T23:59:35Z",
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-3496",
-      "store": "itch",
-      "title": "Cherophobia (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/cherophobia-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/698fa7369c1f5.jpg",
-      "genres": [],
-      "blurb": "Download Cherophobia for free via Itch.io! Cherophobia is a short 3D psychological horror game.",
-      "ends_at": "2026-11-05T23:59:00Z",
-      "steam_appid": 2994800,
-      "review_percent": 76,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "itad-4e08566b4c8b",
@@ -354,76 +328,6 @@
       "source": "itad",
       "first_seen": "2026-10-29T23:12:10Z",
       "premium_only": true
-    },
-    {
-      "id": "gamerpower-3180",
-      "store": "itch",
-      "title": "Solace Inc. (itchio) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/solace-inc-itchio-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/684151ffd5fd6.jpg",
-      "genres": [],
-      "blurb": "Hack, slash, shoot, and blast! Download Solace Inc. for free on itchi.o. Solace Inc. is a 2D survivors-like game where you recruit your employees against endless hordes of enemies.",
-      "ends_at": "2026-11-05T23:59:00Z",
-      "steam_appid": 2778250,
-      "review_percent": 91,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-2091",
-      "store": "itch",
-      "title": "Buckler 2 (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/buckler-2-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/639f704bc35bc.jpg",
-      "genres": [],
-      "blurb": "Download Buckler 2 for free via itch.io! Buckler 2 is a 2d retro-styled roguelite platformer with unique levels and a diverse cast of characters. Check it out!",
-      "ends_at": "2026-11-05T23:59:59Z",
-      "steam_appid": 1039910,
-      "review_percent": 75,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-2089",
-      "store": "itch",
-      "title": "Project Malice (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/project-malice-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/639e763b0c618.jpg",
-      "genres": [],
-      "blurb": "Score Project Malice for free on itch.io! Project Malice is an indie isometric roguelike third-person shooter game about a ruined Earth.",
-      "ends_at": "2026-11-05T23:59:59Z",
-      "steam_appid": 2157060,
-      "review_percent": 90,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-1329",
-      "store": "itch",
-      "title": "Roseblight (itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/roseblight",
-      "header_image": "https://www.gamerpower.com/offers/1b/61c3b92ec8e9f.jpg",
-      "genres": [],
-      "blurb": "Grab Roseblight for free on itch.io! Roseblight is an RPG about a gardener with a dark secret...",
-      "ends_at": "2026-11-05T23:59:59Z",
-      "steam_appid": 1728080,
-      "review_percent": 82,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
-    },
-    {
-      "id": "gamerpower-3422",
-      "store": "itch",
-      "title": "Do You Have a Moment to Talk About Our Lord and Savior? (Itch.io) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/do-you-have-a-moment-to-talk-about-our-lord-and-savior-itch-io-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/6946b8c46bc9b.jpg",
-      "genres": [],
-      "blurb": "Grab “Do You Have a Moment to Talk About Our Lord and Savior?” for free on itch.io! A short 3D roguelike deckbuilder with retro PSX-style graphics.",
-      "ends_at": "2026-11-05T23:59:00Z",
-      "steam_appid": 3063960,
-      "review_percent": 75,
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     }
   ],
   "attribution": [

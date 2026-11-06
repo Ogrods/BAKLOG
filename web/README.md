@@ -46,6 +46,7 @@ Postconditions to verify after deploy or regression:
 - `favicon.svg` — white BAKLOG mark.
 - `apple-touch-icon.png` — 180×180 home-screen icon (`../tools/make_apple_touch_icon.py`).
 - `404.html` — branded not-found page (Vercel serves automatically).
+- `privacy.html` / `terms.html` + `legal.css` — hosted Privacy and Terms (`/privacy`, `/terms`). Sync with repo-root `PRIVACY.md` and `TERMS.md` whenever either changes (TikTok/Meta URL verify + footer).
 - `free-claims.json` — built by `build_free_claims.py` at repo root; hosted feed for Claimable Now.
 - `sponsors.json` — sponsored/house deal slots for the local app; sync from `curated/sponsors.json` before deploy.
 - `vercel.json` — CSP, security + cache headers, clean URLs.

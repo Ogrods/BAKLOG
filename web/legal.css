@@ -1,0 +1,95 @@
+/* Shared chrome for /privacy and /terms (baklog.app). Keep copy in sync with
+   repo-root PRIVACY.md and TERMS.md - see AGENTS.md sync pairs / tracker. */
+@font-face {
+  font-family: "DM Sans";
+  font-style: normal;
+  font-weight: 100 1000;
+  font-display: optional;
+  src: url("assets/fonts/dm-sans-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: optional;
+  src: url("assets/fonts/space-grotesk-latin.woff2") format("woff2");
+}
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --text: #e2e8f0;
+  --mute: #94a3b8;
+  --accent: #38bdf8;
+  --border: rgba(148, 163, 184, 0.25);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+.legal-wrap {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+.legal-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  text-decoration: none;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 2rem;
+}
+.legal-brand:hover { color: var(--accent); }
+.legal-brand img { width: 1.75rem; height: 1.75rem; }
+h1 {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: clamp(1.6rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.35rem;
+}
+.legal-meta {
+  color: var(--mute);
+  font-size: 0.9rem;
+  margin: 0 0 1.75rem;
+}
+.legal-meta a { color: var(--accent); }
+h2 {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 1.1rem;
+  margin: 1.75rem 0 0.5rem;
+}
+p, li { color: var(--text); font-size: 0.95rem; }
+p { margin: 0 0 0.85rem; }
+ul { margin: 0 0 0.85rem; padding-left: 1.2rem; }
+li { margin: 0.25rem 0; }
+a { color: var(--accent); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 0.5rem 0 1rem;
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+th { color: var(--mute); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.legal-foot {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--mute);
+}
+.legal-foot a { color: var(--accent); }

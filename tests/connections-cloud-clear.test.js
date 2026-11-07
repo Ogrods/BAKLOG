@@ -30,6 +30,8 @@ const { mockFetch } = vi.hoisted(() => {
 vi.mock('../js/api-client.js', () => ({
   baklogFetch: vi.fn(mockFetch),
   urlWithStreamTicket: vi.fn(async (u) => u),
+  beginConnectNetworkSuppress: vi.fn(),
+  endConnectNetworkSuppress: vi.fn(),
 }));
 
 vi.mock('../js/auth-gate.js', () => ({

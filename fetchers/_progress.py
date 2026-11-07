@@ -37,6 +37,11 @@ def heartbeat(msg: str) -> None:
     print(f"  · {msg}", flush=True)
 
 
+def phase(msg: str) -> None:
+    """Immediate phase line for long silent stretches (validate, probe, capture)."""
+    print(f"  → {msg}", flush=True)
+
+
 def pct(done: int, total: int) -> str:
     """Return a percent string for progress display, or empty when total is unknown."""
     if not total or total < 0:
@@ -109,17 +114,23 @@ class HeartbeatTimer:
 
 def run_with_heartbeat(
     fn: Callable[[], T],
-    phase: str,
+    phase_label: str,
     *,
     interval: float = 25.0,
 ) -> T:
-    """Run a blocking call while emitting elapsed heartbeats (no countable total)."""
+    """Run a blocking call while emitting elapsed heartbeats (no countable total).
+
+    Prints an immediate phase line + starting heartbeat so the UI is not blank
+    for a full ``interval`` before the first pulse.
+    """
+    phase(phase_label)
+    heartbeat(f"{phase_label} - starting")
     hb = HeartbeatTimer(interval=interval)
     stop = threading.Event()
 
     def pulse() -> None:
         while not stop.wait(interval):
-            hb.tick_elapsed(phase)
+            hb.tick_elapsed(phase_label)
 
     thread = threading.Thread(target=pulse, daemon=True)
     thread.start()

@@ -473,7 +473,9 @@ async function applyMergedLibraryUnlocked(mergeKey = null) {
   noteLibraryMerge(mergeKey);
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
-  invalidateTableCache();
+  // keepDom: clearing #tbody here collapses height and clamps scroll to top
+  // before the async renderTable rebuild (fetch completion while scanning).
+  invalidateTableCache({ keepDom: true });
   recomputeCrossStoreHidden();
   // Refresh the gameKey lookup before any findGameByKey consumers run — the
   // length-based fingerprint can't see same-size content swaps after a merge.

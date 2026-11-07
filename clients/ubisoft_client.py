@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import requests
 
+from shared.http_error_snippet import http_error_snippet
+
 BASE_URL = "https://public-ubiservices.ubi.com"
 
 # ubisoft.com web app (see DevTools → Ubi-AppId). connect.ubisoft.com uses another id.
@@ -101,7 +103,7 @@ class UbisoftClient:
             body = resp.json()
         except ValueError:
             body = None
-        return resp.status_code, body, resp.text[:200]
+        return resp.status_code, body, http_error_snippet(resp)
 
     def _fetch_catalog(self, space_ids: list[str]) -> list[dict]:
         catalog: list[dict] = []

@@ -37,6 +37,8 @@ const { mkProvider, steamProvider, mockProviders, mockBaklogFetchDefault } = vi.
 vi.mock('../js/api-client.js', () => ({
   baklogFetch: vi.fn(mockBaklogFetchDefault),
   urlWithStreamTicket: vi.fn(async (u) => u),
+  beginConnectNetworkSuppress: vi.fn(),
+  endConnectNetworkSuppress: vi.fn(),
 }));
 
 vi.mock('../js/auth-gate.js', () => ({
@@ -552,5 +554,47 @@ describe('cloud mirror prefs visibility', () => {
     expect(document.getElementById('cloudMirrorImportModeMerge')?.checked).toBe(false);
     dialog.close('cancel');
     await second;
+  });
+});
+
+describe('connections deep-link focus', () => {
+  beforeEach(() => {
+    mockProviders.list = [
+      mkProvider('steam', { label: 'Steam', status: 'expired' }),
+      mkProvider('battlenet', { label: 'Battle.net', status: 'expired' }),
+      mkProvider('ubisoft', { label: 'Ubisoft', status: 'expired' }),
+    ];
+    mountConnectionsDom();
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('focusConnectionsProvider selects and scrollIntoViews top and bottom rail cards', async () => {
+    const { refreshConnections, focusConnectionsProvider } = await import(
+      '../js/connections.js'
+    );
+    await refreshConnections();
+
+    const steam = document.querySelector('.conn-rail-item[data-provider="steam"]');
+    const ubisoft = document.querySelector('.conn-rail-item[data-provider="ubisoft"]');
+    expect(steam).toBeTruthy();
+    expect(ubisoft).toBeTruthy();
+
+    const steamScroll = vi.fn();
+    const ubisoftScroll = vi.fn();
+    steam.scrollIntoView = steamScroll;
+    ubisoft.scrollIntoView = ubisoftScroll;
+
+    await focusConnectionsProvider('steam');
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(steam.getAttribute('aria-selected')).toBe('true');
+    expect(steamScroll).toHaveBeenCalled();
+
+    await focusConnectionsProvider('ubisoft');
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(ubisoft.getAttribute('aria-selected')).toBe('true');
+    expect(ubisoftScroll).toHaveBeenCalled();
   });
 });

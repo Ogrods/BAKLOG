@@ -773,7 +773,17 @@ export function consumePendingScrollTarget(list = state._visibleList) {
       return false;
     }
     const key = t.key;
-    if (!key || !Array.isArray(list) || !list.length) {
+    if (!key) {
+      t.consumed = true;
+      _pendingScrollTarget = null;
+      return false;
+    }
+    // Soft-invalidate (keepDom) nulls _visibleList while the query is in flight.
+    // Keep the pending target so the post-paint path can scroll once the list exists.
+    if (!Array.isArray(list)) {
+      return false;
+    }
+    if (!list.length) {
       t.consumed = true;
       _pendingScrollTarget = null;
       return false;
@@ -1137,8 +1147,14 @@ export function tableFingerprint() {
   });
 }
 
-export function invalidateTableCache() {
-  cancelPendingScrollTarget();
+/**
+ * Bust table fingerprints / virtual state so the next renderTable rebuilds.
+ * keepDom=true (catalog merges): leave #tbody mounted so document height does
+ * not collapse and window.scrollY is not clamped to 0 while the async query
+ * runs. Hard clear (default) still empties tbody for view/filter switches.
+ */
+export function invalidateTableCache({ keepDom = false } = {}) {
+  if (!keepDom) cancelPendingScrollTarget();
   forceHideRowLoader();
   _tableFingerprint = "";
   state._visibleList = null;
@@ -1152,8 +1168,10 @@ export function invalidateTableCache() {
   _virtualWindowList = null;
   _alphaListRef = null;
   _alphaLetterSet = null;
-  const tbody = document.getElementById("tbody");
-  if (tbody) tbody.innerHTML = "";
+  if (!keepDom) {
+    const tbody = document.getElementById("tbody");
+    if (tbody) tbody.innerHTML = "";
+  }
 }
 
 /** Survives invalidateTableCache so a drill-back-to-library doesn't re-query 1700 rows. */

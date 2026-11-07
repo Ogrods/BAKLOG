@@ -22,7 +22,7 @@ import {
   initAuthCooldowns,
   noteAuthCooldownStrike,
 } from '../fetcher-cooldown.js';
-import { lastRunFailedByKey } from '../fetcher-health-shared.js';
+import { lastRunFailedByKey, lastRunErrorByKey } from '../fetcher-health-shared.js';
 import { fetchWithTimeout } from './http.js';
 import { maybeAutoFetchOnConnect } from '../fetcher-auto-refresh.js';
 
@@ -157,6 +157,7 @@ function fetcherKeysForProvider(provider) {
 function clearFailedStateForReconnectedProvider(provider) {
   for (const key of fetcherKeysForProvider(provider)) {
     lastRunFailedByKey.delete(key);
+    lastRunErrorByKey.delete(key);
     clearAuthCooldown(key);
   }
 }
@@ -174,8 +175,12 @@ export function dismissStickyFailedState({
 } = {}) {
   if (all) {
     lastRunFailedByKey.clear();
+    lastRunErrorByKey.clear();
   } else {
-    if (fetcherKey) lastRunFailedByKey.delete(fetcherKey);
+    if (fetcherKey) {
+      lastRunFailedByKey.delete(fetcherKey);
+      lastRunErrorByKey.delete(fetcherKey);
+    }
     if (provider) clearFailedStateForReconnectedProvider(provider);
   }
   try { _refreshGlobalIndicator(); } catch (_) { /* runner not ready */ }
@@ -319,13 +324,20 @@ export function connectionsNavigateProvider(key) {
   return null;
 }
 
-/** First sticky failed fetcher that should route to Connections (pill + chips). */
+/** Most recent sticky failed fetcher that should route to Connections (pill + chips). */
 export function primaryFailureNavigateTarget() {
-  for (const key of lastRunFailedByKey.keys()) {
+  let best = null;
+  let bestAt = -1;
+  for (const [key, at] of lastRunFailedByKey.entries()) {
     const provider = connectionsNavigateProvider(key);
-    if (provider) return { fetcherKey: key, provider };
+    if (!provider) continue;
+    const t = typeof at === "number" ? at : 0;
+    if (t >= bestAt) {
+      bestAt = t;
+      best = { fetcherKey: key, provider };
+    }
   }
-  return null;
+  return best;
 }
 
 /** Provider key to use for the chip Connect button when disconnected. */

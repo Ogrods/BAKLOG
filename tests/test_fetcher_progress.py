@@ -8,7 +8,9 @@ from fetchers._progress import (
     HeartbeatTimer,
     RunStats,
     pct,
+    phase,
     progress_line,
+    run_with_heartbeat,
     started,
 )
 
@@ -108,6 +110,19 @@ def test_progress_line_with_and_without_total():
     assert progress_line(3, 10, "phase") == "[3/10] (30%) phase"
     assert progress_line(3, 10, "phase", "detail") == "[3/10] (30%) phase: detail"
     assert progress_line(3, 0, "phase", "detail") == "[3] phase: detail"
+
+
+def test_phase_prints_immediately(capsys):
+    phase("validating session")
+    assert "validating session" in capsys.readouterr().out
+
+
+def test_run_with_heartbeat_emits_start_line(capsys):
+    result = run_with_heartbeat(lambda: 42, "probe library", interval=60.0)
+    assert result == 42
+    out = capsys.readouterr().out
+    assert "probe library" in out
+    assert "starting" in out
 
 
 def test_heartbeat_timer_tick_progress_emits_after_interval(capsys, monkeypatch):

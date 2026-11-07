@@ -1,4 +1,9 @@
-import { baklogFetch, urlWithStreamTicket } from "./api-client.js";
+import {
+  baklogFetch,
+  beginConnectNetworkSuppress,
+  endConnectNetworkSuppress,
+  urlWithStreamTicket,
+} from "./api-client.js";
 import {
   getAccessToken,
   getAccountProfileId,
@@ -22,6 +27,9 @@ import { storeLogoHtml } from "./store-logos.js";
 import { STORE_BRAND_COLORS } from "./store-brand-colors.js";
 import { formatPlatformList } from "./platform-labels.js";
 import { activeProfileId } from "./profiles.js";
+import {
+  lastRunErrorForProvider,
+} from "./fetcher-health-shared.js";
 import {
   authStatusLoaded,
   connectedProviderCount,
@@ -111,6 +119,8 @@ export function localProviderFooterCopy(providerKey, connected) {
 let _connPopoverRelease = null;
 
 let reconnectProviders = new Set();
+/** Most recently flagged provider for banner / deep-link focus. */
+let _lastReconnectFocusProvider = null;
 
 let pollTimer = null;
 // True while refreshConnections() is running, so the baklog:auth-status listener
@@ -417,6 +427,13 @@ function buildCardHtml(p) {
     ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>`
     : "";
 
+  // Sticky last-run failure from fetcher health (rate-limit / empty / network)
+  // while Connections status may still read Connected.
+  const lastFetch = lastRunErrorForProvider(p.key, providerForFetcher);
+  const lastFetchErr = lastFetch?.message
+    ? `<p class="conn-error conn-error--fetch" title="Last fetcher run failed while this connection stayed connected">Last fetch failed: ${escapeHtml(lastFetch.message)}</p>`
+    : "";
+
   const tips = (p.tips || []).length
     ? `<ul class="conn-tips">${p.tips.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
     : "";
@@ -477,6 +494,8 @@ function buildCardHtml(p) {
           ${note}
 
           ${err}
+
+          ${lastFetchErr}
 
           ${expiry}
 
@@ -1696,14 +1715,44 @@ function wireChromeEvents() {
 }
 
 export function showReconnectBanner(providers) {
-  for (const p of providers || []) reconnectProviders.add(p);
+  for (const p of providers || []) {
+    reconnectProviders.add(p);
+    _lastReconnectFocusProvider = p;
+  }
 
   renderReconnectBanner();
 }
 
 export function clearReconnectBanner(provider) {
   if (!provider) return;
-  if (reconnectProviders.delete(provider)) renderReconnectBanner();
+  if (reconnectProviders.delete(provider)) {
+    if (_lastReconnectFocusProvider === provider) {
+      _lastReconnectFocusProvider = [...reconnectProviders].at(-1) || null;
+    }
+    renderReconnectBanner();
+  }
+}
+
+/** Select a Connections rail card and scroll it into view (deep-link from chips/banner). */
+export async function focusConnectionsProvider(provider) {
+  if (!provider) return;
+  _selectedKey = groupRepFor(provider);
+  try {
+    await refreshConnections();
+  } catch {
+    try {
+      renderConnections();
+    } catch {
+      /* ignore */
+    }
+  }
+  requestAnimationFrame(() => {
+    const rail = document.getElementById("connRail");
+    const item =
+      rail?.querySelector(`.conn-rail-item[data-provider="${CSS.escape(_selectedKey)}"]`) ||
+      rail?.querySelector(`.conn-rail-item.is-selected`);
+    item?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  });
 }
 
 function renderReconnectBanner() {
@@ -1738,13 +1787,11 @@ function renderReconnectBanner() {
   `;
 
   el.querySelector("[data-jump-connections]")?.addEventListener("click", () => {
-    const first = reconnectProviders.values().next().value;
-
-    if (first) _selectedKey = first;
-
+    const target =
+      _lastReconnectFocusProvider || [...reconnectProviders].at(-1) || null;
     document.querySelector('.view-tab[data-view="connections"]')?.click();
-
-    renderConnections();
+    if (target) void focusConnectionsProvider(target);
+    else renderConnections();
   });
 
   el.querySelector("[data-dismiss-auth-banner]")?.addEventListener(
@@ -1752,6 +1799,7 @@ function renderReconnectBanner() {
     () => {
       const providers = [...reconnectProviders];
       reconnectProviders.clear();
+      _lastReconnectFocusProvider = null;
       renderReconnectBanner();
       try {
         document.dispatchEvent(
@@ -2177,6 +2225,9 @@ async function startBrowserConnect(provider) {
     if (log && isCurrentFlow()) log.textContent = text;
   };
   let es = null;
+  // Time-box NetworkError spam for status/runs/fetchers polls while Connect
+  // holds the HTTP thread (profile clear + Chromium launch). Auto-expires.
+  beginConnectNetworkSuppress(120_000);
   /** Release card-level state only while this flow still owns it. */
   const releaseSharedUi = () => {
     if (es && _activeConnectStreams.get(provider) === es) {
@@ -2185,6 +2236,7 @@ async function startBrowserConnect(provider) {
     if (!isCurrentFlow()) return;
     hideConnectCancelControl(card);
     stopPostConnectFastPoll();
+    if (!_activeConnectStreams.size) endConnectNetworkSuppress();
   };
 
   // A "Reconnect" (status connected/expired) should start a clean sign-in:
@@ -2563,15 +2615,8 @@ export function noteFetcherAuthFailure(fetcherKey, logText) {
 export async function reconnectProvider(provider, { autoStart = true } = {}) {
   if (!provider) return;
 
-  _selectedKey = groupRepFor(provider);
-
   document.querySelector('.view-tab[data-view="connections"]')?.click();
-
-  try {
-    await refreshConnections();
-  } catch {
-    renderConnections();
-  }
+  await focusConnectionsProvider(provider);
 
   // When navigating in from a dashboard chip/affordance we only want to tab
   // over to the right card so the user can choose - never auto-open a sign-in

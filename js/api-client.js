@@ -100,6 +100,58 @@ const _NETWORK_ERROR_RE = /Failed to fetch|network error|NetworkError/i;
 /** Session key shared with update-check.js (avoid import cycle). */
 const UPDATE_SUPPRESS_NETWORK_KEY = "baklog.suppressNetworkErrors";
 
+/** Paths that poll during Connect and briefly  fail when the HTTP thread is busy. */
+const CONNECT_SUPPRESS_PATH_RE = /\/api\/(runs\b|auth\/status\b|fetchers\b)/i;
+
+/** @type {number} epoch ms; 0 = off */
+let _connectNetworkSuppressUntil = 0;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _connectNetworkSuppressTimer = null;
+
+/**
+ * Time-boxed suppress of NetworkError toasts for Connect-adjacent polls.
+ * Does not weaken auth - only skips reportError for Failed-to-fetch on
+ * /api/runs, /api/auth/status, and /api/fetchers while a headed Connect is active.
+ * @param {number} [ms=120000]
+ */
+export function beginConnectNetworkSuppress(ms = 120_000) {
+  const until = Date.now() + Math.max(1_000, Number(ms) || 120_000);
+  _connectNetworkSuppressUntil = until;
+  if (typeof window !== "undefined") {
+    window.__baklogConnectNetworkSuppressUntil = until;
+  }
+  if (_connectNetworkSuppressTimer) {
+    clearTimeout(_connectNetworkSuppressTimer);
+  }
+  _connectNetworkSuppressTimer = setTimeout(() => {
+    endConnectNetworkSuppress();
+  }, Math.max(1_000, until - Date.now()));
+}
+
+export function endConnectNetworkSuppress() {
+  _connectNetworkSuppressUntil = 0;
+  if (_connectNetworkSuppressTimer) {
+    clearTimeout(_connectNetworkSuppressTimer);
+    _connectNetworkSuppressTimer = null;
+  }
+  if (typeof window !== "undefined") {
+    window.__baklogConnectNetworkSuppressUntil = 0;
+  }
+}
+
+function connectSuppressUntil() {
+  const winUntil =
+    typeof window !== "undefined"
+      ? Number(window.__baklogConnectNetworkSuppressUntil) || 0
+      : 0;
+  return Math.max(_connectNetworkSuppressUntil, winUntil);
+}
+
+function shouldSuppressConnectNetworkError(url) {
+  if (Date.now() > connectSuppressUntil()) return false;
+  return CONNECT_SUPPRESS_PATH_RE.test(String(url || ""));
+}
+
 function shouldSuppressNetworkErrors() {
   if (typeof window === "undefined") return false;
   if (window.__baklogSuppressNetworkErrors) return true;
@@ -176,7 +228,11 @@ async function _fetchWithRetry(
       // Suppress error persistence when the server is expected to be down
       // (e.g. during update apply/restart). Window flag covers the live poll;
       // sessionStorage survives the post-apply reload until boot clears it.
-      if (typeof window === "undefined" || !shouldSuppressNetworkErrors()) {
+      // Connect also time-boxes suppress for a few busy poll URLs only.
+      const suppress =
+        shouldSuppressNetworkErrors() ||
+        shouldSuppressConnectNetworkError(url);
+      if (typeof window === "undefined" || !suppress) {
         reportError(descriptive, {
           source: "fetchWithAuthRetry",
           kind: "network",

@@ -25,6 +25,8 @@ from pathlib import Path
 
 import requests
 
+from shared.http_error_snippet import http_error_snippet
+
 
 def _legacy_epic_cache_dir() -> Path:
     from shared.profile_paths import ROOT
@@ -271,7 +273,9 @@ class EpicClient:
                     continuation=fields.get("continuation") or None,
                     error_code=fields.get("errorCode") or None,
                 )
-            err = fields.get("errorCode") or (resp.text[:200] if resp.text else "")
+            err = fields.get("errorCode") or (
+                http_error_snippet(resp) if resp.text else ""
+            )
             raise EpicAuthError(f"OAuth {resp.status_code}: {err}")
         return resp.json()
 

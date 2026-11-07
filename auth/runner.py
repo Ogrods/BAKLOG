@@ -1764,22 +1764,43 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             ensure_ea_graphql_hook(page)
 
         now = time.time()
-        if session and now - last_hint > 10:
+        # Deals handoff needs denser SSE so the Connect UI does not look frozen
+        # while GraphQL cookies settle (EA-only; no cross-provider commit-sooner).
+        hint_interval = 3.0 if (signed_in and nudged and not expired_page) else 10.0
+        if session and now - last_hint > hint_interval:
             last_hint = now
             if "signin.ea.com" in url or "/login" in url:
                 msg = "Sign in to your EA account in the browser window."
             elif expired_page:
-                msg = "EA session expired ΓÇö sign in again in the browser window."
+                msg = "EA session expired - sign in again in the browser window."
+            elif signed_in and nudged:
+                if consecutive_auth:
+                    msg = (
+                        f"Confirming EA deals session "
+                        f"({consecutive_auth} auth pulse"
+                        f"{'s' if consecutive_auth != 1 else ''}"
+                        f", {len(owned_accum)} games seen)..."
+                    )
+                else:
+                    msg = "Signed in - waiting for EA deals page auth traffic..."
             elif signed_in:
-                msg = "Signed in ΓÇö confirming your EA session on the deals page."
+                msg = "Signed in - opening the EA deals page to confirm your session."
             else:
                 msg = "Keep the window open while we confirm your EA App session."
-            session.emit("waiting_for_user", {"message": msg})
+            session.emit(
+                "waiting_for_user",
+                {
+                    "message": msg,
+                    "ea_deals": bool(signed_in and nudged),
+                    "consecutive_auth": consecutive_auth,
+                    "owned_seen": len(owned_accum),
+                },
+            )
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
 
     raise RuntimeError(
-        "EA session not confirmed ΓÇö sign in at ea.com and wait for the deals page "
+        "EA session not confirmed - sign in at ea.com and wait for the deals page "
         "to finish loading before the window closes."
     )
 

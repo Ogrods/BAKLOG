@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import requests
 
+from shared.http_error_snippet import http_error_snippet
+
 # api.xbl.io often 500s; xbl.io is the working host per OpenXBL docs.
 BASE = "https://xbl.io/api/v2"
 
@@ -54,7 +56,7 @@ class XboxClient:
         if resp.status_code == 429:
             raise XboxRateLimitError(_rate_limit_message(resp))
         if resp.status_code >= 400:
-            raise XboxAuthError(f"OpenXBL {resp.status_code}: {resp.text[:200]}")
+            raise XboxAuthError(f"OpenXBL {http_error_snippet(resp)}")
         data = resp.json()
         if isinstance(data, dict) and data.get("code") not in (None, 200, "200", "SUCCESS"):
             code = data.get("code")

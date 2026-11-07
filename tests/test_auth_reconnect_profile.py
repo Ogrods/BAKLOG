@@ -28,10 +28,24 @@ def test_epic_library_in_preserve_set() -> None:
 def test_epic_wishlist_clears_profile_when_disconnected() -> None:
     from auth.manager import start_browser_auth
 
+    def run_inline(*_a, **kwargs):
+        target = kwargs.get("target")
+
+        class _T:
+            def start(self) -> None:
+                if target:
+                    target()
+
+        return _T()
+
     with (
         patch("auth.manager._provider_state", return_value="disconnected"),
         patch("auth.manager.clear_browser_session") as clear_mock,
-        patch("auth.manager.threading.Thread"),
+        patch("auth.cdp_browser.ensure_chromium_executable", return_value=None),
+        patch("auth.manager.run_browser_auth", return_value={"ok": "1"}),
+        patch("auth.session_probe.probe_browser_session", return_value=None),
+        patch("auth.manager.mark_connected"),
+        patch("auth.manager.threading.Thread", side_effect=run_inline),
     ):
         start_browser_auth("epic_wishlist", fresh=False)
 

@@ -786,20 +786,25 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
                 f"A sign-in window for {spec.label} is already open. "
                 "Finish or close it before starting again."
             )
+    # Decide whether to wipe the profile, but do the wipe on the auth worker
+    # thread (below). Synchronous clear_browser_session on the HTTP /start
+    # thread blocks the stdlib server during WMI/profile lock release and
+    # was a documented aggravator for "Server unreachable" during Connect.
+    clear_profile = False
     if fresh and _should_clear_on_reconnect(provider):
         # Reconnect: drop the old profile cookies so the sign-in window starts
         # logged out instead of resurrecting the stale/expired session.
-        clear_browser_session(provider)
+        clear_profile = True
     elif provider == "battlenet":
         # Stale jar + broad API traffic caused false Connect before login.
         # Always start Battle.net Connect from a clean profile.
-        clear_browser_session(provider)
+        clear_profile = True
     elif provider in PRESERVE_PROFILE_ON_RECONNECT:
         # Keep profile on reconnect (connected/expired) but drop ghost cookies
         # when starting from disconnected so connect cannot auto-complete on a
         # stale storefront session left in the profile dir.
         if _provider_state(provider) == "disconnected":
-            clear_browser_session(provider)
+            clear_profile = True
     session_id = uuid.uuid4().hex
     session = AuthSession(session_id, provider, fresh_connect=fresh)
     with _sessions_lock:
@@ -807,6 +812,15 @@ def start_browser_auth(provider: str, *, fresh: bool = False) -> str:
 
     def _worker() -> None:
         try:
+            if clear_profile:
+                session.emit(
+                    "status",
+                    {"message": "Clearing old browser session…"},
+                )
+                clear_browser_session(provider)
+                if session.is_cancelled():
+                    return
+
             # Prefetch managed Chrome for Testing before the Connect window opens so
             # progress can stream over SSE (wishlist/headless paths still ensure in
             # launch_persistent_profile).

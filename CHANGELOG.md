@@ -37,6 +37,18 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.07] - 2026-11-07
+
+### Fixed
+
+- Library table no longer jumps to the top after a store refresh finishes.
+- PlayStation Network fetch shows progress sooner instead of sitting quiet for a long stretch.
+- Expired or failed store chips and the session-expired banner open the matching Connections card (including lower rail stores) instead of the first entry.
+- Connections cards show a last-fetch error when a refresh fails while the store still reads Connected (for example Xbox rate limits).
+- Store HTTP errors no longer dump raw HTML into the fetcher log; itch retries once on temporary 429/5xx responses.
+- EA Connect reports clearer progress while the deals page finishes confirming the session.
+- Headed Connect is less likely to spam "Server unreachable" toasts, and clearing an old browser profile no longer blocks the local server on the Connect start request.
+
 ## [0.9.06] - 2026-11-06
 
 ### Fixed

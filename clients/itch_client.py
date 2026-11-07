@@ -23,10 +23,12 @@ from pathlib import Path
 import requests
 
 from fetchers._progress import HeartbeatTimer, heartbeat, progress_line
+from shared.http_error_snippet import http_error_snippet
 
 BASE_URL = "https://itch.io/api/1"
 DEFAULT_PAGE_SIZE_FALLBACK = 50  # itch may return up to 50 keys per page
 REQUEST_DELAY_SEC = 0.4
+TRANSIENT_RETRY_DELAY_SEC = 1.5
 
 
 class ItchAuthError(Exception):
@@ -70,7 +72,7 @@ class ItchClient:
             time.sleep(REQUEST_DELAY_SEC - elapsed)
         self._last_call = time.time()
 
-    def _get(self, path: str, params: dict | None = None) -> dict:
+    def _get(self, path: str, params: dict | None = None, *, _retried: bool = False) -> dict:
         self._throttle()
         url = f"{BASE_URL}/{self.api_key}/{path}"
         try:
@@ -80,11 +82,19 @@ class ItchClient:
         if resp.status_code in (401, 403):
             raise ItchAuthError("itch.io rejected the API key (401/403). Regenerate at https://itch.io/user/settings/api-keys")
         if resp.status_code >= 400:
-            raise ItchApiError(f"itch.io HTTP {resp.status_code}: {resp.text[:200]}")
+            if (
+                not _retried
+                and (resp.status_code == 429 or resp.status_code >= 500)
+            ):
+                time.sleep(TRANSIENT_RETRY_DELAY_SEC)
+                return self._get(path, params, _retried=True)
+            raise ItchApiError(f"itch.io {http_error_snippet(resp)}")
         try:
             data = resp.json()
         except ValueError as e:
-            raise ItchApiError(f"itch.io returned non-JSON: {e}") from e
+            raise ItchApiError(
+                f"itch.io returned non-JSON ({http_error_snippet(resp)}): {e}"
+            ) from e
         if isinstance(data, dict) and data.get("errors"):
             raise ItchApiError(f"itch.io error: {data['errors']}")
         return data

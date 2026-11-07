@@ -27,7 +27,14 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
+from fetchers._progress import (
+    EXIT_CODE_AUTH,
+    HeartbeatTimer,
+    RunStats,
+    phase,
+    run_with_heartbeat,
+    started,
+)
 from shared.library_noise import catalog_game_count, maybe_tag_library_noise_row
 
 GAMES_PSN_JSON = Path("games_psn.json")
@@ -185,6 +192,7 @@ def main() -> int:
         stats.error("Set PSN_NPSSO in .env (see README for NPSSO instructions).")
         return stats.finish("fetch_psn", t0, exit_code=1)
 
+    phase("Validating PSN session...")
     try:
         psn = PsnClient(npsso)
         online_id = psn.validate_session()
@@ -214,6 +222,7 @@ def main() -> int:
         and existing
         and prev_meta.get("title_stats_count") is not None
     ):
+        phase("Checking PSN library fingerprint...")
         try:
             probe_count, probe_max = psn.probe_library_fingerprint()
         except PsnAuthError as exc:
@@ -233,7 +242,11 @@ def main() -> int:
 
     if library is None:
         try:
-            library = run_with_heartbeat(psn.collect_library, "PSN library capture")
+            library = run_with_heartbeat(
+                psn.collect_library,
+                "PSN library capture (title stats, trophies, entitlements)",
+                interval=10.0,
+            )
         except PsnAuthError as exc:
             mark_invalid("psn", error=str(exc))
             stats.error(str(exc))

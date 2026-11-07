@@ -32,6 +32,8 @@ import {
   fetcherSources,
   fetchSuccessLabels,
   lastRunFailedByKey,
+  lastRunErrorByKey,
+  summarizeRunFailure,
   markItadPendingAutoRun,
 } from '../../fetcher-health-shared.js';
 import { startFastAgeTick, stopAgeTicker, stopFastAgeTick } from '../../fetcher-chips.js';
@@ -1181,6 +1183,7 @@ export const fetcherRunner = (() => {
       if (hist) {
         if (hist.status === 'done' && hist.exit_code === 0) {
           lastRunFailedByKey.delete(key);
+          lastRunErrorByKey.delete(key);
           markChipState(key, null);
           if (hist.id && hist.id !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = hist.id;
@@ -1189,7 +1192,14 @@ export const fetcherRunner = (() => {
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
         } else {
-          lastRunFailedByKey.set(key, Date.now());
+          const at = Date.now();
+          lastRunFailedByKey.set(key, at);
+          if (!lastRunErrorByKey.has(key)) {
+            lastRunErrorByKey.set(key, {
+              message: summarizeRunFailure('', hist.exit_code),
+              at,
+            });
+          }
           markChipState(key, 'failed');
           scheduleFailedChipClear(key);
         }
@@ -1738,6 +1748,7 @@ export const fetcherRunner = (() => {
         }
         if (ok) {
           lastRunFailedByKey.delete(key);
+          lastRunErrorByKey.delete(key);
           fetchSuccessLabels.add(src.label || key);
           // Clear the chip before client-side reload so a slow hosted-feed merge
           // cannot leave the claims fetcher spinning after the subprocess exited.
@@ -1755,7 +1766,12 @@ export const fetcherRunner = (() => {
         } else if (cancelled) {
           markChipState(key, null);
         } else {
-          lastRunFailedByKey.set(key, Date.now());
+          const at = Date.now();
+          lastRunFailedByKey.set(key, at);
+          lastRunErrorByKey.set(key, {
+            message: summarizeRunFailure(recentLog.join('\n'), data.exit_code),
+            at,
+          });
           markChipState(key, 'failed');
           handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
           scheduleFailedChipClear(key);
@@ -1808,6 +1824,7 @@ export const fetcherRunner = (() => {
           }
           if (ok) {
             lastRunFailedByKey.delete(key);
+            lastRunErrorByKey.delete(key);
             fetchSuccessLabels.add(src.label || key);
             markChipState(key, null);
             if (finished.id !== _lastAppliedDoneRunId) {
@@ -1818,7 +1835,12 @@ export const fetcherRunner = (() => {
           } else if (cancelled) {
             markChipState(key, null);
           } else {
-            lastRunFailedByKey.set(key, Date.now());
+            const at = Date.now();
+            lastRunFailedByKey.set(key, at);
+            lastRunErrorByKey.set(key, {
+              message: summarizeRunFailure('', finished.exit_code),
+              at,
+            });
             markChipState(key, 'failed');
             handleFetcherAuthOutcome(key, finished, '');
             scheduleFailedChipClear(key);
@@ -2101,14 +2123,18 @@ export const fetcherRunner = (() => {
     markChipStateForTest(key, state, runId = null) {
       markChipState(key, state, runId);
     },
-    markRunFailedForTest(key) {
-      lastRunFailedByKey.set(key, Date.now());
+    markRunFailedForTest(key, message = 'test failure') {
+      const at = Date.now();
+      lastRunFailedByKey.set(key, at);
+      lastRunErrorByKey.set(key, { message, at });
     },
     clearRunFailedForTest(key) {
       lastRunFailedByKey.delete(key);
+      lastRunErrorByKey.delete(key);
     },
     resetPillAggregatesForTest() {
       lastRunFailedByKey.clear();
+      lastRunErrorByKey.clear();
       fetchSuccessLabels.clear();
     },
     isRunFailedForTest(key) {

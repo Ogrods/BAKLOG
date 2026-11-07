@@ -1137,8 +1137,14 @@ export function tableFingerprint() {
   });
 }
 
-export function invalidateTableCache() {
-  cancelPendingScrollTarget();
+/**
+ * Bust table fingerprints / virtual state so the next renderTable rebuilds.
+ * keepDom=true (catalog merges): leave #tbody mounted so document height does
+ * not collapse and window.scrollY is not clamped to 0 while the async query
+ * runs. Hard clear (default) still empties tbody for view/filter switches.
+ */
+export function invalidateTableCache({ keepDom = false } = {}) {
+  if (!keepDom) cancelPendingScrollTarget();
   forceHideRowLoader();
   _tableFingerprint = "";
   state._visibleList = null;
@@ -1152,8 +1158,10 @@ export function invalidateTableCache() {
   _virtualWindowList = null;
   _alphaListRef = null;
   _alphaLetterSet = null;
-  const tbody = document.getElementById("tbody");
-  if (tbody) tbody.innerHTML = "";
+  if (!keepDom) {
+    const tbody = document.getElementById("tbody");
+    if (tbody) tbody.innerHTML = "";
+  }
 }
 
 /** Survives invalidateTableCache so a drill-back-to-library doesn't re-query 1700 rows. */

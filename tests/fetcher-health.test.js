@@ -44,6 +44,7 @@ import {
   primaryFailureNavigateTarget,
   dismissStickyFailedState,
 } from '../js/fetcher-health.js';
+import { lastRunFailedByKey } from '../js/fetcher-health-shared.js';
 import { state } from '../js/state.js';
 
 const connMock = vi.hoisted(() => ({
@@ -1379,6 +1380,24 @@ describe('global failure nav', () => {
       fetcherKey: 'wishlistXbox',
       provider: 'xbox_wishlist',
     });
+    clearReconnectRequired('xbox_wishlist');
+  });
+
+  it('primaryFailureNavigateTarget prefers the most recent sticky failure', () => {
+    connMock.statuses.steam = 'expired';
+    connMock.statuses.xbox_wishlist = 'expired';
+    markReconnectRequired('steam');
+    markReconnectRequired('xbox_wishlist');
+    fetcherRunner.markRunFailedForTest('steam');
+    const older = primaryFailureNavigateTarget();
+    expect(older?.fetcherKey).toBe('steam');
+    // Ensure a later timestamp wins even if steam was inserted first.
+    lastRunFailedByKey.set('wishlistXbox', Date.now() + 5_000);
+    expect(primaryFailureNavigateTarget()).toEqual({
+      fetcherKey: 'wishlistXbox',
+      provider: 'xbox_wishlist',
+    });
+    clearReconnectRequired('steam');
     clearReconnectRequired('xbox_wishlist');
   });
 

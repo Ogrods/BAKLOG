@@ -12,6 +12,8 @@ from urllib.parse import quote
 
 import requests
 
+from shared.http_error_snippet import http_error_snippet
+
 GRAPHQL_URL = "https://service-aggregation-layer.juno.ea.com/graphql"
 EA_WEB_ORIGIN = "https://www.ea.com"
 EA_WEB_REFERER = "https://www.ea.com/sales/deals"
@@ -208,16 +210,16 @@ class EaClient:
     def _raise_graphql_errors(self, data: dict, resp: requests.Response) -> None:
         if resp.status_code in (401, 403):
             raise EaAuthError(
-                f"EA GraphQL unauthorized ({resp.status_code}) — reconnect EA App."
+                f"EA GraphQL unauthorized ({resp.status_code}) - reconnect EA App."
             )
         if resp.status_code >= 400:
-            raise EaAuthError(f"EA GraphQL HTTP {resp.status_code}: {resp.text[:300]}")
+            raise EaAuthError(f"EA GraphQL {http_error_snippet(resp)}")
         if data.get("errors"):
             err = data["errors"][0] if data["errors"] else {}
             code = ((err.get("extensions") or {}).get("code") or "").upper()
             msg = str(err.get("message") or "")
             if code == "UNAUTHENTICATED" or "not authenticated" in msg.lower():
-                raise EaAuthError("EA GraphQL not authenticated — reconnect EA App.")
+                raise EaAuthError("EA GraphQL not authenticated - reconnect EA App.")
             raise EaAuthError(f"EA GraphQL errors: {data['errors'][:1]}")
 
     def _graphql_get(self, operation: str, variables: dict, sha256_hash: str) -> dict:

@@ -94,3 +94,53 @@ describe('api-client update-restart network suppress', () => {
     expect(errorBoundary.reportError).not.toHaveBeenCalled();
   });
 });
+
+describe('api-client Connect network suppress', () => {
+  beforeEach(() => {
+    errorBoundary.reportError.mockReset();
+    authGate.isAccountAuthMode.mockReturnValue(false);
+    window.__baklogConnectNetworkSuppressUntil = 0;
+  });
+
+  afterEach(async () => {
+    const mod = await import('../js/api-client.js').catch(() => null);
+    mod?.endConnectNetworkSuppress?.();
+    window.__baklogConnectNetworkSuppressUntil = 0;
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('skips reportError for /api/auth/status during Connect suppress', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    const { baklogFetch, beginConnectNetworkSuppress } = await import(
+      '../js/api-client.js'
+    );
+    beginConnectNetworkSuppress(60_000);
+    await expect(baklogFetch('/api/auth/status')).rejects.toMatchObject({
+      name: 'NetworkError',
+    });
+    expect(errorBoundary.reportError).not.toHaveBeenCalled();
+  });
+
+  it('still reports NetworkError for unrelated URLs during Connect suppress', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    const { baklogFetch, beginConnectNetworkSuppress } = await import(
+      '../js/api-client.js'
+    );
+    beginConnectNetworkSuppress(60_000);
+    await expect(baklogFetch('/api/config')).rejects.toMatchObject({
+      name: 'NetworkError',
+    });
+    expect(errorBoundary.reportError).toHaveBeenCalled();
+  });
+});

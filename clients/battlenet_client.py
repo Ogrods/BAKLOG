@@ -17,6 +17,8 @@ from urllib.parse import unquote
 
 import requests
 
+from shared.http_error_snippet import http_error_snippet
+
 ACCOUNT_URL = "https://account.battle.net/api/games-and-subs"
 
 # Names only — browser_cookie3 is imported inside from_browser() so
@@ -131,11 +133,11 @@ class BattleNetClient:
                 "intermittently breaks it; retry later."
             )
         if resp.status_code >= 400:
-            raise BattleNetAuthError(f"Battle.net {resp.status_code}: {resp.text[:200]}")
+            raise BattleNetAuthError(f"Battle.net {http_error_snippet(resp)}")
         try:
             return resp.json()
         except ValueError as e:
             raise BattleNetAuthError(
-                f"Battle.net returned non-JSON ({resp.headers.get('content-type')}). "
-                "Session likely expired — sign in at account.battle.net in Edge."
+                f"Battle.net returned non-JSON ({http_error_snippet(resp)}). "
+                "Session likely expired - sign in at account.battle.net in Edge."
             ) from e

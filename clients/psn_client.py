@@ -412,8 +412,10 @@ class PsnClient:
         """Cheap title-stats walk: count + newest last_played (for incremental skip)."""
         count = 0
         max_last: str | None = None
+        hb = HeartbeatTimer(interval=10.0)
         for stat in self._client.title_stats(limit=None):
             count += 1
+            hb.tick_progress(count, 0, "PSN fingerprint", f"{count} titles")
             last = _iso(getattr(stat, "last_played_date_time", None))
             if last and (max_last is None or last > max_last):
                 max_last = last
@@ -424,8 +426,10 @@ class PsnClient:
         stats_by_name: dict[str, object] = {}
         stat_agg = _new_stat_agg()
         count = 0
+        hb = HeartbeatTimer(interval=10.0)
         for stat in self._client.title_stats(limit=None):
             count += 1
+            hb.tick_progress(count, 0, "PSN title stats", f"{count} loaded")
             if stat.title_id:
                 stats_by_title_id[stat.title_id] = stat
             if stat.name:
@@ -436,8 +440,10 @@ class PsnClient:
     def _walk_trophy_entries(self) -> tuple[dict[str, PsnGameEntry], int]:
         entries: dict[str, PsnGameEntry] = {}
         count = 0
+        hb = HeartbeatTimer(interval=10.0)
         for trophy in self._client.trophy_titles(limit=None):
             count += 1
+            hb.tick_progress(count, 0, "PSN trophies", f"{count} titles")
             comm_id = trophy.np_communication_id
             if not comm_id:
                 continue
@@ -470,13 +476,15 @@ class PsnClient:
     def _walk_entitlements_raw(self) -> tuple[list, int]:
         raw: list = []
         count = 0
+        hb = HeartbeatTimer(interval=10.0)
         for entitlement in self._client.game_entitlements(limit=None):
             count += 1
+            hb.tick_progress(count, 0, "PSN entitlements", f"{count} loaded")
             raw.append(entitlement)
         return raw, count
 
     def collect_library(self) -> list[PsnGameEntry]:
-        hb = HeartbeatTimer(interval=25.0)
+        hb = HeartbeatTimer(interval=10.0)
         heartbeat("PSN library: loading (parallel API walks)")
         with ThreadPoolExecutor(max_workers=3) as ex:
             f_stats = ex.submit(self._walk_title_stats)

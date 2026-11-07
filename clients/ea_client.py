@@ -213,7 +213,9 @@ class EaClient:
                 f"EA GraphQL unauthorized ({resp.status_code}) - reconnect EA App."
             )
         if resp.status_code >= 400:
-            raise EaAuthError(f"EA GraphQL {http_error_snippet(resp)}")
+            raise EaAuthError(
+                f"EA GraphQL {http_error_snippet(resp, max_len=300)}"
+            )
         if data.get("errors"):
             err = data["errors"][0] if data["errors"] else {}
             code = ((err.get("extensions") or {}).get("code") or "").upper()

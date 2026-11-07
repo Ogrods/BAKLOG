@@ -587,12 +587,12 @@ describe('connections deep-link focus', () => {
     steam.scrollIntoView = steamScroll;
     ubisoft.scrollIntoView = ubisoftScroll;
 
-    focusConnectionsProvider('steam');
+    await focusConnectionsProvider('steam');
     await new Promise((r) => requestAnimationFrame(r));
     expect(steam.getAttribute('aria-selected')).toBe('true');
     expect(steamScroll).toHaveBeenCalled();
 
-    focusConnectionsProvider('ubisoft');
+    await focusConnectionsProvider('ubisoft');
     await new Promise((r) => requestAnimationFrame(r));
     expect(ubisoft.getAttribute('aria-selected')).toBe('true');
     expect(ubisoftScroll).toHaveBeenCalled();

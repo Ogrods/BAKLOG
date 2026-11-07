@@ -43,8 +43,8 @@
       </thead>
       <tbody>
         <tr><td>Waitlist / beta email</td><td>Email you submit</td><td>You opt in on the landing page</td></tr>
-        <tr><td>Google Analytics (GA4)</td><td>Anonymous page views on the marketing site</td><td>Browser loads baklog.app (not the desktop app)</td></tr>
-        <tr><td>Bug report</td><td>Whitelisted diagnostic bundle you send</td><td>You confirm <strong>Send report</strong> in the app</td></tr>
+        <tr><td>Google Analytics (GA4)</td><td>Page views plus typical GA4 browser/device signals; may set a <code>_ga</code> client ID cookie</td><td>Browser loads baklog.app (not the desktop app)</td></tr>
+        <tr><td>Bug report</td><td>Whitelisted diagnostic bundle, plus optional contact email and note you enter</td><td>You confirm <strong>Send report</strong> in the app</td></tr>
         <tr><td>Free claims / sponsors feeds</td><td>Public curated metadata (no personal library)</td><td>App or site fetches when online</td></tr>
         <tr><td>Metrics</td><td>Anonymous session/impression counts</td><td>Opt-in only in Connections</td></tr>
         <tr><td>Pro cloud sync</td><td>Catalogs and personal statuses for your account</td><td>You enable Cloud sync; credentials stay local</td></tr>
@@ -61,7 +61,7 @@
     </ul>
 
     <h2>Removing your data</h2>
-    <p>Local data lives under your BAKLOG data root (on Windows installs, typically under LocalAppData). Delete profile folders, cache, and browser localStorage for the app origin to remove local data. For hosted account email or Pro cloud objects, contact <a href="mailto:dan@baklog.app">dan@baklog.app</a> or use the account tools we provide.</p>
+    <p>Local data lives under your BAKLOG data root (on Windows installs, typically under LocalAppData). Delete profile folders, cache, and browser localStorage for the app origin to remove local data. For Pro cloud objects, use <strong>Clear cloud library</strong> in Connections (turning Cloud sync off stops new uploads but leaves existing cloud files). For hosted account email or other account storage, contact <a href="mailto:dan@baklog.app">dan@baklog.app</a>.</p>
 
     <h2>Security</h2>
     <p>Threat model and store access notes:

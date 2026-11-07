@@ -1734,13 +1734,17 @@ export function clearReconnectBanner(provider) {
 }
 
 /** Select a Connections rail card and scroll it into view (deep-link from chips/banner). */
-export function focusConnectionsProvider(provider) {
+export async function focusConnectionsProvider(provider) {
   if (!provider) return;
   _selectedKey = groupRepFor(provider);
   try {
-    refreshConnections();
+    await refreshConnections();
   } catch {
-    /* ignore */
+    try {
+      renderConnections();
+    } catch {
+      /* ignore */
+    }
   }
   requestAnimationFrame(() => {
     const rail = document.getElementById("connRail");
@@ -1786,7 +1790,7 @@ function renderReconnectBanner() {
     const target =
       _lastReconnectFocusProvider || [...reconnectProviders].at(-1) || null;
     document.querySelector('.view-tab[data-view="connections"]')?.click();
-    if (target) focusConnectionsProvider(target);
+    if (target) void focusConnectionsProvider(target);
     else renderConnections();
   });
 
@@ -2612,7 +2616,7 @@ export async function reconnectProvider(provider, { autoStart = true } = {}) {
   if (!provider) return;
 
   document.querySelector('.view-tab[data-view="connections"]')?.click();
-  focusConnectionsProvider(provider);
+  await focusConnectionsProvider(provider);
 
   // When navigating in from a dashboard chip/affordance we only want to tab
   // over to the right card so the user can choose - never auto-open a sign-in

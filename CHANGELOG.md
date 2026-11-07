@@ -48,6 +48,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 - Store HTTP errors no longer dump raw HTML into the fetcher log; itch retries once on temporary 429/5xx responses.
 - EA Connect reports clearer progress while the deals page finishes confirming the session.
 - Headed Connect is less likely to spam "Server unreachable" toasts, and clearing an old browser profile no longer blocks the local server on the Connect start request.
+- Privacy pages document Pro Cloud sync, GA4 cookies, optional bug-report contact fields, and Clear cloud library (sync-off keeps existing cloud files).
 
 ## [0.9.06] - 2026-11-06
 

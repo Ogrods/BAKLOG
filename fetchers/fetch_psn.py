@@ -194,8 +194,15 @@ def main() -> int:
 
     phase("Validating PSN session...")
     try:
-        psn = PsnClient(npsso)
-        online_id = psn.validate_session()
+        def _open_psn():
+            client = PsnClient(npsso)
+            return client, client.validate_session()
+
+        psn, online_id = run_with_heartbeat(
+            _open_psn,
+            "PSN session validate",
+            interval=10.0,
+        )
     except PsnAuthError as exc:
         mark_invalid("psn", error=str(exc))
         stats.error(str(exc))
@@ -224,7 +231,11 @@ def main() -> int:
     ):
         phase("Checking PSN library fingerprint...")
         try:
-            probe_count, probe_max = psn.probe_library_fingerprint()
+            probe_count, probe_max = run_with_heartbeat(
+                psn.probe_library_fingerprint,
+                "PSN library fingerprint",
+                interval=10.0,
+            )
         except PsnAuthError as exc:
             mark_invalid("psn", error=str(exc))
             stats.error(str(exc))

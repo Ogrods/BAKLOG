@@ -65,4 +65,17 @@ describe("table merge scroll preserve", () => {
     invalidateTableCache();
     expect(hasPendingScrollTarget()).toBe(false);
   });
+
+  it("consumePendingScrollTarget keeps row target while _visibleList is null", async () => {
+    const {
+      setPendingScrollTarget,
+      consumePendingScrollTarget,
+      hasPendingScrollTarget,
+      invalidateTableCache,
+    } = await import("../js/table-ui.js");
+    setPendingScrollTarget({ kind: "row", key: "steam:1", smooth: false });
+    invalidateTableCache({ keepDom: true });
+    expect(consumePendingScrollTarget(null)).toBe(false);
+    expect(hasPendingScrollTarget()).toBe(true);
+  });
 });

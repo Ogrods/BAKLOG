@@ -9,16 +9,19 @@ machine. On frozen Windows beta installs, the default data root is
 `%LOCALAPPDATA%\BAKLOG-Data` (override with `BAKLOG_DATA_DIR`). Profile-scoped
 files live under `profiles/<id>/` inside that root.
 
-**Optional account sign-in:** If you enable auth (set
+**Optional account / Pro cloud:** If you enable auth (set
 `BAKLOG_SUPABASE_URL` and `BAKLOG_SUPABASE_ANON_KEY` in `.env`), Supabase stores your account
-email and session metadata on their hosted service. BAKLOG still keeps library
-JSON and Connections secrets locally; only the login handshake talks to Supabase.
+email and session metadata on their hosted service. Connections secrets and browser
+profiles stay local. When you also enable **Pro Cloud sync**, catalog JSON and personal
+statuses upload to a private bucket under your account (never credentials). Optional
+**Send report** can store a scrubbed bug bundle (plus optional contact/note) in Supabase
+when that endpoint is configured.
 
 Nothing else leaves your machine except direct calls to storefronts and
 enrichment services (network hosts below), plus optional `baklog.app` endpoints
 in **Hosted surfaces** when you use those features.
 
-Last updated: 2026-11-06.
+Last updated: 2026-11-07.
 
 **Hosted summary:** https://baklog.app/privacy (`web/privacy.html`). When you change
 this file, update the hosted page in the same change (TikTok / Meta developer
@@ -32,23 +35,27 @@ These are optional and separate from the local dashboard:
 | Surface | What it collects | When |
 |---------|------------------|------|
 | Waitlist (`/api/subscribe`) | Email you submit | You opt in on the landing page |
-| Google Analytics (GA4 `G-88L32JZQDH`) | Anonymous page views on the marketing site | Browser loads baklog.app (not the desktop app) |
-| Bug report (`/api/report`) | Whitelisted diagnostic bundle you paste/send | You click **Send report** in the app |
+| Google Analytics (GA4 `G-88L32JZQDH`) | Page views plus typical GA4 browser/device signals; may set a `_ga` client ID cookie | Browser loads baklog.app (not the desktop app) |
+| Bug report (`/api/report`) | Whitelisted diagnostic bundle, plus optional contact email and note you enter | You confirm **Send report** in the app |
 | Free claims feed (`free-claims.json`) | Public curated giveaway metadata (no personal data) | App polls when you open Claimable Now |
 | Sponsored deals feed (`sponsors.json`) | Public house/paid ad metadata (no personal data) | App fetches when online (profile override → hosted → bundled) |
 | Metrics (`/api/metrics`) | Anonymous session/impression counts | **Opt-in only** (`shareAnonStats` in Connections; default off) |
+| Pro cloud sync | Catalog JSON and personal statuses for your signed-in account | You enable Cloud sync; credentials stay local |
+| Account sign-in | Email and session metadata (Supabase) | You create or use an account |
 
-The local app does **not** upload your library or credentials to these endpoints.
+The local app does **not** upload your credentials to these endpoints. Library
+catalogs leave the machine only when you enable Pro Cloud sync.
 
 ## TL;DR
 
 - Everything is stored locally on your computer.
 - BAKLOG talks to each storefront on your behalf using the credentials you
   provide. Each storefront sees its own normal API/scrape traffic from you.
-- The **local app** has no remote backend for your library: the authors never
-  receive your catalog, notes, or credentials automatically.
-- The **baklog.app** marketing site is separate (Google Analytics page views, waitlist email, optional bug
-  reports you send, public free-claims feed) — see **Hosted surfaces** below.
+- The **local app** keeps catalogs and credentials on disk by default. Authors
+  never receive them automatically. Pro Cloud sync (opt-in) uploads catalogs and
+  personal statuses only.
+- The **baklog.app** marketing site is separate (GA4, waitlist email, optional bug
+  reports you send, public feeds, Pro mirror) - see **Hosted surfaces** below.
 - Backups of your personal data and fetched libraries are written locally and
   not transmitted anywhere.
 
@@ -279,9 +286,9 @@ inline Add-game flow hits `store.steampowered.com/api/storesearch/`.
   Objects are capped at 25 MiB. Browse at baklog.app/mirror while signed in;
   Import overwrites matching files in the active local profile on another PC.
   Turning Cloud sync off stops new uploads; existing hosted objects remain until
-  the account owner deletes them in Supabase Storage (in-app delete is planned).
-  For moving credentials, use the portable secrets bundle (Connections → Export
-  bundle…).
+  you use **Clear cloud library** in Connections (or delete them in account
+  storage). For moving credentials, use the portable secrets bundle
+  (Connections → Export bundle…).
 
 ## Removing your data
 
@@ -299,7 +306,9 @@ Everything is on disk:
 
 Delete the folders above to remove everything. To rotate or revoke individual
 credentials, do it on the storefront's account page and then drop the matching
-file in `cache/` / row in `.env`.
+file in `cache/` / row in `.env`. For Pro cloud objects, use **Clear cloud
+library** in Connections or contact dan@baklog.app; turning Cloud sync off alone
+does not delete existing cloud files.
 
 ## Threat model
 

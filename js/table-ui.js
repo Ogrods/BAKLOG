@@ -773,7 +773,17 @@ export function consumePendingScrollTarget(list = state._visibleList) {
       return false;
     }
     const key = t.key;
-    if (!key || !Array.isArray(list) || !list.length) {
+    if (!key) {
+      t.consumed = true;
+      _pendingScrollTarget = null;
+      return false;
+    }
+    // Soft-invalidate (keepDom) nulls _visibleList while the query is in flight.
+    // Keep the pending target so the post-paint path can scroll once the list exists.
+    if (!Array.isArray(list)) {
+      return false;
+    }
+    if (!list.length) {
       t.consumed = true;
       _pendingScrollTarget = null;
       return false;

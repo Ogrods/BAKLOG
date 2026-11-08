@@ -37,6 +37,16 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.08] - 2026-11-08
+
+### Fixed
+
+- Steals "view all" uses the same high-rating + deep-cut rules as the Steals card (no unrated 50%+ fillers).
+- Connect is less likely to flash red store chips or leave stale network errors in bug-report bundles.
+- Failed store chips stay red until a real reconnect or a successful refresh; the header fetcher pill matches the chips.
+- Spotlight jumps into the library land on the right row more reliably on the first click.
+- EA Connect returns sooner after sign-in instead of a long silent wait on the deals page.
+
 ## [0.9.07] - 2026-11-07
 
 ### Fixed

@@ -10,7 +10,7 @@ describe('clearAllFilters deal prefs', () => {
     hydrateIndexDocument();
   });
 
-  it('resets on-sale / historical-low / hide-owned / min discount / max price', async () => {
+  it('resets on-sale / historical-low / hide-owned / steals / min discount / max price', async () => {
     const { state } = await import('../js/state.js');
     const { clearAllFilters } = await import('../js/filters-ui.js');
 
@@ -19,6 +19,7 @@ describe('clearAllFilters deal prefs', () => {
       dealOnSaleOnly: true,
       dealHistoricalLowOnly: true,
       dealHideOwned: true,
+      dealStealsOnly: true,
       dealMinDiscount: 40,
       dealMaxPrice: 15,
       storeFilter: 'steam',
@@ -30,6 +31,7 @@ describe('clearAllFilters deal prefs', () => {
     expect(state.prefs.dealOnSaleOnly).toBe(false);
     expect(state.prefs.dealHistoricalLowOnly).toBe(false);
     expect(state.prefs.dealHideOwned).toBe(false);
+    expect(state.prefs.dealStealsOnly).toBe(false);
     expect(state.prefs.dealMinDiscount).toBe(0);
     expect(state.prefs.dealMaxPrice).toBe(100);
     expect(state.prefs.storeFilter).toBe('');

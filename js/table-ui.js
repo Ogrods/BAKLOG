@@ -815,6 +815,9 @@ export function consumePendingScrollTarget(list = state._visibleList) {
       // top spacer isn't always laid out when we measure two rAF after paint, so a
       // getBoundingClientRect read can land the drill "much too high" near the top
       // of the page. This mirrors the anchor-paint path that dashboard drills use.
+      // Cross-view first drills often still have the bootstrap ROW_HEIGHT=76; measure
+      // from the painted probe row before scrolling so chrome growth does not undershoot.
+      if (row) refreshMeasuredRowHeight(row.parentElement);
       scrollToVirtualRowIndex(idx, { behavior: t.smooth ? "smooth" : "auto" });
       if (row) markFocusedRow(key);
       if (_pendingFlashKeys.has(key)) applyRowFlash(key);
@@ -964,7 +967,12 @@ export function scheduleScrollAfterChromeSettled() {
   if (wishRadar) _chromeScrollObs.observe(wishRadar);
   requestAnimationFrame(() => requestAnimationFrame(tryConsume));
   // Cap wait so house/radar growth cannot leave the drill overlay forever.
-  _chromeSettleTimer = setTimeout(forceConsume, CHROME_SETTLE_TIMEOUT_MS);
+  // Cross-view row drills need a little longer so force-consume does not race
+  // picks ResizeObserver (toolbar drills already paint chrome first).
+  const settleMs = (t.kind === 'row' && t.hideOverlay)
+    ? CHROME_SETTLE_TIMEOUT_MS + 500
+    : CHROME_SETTLE_TIMEOUT_MS;
+  _chromeSettleTimer = setTimeout(forceConsume, settleMs);
 }
 
 const CHROME_BAND_ABOVE_TOOLBAR = ['viewHouseSlot', 'wishlistDealRadar'];
@@ -1135,7 +1143,7 @@ export function tableFingerprint() {
     hltbBucket: state.prefs.hltbBucket ?? null,
     gen: state.prefs.genreFilters || [],
     gm: state.prefs.genreFilterMode,
-    deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
+    deal: [state.prefs.dealOnSaleOnly, state.prefs.dealHistoricalLowOnly, state.prefs.dealHideOwned, !!state.prefs.dealStealsOnly, state.prefs.dealMinDiscount, state.prefs.dealMaxPrice],
     coop: getCoopFilterMode(),
     cleanup: !!state.cleanupModeActive,
     dedupe: !!state.sessionPrefs.crossStoreDedup,

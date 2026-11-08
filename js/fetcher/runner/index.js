@@ -1,5 +1,10 @@
 /** Fetcher runner: queue, SSE streams, log panel, batch runs. */
-import { baklogFetch, urlWithStreamTicket } from '../../api-client.js';
+import {
+  baklogFetch,
+  urlWithStreamTicket,
+  shouldSoftFailConnectPoll,
+  isConnectNetworkSuppressActive,
+} from '../../api-client.js';
 import { isPageHidden, registerPausable } from '../../visibility.js';
 import { state } from '../../state.js';
 import { escapeAttr, escapeHtml } from '../../dom-util.js';
@@ -231,7 +236,12 @@ export const fetcherRunner = (() => {
     try {
       return await fetchWithTimeout(url, options, ms);
     } catch (err) {
-      if (String(err?.message || err).includes('server not responding')) {
+      const msg = String(err?.message || err);
+      const softConnect =
+        shouldSoftFailConnectPoll(url) ||
+        (isConnectNetworkSuppressActive() &&
+          (msg.includes('server not responding') || msg.includes('Server unreachable')));
+      if (!softConnect && msg.includes('server not responding')) {
         invalidateApiProbe();
       }
       throw err;
@@ -348,7 +358,7 @@ export const fetcherRunner = (() => {
         'error',
         `[${src.label}: stream dropped too many times - refresh the page or use Cancel]`,
       );
-      markChipState(key, null);
+      markRunFailed(key, 'stream dropped too many times');
       if (liveRunId === runId) {
         setStatus('failed');
         liveRunId = null;
@@ -750,6 +760,11 @@ export const fetcherRunner = (() => {
       const res = await baklogFetch('/api/fetchers', { method: 'GET' });
       apiAvailable = res.ok;
     } catch {
+      // During Connect suppress, Failed-to-fetch is expected busy-window noise —
+      // do not paint chips red / readonly until a real probe after Connect ends.
+      if (shouldSoftFailConnectPoll('/api/fetchers')) {
+        return apiAvailable === true;
+      }
       apiAvailable = false;
     }
     return apiAvailable;
@@ -1182,8 +1197,7 @@ export const fetcherRunner = (() => {
       }
       if (hist) {
         if (hist.status === 'done' && hist.exit_code === 0) {
-          lastRunFailedByKey.delete(key);
-          lastRunErrorByKey.delete(key);
+          clearRunFailed(key);
           markChipState(key, null);
           if (hist.id && hist.id !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = hist.id;
@@ -1192,20 +1206,17 @@ export const fetcherRunner = (() => {
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
         } else {
-          const at = Date.now();
-          lastRunFailedByKey.set(key, at);
-          if (!lastRunErrorByKey.has(key)) {
-            lastRunErrorByKey.set(key, {
-              message: summarizeRunFailure('', hist.exit_code),
-              at,
-            });
-          }
-          markChipState(key, 'failed');
-          scheduleFailedChipClear(key);
+          markRunFailed(key, summarizeRunFailure('', hist.exit_code));
         }
         if (hist.id) clearLastSeq(hist.id);
       } else {
-        markChipState(key, null);
+        // Mid-run server restart / unreachable: keep sticky if already failed,
+        // otherwise record a transport fail so the chip does not silently clear.
+        if (!lastRunFailedByKey.has(key)) {
+          markRunFailed(key, 'run interrupted');
+        } else {
+          markChipState(key, null);
+        }
         if (runId) clearLastSeq(runId);
       }
     }
@@ -1438,12 +1449,42 @@ export const fetcherRunner = (() => {
   }
 
   const FAILED_CHIP_CLEAR_MS = 10_000;
+  /** @type {Map<string, ReturnType<typeof setTimeout>>} */
+  const failedChipClearTimers = new Map();
+
+  function cancelFailedChipClear(key) {
+    const t = failedChipClearTimers.get(key);
+    if (t) clearTimeout(t);
+    failedChipClearTimers.delete(key);
+  }
+
   function scheduleFailedChipClear(key) {
-    setTimeout(() => {
+    cancelFailedChipClear(key);
+    const timer = setTimeout(() => {
+      failedChipClearTimers.delete(key);
       if (runStateByKey.get(key) === 'failed') {
         markChipState(key, null);
       }
     }, FAILED_CHIP_CLEAR_MS);
+    failedChipClearTimers.set(key, timer);
+  }
+
+  /** Sticky failed chip + 10s flash. Used by done/history/stream/submit give-up. */
+  function markRunFailed(key, message = 'unknown error') {
+    const at = Date.now();
+    lastRunFailedByKey.set(key, at);
+    lastRunErrorByKey.set(key, {
+      message: String(message || 'unknown error').slice(0, 160),
+      at,
+    });
+    markChipState(key, 'failed');
+    scheduleFailedChipClear(key);
+  }
+
+  function clearRunFailed(key) {
+    cancelFailedChipClear(key);
+    lastRunFailedByKey.delete(key);
+    lastRunErrorByKey.delete(key);
   }
 
   // Returns true only when a run was actually submitted to the server; false on
@@ -1551,6 +1592,7 @@ export const fetcherRunner = (() => {
       } catch (err) {
         logEvent('error', `[client] cannot reach server: ${err}`);
         setStatus('failed');
+        markRunFailed(key, 'cannot reach server');
         return false;
       }
       if (res.status !== 409) break;
@@ -1573,7 +1615,7 @@ export const fetcherRunner = (() => {
         const txt = await res.text().catch(() => '');
         logEvent('error', `[server ${res.status}] ${txt || 'submit failed'}`);
         setStatus('failed');
-        markChipState(key, null);
+        markRunFailed(key, txt || `submit failed (${res.status})`);
         return false;
       }
       const { run_id: runId } = await res.json();
@@ -1747,8 +1789,7 @@ export const fetcherRunner = (() => {
           updateCancelButton();
         }
         if (ok) {
-          lastRunFailedByKey.delete(key);
-          lastRunErrorByKey.delete(key);
+          clearRunFailed(key);
           fetchSuccessLabels.add(src.label || key);
           // Clear the chip before client-side reload so a slow hosted-feed merge
           // cannot leave the claims fetcher spinning after the subprocess exited.
@@ -1766,15 +1807,8 @@ export const fetcherRunner = (() => {
         } else if (cancelled) {
           markChipState(key, null);
         } else {
-          const at = Date.now();
-          lastRunFailedByKey.set(key, at);
-          lastRunErrorByKey.set(key, {
-            message: summarizeRunFailure(recentLog.join('\n'), data.exit_code),
-            at,
-          });
-          markChipState(key, 'failed');
+          markRunFailed(key, summarizeRunFailure(recentLog.join('\n'), data.exit_code));
           handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
-          scheduleFailedChipClear(key);
         }
       } catch (err) {
         logEvent('error', `[client] parse error on done: ${err}`);
@@ -1823,8 +1857,7 @@ export const fetcherRunner = (() => {
             updateCancelButton();
           }
           if (ok) {
-            lastRunFailedByKey.delete(key);
-            lastRunErrorByKey.delete(key);
+            clearRunFailed(key);
             fetchSuccessLabels.add(src.label || key);
             markChipState(key, null);
             if (finished.id !== _lastAppliedDoneRunId) {
@@ -1835,15 +1868,8 @@ export const fetcherRunner = (() => {
           } else if (cancelled) {
             markChipState(key, null);
           } else {
-            const at = Date.now();
-            lastRunFailedByKey.set(key, at);
-            lastRunErrorByKey.set(key, {
-              message: summarizeRunFailure('', finished.exit_code),
-              at,
-            });
-            markChipState(key, 'failed');
+            markRunFailed(key, summarizeRunFailure('', finished.exit_code));
             handleFetcherAuthOutcome(key, finished, '');
-            scheduleFailedChipClear(key);
           }
           if (liveRunId === runId) liveRunId = null;
           revertFetcherLayoutIfIdle();
@@ -1858,7 +1884,7 @@ export const fetcherRunner = (() => {
         setStatus('failed');
         liveRunId = null;
       }
-      markChipState(key, null);
+      markRunFailed(key, 'stream error');
     };
   }
 
@@ -2124,18 +2150,27 @@ export const fetcherRunner = (() => {
       markChipState(key, state, runId);
     },
     markRunFailedForTest(key, message = 'test failure') {
-      const at = Date.now();
-      lastRunFailedByKey.set(key, at);
-      lastRunErrorByKey.set(key, { message, at });
+      markRunFailed(key, message);
     },
     clearRunFailedForTest(key) {
-      lastRunFailedByKey.delete(key);
-      lastRunErrorByKey.delete(key);
+      clearRunFailed(key);
+      markChipState(key, null);
+    },
+    /** Drop the 10s failed flash (and its clear timer) without touching sticky. */
+    clearFailedChipFlash(keys = []) {
+      for (const key of keys) {
+        cancelFailedChipClear(key);
+        if (runStateByKey.get(key) === 'failed') markChipState(key, null);
+      }
     },
     resetPillAggregatesForTest() {
+      for (const key of [...failedChipClearTimers.keys()]) cancelFailedChipClear(key);
       lastRunFailedByKey.clear();
       lastRunErrorByKey.clear();
       fetchSuccessLabels.clear();
+      for (const [key, st] of [...runStateByKey.entries()]) {
+        if (st === 'failed') markChipState(key, null);
+      }
     },
     isRunFailedForTest(key) {
       return lastRunFailedByKey.has(key);

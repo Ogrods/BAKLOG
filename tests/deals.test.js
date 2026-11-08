@@ -45,10 +45,12 @@ function resetState() {
   state.crossStoreHiddenKeys = new Set();
   state.wishlistCrossStoreHiddenKeys = new Set();
   if (typeof window !== 'undefined') window._dataVersion = (window._dataVersion || 0) + 1;
+  state.activeView = 'wishlist';
   state.prefs = {
     dealOnSaleOnly: false,
     dealHistoricalLowOnly: false,
     dealHideOwned: false,
+    dealStealsOnly: false,
     dealMinDiscount: 0,
     dealMaxPrice: 100,
   };
@@ -236,6 +238,28 @@ describe('passesDealFilters', () => {
     buildOwnedNormNames();
     expect(passesDealFilters(baseGame)).toBe(false);
   });
+
+  it('dealStealsOnly matches isStealDeal (rejects unrated 50%+ cuts)', () => {
+    state.prefs.dealStealsOnly = true;
+    state.itadByKey['wishlist:wl-1'] = { price: 10, cut: 55, shop: 'Steam' };
+    expect(isStealDeal(baseGame)).toBe(true);
+    expect(passesDealFilters(baseGame)).toBe(true);
+    const unrated = { ...baseGame, steam_review_percent: 0 };
+    expect(isStealDeal(unrated)).toBe(false);
+    expect(passesDealFilters(unrated)).toBe(false);
+  });
+
+  it('dealStealsOnly keeps rated historical lows under 50% cut', () => {
+    state.prefs.dealStealsOnly = true;
+    state.itadByKey['wishlist:wl-1'] = {
+      price: 10,
+      cut: 30,
+      shop: 'Steam',
+      is_historical_low: true,
+    };
+    expect(isStealDeal(baseGame)).toBe(true);
+    expect(passesDealFilters(baseGame)).toBe(true);
+  });
 });
 
 describe('effectiveDiscountPercent, effectiveSortPrice, isStealDeal', () => {
@@ -252,6 +276,7 @@ describe('effectiveDiscountPercent, effectiveSortPrice, isStealDeal', () => {
     state.itadByKey['wishlist:wl-1'] = { price: 10, cut: 30, shop: 'Steam' };
     expect(isStealDeal(weak)).toBe(false);
   });
+
 });
 
 describe('dealShopShort and shopSlug', () => {

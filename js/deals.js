@@ -75,9 +75,19 @@ export function syncDealFilterControls() {
   if (minVal) minVal.textContent = String(state.prefs.dealMinDiscount || 0);
 }
 
-export function drillWishlistDealFilter({ onSaleOnly, minDiscount }) {
-  if (onSaleOnly) state.prefs.dealOnSaleOnly = true;
-  if (minDiscount != null) state.prefs.dealMinDiscount = minDiscount;
+export function drillWishlistDealFilter({ onSaleOnly, minDiscount, stealsOnly } = {}) {
+  if (stealsOnly) {
+    state.prefs.dealStealsOnly = true;
+    // Steals card uses isStealDeal (rating ≥ 80 and cut ≥ 50 or historical low).
+    // Clear looser deal toggles so the wishlist matches the card exactly.
+    state.prefs.dealOnSaleOnly = false;
+    state.prefs.dealHistoricalLowOnly = false;
+    state.prefs.dealMinDiscount = 0;
+  } else {
+    if (state.prefs.dealStealsOnly) state.prefs.dealStealsOnly = false;
+    if (onSaleOnly) state.prefs.dealOnSaleOnly = true;
+    if (minDiscount != null) state.prefs.dealMinDiscount = minDiscount;
+  }
   syncDealFilterControls();
   savePrefs();
   if (state.activeView !== "wishlist") switchView("wishlist");
@@ -554,6 +564,7 @@ export function dealScore(g) {
 
 export function passesDealFilters(g) {
   if (state.prefs.dealHideOwned && isOwnedByTitle(g.name)) return false;
+  if (state.prefs.dealStealsOnly && !isStealDeal(g)) return false;
   const d = getDealInfo(g);
   const onSale = state.prefs.dealOnSaleOnly;
   const lowOnly = state.prefs.dealHistoricalLowOnly;

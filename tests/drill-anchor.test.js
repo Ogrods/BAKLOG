@@ -238,6 +238,37 @@ describe("drill-anchor pending scroll target", () => {
     expect(hasPendingScrollTarget()).toBe(false);
     expect(scrollToSpy).toHaveBeenCalled();
   });
+
+  it("hideOverlay row drills wait longer before force-consume", async () => {
+    const timeouts = [];
+    global.setTimeout = (cb, ms) => {
+      const id = timeouts.length + 1;
+      timeouts.push({ cb, ms, id });
+      return id;
+    };
+    global.clearTimeout = (id) => {
+      const slot = timeouts.find((t) => t.id === id);
+      if (slot) slot.cleared = true;
+    };
+    // Keep chrome unsettled so force-consume timer stays armed.
+    const picks = document.getElementById("picksSection");
+    Object.defineProperty(picks, "offsetHeight", { configurable: true, value: 0 });
+
+    const { state } = await import("../js/state.js");
+    const {
+      setPendingScrollTarget,
+      scheduleScrollAfterChromeSettled,
+      hasPendingScrollTarget,
+    } = await import("../js/table-ui.js");
+    state.activeView = "library";
+    state.prefs = { ...(state.prefs || {}), picksCollapsed: false };
+    state._visibleList = [{ store: "steam", id: "42", name: "Test Game" }];
+    setPendingScrollTarget({ kind: "row", key: "steam:42", smooth: false, hideOverlay: true });
+    scheduleScrollAfterChromeSettled();
+    expect(hasPendingScrollTarget()).toBe(true);
+    expect(timeouts.some((t) => t.ms === 1200 && !t.cleared)).toBe(true);
+    expect(timeouts.some((t) => t.ms === 700 && !t.cleared)).toBe(false);
+  });
 });
 
 function makeVirtualList(n) {

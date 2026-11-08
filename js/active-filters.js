@@ -60,6 +60,7 @@ export function collectActiveFilters() {
   if (state.activeView === "itch" && state.sessionPrefs.itchHideNonGames) pills.push({ kind: "itchHideNonGames", value: "1", label: "Hide tools, soundtracks, etc." });
   if (state.sessionPrefs.crossStoreDedup && state.allGames.length > 0) pills.push({ kind: "dedup", value: "1", label: "Hide duplicates" });
   if (state.activeView === "wishlist" && isItadDealsAvailable()) {
+    if (state.prefs.dealStealsOnly) pills.push({ kind: "dealSteals", value: "1", label: "Steals (80%+ rated)" });
     if (state.prefs.dealOnSaleOnly) pills.push({ kind: "dealOnSale", value: "1", label: "On sale only" });
     if (state.prefs.dealHistoricalLowOnly) pills.push({ kind: "dealLow", value: "1", label: "Historical low only" });
     if (state.prefs.dealHideOwned) pills.push({ kind: "dealHideOwned", value: "1", label: "Hide owned" });

@@ -140,3 +140,84 @@ def test_extract_ea_single_poll_with_owned_is_enough(monkeypatch) -> None:
     creds = _extract_ea(page, FakeContext())
     assert creds["EA_BEARER_TOKEN"] == EA_COOKIE_SESSION
     assert page.polls <= 1
+
+
+def test_ensure_ea_deals_ready_skips_renav_and_caps_dwell_on_deals() -> None:
+    from clients.ea_session import _ensure_ea_deals_ready
+
+    waits: list[int] = []
+
+    class DealsPage:
+        url = EA_DEALS_URL
+
+        def goto(self, *_a, **_k):
+            raise AssertionError("should not re-nav when already on deals")
+
+        def wait_for_timeout(self, ms: int) -> None:
+            waits.append(ms)
+
+    _ensure_ea_deals_ready(DealsPage(), dwell_ms=1500)
+    assert waits == [300]
+
+    waits.clear()
+    _ensure_ea_deals_ready(DealsPage(), dwell_ms=0)
+    assert waits == []
+
+
+def test_extract_ea_owned_harvest_budget_skips_long_cascade(monkeypatch) -> None:
+    """deals_burst_ok with empty owned must not burn multi-second EaClient/inpage loops."""
+    poll = {"n": 0}
+    dwells: list[int] = []
+    pw_calls = {"n": 0}
+    inpage_calls = {"n": 0}
+    events: list[str] = []
+
+    class Sess:
+        fresh_connect = False
+
+        def emit(self, _ev, payload=None):
+            events.append((payload or {}).get("message") or "")
+
+    def fake_drain(_page):
+        poll["n"] += 1
+        # First poll: nudge path needs signed-in deals URL; return auth burst
+        # with entries but no owned rows so harvest runs.
+        return True, [], {
+            "hook_authenticated": True,
+            "hook_entries": 2,
+        }
+
+    def fake_ensure(page, *, dwell_ms=2500):
+        dwells.append(dwell_ms)
+
+    def fake_pw(_ctx):
+        pw_calls["n"] += 1
+        return []
+
+    def fake_inpage(_page):
+        inpage_calls["n"] += 1
+        return []
+
+    monkeypatch.setattr("clients.ea_session.drain_ea_graphql_hook", fake_drain)
+    monkeypatch.setattr("clients.ea_session.install_ea_graphql_hook", lambda _c: None)
+    monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
+    monkeypatch.setattr("clients.ea_session._ensure_ea_deals_ready", fake_ensure)
+    monkeypatch.setattr("clients.ea_session.fetch_owned_games_playwright_request", fake_pw)
+    monkeypatch.setattr("clients.ea_session.fetch_owned_games_inpage", fake_inpage)
+    monkeypatch.setattr("clients.ea_session.write_ea_connect_snapshot", lambda *_a, **_k: None)
+    monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 2.0)
+    monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+
+    class NudgePage(FakePage):
+        def wait_for_timeout(self, ms: int) -> None:
+            # Preserve FakePage login→deals transition, then record harvest dwells.
+            super().wait_for_timeout(ms)
+
+    page = NudgePage(start_url=EA_LOGIN_URL)
+    creds = _extract_ea(page, FakeContext(), Sess())
+    assert creds["EA_BEARER_TOKEN"] == EA_COOKIE_SESSION
+    # One PW + one inpage max (no EaClient / no 3x escalating inpage).
+    assert pw_calls["n"] <= 1
+    assert inpage_calls["n"] <= 1
+    assert all(d <= 200 for d in dwells)
+    assert any("Waiting for EA library" in m for m in events)

@@ -155,11 +155,14 @@ export function updateGlobalFetcherIndicator(runStateByKey, sourceFn) {
   }
   if (!running.length && !queued.length) {
     // Failed takes precedence over done: a broken run is the most important
-    // thing to surface. lastRunFailedByKey is sticky until that source's next
-    // success or the user dismisses via the red pill / connect chip.
-    const failedKeys = [...lastRunFailedByKey.keys()];
-    if (failedKeys.length > 0) {
-      const labels = failedKeys.map(k => sourceFn(k)?.label || k);
+    // thing to surface. Include the 10s failed flash (runState) so the pill
+    // matches chip redness; sticky lastRunFailedByKey covers after the flash.
+    const failedKeys = new Set(lastRunFailedByKey.keys());
+    for (const [key, st] of runStateByKey) {
+      if (st === 'failed') failedKeys.add(key);
+    }
+    if (failedKeys.size > 0) {
+      const labels = [...failedKeys].map(k => sourceFn(k)?.label || k);
       const text = labels.length === 1
         ? `✕ ${labels[0]} failed`
         : `✕ ${labels.join(', ')} failed`;

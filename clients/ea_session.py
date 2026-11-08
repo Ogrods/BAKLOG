@@ -330,18 +330,32 @@ def _inpage_owned_eval(page: Any, *, body: dict[str, Any]) -> Any:
 
 
 def _ensure_ea_deals_ready(page: Any, *, dwell_ms: int = 2500) -> None:
-    """Navigate to the deals SPA and wait before in-page Juno fetch."""
+    """Navigate to the deals SPA and wait before in-page Juno fetch.
+
+    When already on /sales/deals, skip re-nav and cap dwell (Connect was burning
+    multi-second sleeps that rarely yielded owned rows after deals_burst_ok).
+    """
     url = (getattr(page, "url", None) or "").lower()
-    if "ea.com/sales/deals" not in url:
+    on_deals = "ea.com/sales/deals" in url
+    if not on_deals:
         try:
             page.goto(EA_DEALS_URL, wait_until="load", timeout=30_000)
         except Exception:  # noqa: BLE001
             pass
+        ensure_ea_graphql_hook(page)
+        if dwell_ms > 0:
+            try:
+                page.wait_for_timeout(dwell_ms)
+            except Exception:  # noqa: BLE001
+                pass
+        return
     ensure_ea_graphql_hook(page)
-    try:
-        page.wait_for_timeout(dwell_ms)
-    except Exception:  # noqa: BLE001
-        pass
+    short_dwell = 0 if dwell_ms <= 0 else min(int(dwell_ms), 300)
+    if short_dwell > 0:
+        try:
+            page.wait_for_timeout(short_dwell)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def fetch_owned_games_playwright_request(

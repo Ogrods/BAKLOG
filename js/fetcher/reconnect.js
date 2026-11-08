@@ -30,14 +30,22 @@ export { authCooldownDurationMs, clearAuthCooldown, noteAuthCooldownStrike };
 
 let _renderDashboard = () => {};
 let _refreshGlobalIndicator = () => {};
+let _clearFailedChipFlash = (_keys) => {};
 
 /** Wire dashboard refresh callbacks (avoids import cycles at load time). */
-export function wireFetcherReconnect({ renderDashboardFetcherHealth, refreshGlobalIndicator } = {}) {
+export function wireFetcherReconnect({
+  renderDashboardFetcherHealth,
+  refreshGlobalIndicator,
+  clearFailedChipFlash,
+} = {}) {
   if (typeof renderDashboardFetcherHealth === 'function') {
     _renderDashboard = renderDashboardFetcherHealth;
   }
   if (typeof refreshGlobalIndicator === 'function') {
     _refreshGlobalIndicator = refreshGlobalIndicator;
+  }
+  if (typeof clearFailedChipFlash === 'function') {
+    _clearFailedChipFlash = clearFailedChipFlash;
   }
 }
 
@@ -155,11 +163,13 @@ function fetcherKeysForProvider(provider) {
 /** A provider just reconnected (was reconnect-required -> connected): clear
  *  sticky failed/cooldown chip state so chips recover without a fresh run. */
 function clearFailedStateForReconnectedProvider(provider) {
-  for (const key of fetcherKeysForProvider(provider)) {
+  const keys = fetcherKeysForProvider(provider);
+  for (const key of keys) {
     lastRunFailedByKey.delete(key);
     lastRunErrorByKey.delete(key);
     clearAuthCooldown(key);
   }
+  try { _clearFailedChipFlash(keys); } catch (_) { /* runner not ready */ }
 }
 
 /**
@@ -173,15 +183,21 @@ export function dismissStickyFailedState({
   provider = null,
   fetcherKey = null,
 } = {}) {
+  const flashKeys = [];
   if (all) {
+    flashKeys.push(...lastRunFailedByKey.keys());
     lastRunFailedByKey.clear();
     lastRunErrorByKey.clear();
   } else {
     if (fetcherKey) {
+      flashKeys.push(fetcherKey);
       lastRunFailedByKey.delete(fetcherKey);
       lastRunErrorByKey.delete(fetcherKey);
     }
     if (provider) clearFailedStateForReconnectedProvider(provider);
+  }
+  if (flashKeys.length) {
+    try { _clearFailedChipFlash(flashKeys); } catch (_) { /* runner not ready */ }
   }
   try { _refreshGlobalIndicator(); } catch (_) { /* runner not ready */ }
   try { _renderDashboard(); } catch (_) { /* not mounted */ }
@@ -222,11 +238,13 @@ function applyAuthStatusProviderEffects(providers) {
     if (p.status === 'expired') markReconnectRequired(p.key);
     else if (p.status === 'connected') {
       const prev = prevStatusByProvider.get(p.key);
-      const transitionedToConnected = prev !== undefined && prev !== 'connected';
-      const hadReconnectFlag = reconnectRequiredByProvider.has(p.key);
+      // Only clear sticky fail on a real reconnect (was disconnected/expired).
+      // hadReconnectFlag alone can race with mark_invalid still reporting connected.
+      const transitionedFromBroken =
+        prev === 'disconnected' || prev === 'expired';
       clearReconnectRequired(p.key);
       clearReconnectBanner(p.key);
-      if (transitionedToConnected || hadReconnectFlag) {
+      if (transitionedFromBroken) {
         clearFailedStateForReconnectedProvider(p.key);
       }
     }

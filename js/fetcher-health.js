@@ -29,6 +29,7 @@ setFetcherRunner(fetcherRunner);
 wireFetcherReconnect({
   renderDashboardFetcherHealth,
   refreshGlobalIndicator: () => fetcherRunner.refreshGlobalIndicator(),
+  clearFailedChipFlash: (keys) => fetcherRunner.clearFailedChipFlash(keys),
 });
 
 configureFetcherCooldown({

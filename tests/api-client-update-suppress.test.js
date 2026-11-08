@@ -143,4 +143,30 @@ describe('api-client Connect network suppress', () => {
     });
     expect(errorBoundary.reportError).toHaveBeenCalled();
   });
+
+  it('refcount keeps suppress active until matching ends', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    const {
+      baklogFetch,
+      beginConnectNetworkSuppress,
+      endConnectNetworkSuppress,
+      isConnectNetworkSuppressActive,
+    } = await import('../js/api-client.js');
+    beginConnectNetworkSuppress(60_000);
+    beginConnectNetworkSuppress(60_000);
+    expect(isConnectNetworkSuppressActive()).toBe(true);
+    endConnectNetworkSuppress();
+    expect(isConnectNetworkSuppressActive()).toBe(true);
+    await expect(baklogFetch('/api/runs')).rejects.toMatchObject({
+      name: 'NetworkError',
+    });
+    expect(errorBoundary.reportError).not.toHaveBeenCalled();
+    endConnectNetworkSuppress();
+    expect(isConnectNetworkSuppressActive()).toBe(false);
+  });
 });

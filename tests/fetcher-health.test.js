@@ -43,6 +43,7 @@ import {
   coverableRows,
   primaryFailureNavigateTarget,
   dismissStickyFailedState,
+  resetAuthStatusTransitionsForTest,
 } from '../js/fetcher-health.js';
 import { lastRunFailedByKey } from '../js/fetcher-health-shared.js';
 import { state } from '../js/state.js';
@@ -627,7 +628,16 @@ describe('reconnect-required state', () => {
     localStorage.clear();
     clearReconnectRequired('gog');
     clearReconnectRequired('psn');
+    clearReconnectRequired('xbox_wishlist');
+    resetAuthStatusTransitionsForTest();
+    fetcherRunner.resetPillAggregatesForTest();
     isProviderConnected.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    fetcherRunner.resetPillAggregatesForTest();
+    clearReconnectRequired('xbox_wishlist');
+    resetAuthStatusTransitionsForTest();
   });
 
   it('marks provider reconnect-required and maps to fetcher key', () => {
@@ -688,19 +698,31 @@ describe('reconnect-required state', () => {
     expect(isProviderReconnectRequired('gog')).toBe(true);
   });
 
-  it('clears sticky failed chip state when provider reconnects', () => {
+  it('does not clear sticky fail on reconnect-required flag alone while still connected', () => {
+    processAuthStatusTransitions([{ key: 'xbox_wishlist', status: 'connected' }]);
     fetcherRunner.markRunFailedForTest('wishlistXbox');
     markReconnectRequired('xbox_wishlist');
     expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
     document.dispatchEvent(new CustomEvent('baklog:auth-status', {
       detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
     }));
-    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(false);
+    // mark_invalid can leave status=connected while reconnect-required is set;
+    // clearing sticky here caused chips to flap during Connect.
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
     expect(isProviderReconnectRequired('xbox_wishlist')).toBe(false);
   });
 
-  it('connected event clears failed chip when provider transitions to connected', () => {
+  it('connected event clears failed chip when provider transitions from expired', () => {
     processAuthStatusTransitions([{ key: 'xbox_wishlist', status: 'expired' }]);
+    fetcherRunner.markRunFailedForTest('wishlistXbox');
+    document.dispatchEvent(new CustomEvent('baklog:auth-status', {
+      detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
+    }));
+    expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(false);
+  });
+
+  it('connected event clears failed chip when provider transitions from disconnected', () => {
+    processAuthStatusTransitions([{ key: 'xbox_wishlist', status: 'disconnected' }]);
     fetcherRunner.markRunFailedForTest('wishlistXbox');
     document.dispatchEvent(new CustomEvent('baklog:auth-status', {
       detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
@@ -715,6 +737,21 @@ describe('reconnect-required state', () => {
       detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
     }));
     expect(fetcherRunner.isRunFailedForTest('wishlistXbox')).toBe(true);
+  });
+
+  it('markRunFailed keeps sticky after the flash timer clears', () => {
+    vi.useFakeTimers();
+    try {
+      fetcherRunner.markRunFailedForTest('steam', 'stream give-up');
+      expect(fetcherRunner.stateFor('steam')).toBe('failed');
+      expect(fetcherRunner.isRunFailedForTest('steam')).toBe(true);
+      vi.advanceTimersByTime(15_000);
+      expect(fetcherRunner.stateFor('steam')).toBe(null);
+      expect(fetcherRunner.isRunFailedForTest('steam')).toBe(true);
+    } finally {
+      fetcherRunner.clearRunFailedForTest('steam');
+      vi.useRealTimers();
+    }
   });
 
   it('dismissStickyFailedState clears sticky failed for dual-source amazon_web', () => {
@@ -1289,13 +1326,7 @@ describe('failed chip routes to Connections', () => {
   });
 
   afterEach(() => {
-    // Drain the sticky failed/reconnect state set during the test so later
-    // suites start clean (reconnect event clears lastRunFailedByKey + flag).
-    fetcherRunner.markChipStateForTest('wishlistXbox', null);
-    markReconnectRequired('xbox_wishlist');
-    document.dispatchEvent(new CustomEvent('baklog:auth-status', {
-      detail: { providers: [{ key: 'xbox_wishlist', status: 'connected' }] },
-    }));
+    fetcherRunner.clearRunFailedForTest('wishlistXbox');
     clearReconnectRequired('xbox_wishlist');
     vi.unstubAllGlobals();
     document.body.innerHTML = '';
@@ -1758,6 +1789,15 @@ describe('header pill ticker', () => {
     } finally {
       fetcherRunner.clearRunFailedForTest('steam');
     }
+  });
+
+  it('shows failed (red) during the flash even before sticky alone would paint', () => {
+    const pill = document.getElementById('fetcherGlobalStatus');
+    fetcherRunner.resetPillAggregatesForTest();
+    fetcherRunner.markChipStateForTest('steam', 'failed');
+    expect(pill.classList.contains('fh-global-status-failed')).toBe(true);
+    expect(pill.classList.contains('fh-global-status-idle')).toBe(false);
+    fetcherRunner.markChipStateForTest('steam', null);
   });
 });
 

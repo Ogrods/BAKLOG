@@ -222,9 +222,20 @@ export function isOwnedByTitle(ownedNormNames, name) {
   return !!(n && ownedNormNames.has(n));
 }
 
+/** Mirror deals.js isStealDeal for the worker/table path (same rating + cut/low gate). */
+export function isStealDealCtx(ctx, g) {
+  const d = getDealInfo(ctx.itadByKey, g, ctx.displayCurrency);
+  if (!d) return false;
+  const cut = d.cut || 0;
+  if (cut <= 0) return false;
+  if (ratingValue(g) < 80) return false;
+  return cut >= 50 || d.isHistoricalLow;
+}
+
 export function passesDealFilters(ctx, g) {
   const { prefs, ownedNormNames, itadByKey, displayCurrency: displayCcy } = ctx;
   if (prefs.dealHideOwned && isOwnedByTitle(ownedNormNames, g.name)) return false;
+  if (prefs.dealStealsOnly && !isStealDealCtx(ctx, g)) return false;
   const d = getDealInfo(itadByKey, g, displayCcy);
   const onSale = prefs.dealOnSaleOnly;
   const lowOnly = prefs.dealHistoricalLowOnly;

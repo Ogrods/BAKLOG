@@ -107,29 +107,12 @@ const CONNECT_SUPPRESS_PATH_RE = /\/api\/(runs\b|auth\/status\b|fetchers\b)/i;
 let _connectNetworkSuppressUntil = 0;
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _connectNetworkSuppressTimer = null;
+/** Nested Connect flows (refcount); suppress stays until depth hits 0 or the timer. */
+let _connectNetworkSuppressDepth = 0;
 
-/**
- * Time-boxed suppress of NetworkError toasts for Connect-adjacent polls.
- * Does not weaken auth - only skips reportError for Failed-to-fetch on
- * /api/runs, /api/auth/status, and /api/fetchers while a headed Connect is active.
- * @param {number} [ms=120000]
- */
-export function beginConnectNetworkSuppress(ms = 120_000) {
-  const until = Date.now() + Math.max(1_000, Number(ms) || 120_000);
-  _connectNetworkSuppressUntil = until;
-  if (typeof window !== "undefined") {
-    window.__baklogConnectNetworkSuppressUntil = until;
-  }
-  if (_connectNetworkSuppressTimer) {
-    clearTimeout(_connectNetworkSuppressTimer);
-  }
-  _connectNetworkSuppressTimer = setTimeout(() => {
-    endConnectNetworkSuppress();
-  }, Math.max(1_000, until - Date.now()));
-}
-
-export function endConnectNetworkSuppress() {
+function _clearConnectNetworkSuppressState() {
   _connectNetworkSuppressUntil = 0;
+  _connectNetworkSuppressDepth = 0;
   if (_connectNetworkSuppressTimer) {
     clearTimeout(_connectNetworkSuppressTimer);
     _connectNetworkSuppressTimer = null;
@@ -137,6 +120,34 @@ export function endConnectNetworkSuppress() {
   if (typeof window !== "undefined") {
     window.__baklogConnectNetworkSuppressUntil = 0;
   }
+}
+
+/**
+ * Time-boxed suppress of NetworkError toasts for Connect-adjacent polls.
+ * Does not weaken auth - only skips reportError for Failed-to-fetch on
+ * /api/runs, /api/auth/status, and /api/fetchers while a headed Connect is active.
+ * Refcounted: each begin must be matched by end; sibling Connects do not cancel each other.
+ * @param {number} [ms=120000]
+ */
+export function beginConnectNetworkSuppress(ms = 120_000) {
+  _connectNetworkSuppressDepth += 1;
+  const until = Date.now() + Math.max(1_000, Number(ms) || 120_000);
+  _connectNetworkSuppressUntil = Math.max(_connectNetworkSuppressUntil, until);
+  if (typeof window !== "undefined") {
+    window.__baklogConnectNetworkSuppressUntil = _connectNetworkSuppressUntil;
+  }
+  if (_connectNetworkSuppressTimer) {
+    clearTimeout(_connectNetworkSuppressTimer);
+  }
+  _connectNetworkSuppressTimer = setTimeout(() => {
+    _clearConnectNetworkSuppressState();
+  }, Math.max(1_000, _connectNetworkSuppressUntil - Date.now()));
+}
+
+export function endConnectNetworkSuppress() {
+  if (_connectNetworkSuppressDepth > 0) _connectNetworkSuppressDepth -= 1;
+  if (_connectNetworkSuppressDepth > 0) return;
+  _clearConnectNetworkSuppressState();
 }
 
 function connectSuppressUntil() {
@@ -147,9 +158,21 @@ function connectSuppressUntil() {
   return Math.max(_connectNetworkSuppressUntil, winUntil);
 }
 
+/** True while any Connect suppress window is live (refcount + until clock). */
+export function isConnectNetworkSuppressActive() {
+  return (
+    _connectNetworkSuppressDepth > 0 && Date.now() <= connectSuppressUntil()
+  );
+}
+
 function shouldSuppressConnectNetworkError(url) {
-  if (Date.now() > connectSuppressUntil()) return false;
+  if (!isConnectNetworkSuppressActive()) return false;
   return CONNECT_SUPPRESS_PATH_RE.test(String(url || ""));
+}
+
+/** Soft-fail Connect poll URLs while suppress is active (do not flip apiAvailable). */
+export function shouldSoftFailConnectPoll(url) {
+  return shouldSuppressConnectNetworkError(url);
 }
 
 function shouldSuppressNetworkErrors() {

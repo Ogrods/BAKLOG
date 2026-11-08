@@ -75,8 +75,11 @@ export function renderDashboardFetcherHealth() {
   });
   const runnableFailed = rows.filter(r => {
     const key = r.src.key;
-    if (!lastRunFailedByKey.has(key)) return false;
-    if (fetcherRunner.stateFor(key)) return false;
+    const runState = fetcherRunner.stateFor(key);
+    const failedFlash = runState === 'failed';
+    if (!lastRunFailedByKey.has(key) && !failedFlash) return false;
+    // Active non-failed runs still occupy the lane.
+    if (runState && runState !== 'failed') return false;
     if (authCooldownRemainingMs(key) > 0) return false;
     if (isFetcherDisconnected(key)) return false;
     if (r.src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) return false;
@@ -91,7 +94,8 @@ export function renderDashboardFetcherHealth() {
     const key = r.src.key;
     const runState = fetcherRunner.stateFor(key);
     if (runState && runState !== 'failed') return 0; // running / queued / launching
-    if (!runState && lastRunFailedByKey.has(key)) return 8; // failed (worst)
+    // Flash fail ranks with sticky fail so the 10s clear does not reshuffle chips.
+    if (runState === 'failed' || lastRunFailedByKey.has(key)) return 8;
     if (isFetcherReconnectRequired(key)) return 7; // session expired
     if (isFetcherDisconnected(key)) return 6; // not connected
     if (authCooldownRemainingMs(key) > 0) return 5; // auth cooldown
@@ -169,8 +173,10 @@ export function renderDashboardFetcherHealth() {
     const authCooldownMs = (runState || needsReconnect || disconnected) ? 0 : authCooldownRemainingMs(src.key);
     const inAuthCooldown = authCooldownMs > 0;
     const persistFailed = !runState && lastRunFailedByKey.has(src.key);
+    // Prefer reconnect chrome over sticky-failed when both apply so the
+    // "session expired" meaning is not masked by a later CSS failed rule.
     const displayStatus = runState
-      || (persistFailed ? 'failed' : (needsReconnect ? 'reconnect' : status));
+      || (needsReconnect ? 'reconnect' : (persistFailed ? 'failed' : status));
     const runLabel = runState ? ` · ${runState.toUpperCase()}` : '';
     const needsConfig = (src.missingRequirements || []).length > 0
       && !fetcherCredentialsSatisfied(src.key);

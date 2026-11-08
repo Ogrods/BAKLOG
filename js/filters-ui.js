@@ -251,6 +251,8 @@ export function removeActiveFilter(kind, value) {
         { sessionPrefs: { itchHideNonGames: false } },
         { renderers: [() => setInputChecked("itchShowNonGames", true)] },
       );
+    case "dealSteals":
+      return applyPrefsChange({ prefs: { dealStealsOnly: false } });
     case "dealOnSale":
       return applyPrefsChange(
         { prefs: { dealOnSaleOnly: false } },
@@ -301,6 +303,7 @@ export function clearAllFilters() {
         dealOnSaleOnly: false,
         dealHistoricalLowOnly: false,
         dealHideOwned: false,
+        dealStealsOnly: false,
         dealMinDiscount: 0,
         dealMaxPrice: 100,
       },
@@ -442,19 +445,22 @@ export async function refreshFilterUI(options) {
     scheduleScrollAfterChromeSettled();
     return;
   }
-  if (!options?.skipTable) {
-    if (options?.force || drillIn) await renderTable({ force: true, drillIn });
-    else renderTable({ drillIn });
-  }
+  // Row drills (spotlight / dash-list jump): paint summary + picks before scroll,
+  // matching toolbar drills. Idle-deferring chrome used to race CHROME_SETTLE
+  // (700ms force) and undershoot the virtual row while height was still growing.
   if (drillIn) {
-    const deferChrome = () => {
-      renderSummary();
-      if (!options?.skipPicks) renderPicks();
-      scheduleScrollAfterChromeSettled();
-    };
-    if (typeof requestIdleCallback === "function") requestIdleCallback(deferChrome, { timeout: 800 });
-    else setTimeout(deferChrome, 0);
+    renderSummary();
+    if (!options?.skipPicks) renderPicks();
+    if (!options?.skipTable) {
+      if (options?.force || drillIn) await renderTable({ force: true, drillIn });
+      else await renderTable({ drillIn });
+    }
+    scheduleScrollAfterChromeSettled();
     return;
+  }
+  if (!options?.skipTable) {
+    if (options?.force) await renderTable({ force: true, drillIn: false });
+    else renderTable({ drillIn: false });
   }
   if (options?.skipPicks) {
     if (hasPendingScrollTarget()) scheduleScrollAfterChromeSettled();

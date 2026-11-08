@@ -1352,6 +1352,12 @@ function applySpotlightSlide(el, next) {
 
 function fadeToSpotlight(el, next) {
   el.classList.add("is-fading");
+  // Point dataset.key at the incoming slide immediately so a mid-fade click
+  // does not drill the previous game still painted in the DOM.
+  if (next) {
+    el.dataset.key = gameKey(next);
+    _spotlightCurrentKey = gameKey(next);
+  }
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
   _spotlightFadeTimer = setTimeout(() => {
     applySpotlightSlide(el, next);

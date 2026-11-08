@@ -25,6 +25,10 @@ export function clearItadDealPrefs() {
     state.prefs.dealHideOwned = false;
     changed = true;
   }
+  if (state.prefs.dealStealsOnly) {
+    state.prefs.dealStealsOnly = false;
+    changed = true;
+  }
   if (+state.prefs.dealMinDiscount > 0) {
     state.prefs.dealMinDiscount = 0;
     changed = true;

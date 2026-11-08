@@ -1645,10 +1645,24 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             consecutive_auth >= 2 or bool(owned_accum) or deals_burst_ok
         )
         if sustained_cookie:
+            # Post-auth owned harvest: hard-capped (~3.5s). Empty snapshot is ok;
+            # the library fetcher loads games after Connect returns.
+            harvest_deadline = time.time() + 3.5
+            if session:
+                session.emit(
+                    "waiting_for_user",
+                    {
+                        "message": "Waiting for EA library…",
+                        "ea_deals": True,
+                        "ea_owned_harvest": True,
+                    },
+                )
             if deals_burst_ok and not owned_accum:
-                for _ in range(4):
+                for _ in range(2):
+                    if time.time() >= harvest_deadline:
+                        break
                     try:
-                        page.wait_for_timeout(500)
+                        page.wait_for_timeout(300)
                     except Exception:
                         break
                     ensure_ea_graphql_hook(page)
@@ -1656,49 +1670,21 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                     _merge_owned_items(owned_accum, owned_seen, owned_batch)
                     if owned_accum:
                         break
-            if not owned_accum and deals_burst_ok:
+            if not owned_accum and deals_burst_ok and time.time() < harvest_deadline:
                 try:
-                    _ensure_ea_deals_ready(page, dwell_ms=1500)
+                    # Already on deals after nudge: no long dwell; try PW first.
+                    _ensure_ea_deals_ready(page, dwell_ms=0)
                     pw_owned = fetch_owned_games_playwright_request(context)
                     _merge_owned_items(owned_accum, owned_seen, pw_owned)
                 except Exception:  # noqa: BLE001
                     pass
-            if not owned_accum and deals_burst_ok:
+            if not owned_accum and deals_burst_ok and time.time() < harvest_deadline:
                 try:
-                    _ensure_ea_deals_ready(page, dwell_ms=1500)
+                    _ensure_ea_deals_ready(page, dwell_ms=200)
                     inpage_owned = fetch_owned_games_inpage(page)
                     _merge_owned_items(owned_accum, owned_seen, inpage_owned)
                 except Exception:  # noqa: BLE001
                     pass
-            if not owned_accum:
-                cookie_jar = context.cookies()
-                bearer = (saw_token.get("value") or "").strip() if saw_token.get("ok") else ""
-                for mode, token in (
-                    ("bearer+cookies", bearer),
-                    ("cookies", ""),
-                ):
-                    if mode == "bearer+cookies" and not token:
-                        continue
-                    try:
-                        from clients.ea_client import EaClient
-
-                        client = EaClient(token, cookies=cookie_jar) if token else EaClient(cookies=cookie_jar)
-                        api_owned = client.get_owned_games()
-                        _merge_owned_items(owned_accum, owned_seen, api_owned)
-                        if owned_accum:
-                            break
-                    except Exception:  # noqa: BLE001
-                        pass
-            if not owned_accum:
-                for attempt in range(3):
-                    try:
-                        _ensure_ea_deals_ready(page, dwell_ms=1500 + attempt * 1000)
-                        inpage_owned = fetch_owned_games_inpage(page)
-                        _merge_owned_items(owned_accum, owned_seen, inpage_owned)
-                        if owned_accum:
-                            break
-                    except Exception:  # noqa: BLE001
-                        pass
             cookie_jar = context.cookies()
             write_ea_connect_snapshot(
                 owned_accum,

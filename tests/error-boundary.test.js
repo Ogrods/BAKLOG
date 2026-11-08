@@ -258,7 +258,10 @@ describe("error-boundary stale-chunk recovery", () => {
       { kind: "unhandledrejection", time: 5, message: "itadPendingAutoRun is not defined", stack: "", source: "", lineno: 0, colno: 0, name: "ReferenceError" },
       { kind: "network", time: 6, message: "Server unreachable: BAKLOG is not responding at /api/update/status. Check that the server is running.", stack: "", source: "fetchWithAuthRetry", lineno: 0, colno: 0, name: "NetworkError" },
       { kind: "network", time: 7, message: "Server unreachable: BAKLOG is not responding at /api/update/apply-result. Check that the server is running.", stack: "", source: "fetchWithAuthRetry", lineno: 0, colno: 0, name: "NetworkError" },
-      { kind: "reported", time: 8, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
+      { kind: "network", time: 8, message: "Server unreachable: BAKLOG is not responding at /api/runs. Check that the server is running.", stack: "", source: "fetchWithAuthRetry", lineno: 0, colno: 0, name: "NetworkError" },
+      { kind: "network", time: 9, message: "Server unreachable: BAKLOG is not responding at /api/auth/status. Check that the server is running.", stack: "", source: "fetchWithAuthRetry", lineno: 0, colno: 0, name: "NetworkError" },
+      { kind: "network", time: 10, message: "Server unreachable: BAKLOG is not responding at /api/fetchers. Check that the server is running.", stack: "", source: "fetchWithAuthRetry", lineno: 0, colno: 0, name: "NetworkError" },
+      { kind: "reported", time: 11, message: "still relevant", stack: "", source: "", lineno: 0, colno: 0, name: "Error" },
     ]);
     installWindow({ localStorageRaw: seeded, localStorageKey: "baklog-error-log:dev" });
     _resetForTests();

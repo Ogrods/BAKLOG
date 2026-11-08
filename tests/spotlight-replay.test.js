@@ -447,4 +447,32 @@ describe("spotlight rotation safety", () => {
     expect(el.innerHTML).toBe(htmlBefore);
     expect(el.classList.contains("is-fading")).toBe(false);
   });
+
+  it("fade start retargets dataset.key to the incoming slide", async () => {
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const { startSpotlightRotation, SPOTLIGHT_INTERVAL_MS } = await import("../js/dashboard-spotlight.js");
+    const games = [
+      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
+      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
+    ];
+    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
+    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
+
+    document.body.innerHTML = `
+      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1" data-action="dash-list-jump">
+        <span id="spot-inner">slide-1</span>
+      </button>
+    `;
+    const el = document.getElementById("dashboardSpotlight");
+    startSpotlightRotation(games);
+    expect(el.dataset.key).toBe("steam:1");
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
+    expect(el.classList.contains("is-fading")).toBe(true);
+    expect(el.dataset.key).toBe("steam:2");
+  });
 });

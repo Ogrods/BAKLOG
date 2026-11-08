@@ -2226,17 +2226,24 @@ async function startBrowserConnect(provider) {
   };
   let es = null;
   // Time-box NetworkError spam for status/runs/fetchers polls while Connect
-  // holds the HTTP thread (profile clear + Chromium launch). Auto-expires.
+  // holds the HTTP thread (profile clear + Chromium launch). Refcounted +
+  // auto-expires; each begin must end once (sibling Connects stay protected).
   beginConnectNetworkSuppress(120_000);
+  let suppressEnded = false;
+  const endSuppressOnce = () => {
+    if (suppressEnded) return;
+    suppressEnded = true;
+    endConnectNetworkSuppress();
+  };
   /** Release card-level state only while this flow still owns it. */
   const releaseSharedUi = () => {
     if (es && _activeConnectStreams.get(provider) === es) {
       _activeConnectStreams.delete(provider);
     }
+    endSuppressOnce();
     if (!isCurrentFlow()) return;
     hideConnectCancelControl(card);
     stopPostConnectFastPoll();
-    if (!_activeConnectStreams.size) endConnectNetworkSuppress();
   };
 
   // A "Reconnect" (status connected/expired) should start a clean sign-in:
@@ -2268,6 +2275,7 @@ async function startBrowserConnect(provider) {
     );
   } catch (err) {
     setLog("Could not reach the local server (is server.py running?).");
+    endSuppressOnce();
     return;
   }
 
@@ -2293,18 +2301,23 @@ async function startBrowserConnect(provider) {
           data = await res.json().catch(() => ({}));
         } catch {
           setLog("Could not reach the local server (is server.py running?).");
+          endSuppressOnce();
           return;
         }
       }
     }
     if (!res.ok) {
       setLog(data.error || `Start failed (${res.status})`);
+      endSuppressOnce();
       return;
     }
   }
 
   // A newer Connect click took over while this one was starting.
-  if (!isCurrentFlow()) return;
+  if (!isCurrentFlow()) {
+    endSuppressOnce();
+    return;
+  }
 
   showConnectCancelControl(card, provider, log);
   if (!data.session_id) {
@@ -2317,7 +2330,10 @@ async function startBrowserConnect(provider) {
   const streamUrl = await urlWithStreamTicket(
     `/api/auth/${data.session_id}/stream`,
   );
-  if (!isCurrentFlow()) return;
+  if (!isCurrentFlow()) {
+    endSuppressOnce();
+    return;
+  }
   es = new EventSource(streamUrl);
   _activeConnectStreams.set(provider, es);
   let connectUiFinished = false;

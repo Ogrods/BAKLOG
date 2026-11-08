@@ -215,7 +215,7 @@ export function bindEvents() {
       return;
     }
     if (action === "deal-steals") {
-      drillWishlistDealFilter({ minDiscount: 50 });
+      drillWishlistDealFilter({ stealsOnly: true });
       setPendingScrollTarget({ kind: "toolbar", smooth: false });
       scheduleScrollAfterChromeSettled();
     }
@@ -381,7 +381,8 @@ export function bindEvents() {
     if (!el) return;
     el.checked = !!state.prefs[key];
     el.addEventListener("change", () => {
-      applyPrefsChange({ prefs: { [key]: el.checked } });
+      // Manual deal toggles leave the steals drill mode.
+      applyPrefsChange({ prefs: { [key]: el.checked, dealStealsOnly: false } });
     });
   };
   bindDealCheckbox("dealOnSaleOnly", "dealOnSaleOnly");
@@ -395,7 +396,7 @@ export function bindEvents() {
     dealMinDiscountEl.addEventListener("input", () => {
       const v = +dealMinDiscountEl.value;
       dealMinDiscountVal.textContent = String(v);
-      applyPrefsChange({ prefs: { dealMinDiscount: v } }, { debounced: true });
+      applyPrefsChange({ prefs: { dealMinDiscount: v, dealStealsOnly: false } }, { debounced: true });
     });
   }
   const dealMaxPriceEl = document.getElementById("dealMaxPrice");
@@ -407,7 +408,7 @@ export function bindEvents() {
     dealMaxPriceEl.addEventListener("input", () => {
       const v = +dealMaxPriceEl.value;
       dealMaxPriceVal.textContent = v >= 100 ? "any" : `$${v}`;
-      applyPrefsChange({ prefs: { dealMaxPrice: v } }, { debounced: true });
+      applyPrefsChange({ prefs: { dealMaxPrice: v, dealStealsOnly: false } }, { debounced: true });
     });
   }
   const resetDealFiltersBtn = document.getElementById("resetDealFiltersBtn");
@@ -419,6 +420,7 @@ export function bindEvents() {
             dealOnSaleOnly: false,
             dealHistoricalLowOnly: false,
             dealHideOwned: false,
+            dealStealsOnly: false,
             dealMinDiscount: 0,
             dealMaxPrice: 100,
           },

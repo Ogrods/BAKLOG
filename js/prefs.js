@@ -78,6 +78,7 @@ export function loadPrefs() {
     storeFilter: "", wishlistStoreFilter: "", releaseYearFilter: "",
     viewPicksLimits: normalizeViewPicksLimits({}),
     dealOnSaleOnly: false, dealHistoricalLowOnly: false, dealHideOwned: false,
+    dealStealsOnly: false,
     dealMinDiscount: 0, dealMaxPrice: 100, viewSorts: {},
     shareAnonStats: false,
     fetcherHealthShowConnected: true, fetcherHealthShowStaleMissing: true,

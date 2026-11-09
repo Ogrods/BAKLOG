@@ -43,8 +43,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
-    "@supabase/supabase-js": "^2.118.0",
-    "@tailwindcss/cli": "^4.3.3",
+    "@supabase/supabase-js": "^2.119.0",
+    "@tailwindcss/cli": "^4.3.4",
     "axe-core": "^4.14.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
@@ -53,13 +53,13 @@
     "happy-dom": "^21.0.4",
     "patch-package": "^8.0.1",
     "pixelmatch": "^8.0.0",
-    "playwright": "^1.64.1",
+    "playwright": "^1.65.0",
     "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "dependencies": {
-    "vite": "^8.3.5"
+    "vite": "^8.3.6"
   },
   "overrides": {
     "minimatch": ">=11.0.1"

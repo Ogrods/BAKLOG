@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-12T21:53:55.076573+00:00",
+  "generated_at": "2026-11-12T23:20:14.189387+00:00",
   "items": [
     {
       "id": "epic-knightica-3be45c",
       "store": "epic",
       "title": "Knightica",
       "claim_url": "https://store.epicgames.com/en-US/p/knightica-3be45c",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3093400/header.jpg?t=1794501426",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/357100ca5613420e98208c5f14585e9d/knightica-1nuxm.png",
       "genres": [],
       "blurb": null,
       "ends_at": "2026-11-19T16:00:00Z",
@@ -131,44 +131,16 @@
       "first_seen": "2026-11-02T21:59:37Z"
     },
     {
-      "id": "itad-b20c5c2002a2",
+      "id": "itad-76e8e7317ba6",
       "store": "epic",
-      "title": "Horror Adventure on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16758/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2292610/library_600x900_2x.jpg",
+      "title": "Super Kids Racing - Mini Edition - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16760/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2248920/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Horror Adventure",
+      "blurb": "Super Kids Racing : Mini Edition",
       "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 2292610,
-      "review_percent": 25,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-4e08566b4c8b",
-      "store": "epic",
-      "title": "Balloon Strike - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16764/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/855030/header.jpg?t=1526665750",
-      "genres": [],
-      "blurb": "Balloon Strike",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 855030,
-      "review_percent": 50,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-b2dc4abeb6d9",
-      "store": "epic",
-      "title": "Mountain Racing - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16762/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/833820/header.jpg?t=1526368279",
-      "genres": [],
-      "blurb": "Mountain Racing",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 833820,
-      "review_percent": 15,
+      "steam_appid": 2248920,
+      "review_percent": 0,
       "source": "itad",
       "first_seen": "2026-11-02T21:59:37Z"
     },
@@ -200,16 +172,16 @@
       "first_seen": "2026-11-02T21:59:37Z"
     },
     {
-      "id": "itad-76e8e7317ba6",
+      "id": "itad-b20c5c2002a2",
       "store": "epic",
-      "title": "Super Kids Racing - Mini Edition - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16760/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2248920/library_600x900_2x.jpg",
+      "title": "Horror Adventure on Epic Game Store",
+      "claim_url": "https://isthereanydeal.com/giveaways/16758/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2292610/library_600x900_2x.jpg",
       "genres": [],
-      "blurb": "Super Kids Racing : Mini Edition",
+      "blurb": "Horror Adventure",
       "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 2248920,
-      "review_percent": 0,
+      "steam_appid": 2292610,
+      "review_percent": 25,
       "source": "itad",
       "first_seen": "2026-11-02T21:59:37Z"
     },
@@ -228,21 +200,32 @@
       "first_seen": "2026-11-02T21:59:37Z"
     },
     {
-      "id": "itad-c52e531ef849",
-      "store": "steam",
-      "title": "Hunting Simulator 3 - Classic American Hunter Pack - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16742/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4693960/d37423b5b7941444dfe63d8b185ed680ff03009d/header.jpg?t=1793269525",
-      "genres": [
-        "Simulation"
-      ],
-      "blurb": "Hunting Simulator 3 - Classic American Hunter Pack",
-      "ends_at": "2026-11-12T23:12:10Z",
-      "steam_appid": 4693960,
-      "review_percent": 100,
+      "id": "itad-b2dc4abeb6d9",
+      "store": "epic",
+      "title": "Mountain Racing - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16762/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/833820/header.jpg?t=1526368279",
+      "genres": [],
+      "blurb": "Mountain Racing",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 833820,
+      "review_percent": 15,
       "source": "itad",
-      "first_seen": "2026-10-29T23:12:10Z",
-      "premium_only": true
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-4e08566b4c8b",
+      "store": "epic",
+      "title": "Balloon Strike - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16764/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/855030/header.jpg?t=1526665750",
+      "genres": [],
+      "blurb": "Balloon Strike",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 855030,
+      "review_percent": 50,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
     }
   ],
   "attribution": [

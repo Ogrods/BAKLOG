@@ -1,33 +1,19 @@
 {
-  "generated_at": "2026-11-08T21:50:02.162293+00:00",
+  "generated_at": "2026-11-12T21:53:55.076573+00:00",
   "items": [
     {
-      "id": "epic-idle-champions-of-the-forgotten-realms",
+      "id": "epic-knightica-3be45c",
       "store": "epic",
-      "title": "Idle Champions of the Forgotten Realms",
-      "claim_url": "https://store.epicgames.com/en-US/p/idle-champions-of-the-forgotten-realms",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/a53f91e55c6840018cb5de0b204f1ad9/idle-champions-of-the-forgotten-realms-1cv5z.jpg",
+      "title": "Knightica",
+      "claim_url": "https://store.epicgames.com/en-US/p/knightica-3be45c",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3093400/header.jpg?t=1794501426",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-11-12T16:00:00Z",
-      "steam_appid": 627690,
-      "review_percent": 77,
+      "ends_at": "2026-11-19T16:00:00Z",
+      "steam_appid": 3093400,
+      "review_percent": 75,
       "source": "epic",
-      "first_seen": "2026-11-05T21:32:20Z"
-    },
-    {
-      "id": "epic-flotsam-266287",
-      "store": "epic",
-      "title": "Flotsam",
-      "claim_url": "https://store.epicgames.com/en-US/p/flotsam-266287",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/5c36b876e80d4285b9993947efeeaf2b/flotsam-1yczl.jpg",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-11-12T16:00:00Z",
-      "steam_appid": 821250,
-      "review_percent": 81,
-      "source": "epic",
-      "first_seen": "2026-11-05T21:32:20Z"
+      "first_seen": "2026-11-12T21:53:49Z"
     },
     {
       "id": "gamerpower-3346",
@@ -145,37 +131,6 @@
       "first_seen": "2026-11-02T21:59:37Z"
     },
     {
-      "id": "itad-c52e531ef849",
-      "store": "steam",
-      "title": "Hunting Simulator 3 - Classic American Hunter Pack - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16742/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4693960/d37423b5b7941444dfe63d8b185ed680ff03009d/header.jpg?t=1793269525",
-      "genres": [
-        "Simulation"
-      ],
-      "blurb": "Hunting Simulator 3 - Classic American Hunter Pack",
-      "ends_at": "2026-11-12T23:12:10Z",
-      "steam_appid": 4693960,
-      "review_percent": 100,
-      "source": "itad",
-      "first_seen": "2026-10-29T23:12:10Z",
-      "premium_only": true
-    },
-    {
-      "id": "itad-b2dc4abeb6d9",
-      "store": "epic",
-      "title": "Mountain Racing - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16762/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/833820/header.jpg?t=1526368279",
-      "genres": [],
-      "blurb": "Mountain Racing",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 833820,
-      "review_percent": 15,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
       "id": "itad-b20c5c2002a2",
       "store": "epic",
       "title": "Horror Adventure on Epic Game Store",
@@ -186,20 +141,6 @@
       "ends_at": "2026-11-16T21:59:37Z",
       "steam_appid": 2292610,
       "review_percent": 25,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-175470cfaf8d",
-      "store": "epic",
-      "title": "Math Fun - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16763/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/890220/header.jpg?t=1533404522",
-      "genres": [],
-      "blurb": "Math Fun",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 890220,
-      "review_percent": 80,
       "source": "itad",
       "first_seen": "2026-11-02T21:59:37Z"
     },
@@ -218,15 +159,16 @@
       "first_seen": "2026-11-02T21:59:37Z"
     },
     {
-      "id": "itad-62144c889e7b",
+      "id": "itad-b2dc4abeb6d9",
       "store": "epic",
-      "title": "Maze - The Amazing Labyrinth free on EGS",
-      "claim_url": "https://isthereanydeal.com/giveaways/16754/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2293210/header.jpg?t=1676713019",
+      "title": "Mountain Racing - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16762/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/833820/header.jpg?t=1526368279",
       "genres": [],
-      "blurb": "Maze-The Amazing Labyrinth",
+      "blurb": "Mountain Racing",
       "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 2293210,
+      "steam_appid": 833820,
+      "review_percent": 15,
       "source": "itad",
       "first_seen": "2026-11-02T21:59:37Z"
     },
@@ -245,6 +187,19 @@
       "first_seen": "2026-11-02T21:59:37Z"
     },
     {
+      "id": "itad-62144c889e7b",
+      "store": "epic",
+      "title": "Maze - The Amazing Labyrinth free on EGS",
+      "claim_url": "https://isthereanydeal.com/giveaways/16754/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2293210/header.jpg?t=1676713019",
+      "genres": [],
+      "blurb": "Maze-The Amazing Labyrinth",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 2293210,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
       "id": "itad-76e8e7317ba6",
       "store": "epic",
       "title": "Super Kids Racing - Mini Edition - FREE on Epic Games",
@@ -257,6 +212,37 @@
       "review_percent": 0,
       "source": "itad",
       "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-175470cfaf8d",
+      "store": "epic",
+      "title": "Math Fun - FREE on Epic Games",
+      "claim_url": "https://isthereanydeal.com/giveaways/16763/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/890220/header.jpg?t=1533404522",
+      "genres": [],
+      "blurb": "Math Fun",
+      "ends_at": "2026-11-16T21:59:37Z",
+      "steam_appid": 890220,
+      "review_percent": 80,
+      "source": "itad",
+      "first_seen": "2026-11-02T21:59:37Z"
+    },
+    {
+      "id": "itad-c52e531ef849",
+      "store": "steam",
+      "title": "Hunting Simulator 3 - Classic American Hunter Pack - FREE on Steam",
+      "claim_url": "https://isthereanydeal.com/giveaways/16742/",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4693960/d37423b5b7941444dfe63d8b185ed680ff03009d/header.jpg?t=1793269525",
+      "genres": [
+        "Simulation"
+      ],
+      "blurb": "Hunting Simulator 3 - Classic American Hunter Pack",
+      "ends_at": "2026-11-12T23:12:10Z",
+      "steam_appid": 4693960,
+      "review_percent": 100,
+      "source": "itad",
+      "first_seen": "2026-10-29T23:12:10Z",
+      "premium_only": true
     }
   ],
   "attribution": [

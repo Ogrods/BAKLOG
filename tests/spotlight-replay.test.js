@@ -1,6 +1,14 @@
 /** Spotlight "Replay" category — surfaces finished games occasionally. */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
+
+const APP_CSS = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "..", "app.css"),
+  "utf8",
+);
 
 describe("spotlight replay category", () => {
   let pickSpotlightGames;
@@ -474,5 +482,120 @@ describe("spotlight rotation safety", () => {
     vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
     expect(el.classList.contains("is-fading")).toBe(true);
     expect(el.dataset.key).toBe("steam:2");
+  });
+
+  it("SPOTLIGHT_FADE_MS matches app.css --spotlight-fade", async () => {
+    expect(APP_CSS).toMatch(/\.dash-spotlight\s*\{[^}]*--spotlight-fade:\s*450ms/s);
+    expect(APP_CSS).toMatch(
+      /\.dash-spotlight-art\s*\{[^}]*opacity\s+var\(--spotlight-fade\)/s,
+    );
+    const { SPOTLIGHT_FADE_MS } = await import("../js/dashboard-spotlight.js");
+    expect(SPOTLIGHT_FADE_MS).toBe(450);
+  });
+
+  it("holds is-incoming for one painted frame after the fade swap", async () => {
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const rafQueue = [];
+    global.requestAnimationFrame = (cb) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    };
+    global.cancelAnimationFrame = (id) => {
+      if (id >= 1 && id <= rafQueue.length) rafQueue[id - 1] = null;
+    };
+
+    const {
+      startSpotlightRotation,
+      stopSpotlightRotation,
+      SPOTLIGHT_INTERVAL_MS,
+      SPOTLIGHT_FADE_MS,
+    } = await import("../js/dashboard-spotlight.js");
+    const games = [
+      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
+      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
+    ];
+    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
+    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
+
+    document.body.innerHTML = `
+      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1">
+        <span id="spot-inner">slide-1</span>
+      </button>
+    `;
+    const el = document.getElementById("dashboardSpotlight");
+    startSpotlightRotation(games);
+
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
+    expect(el.dataset.key).toBe("steam:2");
+    expect(el.classList.contains("is-fading")).toBe(false);
+    expect(el.classList.contains("is-incoming")).toBe(true);
+    expect(rafQueue.filter(Boolean).length).toBeGreaterThanOrEqual(1);
+
+    // First painted frame: still held at opacity 0 (is-incoming).
+    const firstBatch = rafQueue.splice(0).filter(Boolean);
+    for (const cb of firstBatch) cb(0);
+    expect(el.classList.contains("is-incoming")).toBe(true);
+    expect(rafQueue.filter(Boolean).length).toBeGreaterThanOrEqual(1);
+
+    // Second frame releases the hold so CSS can fade the new slide in.
+    const secondBatch = rafQueue.splice(0).filter(Boolean);
+    for (const cb of secondBatch) cb(0);
+    expect(el.classList.contains("is-incoming")).toBe(false);
+
+    stopSpotlightRotation();
+  });
+
+  it("stopSpotlightRotation cancels a pending is-incoming release", async () => {
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const rafQueue = [];
+    global.requestAnimationFrame = (cb) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    };
+    global.cancelAnimationFrame = (id) => {
+      if (id >= 1 && id <= rafQueue.length) rafQueue[id - 1] = null;
+    };
+
+    const {
+      startSpotlightRotation,
+      stopSpotlightRotation,
+      SPOTLIGHT_INTERVAL_MS,
+      SPOTLIGHT_FADE_MS,
+    } = await import("../js/dashboard-spotlight.js");
+    const games = [
+      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
+      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
+    ];
+    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
+    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
+
+    document.body.innerHTML = `
+      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1">
+        <span id="spot-inner">slide-1</span>
+      </button>
+    `;
+    const el = document.getElementById("dashboardSpotlight");
+    startSpotlightRotation(games);
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
+    expect(el.classList.contains("is-incoming")).toBe(true);
+
+    const pending = [...rafQueue];
+    stopSpotlightRotation();
+    expect(el.classList.contains("is-incoming")).toBe(false);
+    expect(el.classList.contains("is-fading")).toBe(false);
+
+    // A cancelled frame must not revive is-incoming on a replaced/stopped host.
+    for (const cb of pending) cb?.(0);
+    expect(el.classList.contains("is-incoming")).toBe(false);
   });
 });

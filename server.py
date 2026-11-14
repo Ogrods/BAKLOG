@@ -214,13 +214,20 @@ from shared.server_stream_tickets import (  # noqa: E402, I001
 )
 
 
-def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
+def _authorize_stream(
+    handler: SimpleHTTPRequestHandler, *, session_id: str | None = None
+) -> bool:
     """Legacy helper: prefer peek+commit inside stream handlers (see auth stream)."""
     from shared.supabase_auth import auth_enabled
+    from shared.server_stream_tickets import KIND_AUTH
 
     if not auth_enabled():
         return True
-    profile_id = _peek_stream_ticket(_stream_ticket_from_handler(handler))
+    profile_id = _peek_stream_ticket(
+        _stream_ticket_from_handler(handler),
+        session_id=session_id,
+        expect_kind=KIND_AUTH if session_id else None,
+    )
     if not profile_id:
         _send_auth_required(handler)
         return False
@@ -228,17 +235,36 @@ def _authorize_stream(handler: SimpleHTTPRequestHandler) -> bool:
     return True
 
 
-def _commit_auth_stream_ticket(handler: SimpleHTTPRequestHandler) -> bool:
+def _commit_auth_stream_ticket(
+    handler: SimpleHTTPRequestHandler, *, session_id: str
+) -> bool:
     """Consume one ticket use only after the auth session is confirmed present."""
     from shared.supabase_auth import auth_enabled
+    from shared.server_stream_tickets import KIND_AUTH
 
     if not auth_enabled():
         return True
-    profile_id = _commit_stream_ticket(_stream_ticket_from_handler(handler))
+    profile_id = _commit_stream_ticket(
+        _stream_ticket_from_handler(handler),
+        session_id=session_id,
+        expect_kind=KIND_AUTH,
+    )
     if not profile_id:
         _send_auth_required(handler)
         return False
     set_request_profile_id(profile_id)
+    return True
+
+
+def _reject_if_data_read_forbidden(handler: SimpleHTTPRequestHandler) -> bool:
+    """When Supabase auth is off, data reads require a local Host. Return True if rejected."""
+    from shared.supabase_auth import auth_enabled
+
+    if auth_enabled():
+        return False
+    if _request_host_is_local(handler):
+        return False
+    handler.send_error(HTTPStatus.FORBIDDEN, "Forbidden")
     return True
 
 # Personal-data persistence (scoped to active profile via shared.profile_paths).
@@ -581,13 +607,16 @@ def _gate_static(handler: SimpleHTTPRequestHandler) -> bool:
     if kind == "deny":
         handler.send_error(HTTPStatus.NOT_FOUND, "Not found")
         return False
-    if kind == "data" and auth_enabled():
-        if local_profiles_enabled():
-            if not verify_bearer_user(handler.headers.get("Authorization")):
-                _send_auth_required(handler)
-                return False
-            return True
-        return _bind_bearer_profile(handler)
+    if kind == "data":
+        if auth_enabled():
+            if local_profiles_enabled():
+                if not verify_bearer_user(handler.headers.get("Authorization")):
+                    _send_auth_required(handler)
+                    return False
+                return True
+            return _bind_bearer_profile(handler)
+        if _reject_if_data_read_forbidden(handler):
+            return False
     return True
 
 
@@ -1002,9 +1031,13 @@ class Handler(SimpleHTTPRequestHandler):
             self._handle_proxy_steam_reviews()
             return
         if path == "/api/personal":
+            if _reject_if_data_read_forbidden(self):
+                return
             self._handle_personal_get()
             return
         if path == "/api/profiles":
+            if _reject_if_data_read_forbidden(self):
+                return
             self._handle_profiles_get()
             return
         if path == "/api/auth/session":
@@ -1907,9 +1940,20 @@ class Handler(SimpleHTTPRequestHandler):
             return
         assert payload is not None
         run_id: str | None = None
+        session_id: str | None = None
         profile_id = get_active_profile_id()
         run = None
+        raw_session = payload.get("session_id") if isinstance(payload, dict) else None
+        if raw_session:
+            session_id = str(raw_session).strip().split("/", 1)[0].split("?", 1)[0] or None
         raw_run = payload.get("run_id") if isinstance(payload, dict) else None
+        if raw_run and session_id:
+            _send_json(
+                self,
+                HTTPStatus.BAD_REQUEST,
+                {"error": "run_id and session_id are mutually exclusive"},
+            )
+            return
         if raw_run:
             run_id = str(raw_run).strip().split("/", 1)[0].split("?", 1)[0] or None
             run = MANAGER.get(run_id) if run_id else None
@@ -1926,7 +1970,13 @@ class Handler(SimpleHTTPRequestHandler):
                     )
                     return
                 profile_id = run.profile_id
-        ticket = _mint_stream_ticket(profile_id, run_id=run_id)
+        try:
+            ticket = _mint_stream_ticket(
+                profile_id, run_id=run_id, session_id=session_id
+            )
+        except ValueError as exc:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
         _send_json(self, HTTPStatus.OK, {"ticket": ticket})
 
     def _handle_auth_status(self) -> None:
@@ -2003,7 +2053,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_auth_stream(self, session_id: str) -> None:
         global _sse_connections
         session_id = session_id.strip("/").split("/", 1)[0]
-        if not _authorize_stream(self):
+        if not _authorize_stream(self, session_id=session_id):
             return
         try:
             from auth.manager import get_auth_session
@@ -2027,7 +2077,7 @@ class Handler(SimpleHTTPRequestHandler):
             # does not burn a valid ticket.
             _sse_connections += 1
 
-        if not _commit_auth_stream_ticket(self):
+        if not _commit_auth_stream_ticket(self, session_id=session_id):
             with _sse_lock:
                 _sse_connections = max(0, _sse_connections - 1)
             return
@@ -2057,12 +2107,15 @@ class Handler(SimpleHTTPRequestHandler):
     def _handle_stream(self, run_id: str) -> None:
         global _sse_connections
         from shared.supabase_auth import auth_enabled
+        from shared.server_stream_tickets import KIND_RUN
 
         run_id = run_id.strip("/").split("/", 1)[0].split("?", 1)[0]
         since = _stream_resume_since(self)
         ticket = _stream_ticket_from_handler(self)
         if auth_enabled():
-            profile_id = _peek_stream_ticket(ticket, run_id)
+            profile_id = _peek_stream_ticket(
+                ticket, run_id, expect_kind=KIND_RUN
+            )
             if not profile_id:
                 _send_auth_required(self)
                 return
@@ -2083,7 +2136,9 @@ class Handler(SimpleHTTPRequestHandler):
                     )
                     return
                 _sse_connections += 1
-            if auth_enabled() and not _commit_stream_ticket(ticket, run_id):
+            if auth_enabled() and not _commit_stream_ticket(
+                ticket, run_id, expect_kind=KIND_RUN
+            ):
                 with _sse_lock:
                     _sse_connections = max(0, _sse_connections - 1)
                 _send_auth_required(self)
@@ -2130,7 +2185,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             _sse_connections += 1
 
-        if auth_enabled() and not _commit_stream_ticket(ticket, run_id):
+        if auth_enabled() and not _commit_stream_ticket(
+            ticket, run_id, expect_kind=KIND_RUN
+        ):
             with _sse_lock:
                 _sse_connections = max(0, _sse_connections - 1)
             _send_auth_required(self)

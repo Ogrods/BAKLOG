@@ -935,6 +935,22 @@ describe('reconcileRunStateFromSnapshot', () => {
     expect(fetcherRunner.hasStreamForTest('732655ccd4fc')).toBe(false);
   });
 
+  it('CONNECTING transport errors wait under streak max then go hard', () => {
+    const runId = 'connect-streak-1';
+    const max = fetcherRunner.CONNECTING_ERROR_STREAK_MAX;
+    const es = { readyState: 0 }; // EventSource.CONNECTING
+    fetcherRunner.clearConnectingStreakForTest(runId);
+    for (let i = 1; i < max; i += 1) {
+      expect(fetcherRunner.noteConnectingTransportErrorForTest(runId, es)).toBe('wait');
+      expect(fetcherRunner.getConnectingStreakForTest(runId)).toBe(i);
+    }
+    expect(fetcherRunner.noteConnectingTransportErrorForTest(runId, es)).toBe('hard');
+    expect(fetcherRunner.getConnectingStreakForTest(runId)).toBe(0);
+    expect(
+      fetcherRunner.noteConnectingTransportErrorForTest(runId, { readyState: 2 }),
+    ).toBe('hard');
+  });
+
   it('tracks enrich lane runs in inFlightKeys', () => {
     fetcherRunner.markChipStateForTest('hltb', 'running', 'run-hltb-1');
     fetcherRunner.reconcileRunStateFromSnapshot({

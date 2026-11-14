@@ -299,10 +299,25 @@ export async function baklogFetch(url, init = {}) {
   return fetchWithAuthRetry(url, init, method);
 }
 
-/** Mint a limited-reuse SSE ticket (EventSource cannot send Authorization). */
-export async function mintStreamTicket(runId = null) {
+/** Mint a limited-reuse SSE ticket (EventSource cannot send Authorization).
+ *  Pass runId for fetcher streams, or sessionId for Connect auth streams. */
+export async function mintStreamTicket(runIdOrOpts = null, maybeOpts = undefined) {
   if (!isAccountAuthMode()) return null;
-  const body = runId ? JSON.stringify({ run_id: runId }) : undefined;
+  let runId = null;
+  let sessionId = null;
+  if (runIdOrOpts && typeof runIdOrOpts === "object" && !Array.isArray(runIdOrOpts)) {
+    runId = runIdOrOpts.runId ?? null;
+    sessionId = runIdOrOpts.sessionId ?? null;
+  } else {
+    runId = runIdOrOpts;
+    if (maybeOpts && typeof maybeOpts === "object") {
+      sessionId = maybeOpts.sessionId ?? null;
+    }
+  }
+  const payload = {};
+  if (sessionId) payload.session_id = sessionId;
+  else if (runId) payload.run_id = runId;
+  const body = Object.keys(payload).length ? JSON.stringify(payload) : undefined;
   const res = await baklogFetch("/api/auth/stream-ticket", {
     method: "POST",
     body,
@@ -313,9 +328,9 @@ export async function mintStreamTicket(runId = null) {
 }
 
 /** Append ?ticket= for authenticated SSE streams. */
-export async function urlWithStreamTicket(url, { runId = null } = {}) {
+export async function urlWithStreamTicket(url, { runId = null, sessionId = null } = {}) {
   if (!isAccountAuthMode()) return url;
-  const ticket = await mintStreamTicket(runId);
+  const ticket = await mintStreamTicket({ runId, sessionId });
   if (!ticket) {
     throw new Error("Could not mint SSE stream ticket");
   }

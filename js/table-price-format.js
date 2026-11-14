@@ -1,7 +1,7 @@
 /**
  * Wishlist/library price cell HTML (extracted from table-ui.js).
  */
-import { escapeAttr, escapeHtml } from './dom-util.js';
+import { escapeAttr, escapeHtml, isSafeHttpUrl } from './dom-util.js';
 import {
   cutBucketClass,
   dealDroppedBadgeHtml,
@@ -28,7 +28,8 @@ export function formatPrice(g) {
     const lowStar = d ? priceLowStarHtml(d) : '';
     const dropBadge = dealDroppedBadgeHtml(g).replace(/^/, '&nbsp;');
     const shopHtml = itad.shop ? `@ ${escapeHtml(itad.shop)}` : '';
-    const dealUrl = itad.url || (d && d.url) || null;
+    const rawDealUrl = itad.url || (d && d.url) || null;
+    const dealUrl = isSafeHttpUrl(rawDealUrl) ? rawDealUrl : null;
     const linkOpen = dealUrl
       ? `<a href="${escapeAttr(dealUrl)}" target="_blank" rel="noopener" class="deal-price-link flex flex-col items-end leading-tight" title="Open this deal on ${escapeAttr(itad.shop || 'store')}">`
       : '<div class="flex flex-col items-end leading-tight">';

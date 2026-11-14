@@ -155,8 +155,8 @@ def wipe_user_data(data_dir: Path) -> list[str]:
     Keyring is deleted only after the data wipe succeeds so a failed ``rmtree``
     cannot leave an undecryptable ``secrets.bin`` behind.
     """
-    from shared.install_paths import frozen_bundle_dir, is_frozen, is_portable_frozen
     from auth.secrets import delete_keyring_master_key
+    from shared.install_paths import frozen_bundle_dir, is_frozen, is_portable_frozen
 
     notes: list[str] = []
     _request_graceful_shutdown()

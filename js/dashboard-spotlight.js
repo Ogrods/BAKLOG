@@ -1423,6 +1423,7 @@ function applySpotlightSlide(el, next) {
   // Hold is-incoming before clearing is-fading so the new art never paints at
   // opacity 1 in the same turn as the HTML swap. primeSpotlightArt may fit a
   // cached cover sync; otherwise release waits for onload art-fit (or timeout).
+  el.classList.add("is-incoming");
   el.classList.remove("is-fading");
   primeSpotlightArt(el);
   releaseSpotlightIncoming(el);

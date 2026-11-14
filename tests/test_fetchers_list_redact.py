@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.error
+import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-import urllib.error
-import urllib.request
 
 import server
 from shared import profile_paths

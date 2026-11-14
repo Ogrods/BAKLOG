@@ -461,18 +461,35 @@ def _request_host_is_local(handler: SimpleHTTPRequestHandler) -> bool:
     return _normalize_host(handler.headers.get("Host", "")) in _LOCAL_HOSTNAMES
 
 
-def _csrf_allowed_strict(handler: SimpleHTTPRequestHandler) -> bool:
-    """Mutating-route CSRF gate: localhost Host plus X-BAKLOG-Local (or bearer).
+def _mutation_host_allowed(handler: SimpleHTTPRequestHandler) -> bool:
+    """True when Host is loopback, or matches BAKLOG_PUBLIC_BASE_URL (explicit tunnel)."""
+    if _request_host_is_local(handler):
+        return True
+    base = (os.environ.get("BAKLOG_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if not base:
+        return False
+    try:
+        allowed = _normalize_host(urlparse(base).netloc)
+    except Exception:  # noqa: BLE001
+        return False
+    if not allowed:
+        return False
+    return _normalize_host(handler.headers.get("Host", "")) == allowed
 
-    Origin/Referer alone is never enough — that loose path was removed so new
-    routes cannot accidentally reintroduce it.
+
+def _csrf_allowed_strict(handler: SimpleHTTPRequestHandler) -> bool:
+    """Mutating-route CSRF gate: allowed Host plus X-BAKLOG-Local (or bearer).
+
+    Bearer proves identity when auth is on; it never replaces the Host check.
+    A stolen JWT over a random public Host must not mutate secrets or shutdown.
+    Origin/Referer alone is never enough.
     """
     from shared.supabase_auth import auth_enabled, verify_bearer_user
 
+    if not _mutation_host_allowed(handler):
+        return False
     if auth_enabled() and verify_bearer_user(handler.headers.get("Authorization")):
         return True
-    if not _request_host_is_local(handler):
-        return False
     return handler.headers.get(_BAKLOG_LOCAL_HEADER) == "1"
 
 
@@ -552,17 +569,18 @@ def _send_auth_required(handler: SimpleHTTPRequestHandler) -> None:
 
 def _bind_request_user(handler: SimpleHTTPRequestHandler) -> str | None:
     """Verify bearer, ensure profile dir, pin request context. None after 401."""
-    from shared.account_profiles import ensure_profile_for_user
-    from shared.supabase_auth import local_profiles_enabled, verify_bearer_user
+    from shared.account_profiles import (
+        ensure_profile_for_user,
+        resolve_request_profile_for_user,
+    )
+    from shared.supabase_auth import verify_bearer_user
 
     user = verify_bearer_user(handler.headers.get("Authorization"))
     if not user:
         _send_auth_required(handler)
         return None
-    if local_profiles_enabled():
-        # JWT proves identity; active profile comes from profiles/index.json.
-        return user["id"]
-    pid = ensure_profile_for_user(user["id"], user.get("email") or None)
+    account_pid = ensure_profile_for_user(user["id"], user.get("email") or None)
+    pid = resolve_request_profile_for_user(user["id"], account_pid)
     set_request_profile_id(pid)
     return pid
 
@@ -574,7 +592,7 @@ def _bind_bearer_profile(handler: SimpleHTTPRequestHandler) -> bool:
 
 def _gate_static(handler: SimpleHTTPRequestHandler) -> bool:
     """Gate static catalog/cache paths when Supabase auth is on. Return False if handled."""
-    from shared.supabase_auth import auth_enabled, local_profiles_enabled, verify_bearer_user
+    from shared.supabase_auth import auth_enabled
 
     path_only = _path_only(handler)
     kind = _static_class(path_only)
@@ -582,11 +600,7 @@ def _gate_static(handler: SimpleHTTPRequestHandler) -> bool:
         handler.send_error(HTTPStatus.NOT_FOUND, "Not found")
         return False
     if kind == "data" and auth_enabled():
-        if local_profiles_enabled():
-            if not verify_bearer_user(handler.headers.get("Authorization")):
-                _send_auth_required(handler)
-                return False
-            return True
+        # Always pin via _bind_request_user (account profile or ACL-allowed active).
         return _bind_bearer_profile(handler)
     return True
 
@@ -736,7 +750,13 @@ def _is_admin_exempt_api(path: str) -> bool:
     """Endpoints the local admin console (BAKLOG_ADMIN=1) may reach without a
     Supabase bearer token. Covers internal admin routes plus the RunManager
     status/stream/control endpoints the Jobs run-console polls (the admin console
-    is local-only and does not carry an account JWT)."""
+    is local-only and does not carry an account JWT).
+
+    Posture (intentional): keep JWT exemption under BAKLOG_ADMIN=1. Admin is a
+    maintainer-only local flag, never shipped in installs. Do not require bearer
+    here; if admin is ever exposed remotely, add a dedicated admin token then.
+    CSRF (local Host + X-BAKLOG-Local) still applies to mutating admin routes.
+    """
     if path.startswith("/api/internal/"):
         return True
     if path == "/api/runs" or path.startswith("/api/runs/"):
@@ -1522,8 +1542,16 @@ class Handler(SimpleHTTPRequestHandler):
         assert payload is not None
         try:
             from shared.profiles import create_profile
+            from shared.supabase_auth import auth_enabled, verify_bearer_user
 
-            created = create_profile(str(payload.get("label") or ""))
+            owner: str | None = None
+            if auth_enabled():
+                user = verify_bearer_user(self.headers.get("Authorization"))
+                if user:
+                    owner = str(user["id"]).strip().lower()
+            created = create_profile(
+                str(payload.get("label") or ""), owner_user_id=owner
+            )
             _send_json(self, HTTPStatus.CREATED, created)
         except ValueError as exc:
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": str(exc)})
@@ -1552,6 +1580,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": "id is required"})
             return
         try:
+            from shared.account_profiles import profile_accessible_to_user
             from shared.profiles import (
                 clear_pin_failures,
                 pin_rate_limit_error,
@@ -1560,6 +1589,17 @@ class Handler(SimpleHTTPRequestHandler):
                 set_active_profile,
                 verify_profile_pin,
             )
+            from shared.supabase_auth import auth_enabled, local_profiles_enabled, verify_bearer_user
+
+            if auth_enabled() and local_profiles_enabled():
+                user = verify_bearer_user(self.headers.get("Authorization"))
+                if user and not profile_accessible_to_user(profile_id, user["id"]):
+                    _send_json(
+                        self,
+                        HTTPStatus.FORBIDDEN,
+                        {"error": "profile is not available for this account"},
+                    )
+                    return
 
             locked = pin_rate_limit_error(profile_id)
             if locked:

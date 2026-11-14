@@ -717,14 +717,9 @@ def _require_api_auth(handler: SimpleHTTPRequestHandler) -> bool:
         "/api/update/apply-result",
     ):
         return True
-    # /api/proxy/* endpoints proxy public third-party APIs (Steam storesearch,
-    # IUserReviewsService GetAppReviews). They accept any search term but only
-    # proxy to read-only Steam endpoints - no credentials forwarded, no write
-    # access. Unauthenticated because the add-game modal calls them via bare
-    # fetch() (no Bearer token), and the proxy does not expose the server to
-    # SSRF (fixed target hosts, read-only endpoints only).
-    if path.startswith("/api/proxy/"):
-        return True
+    # /api/proxy/* (Steam storesearch / reviews) uses fixed read-only hosts - no
+    # SSRF - but when Supabase auth is on they still require a bearer like other
+    # /api/* reads. The add-game modal already calls them via baklogFetch.
     if ADMIN_ENABLED and _is_admin_exempt_api(path):
         return True
     if not auth_enabled():
@@ -1477,7 +1472,7 @@ class Handler(SimpleHTTPRequestHandler):
             }
             _send_json(self, HTTPStatus.OK, data)
         except Exception as exc:  # noqa: BLE001
-            _send_json(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            _api_error(self, HTTPStatus.INTERNAL_SERVER_ERROR, "fetchers_list_failed", exc)
 
     @staticmethod
     def _parse_run_submit_path(rest: str) -> tuple[str, bool]:

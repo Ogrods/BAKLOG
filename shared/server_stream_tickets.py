@@ -18,7 +18,9 @@ STREAM_TICKET_MAX_USES = 12
 # Block the stream handler briefly on first connect so a run submitted on another
 # dev-server process (split-brain on localhost) can finish and land in shared history.
 STREAM_ATTACH_SHORT_WAIT_SEC = 2.0
-STREAM_ATTACH_LONG_WAIT_SEC = 300.0
+# Long wait only after short miss when the run id is already on disk. Cap at 30s
+# so a stuck handoff cannot hold a handler thread for minutes (local exhaustion).
+STREAM_ATTACH_LONG_WAIT_SEC = 30.0
 STREAM_ATTACH_POLL_SEC = 0.1
 
 

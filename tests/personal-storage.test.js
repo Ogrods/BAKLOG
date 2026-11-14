@@ -173,11 +173,19 @@ describe('exportPersonalDoc / mergeImportedPersonalDoc', () => {
 });
 
 describe('canonical cross-store notes', () => {
+  const hadesWish = {
+    store: 'wishlist',
+    id: 'nintendo-hades',
+    name: 'Hades',
+    wishlist_store: 'nintendo',
+  };
+
   beforeEach(() => {
     state.allGames = [hadesSteam, hadesEpic];
+    state.wishlistGames = [hadesWish];
   });
 
-  it('setPersonal(notes) mirrors across same-title keys (last-write-wins)', () => {
+  it('setPersonal(notes) mirrors across same-title library keys (last-write-wins)', () => {
     setPersonal(hadesSteam, 'notes', 'try on deck', { silent: true });
     expect(getPersonal(hadesSteam).notes).toBe('try on deck');
     expect(getPersonal(hadesEpic).notes).toBe('try on deck');
@@ -186,13 +194,32 @@ describe('canonical cross-store notes', () => {
     expect(getPersonal(hadesEpic).notes).toBe('epic note wins');
   });
 
-  it('canonicalizeNotesAcrossTitles picks longest note per group', () => {
+  it('library notes do not mirror onto wishlist same title', () => {
+    setPersonal(hadesSteam, 'notes', 'library only', { silent: true });
+    expect(getPersonal(hadesWish).notes).toBe('');
+  });
+
+  it('wishlist notes do not mirror onto owned library same title', () => {
+    setPersonal(hadesWish, 'notes', 'wish only', { silent: true });
+    expect(getPersonal(hadesSteam).notes).toBe('');
+    expect(getPersonal(hadesEpic).notes).toBe('');
+    expect(getPersonal(hadesWish).notes).toBe('wish only');
+  });
+
+  it('canonicalizeNotesAcrossTitles picks longest note per library group only', () => {
     state.personal['steam:1'] = { status: 'backlog', notes: 'short', priority: 0, hltb_override: null };
     state.personal['epic:hades-epic'] = { status: 'backlog', notes: 'much longer note text', priority: 0, hltb_override: null };
+    state.personal[gameKey(hadesWish)] = {
+      status: 'backlog',
+      notes: 'wishlist note that must not win library',
+      priority: 0,
+      hltb_override: null,
+    };
     delete state.personal.__notes_canonicalized_v1;
     expect(canonicalizeNotesAcrossTitles()).toBe(true);
     expect(getPersonal(hadesSteam).notes).toBe('much longer note text');
     expect(getPersonal(hadesEpic).notes).toBe('much longer note text');
+    expect(getPersonal(hadesWish).notes).toBe('wishlist note that must not win library');
     expect(canonicalizeNotesAcrossTitles()).toBe(false);
   });
 
@@ -203,6 +230,7 @@ describe('canonical cross-store notes', () => {
 
   it('canonicalizeNotesAcrossTitles does not materialize empty personal rows', () => {
     state.allGames = [hadesSteam, hadesEpic, { store: 'steam', id: 99, name: 'Lonely Game' }];
+    state.wishlistGames = [];
     state.personal = {};
     delete state.personal.__notes_canonicalized_v1;
     canonicalizeNotesAcrossTitles();

@@ -33,6 +33,7 @@ import {
   applyHiddenTitleNorms,
   filterCounted,
   libraryGamesBase,
+  wishlistGamesBase,
   seedNoiseAutoHidden,
 } from "./personal-storage.js";
 import { savePrefs } from "./prefs.js";
@@ -435,9 +436,8 @@ function countLibraryVisible() {
   return filterCounted(libraryGamesBase()).length;
 }
 function countWishlistVisible() {
-  return state.wishlistGames.filter(
-    (g) => !state.wishlistCrossStoreHiddenKeys.has(gameKey(g)),
-  ).length;
+  // Match table / wishlistGamesBase: drop cross-store dupes and user-hidden.
+  return wishlistGamesBase().length;
 }
 
 /** When reloadGames fails (no JSON files), still mark data ready and paint empty UI. */

@@ -61,6 +61,8 @@ Filename: "{app}\BAKLOG Tray.exe"; Description: "Launch {#MyAppName}"; Flags: no
 var
   WipeUserData: Boolean;
   CleanupRan: Boolean;
+  WipeSucceeded: Boolean;
+  LastWipeResultCode: Integer;
 
 procedure InitializeWizard();
 var
@@ -88,6 +90,8 @@ begin
   Result := True;
   WipeUserData := False;
   CleanupRan := False;
+  WipeSucceeded := False;
+  LastWipeResultCode := -1;
   if FileExists(ExpandConstant('{app}\portable.txt')) then
     DataDir := ExpandConstant('{app}')
   else
@@ -118,20 +122,43 @@ var
   TrayExe: string;
   ResultCode: Integer;
   Args: string;
+  DataDir: string;
 begin
   if CleanupRan then
     Exit;
   CleanupRan := True;
+  WipeSucceeded := False;
+  LastWipeResultCode := -1;
   Exec('taskkill.exe', '/IM "BAKLOG Tray.exe" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/IM BAKLOG.exe /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   TrayExe := ExpandConstant('{app}\BAKLOG Tray.exe');
   if not FileExists(TrayExe) then
+  begin
+    if WipeUserData then
+      LastWipeResultCode := 1;
     Exit;
+  end;
   if WipeUserData then
     Args := '--uninstall-wipe-user-data'
   else
     Args := '--uninstall-cleanup';
   Exec(TrayExe, Args, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  LastWipeResultCode := ResultCode;
+  if WipeUserData then
+  begin
+    if FileExists(ExpandConstant('{app}\portable.txt')) then
+      DataDir := ExpandConstant('{app}')
+    else
+      DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
+    { Portable wipe leaves the app folder; installed wipe must remove BAKLOG-Data. }
+    if ResultCode = 0 then
+    begin
+      if FileExists(ExpandConstant('{app}\portable.txt')) then
+        WipeSucceeded := True
+      else
+        WipeSucceeded := not DirExists(DataDir);
+    end;
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -147,11 +174,21 @@ begin
     else
       DataDir := ExpandConstant('{localappdata}\BAKLOG-Data');
     if WipeUserData then
-      MsgBox(
-        'BAKLOG and all local data were removed from your PC.' + #13#10 + #13#10 +
-        'Browser site data for http://127.0.0.1:8765 may still exist in Chrome or Edge. ' +
-        'Clear it from browser settings if you want a fully clean slate.',
-        mbInformation, MB_OK)
+    begin
+      if WipeSucceeded then
+        MsgBox(
+          'BAKLOG and all local data were removed from your PC.' + #13#10 + #13#10 +
+          'Browser site data for http://127.0.0.1:8765 may still exist in Chrome or Edge. ' +
+          'Clear it from browser settings if you want a fully clean slate.',
+          mbInformation, MB_OK)
+      else
+        MsgBox(
+          'BAKLOG was removed, but wiping library data did not finish cleanly.' + #13#10 + #13#10 +
+          'If folders remain, delete them manually:' + #13#10 +
+          DataDir + #13#10 + #13#10 +
+          'Exit code: ' + IntToStr(LastWipeResultCode),
+          mbError, MB_OK);
+    end
     else
       MsgBox(
         'BAKLOG was removed from your PC.' + #13#10 + #13#10 +

@@ -13,6 +13,8 @@ LOG_REDACT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
     (re.compile(r"(set-cookie:\s*)(.+)$", re.I | re.M), r"\1[redacted]"),
     (re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*)[\"']?[\w\-]+", re.I), r"\1[redacted]"),
+    # Steam Web API puts the key in the query string (?key= / &key=).
+    (re.compile(r"([?&]key=)[^&\s\"']+", re.I), r"\1[redacted]"),
     (re.compile(r"([?&]ticket=)[^&\s]+", re.I), r"\1[redacted]"),
     (re.compile(r"(NPSSO[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),
     (re.compile(r"(Ubi_v1[=:\s]+)[\w\-\.]+", re.I), r"\1[redacted]"),

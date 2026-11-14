@@ -849,6 +849,27 @@ export function getSameTitleKeys(g) {
   return getTitleKeyIndex().get(norm) || [gameKey(g)];
 }
 
+/** Wishlist catalog keys use the wishlist: prefix (store may also be "wishlist"). */
+export function isWishlistGameKey(key) {
+  return String(key || "").startsWith("wishlist:");
+}
+
+export function isWishlistGame(g) {
+  if (!g) return false;
+  if (g.store === "wishlist") return true;
+  return isWishlistGameKey(gameKey(g));
+}
+
+/**
+ * Same-title keys limited to the hide realm of `g` (library vs wishlist).
+ * Hide-by-title must not cross wishlist ↔ owned library.
+ */
+export function getSameTitleKeysInRealm(g) {
+  const keys = getSameTitleKeys(g);
+  const wish = isWishlistGame(g);
+  return keys.filter((k) => isWishlistGameKey(k) === wish);
+}
+
 export function invalidateTitleKeyIndex() {
   _titleKeyIndex = null;
   _titleKeyIndexVer = -1;

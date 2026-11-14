@@ -36,7 +36,7 @@ import {
   formatReleaseDate,
   itchIsGame,
   findGameByKey,
-  getSameTitleKeys,
+  getSameTitleKeysInRealm,
   renderBulkStatusButtons,
   recomputeCrossStoreHidden,
   combinedPlaytime,
@@ -65,6 +65,8 @@ import {
   countedLibraryDenominator,
   addNintendoDroppedId,
   NINTENDO_DROPPED_KEY,
+  HIDDEN_TITLE_NORMS_LIBRARY_KEY,
+  HIDDEN_TITLE_NORMS_WISHLIST_KEY,
 } from './personal-storage.js';
 import { refreshAfterManualChange } from './library-load.js';
 import { getCoopFilterMode } from './prefs.js';
@@ -409,16 +411,17 @@ export function bulkSetStatus(status) {
 }
 
 function snapshotRemoveState(keys) {
-  // Hiding a pulled row mirrors the hidden flag across same-title keys and adds
-  // its title norm to __hidden_title_norms_v1. Capture both so undo fully
-  // reverses the hide — otherwise applyHiddenTitleNorms re-hides the row on the
-  // next merge and the "Removed N games" undo silently leaves it hidden.
+  // Hiding a pulled row mirrors the hidden flag across same-realm title keys and
+  // adds its title norm to the library or wishlist norms list. Capture both so
+  // undo fully reverses the hide — otherwise applyHiddenTitleNorms re-hides the
+  // row on the next merge and the "Removed N games" undo silently leaves it hidden.
   const expanded = new Set(keys);
   for (const key of keys) {
     const g = findGameByKey(key);
-    if (g) for (const k of getSameTitleKeys(g)) expanded.add(k);
+    if (g) for (const k of getSameTitleKeysInRealm(g)) expanded.add(k);
   }
-  expanded.add('__hidden_title_norms_v1');
+  expanded.add(HIDDEN_TITLE_NORMS_LIBRARY_KEY);
+  expanded.add(HIDDEN_TITLE_NORMS_WISHLIST_KEY);
   expanded.add(NINTENDO_DROPPED_KEY);
   const personalSnap = snapshotPersonalForKeys(expanded);
   const manualSnap = [];

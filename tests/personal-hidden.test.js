@@ -92,8 +92,16 @@ describe('hidden personal field', () => {
 });
 
 describe('cross-store hidden mirroring', () => {
+  const fortniteWish = {
+    store: 'wishlist',
+    id: 'nintendo-icey',
+    name: 'Fortnite',
+    wishlist_store: 'nintendo',
+  };
+
   beforeEach(() => {
     state.allGames = [fortniteSteam, fortniteEpic];
+    state.wishlistGames = [fortniteWish];
   });
 
   it('setGameHidden on one copy hides every store copy of the title', () => {
@@ -124,6 +132,41 @@ describe('cross-store hidden mirroring', () => {
     // The norm-based hidden set should re-apply onto whatever keys exist now.
     applyHiddenTitleNorms({ silent: true });
     expect(state.personal[gameKey(fortniteXbox)].hidden).toBe(true);
+  });
+
+  it('wishlist hide does not hide owned library copies of the same title', () => {
+    setGameHidden(fortniteWish, true, { silent: true });
+    expect(state.personal[gameKey(fortniteWish)].hidden).toBe(true);
+    expect(state.personal.__hidden_title_norms_wishlist_v1).toContain('fortnite');
+    expect(state.personal.__hidden_title_norms_v1 || []).not.toContain('fortnite');
+    expect(state.personal[gameKey(fortniteSteam)]?.hidden).not.toBe(true);
+    expect(state.personal[gameKey(fortniteEpic)]?.hidden).not.toBe(true);
+  });
+
+  it('library hide does not hide wishlist copies of the same title', () => {
+    setGameHidden(fortniteSteam, true, { silent: true });
+    expect(state.personal[gameKey(fortniteSteam)].hidden).toBe(true);
+    expect(state.personal[gameKey(fortniteWish)]?.hidden).not.toBe(true);
+    expect(state.personal.__hidden_title_norms_wishlist_v1 || []).not.toContain('fortnite');
+  });
+
+  it('applyHiddenTitleNorms keeps wishlist and library realms separate', () => {
+    setGameHidden(fortniteWish, true, { silent: true });
+    const fortniteXbox = { store: 'xbox', id: 'x1', name: 'Fortnite', playtime_minutes: 0 };
+    state.allGames = [fortniteSteam, fortniteEpic, fortniteXbox];
+    applyHiddenTitleNorms({ silent: true });
+    expect(state.personal[gameKey(fortniteWish)].hidden).toBe(true);
+    expect(state.personal[gameKey(fortniteXbox)]?.hidden).not.toBe(true);
+  });
+
+  it('unhiding library copy leaves wishlist hide intact', () => {
+    setGameHidden(fortniteWish, true, { silent: true });
+    setGameHidden(fortniteSteam, true, { silent: true });
+    setGameHidden(fortniteSteam, false, { silent: true });
+    expect(state.personal[gameKey(fortniteSteam)].hidden).toBe(false);
+    expect(state.personal[gameKey(fortniteEpic)].hidden).toBe(false);
+    expect(state.personal[gameKey(fortniteWish)].hidden).toBe(true);
+    expect(state.personal.__hidden_title_norms_wishlist_v1).toContain('fortnite');
   });
 });
 

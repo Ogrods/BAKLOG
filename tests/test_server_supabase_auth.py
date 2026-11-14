@@ -390,7 +390,7 @@ def test_proxy_open_when_auth_off(local_server) -> None:
     assert status != 401
 
 
-def test_csrf_bearer_allows_put_personal(auth_server) -> None:
+def test_csrf_bearer_allows_put_personal_on_local_host(auth_server) -> None:
     base, secret, _tmp = auth_server
     body = json.dumps({"profile": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "entries": {}}).encode("utf-8")
     status, _ = _request(
@@ -400,7 +400,47 @@ def test_csrf_bearer_allows_put_personal(auth_server) -> None:
         auth=_bearer(secret),
         headers={
             "Content-Type": "application/json",
+            "Host": "127.0.0.1",
+        },
+        body=body,
+    )
+    assert status == 200
+
+
+def test_csrf_bearer_blocked_on_foreign_host(auth_server) -> None:
+    """Bearer is identity only — random public Host cannot mutate."""
+    base, secret, _tmp = auth_server
+    body = json.dumps({"entries": {}}).encode("utf-8")
+    status, _ = _request(
+        base,
+        "/api/personal",
+        method="PUT",
+        auth=_bearer(secret),
+        headers={
+            "Content-Type": "application/json",
             "Host": "public.example.com",
+        },
+        body=body,
+    )
+    assert status == 403
+
+
+def test_csrf_bearer_allows_put_when_host_matches_public_base(
+    auth_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base, secret, _tmp = auth_server
+    monkeypatch.setenv("BAKLOG_PUBLIC_BASE_URL", "https://tunnel.example")
+    body = json.dumps({"profile": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "entries": {}}).encode(
+        "utf-8"
+    )
+    status, _ = _request(
+        base,
+        "/api/personal",
+        method="PUT",
+        auth=_bearer(secret),
+        headers={
+            "Content-Type": "application/json",
+            "Host": "tunnel.example",
         },
         body=body,
     )

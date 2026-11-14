@@ -2329,6 +2329,7 @@ async function startBrowserConnect(provider) {
 
   const streamUrl = await urlWithStreamTicket(
     `/api/auth/${data.session_id}/stream`,
+    { sessionId: data.session_id },
   );
   if (!isCurrentFlow()) {
     endSuppressOnce();

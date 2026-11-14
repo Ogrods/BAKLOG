@@ -78,6 +78,18 @@ export const fetcherRunner = (() => {
   const sourcesByRunId = new Map();
   const reconnectTimers = new Map();
   const reconnectAttempts = new Map();
+  // CONNECTING onerror streak; force reconnect after CONNECTING_ERROR_STREAK_MAX.
+  const connectingErrorStreak = new Map();
+  const CONNECTING_ERROR_STREAK_MAX = 5;
+  /** @returns {'wait'|'hard'} readyState 0 = EventSource.CONNECTING (no global; tests). */
+  function noteConnectingTransportError(runId, es) {
+    if (es.readyState !== 0) { connectingErrorStreak.delete(runId); return 'hard'; }
+    const streak = (connectingErrorStreak.get(runId) || 0) + 1;
+    connectingErrorStreak.set(runId, streak);
+    if (streak < CONNECTING_ERROR_STREAK_MAX) return 'wait';
+    connectingErrorStreak.delete(runId);
+    return 'hard';
+  }
   /** Run ids the user cancelled — do not reconnect or re-subscribe until gone from server. */
   const suppressedRunIds = new Set();
   const SUPPRESSED_RUNS_KEY = profileScopedStorageKey(LS_FETCHER_SUPPRESSED_RUNS);
@@ -1733,6 +1745,7 @@ export const fetcherRunner = (() => {
     const recentLog = [];
 
     es.addEventListener('status', evt => {
+      connectingErrorStreak.delete(runId);
       try {
         const data = JSON.parse(evt.data);
         if (data.status === 'running' || data.status === 'launching') {
@@ -1758,6 +1771,7 @@ export const fetcherRunner = (() => {
     });
 
     es.addEventListener('line', evt => {
+      connectingErrorStreak.delete(runId);
       try {
         const data = JSON.parse(evt.data);
         if (evt.lastEventId) recordLineSeq(runId, evt.lastEventId);
@@ -1815,6 +1829,7 @@ export const fetcherRunner = (() => {
       } finally {
         clearReconnect(runId);
         reconnectAttempts.delete(runId);
+        connectingErrorStreak.delete(runId);
         clearLastSeq(runId);
         try { es.close(); } catch (_) {}
         sourcesByRunId.delete(runId);
@@ -1830,8 +1845,8 @@ export const fetcherRunner = (() => {
       if (suppressedRunIds.has(runId) || cancelInFlight) return;
       const attached = sourcesByRunId.get(runId);
       if (!attached || attached.es !== es) return;
-      // Let the browser retry with the same ticket URL (multi-use tickets on the server).
-      if (es.readyState === EventSource.CONNECTING) return;
+      // Brief CONNECTING retries share the ticket; then hard reconnect (no zombie).
+      if (noteConnectingTransportError(runId, es) === 'wait') return;
       sourcesByRunId.delete(runId);
       es.onerror = null;
       try { es.close(); } catch (_) {}
@@ -2139,6 +2154,10 @@ export const fetcherRunner = (() => {
     hasStreamForTest(runId) {
       return sourcesByRunId.has(runId);
     },
+    CONNECTING_ERROR_STREAK_MAX,
+    noteConnectingTransportErrorForTest: noteConnectingTransportError,
+    getConnectingStreakForTest: (runId) => connectingErrorStreak.get(runId) || 0,
+    clearConnectingStreakForTest: (runId) => { connectingErrorStreak.delete(runId); },
     isCancelInFlightForTest: () => cancelInFlight,
     getInFlightCountForTest: () => runStateByKey.size,
     getCancelEpoch,

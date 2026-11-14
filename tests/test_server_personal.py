@@ -99,6 +99,26 @@ def test_personal_corrupt_without_backup_returns_503(personal_server: str) -> No
     assert "corrupt" in body.get("error", "").lower()
 
 
+def test_personal_get_rejects_non_local_host(personal_server: str) -> None:
+    status, _ = _request(
+        personal_server,
+        "GET",
+        "/api/personal",
+        extra_headers={"Host": "evil.example"},
+    )
+    assert status == 403
+
+
+def test_personal_get_allows_localhost_host(personal_server: str) -> None:
+    status, _ = _request(
+        personal_server,
+        "GET",
+        "/api/personal",
+        extra_headers={"Host": "127.0.0.1"},
+    )
+    assert status == 200
+
+
 def test_personal_get_empty_doc(personal_server: str):
     status, doc = _request(personal_server, "GET", "/api/personal")
     assert status == 200

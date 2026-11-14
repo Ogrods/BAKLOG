@@ -209,6 +209,8 @@ window.applySpotlightArtFit = function (img) {
     }
   }
   spot._spotlightSyncHover?.();
+  // Let dashboard-spotlight release .is-incoming after layout classes settle.
+  spot._spotlightOnArtFitted?.();
 };
 window.spotlightArtFallback = function (img) {
   const list = (img.dataset.spotlightCandidates || "").split("|").filter(Boolean);
@@ -235,6 +237,7 @@ window.spotlightArtFallback = function (img) {
     `<div class="dash-spotlight-art dash-spotlight-art-placeholder is-loaded" aria-hidden="true" title="${safeName}">` +
     `<span class="placeholder-initials">${initials}</span></div>`;
   spot?._spotlightSyncHover?.();
+  spot?._spotlightOnArtFitted?.();
 };
 window.markLandscape = function (img) {
   if (!img?.classList) return;

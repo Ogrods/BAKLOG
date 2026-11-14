@@ -1,4 +1,4 @@
-/** Spotlight auto-rotation respects prefers-reduced-motion. */
+/** Spotlight still autoplays under prefers-reduced-motion (pause is user-only). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Window } from "happy-dom";
 
@@ -8,6 +8,7 @@ describe("spotlight reduced motion", () => {
   let startSpotlightRotation;
   let stopSpotlightRotation;
   let isSpotlightRotationActive;
+  let getSpotlightPaused;
   let toggleSpotlightPause;
   let SPOTLIGHT_INTERVAL_MS;
   let state;
@@ -42,6 +43,7 @@ describe("spotlight reduced motion", () => {
       startSpotlightRotation,
       stopSpotlightRotation,
       isSpotlightRotationActive,
+      getSpotlightPaused,
       toggleSpotlightPause,
       SPOTLIGHT_INTERVAL_MS,
       setStinkerChanceForTest,
@@ -77,7 +79,7 @@ describe("spotlight reduced motion", () => {
     return pool;
   }
 
-  it("does not auto-start rotation when reduced motion is preferred", () => {
+  it("auto-starts rotation even when reduced motion is preferred", () => {
     const games = [];
     for (let i = 0; i < 5; i++) {
       state.personal[`steam:${i + 1}`] = { status: "backlog" };
@@ -85,26 +87,27 @@ describe("spotlight reduced motion", () => {
     }
     window._dataVersion = (window._dataVersion || 0) + 1;
     mountPool(games);
-    expect(isSpotlightRotationActive()).toBe(false);
+    expect(getSpotlightPaused()).toBe(false);
+    expect(isSpotlightRotationActive()).toBe(true);
+    const keyBefore = document.getElementById("dashboardSpotlight").dataset.key;
     vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + 500);
-    expect(document.getElementById("dashboardSpotlight").dataset.key).toBeTruthy();
+    expect(document.getElementById("dashboardSpotlight").dataset.key).not.toBe(keyBefore);
   });
 
-  it("allows opt-in rotation via pause/play", () => {
+  it("still allows user pause under reduced motion", () => {
     const games = [];
     for (let i = 0; i < 5; i++) {
       state.personal[`steam:${i + 1}`] = { status: "backlog" };
       games.push(libraryGame(i + 1, 80 + i));
     }
     window._dataVersion = (window._dataVersion || 0) + 1;
-    const pool = mountPool(games);
+    mountPool(games);
     const keyBefore = document.getElementById("dashboardSpotlight").dataset.key;
 
     toggleSpotlightPause();
-    expect(isSpotlightRotationActive()).toBe(true);
+    expect(getSpotlightPaused()).toBe(true);
+    expect(isSpotlightRotationActive()).toBe(false);
     vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + 500);
-    expect(document.getElementById("dashboardSpotlight").dataset.key).not.toBe(keyBefore);
-    expect(document.getElementById("dashboardSpotlight").dataset.key).toBeTruthy();
-    expect(pool.length).toBeGreaterThan(1);
+    expect(document.getElementById("dashboardSpotlight").dataset.key).toBe(keyBefore);
   });
 });

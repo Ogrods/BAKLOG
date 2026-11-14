@@ -12,6 +12,7 @@ import {
   hasArmedWatches,
   listArmedWatches,
   initLibraryWatches,
+  pollSteamCatalog,
 } from '../js/library-watch.js';
 
 const WATCH_LS_KEY = profileScopedStorageKey('baklog-library-watch');
@@ -112,6 +113,46 @@ describe('initLibraryWatches', () => {
     expect(watches.some(w => w.id === 'pico-park')).toBe(false);
     expect(watches).toHaveLength(1);
     expect(watches[0].id).toBe('test-game');
+  });
+});
+
+describe('pollSteamCatalog', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps existing Steam meta when poll returns empty games', async () => {
+    armLibraryWatch(TEST_WATCH);
+    state.libraryMeta.steam = {
+      games: [{ appid: 99, name: 'Keep Me' }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ games: [] }),
+      })),
+    );
+    await pollSteamCatalog();
+    expect(state.libraryMeta.steam.games[0].name).toBe('Keep Me');
+  });
+
+  it('merges non-empty poll and fires watch when app appears', async () => {
+    armLibraryWatch(TEST_WATCH);
+    state.libraryMeta.steam = { games: [{ appid: 1, name: 'Other' }] };
+    state.allGames = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          games: [{ appid: 42, name: 'Test Game Found' }],
+        }),
+      })),
+    );
+    await pollSteamCatalog();
+    expect(state.libraryMeta.steam.games.some((g) => g.appid === 42)).toBe(true);
+    expect(readWatches()).toHaveLength(0);
   });
 });
 

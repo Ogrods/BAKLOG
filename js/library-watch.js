@@ -7,7 +7,12 @@
 import { state } from './state.js';
 import { escapeHtml } from './dom-util.js';
 import { LS_LIBRARY_WATCH, profileScopedStorageKey } from './profiles.js';
-import { fetchLibraryJson, rebuildAllGamesFromMetas } from './library-load.js';
+import {
+  applyMergedLibrary,
+  captureLibraryKeysBeforeMerge,
+  fetchLibraryJson,
+  rebuildAllGamesFromMetas,
+} from './library-load.js';
 import { applyPrefsChange, switchView } from './filters-ui.js';
 import { syncFilterDomFromState } from './prefs.js';
 import { invalidateTableCache, renderTable } from './table-ui.js';
@@ -181,16 +186,23 @@ export function checkLibraryWatches() {
   return fired;
 }
 
-async function pollSteamCatalog() {
+/** @internal Exported for Vitest — 5-min poll while watches are armed. */
+export async function pollSteamCatalog() {
   if (document.hidden || !hasArmedWatches()) return;
   try {
     const steam = await fetchLibraryJson('games_steam.json');
-    if (steam?.games) {
-      state.libraryMeta.steam = steam;
-      // Keep in-memory allGames / merge state aligned after background catalog swap.
-      rebuildAllGamesFromMetas();
-      checkLibraryWatches();
+    const games = steam?.games;
+    // Reject null / non-array / empty so a flaky poll never blanks Steam.
+    if (!Array.isArray(games) || games.length === 0) return;
+    captureLibraryKeysBeforeMerge();
+    state.libraryMeta.steam = steam;
+    rebuildAllGamesFromMetas();
+    try {
+      await applyMergedLibrary('steam');
+    } catch {
+      /* Merge chrome needs DOM; catalog + watches still proceed. */
     }
+    checkLibraryWatches();
   } catch {
     /* offline / no file yet */
   }

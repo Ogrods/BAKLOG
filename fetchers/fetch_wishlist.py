@@ -3,6 +3,8 @@
 
 import argparse
 import json
+import re
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +30,50 @@ from shared.money import format_price, normalize_currency_code
 
 GAMES_WISHLIST_JSON = Path("games_wishlist.json")
 HLTB_DELAY_SEC = 1.0
+_STEAM_PLACEHOLDER_NAME_RE = re.compile(r"^Steam \d+$")
+_PLACEHOLDER_NAME_RATIO_MAX = 0.5
+
+
+def steam_placeholder_name_ratio(games: list[dict]) -> float:
+    if not games:
+        return 0.0
+    hits = sum(
+        1 for g in games if _STEAM_PLACEHOLDER_NAME_RE.match(str(g.get("name") or ""))
+    )
+    return hits / len(games)
+
+
+def refuse_wishlist_placeholder_collapse(
+    games: list[dict],
+    *,
+    allow_drift: bool,
+    output_path: Path,
+) -> int | None:
+    """Refuse when titles collapsed to Steam {appid} stubs at similar catalog size."""
+    if allow_drift or not games:
+        return None
+    ratio = steam_placeholder_name_ratio(games)
+    if ratio <= _PLACEHOLDER_NAME_RATIO_MAX:
+        return None
+    # Only refuse when count is still "similar" (drift guard would miss quality collapse).
+    drift = refuse_drift_result(
+        games,
+        label="Steam wishlist placeholder check",
+        allow_drift=False,
+        output_path=output_path,
+        threshold=_PLACEHOLDER_NAME_RATIO_MAX,
+    )
+    if drift is not None:
+        return drift
+    print(
+        f"ERROR: Steam wishlist write refused — {ratio:.0%} of titles are "
+        f"'Steam {{appid}}' placeholders (limit {_PLACEHOLDER_NAME_RATIO_MAX:.0%}) "
+        "while the row count stayed similar.\n"
+        "Store details likely failed. Re-run with --allow-drift if intentional.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
 
 
 def fetch_wishlist_items(api_key: str, steam_id: str) -> list[dict]:
@@ -109,9 +155,19 @@ def main() -> int:
             print(f"  details warning: {e}", flush=True)
 
         data = (details or {}).get("data") if details else None
-        name = (data or {}).get("name") or f"Steam {appid}"
         if data and data.get("type") != "game":
             loop_hb.tick_progress(i, len(items), "Steam wishlist", "non-game")
+            continue
+
+        name = str((data or {}).get("name") or "").strip()
+        existing_row = existing.get(str(appid))
+        if not name:
+            # Preserve a prior good row; never invent "Steam {appid}" placeholders.
+            if existing_row:
+                games_out.append(existing_row)
+                loop_hb.tick_progress(i, len(items), "Steam wishlist", "cached-details")
+            else:
+                loop_hb.tick_progress(i, len(items), "Steam wishlist", "no-details")
             continue
 
         reviews = None
@@ -191,12 +247,19 @@ def main() -> int:
     )
     if drift_exit is not None:
         return stats.finish("fetch_wishlist", t0, exit_code=drift_exit)
+    placeholder_exit = refuse_wishlist_placeholder_collapse(
+        games_out,
+        allow_drift=args.allow_drift,
+        output_path=GAMES_WISHLIST_JSON,
+    )
+    if placeholder_exit is not None:
+        return stats.finish("fetch_wishlist", t0, exit_code=placeholder_exit)
 
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "wishlist",
         "game_count": len(games_out),
-        "games": sorted(games_out, key=lambda g: g["name"].lower()),
+        "games": sorted(games_out, key=lambda g: str(g.get("name") or "").lower()),
     }
     write_catalog_text(GAMES_WISHLIST_JSON, json.dumps(payload, indent=2, ensure_ascii=False))
     print(f"\nWrote {len(games_out)} games to {GAMES_WISHLIST_JSON}.", flush=True)

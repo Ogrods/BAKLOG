@@ -553,6 +553,30 @@ function preserveLibraryMeta(metaKey, fetched) {
   return fetched ?? state.libraryMeta[metaKey] ?? null;
 }
 
+/** Bumped at the start of reloadGames / reloadAfterFetcher so a stale await cannot clobber newer meta. */
+let _loadGeneration = 0;
+
+function beginLoadGeneration() {
+  return ++_loadGeneration;
+}
+
+function isStaleLoad(gen) {
+  return gen !== _loadGeneration;
+}
+
+/** Test helpers for Vitest load-generation races. */
+export function _resetLoadGenerationForTests() {
+  _loadGeneration = 0;
+}
+
+export function _beginLoadGenerationForTests() {
+  return beginLoadGeneration();
+}
+
+export function _isStaleLoadForTests(gen) {
+  return isStaleLoad(gen);
+}
+
 export { LIBRARY_STORE_JSON };
 
 /** Pre-legacy carry catalogs may still have stale=true on disk until the next Nintendo sync. */
@@ -709,7 +733,7 @@ export function rebuildWishlistFromMetas() {
   state.wishlistGames = [...fetchedWishlist, ...manualWishlist];
 }
 
-export async function reloadAllLibraryStoreFiles() {
+export async function reloadAllLibraryStoreFiles(loadGen = null) {
   captureLibraryKeysBeforeMerge();
   const entries = await Promise.all(
     Object.entries(LIBRARY_STORE_JSON).map(async ([metaKey, file]) => {
@@ -721,32 +745,38 @@ export async function reloadAllLibraryStoreFiles() {
       }
     }),
   );
+  if (loadGen != null && isStaleLoad(loadGen)) return;
   for (const [metaKey, data] of entries) state.libraryMeta[metaKey] = data;
   rebuildAllGamesFromMetas();
 }
 
-export async function reloadAllWishlistStoreFiles() {
+export async function reloadAllWishlistStoreFiles(loadGen = null) {
   const entries = await Promise.all(
     Object.entries(WISHLIST_FETCHER_JSON).map(async ([fetcherKey, file]) => {
       const metaKey = WISHLIST_FETCHER_META_KEY[fetcherKey];
       try {
-        return [metaKey, await fetchLibraryJson(file)];
+        const data = await fetchLibraryJson(file);
+        return [metaKey, preserveLibraryMeta(metaKey, data)];
       } catch {
         return [metaKey, state.libraryMeta[metaKey] ?? null];
       }
     }),
   );
+  if (loadGen != null && isStaleLoad(loadGen)) return;
   for (const [metaKey, data] of entries) state.libraryMeta[metaKey] = data;
   rebuildWishlistFromMetas();
 }
 
 export async function reloadAfterFetcher(key) {
+  const gen = beginLoadGeneration();
   noteFetcherReload(key);
   if (key === "itad") {
     const prevByKey = { ...state.itadByKey };
     const wasAuto = consumeItadAutoRunFlag();
     await loadItadPrices();
-    await reloadAllWishlistStoreFiles();
+    if (isStaleLoad(gen)) return;
+    await reloadAllWishlistStoreFiles(gen);
+    if (isStaleLoad(gen)) return;
     if (wasAuto) {
       const diff = diffItadDeals(prevByKey, state.itadByKey);
       if (diff.newSales > 0 || diff.newHistoricalLows > 0) {
@@ -754,42 +784,46 @@ export async function reloadAfterFetcher(key) {
       }
     }
   } else if (ENRICH_FETCHER_KEYS.has(key)) {
-    await reloadAllLibraryStoreFiles();
+    await reloadAllLibraryStoreFiles(gen);
+    if (isStaleLoad(gen)) return;
     if (ENRICH_RELOAD_WISHLIST_KEYS.has(key)) {
-      await reloadAllWishlistStoreFiles();
+      await reloadAllWishlistStoreFiles(gen);
+      if (isStaleLoad(gen)) return;
     }
     if (key === "hltb") await loadHltbCache();
     if (key === "steamReviews") await loadSteamReviewCache();
     if (key === "steamCovers") await loadSteamCoversMeta();
     if (key === "steamTags") await loadSteamTagsMeta();
     if (key === "protondb") await loadProtondbCache();
+    if (isStaleLoad(gen)) return;
   } else if (key === "claims") {
     const wasAuto = consumeClaimsAutoRunFlag();
     const prevKeys = loadClaimsSnapshotKeys();
     await loadClaimableNow();
+    if (isStaleLoad(gen)) return;
     const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
     if (wasAuto && newCount > 0) showClaimableBanner(newCount);
     saveClaimsSnapshot(state.claimableFeed?.items || []);
     refreshClaimableUi();
   } else if (WISHLIST_FETCHER_JSON[key]) {
     const metaKey = WISHLIST_FETCHER_META_KEY[key];
-    state.libraryMeta[metaKey] = preserveLibraryMeta(
-      metaKey,
-      await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]),
-    );
+    const data = await fetchLibraryJson(WISHLIST_FETCHER_JSON[key]);
+    if (isStaleLoad(gen)) return;
+    state.libraryMeta[metaKey] = preserveLibraryMeta(metaKey, data);
     rebuildWishlistFromMetas();
   } else if (LIBRARY_STORE_JSON[key]) {
     captureLibraryKeysBeforeMerge();
-    state.libraryMeta[key] = preserveLibraryMeta(
-      key,
-      await fetchLibraryJson(LIBRARY_STORE_JSON[key]),
-    );
+    const data = await fetchLibraryJson(LIBRARY_STORE_JSON[key]);
+    if (isStaleLoad(gen)) return;
+    state.libraryMeta[key] = preserveLibraryMeta(key, data);
     rebuildAllGamesFromMetas();
   } else {
     await reloadGames();
     return;
   }
+  if (isStaleLoad(gen)) return;
   await applyMergedLibrary(key);
+  if (isStaleLoad(gen)) return;
   const newCount = state._lastNewlyAddedCount ?? 0;
   if (LIBRARY_STORE_JSON[key] && !ENRICH_FETCHER_KEYS.has(key)) {
     void maybeAutoEnrichNewAdditions(newCount).catch(() => {});
@@ -800,6 +834,7 @@ export async function reloadAfterFetcher(key) {
 }
 
 export async function reloadGames() {
+  const gen = beginLoadGeneration();
   const [
     steam,
     gog,
@@ -843,6 +878,7 @@ export async function reloadGames() {
     fetchLibraryJson("games_wishlist_nintendo.json"),
     fetchLibraryJson("games_wishlist_humble.json"),
   ]);
+  if (isStaleLoad(gen)) return;
   if (
     !steam &&
     !gog &&
@@ -911,10 +947,13 @@ export async function reloadGames() {
     loadSteamTagsMeta(),
     loadProtondbCache(),
   ]);
+  if (isStaleLoad(gen)) return;
   await applyMergedLibrary();
+  if (isStaleLoad(gen)) return;
   // Load claimables after buildOwnedNormNames() so owned-library games are
   // filtered on the first paint, not briefly shown until merge completes.
   await loadClaimableNow();
+  if (isStaleLoad(gen)) return;
   saveClaimsSnapshot(state.claimableFeed?.items || []);
   if (state.activeView === "wishlist") refreshClaimableUi();
   void import("./library-watch.js").then((m) => m.onSteamCatalogReloaded());

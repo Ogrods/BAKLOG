@@ -12,6 +12,7 @@ import {
   findOrphanPersonalKeys,
   setPersonalByKey,
   applyHiddenTitleNorms,
+  unhidePersonalKey,
 } from '../js/personal-storage.js';
 import { gameKey } from '../js/game-core.js';
 
@@ -167,6 +168,53 @@ describe('cross-store hidden mirroring', () => {
     expect(state.personal[gameKey(fortniteEpic)].hidden).toBe(false);
     expect(state.personal[gameKey(fortniteWish)].hidden).toBe(true);
     expect(state.personal.__hidden_title_norms_wishlist_v1).toContain('fortnite');
+  });
+
+  it('orphan unhide clears sticky library title-norm', () => {
+    state.allGames = [];
+    state.wishlistGames = [];
+    state.personal = {
+      'steam:gone': {
+        status: 'backlog',
+        notes: '',
+        priority: 0,
+        hltb_override: null,
+        hidden: true,
+        hidden_title_norm: 'fortnite',
+      },
+      __hidden_title_norms_v1: ['fortnite'],
+      __hidden_title_norms_migrated_v1: true,
+      __hidden_title_norms_realm_split_v1: true,
+      __hidden_title_norms_scrub_unused_v1: true,
+    };
+    unhidePersonalKey('steam:gone', { silent: true });
+    expect(state.personal['steam:gone'].hidden).toBe(false);
+    expect(state.personal.__hidden_title_norms_v1 || []).not.toContain('fortnite');
+  });
+
+  it('scrubUnusedHideNorms drops library norms with no remaining library hides', () => {
+    state.allGames = [fortniteSteam];
+    state.wishlistGames = [fortniteWish];
+    state.personal = {
+      [gameKey(fortniteWish)]: {
+        status: 'backlog',
+        notes: '',
+        priority: 0,
+        hltb_override: null,
+        hidden: true,
+        hidden_title_norm: 'fortnite',
+      },
+      // Pre-split pollution: library norm still lists fortnite though library is visible.
+      __hidden_title_norms_v1: ['fortnite'],
+      __hidden_title_norms_wishlist_v1: ['fortnite'],
+      __hidden_title_norms_migrated_v1: true,
+      __hidden_title_norms_realm_split_v1: true,
+    };
+    applyHiddenTitleNorms({ silent: true });
+    expect(state.personal.__hidden_title_norms_v1 || []).not.toContain('fortnite');
+    expect(state.personal.__hidden_title_norms_wishlist_v1).toContain('fortnite');
+    expect(state.personal[gameKey(fortniteSteam)]?.hidden).not.toBe(true);
+    expect(state.personal[gameKey(fortniteWish)].hidden).toBe(true);
   });
 });
 

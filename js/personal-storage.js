@@ -15,7 +15,6 @@ import {
   gameKey,
   gameId,
   findGameByKey,
-  getSameTitleKeys,
   getSameTitleKeysInRealm,
   getTitleKeyIndex,
   isWishlistGame,
@@ -231,6 +230,7 @@ const META_KEYS = new Set([
   "__hidden_title_norms_wishlist_v1",
   "__hidden_title_norms_migrated_v1",
   "__hidden_title_norms_realm_split_v1",
+  "__hidden_title_norms_scrub_unused_v1",
   "__nintendo_dropped_ids_v1",
 ]);
 
@@ -344,6 +344,52 @@ function ensureHiddenTitleNormsRealmSplit() {
   state.personal.__hidden_title_norms_realm_split_v1 = true;
   if (changed) {
     saveHiddenTitleNorms(wishNorms, { silent: true }, true);
+    return true;
+  }
+  savePersonal();
+  return false;
+}
+
+function titleNormStillUsedInRealm(norm, wishlistRealm, { exceptKey = null } = {}) {
+  if (!norm) return false;
+  for (const [key, rec] of Object.entries(state.personal)) {
+    if (key === exceptKey) continue;
+    if (isMetaPersonalKey(key)) continue;
+    if (isWishlistGameKey(key) !== wishlistRealm) continue;
+    if (rec?.hidden !== true) continue;
+    if (rec.hidden_title_norm === norm) return true;
+    const g = findGameByKey(key);
+    if (g && normalizeNameForDedup(g.name) === norm) return true;
+  }
+  const index = getTitleKeyIndex();
+  for (const key of index.get(norm) || []) {
+    if (key === exceptKey) continue;
+    if (isWishlistGameKey(key) !== wishlistRealm) continue;
+    if (state.personal[key]?.hidden === true) return true;
+  }
+  return false;
+}
+
+/** Drop hide norms with no remaining hidden keys in that realm (heals pre-split pollution). */
+function scrubUnusedHideNorms() {
+  if (state.personal.__hidden_title_norms_scrub_unused_v1) return false;
+  let changed = false;
+  for (const wishlistRealm of [false, true]) {
+    const norms = hiddenTitleNorms(wishlistRealm);
+    let next = null;
+    for (const norm of norms) {
+      if (titleNormStillUsedInRealm(norm, wishlistRealm)) continue;
+      if (!next) next = new Set(norms);
+      next.delete(norm);
+      changed = true;
+    }
+    if (next) saveHiddenTitleNorms(next, { silent: true }, wishlistRealm);
+  }
+  state.personal.__hidden_title_norms_scrub_unused_v1 = true;
+  if (changed) {
+    window._dataVersion = (window._dataVersion || 0) + 1;
+    personalMemo.bump();
+    savePersonal();
     return true;
   }
   savePersonal();
@@ -624,18 +670,25 @@ function mirrorHiddenToKeys(keys, hidden, options) {
   return changed;
 }
 
-/** Pick the longest non-empty note per title group and mirror to every store copy. */
+/** Pick the longest non-empty note per same-realm title group and mirror within that realm. */
 export function reconcileNotesAcrossTitles() {
   const index = getTitleKeyIndex();
   const processed = new Set();
   let changed = false;
 
-  const applyToGroup = (keys) => {
-    const sig = keys.slice().sort().join("|");
+  const applyToRealmGroup = (keys, wishlistRealm) => {
+    const realmKeys = keys.filter((k) => isWishlistGameKey(k) === wishlistRealm);
+    const sig = `${wishlistRealm ? "w" : "l"}:${realmKeys.slice().sort().join("|")}`;
     if (processed.has(sig)) return;
     processed.add(sig);
-    const canonical = pickLongestNoteForKeys(keys);
-    if (mirrorNoteToKeys(keys, canonical, { silent: true })) changed = true;
+    if (!realmKeys.length) return;
+    const canonical = pickLongestNoteForKeys(realmKeys);
+    if (mirrorNoteToKeys(realmKeys, canonical, { silent: true })) changed = true;
+  };
+
+  const applyToGroup = (keys) => {
+    applyToRealmGroup(keys, false);
+    applyToRealmGroup(keys, true);
   };
 
   for (const keys of index.values()) applyToGroup(keys);
@@ -721,11 +774,47 @@ function applyNormSetToRealm(norms, wishlistRealm) {
 export function applyHiddenTitleNorms({ silent = false } = {}) {
   migrateHiddenTitleNorms();
   ensureHiddenTitleNormsRealmSplit();
+  scrubUnusedHideNorms();
   const libChanged = applyNormSetToRealm(hiddenTitleNorms(false), false);
   const wishChanged = applyNormSetToRealm(hiddenTitleNorms(true), true);
   const changed = libChanged || wishChanged;
   if (changed && !silent) scheduleDownstreamSync();
   return changed;
+}
+
+/**
+ * Unhide by personal key (catalog row or orphan). Updates the correct realm
+ * title-norm set so applyHiddenTitleNorms cannot immediately re-hide.
+ */
+export function unhidePersonalKey(key, options) {
+  if (!key || isMetaPersonalKey(key)) return;
+  const g = findGameByKey(key);
+  if (g) {
+    setGameHidden(g, false, options);
+    return;
+  }
+  const wishlistRealm = isWishlistGameKey(key);
+  if (!state.personal[key]) return;
+  const norm = state.personal[key].hidden_title_norm || null;
+  if (state.personal[key].hidden !== true && !norm) return;
+  state.personal[key].hidden = false;
+  if ("hidden_title_norm" in state.personal[key]) {
+    delete state.personal[key].hidden_title_norm;
+  }
+  window._dataVersion = (window._dataVersion || 0) + 1;
+  personalMemo.bump();
+  if (norm) {
+    const norms = hiddenTitleNorms(wishlistRealm);
+    if (
+      norms.has(norm) &&
+      !titleNormStillUsedInRealm(norm, wishlistRealm, { exceptKey: key })
+    ) {
+      norms.delete(norm);
+      saveHiddenTitleNorms(norms, { ...options, silent: true }, wishlistRealm);
+    }
+  }
+  savePersonal();
+  if (!options?.silent) scheduleDownstreamSync();
 }
 
 /** Sync hidden flag across same-realm store copies of the same title (fixes key churn). */
@@ -797,7 +886,9 @@ export function setPersonalByKey(key, field, value, options) {
 
 export function setPersonal(g, field, value, options) {
   if (field === "notes") {
-    mirrorNoteToKeys(getSameTitleKeys(g), value, options);
+    // Same-realm only: wishlist notes must not rewrite owned-library notes (and
+    // vice versa). Cross-store library copies still share one note.
+    mirrorNoteToKeys(getSameTitleKeysInRealm(g), value, options);
     return;
   }
   if (field === "hidden") {

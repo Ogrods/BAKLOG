@@ -4,7 +4,7 @@ import {
   countUserHiddenGames,
   countHiddenLibraryNoiseGames,
   setGameHidden,
-  setPersonalByKey,
+  unhidePersonalKey,
   flushSavePersonal,
   removeNintendoDroppedId,
 } from './personal-storage.js';
@@ -153,12 +153,13 @@ function close() {
 }
 
 function unhideEntry(entry, options) {
-  if (entry.game) {
-    if (entry.game.store === 'nintendo') {
-      removeNintendoDroppedId(entry.game.nintendo_id ?? entry.game.id, { silent: true });
-    }
-    setGameHidden(entry.game, false, options);
-  } else setPersonalByKey(entry.key, 'hidden', false, options);
+  if (entry.game?.store === 'nintendo') {
+    removeNintendoDroppedId(entry.game.nintendo_id ?? entry.game.id, { silent: true });
+  }
+  // Catalog or orphan: always go through unhidePersonalKey so title-norm sets
+  // stay in sync (setPersonalByKey alone left sticky norms that re-hid on merge).
+  if (entry.game) setGameHidden(entry.game, false, options);
+  else unhidePersonalKey(entry.key, options);
 }
 
 function restoreKey(key) {

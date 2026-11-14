@@ -39,6 +39,8 @@ GAMES_GOG_JSON = Path("games_gog.json")
 HLTB_DELAY_SEC = 1.0
 GOG_WEB_DETAIL_WORKERS = 6
 LEGACY_ROW_SOURCE = "web"
+_GOG_PLACEHOLDER_NAME_RE = re.compile(r"^GOG \d+$")
+_PLACEHOLDER_NAME_RATIO_MAX = 0.5
 
 # Stable metadata that the other GOG source may have populated (web has release_date;
 # local Galaxy DB often does not). Carried on source flip after merge_cached_row.
@@ -129,11 +131,12 @@ def _build_game_row(
     media_type = product.get("mediaType") or product.get("media_type")
     non_game_media = media_type not in (None, 1, "1", "game")
 
+    # Empty name lets merge_cached_row keep a cached title; never invent "GOG {id}".
     name = (
         product.get("title")
         or product.get("name")
         or (details or {}).get("title")
-        or f"GOG {gog_id}"
+        or ""
     )
     image = (
         product.get("image")
@@ -301,6 +304,37 @@ def merge_gog_sources(
 
 def _count_rows_for_source(games: list[dict], source: str) -> int:
     return sum(1 for g in games if _effective_row_source(g) == source)
+
+
+def gog_placeholder_name_ratio(games: list[dict]) -> float:
+    """Fraction of rows whose title is still a synthetic ``GOG {id}`` stub."""
+    if not games:
+        return 0.0
+    hits = sum(
+        1 for g in games if _GOG_PLACEHOLDER_NAME_RE.match(str(g.get("name") or ""))
+    )
+    return hits / len(games)
+
+
+def refuse_gog_placeholder_collapse(
+    games: list[dict],
+    *,
+    allow_drift: bool,
+) -> int | None:
+    """Refuse writes that would mostly replace real titles with GOG id stubs."""
+    if allow_drift:
+        return None
+    ratio = gog_placeholder_name_ratio(games)
+    if ratio <= _PLACEHOLDER_NAME_RATIO_MAX:
+        return None
+    print(
+        f"ERROR: GOG library write refused — {ratio:.0%} of titles are "
+        f"'GOG {{id}}' placeholders (limit {_PLACEHOLDER_NAME_RATIO_MAX:.0%}).\n"
+        "Likely a broken enrich/auth path. Re-run with --allow-drift if intentional.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return 3
 
 
 def refuse_gog_source_drift(
@@ -584,26 +618,12 @@ def main() -> int:
         try:
             products = gog.get_all_filtered_products(refresh=args.refresh)
         except GogAuthError:
-            print(
-                "GOG library API rejected the session; trying owned-game ID list...",
-                flush=True,
-            )
-            products = None
-            try:
-                owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")
-            except GogAuthError:
-                owned_ids = []
-            if owned_ids:
-                print(
-                    f"Warning: degraded fetch via per-game details ({len(owned_ids)} IDs).",
-                    flush=True,
-                )
-                products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
-            if products is None:
-                msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
-                mark_invalid("gog", error=msg)
-                stats.error(msg)
-                return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
+            # Do not degrade to owned-ID stubs ("GOG {id}") — that overwrites
+            # real cached titles via authoritative merge. Fail closed like other stores.
+            msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
+            mark_invalid("gog", error=msg)
+            stats.error(msg)
+            return stats.finish("fetch_gog", t0, exit_code=EXIT_CODE_AUTH)
         except requests.HTTPError as e:
             if e.response is not None and e.response.status_code in (401, 403):
                 msg = GOG_AUTH_MESSAGE + _gog_galaxy_hint(db_path)
@@ -616,7 +636,8 @@ def main() -> int:
         if not products:
             owned_ids = run_with_heartbeat(gog.get_owned_game_ids, "GOG owned IDs")
             print(f"Found {len(owned_ids)} owned IDs (building from details)...", flush=True)
-            products = [{"id": pid, "title": f"GOG {pid}"} for pid in owned_ids]
+            # Empty title: merge_cached_row keeps prior names; details fill new rows.
+            products = [{"id": pid, "title": ""} for pid in owned_ids]
         else:
             print(f"Found {len(products)} products in library.", flush=True)
 
@@ -636,7 +657,7 @@ def main() -> int:
                 if int(p.get("id") or p.get("productId") or 0) == args.gog_id
             ]
             if not products:
-                products = [{"id": args.gog_id, "title": f"GOG {args.gog_id}"}]
+                products = [{"id": args.gog_id, "title": ""}]
 
         skipped = 0
         details_by_id: dict[int, dict | None] = {}
@@ -777,13 +798,19 @@ def main() -> int:
     if drift_exit is not None:
         return stats.finish("fetch_gog", t0, exit_code=drift_exit)
 
+    placeholder_exit = refuse_gog_placeholder_collapse(
+        games_out, allow_drift=args.allow_drift
+    )
+    if placeholder_exit is not None:
+        return stats.finish("fetch_gog", t0, exit_code=placeholder_exit)
+
     playable = catalog_game_count(games_out)
     payload = {
         "fetched_at": datetime.now(UTC).isoformat(),
         "store": "gog",
         "source": source,
         "game_count": playable,
-        "games": sorted(games_out, key=lambda g: g["name"].lower()),
+        "games": sorted(games_out, key=lambda g: str(g.get("name") or "").lower()),
     }
 
     write_catalog_text(GAMES_GOG_JSON, json.dumps(payload, indent=2, ensure_ascii=False))

@@ -72,4 +72,48 @@ describe('reloadAllWishlistStoreFiles', () => {
     expect(state.libraryMeta.wishlist.games[0].name).toBe('Cached Steam WL');
     expect(state.wishlistGames.some((g) => g.name === 'Cached Steam WL')).toBe(true);
   });
+
+  it('keeps cached meta when fetch returns !ok (null)', async () => {
+    state.libraryMeta.wishlist = {
+      games: [{ id: 'cached', name: 'Cached Steam WL', appid: 1 }],
+    };
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const path = String(url).split('?')[0];
+      if (path.includes('games_wishlist.json')) {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      const file = path.replace(/^\//, '');
+      return {
+        ok: true,
+        json: async () => ({
+          games: [{ id: `id-${file}`, name: `Game from ${file}` }],
+        }),
+      };
+    });
+
+    await reloadAllWishlistStoreFiles();
+
+    expect(state.libraryMeta.wishlist.games[0].name).toBe('Cached Steam WL');
+  });
+
+  it('clears a store when the catalog is a real empty games array', async () => {
+    state.libraryMeta.wishlist = {
+      games: [{ id: 'old', name: 'Gone', appid: 9 }],
+    };
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const path = String(url).split('?')[0];
+      if (path.includes('games_wishlist.json')) {
+        return { ok: true, json: async () => ({ games: [] }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({ games: [{ id: 'x', name: 'Other' }] }),
+      };
+    });
+
+    await reloadAllWishlistStoreFiles();
+
+    expect(state.libraryMeta.wishlist.games).toEqual([]);
+    expect(state.wishlistGames.some((g) => g.name === 'Gone')).toBe(false);
+  });
 });

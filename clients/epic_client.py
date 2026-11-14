@@ -18,6 +18,7 @@ tools like legendary; they grant access only when paired with a real user code.
 
 import base64
 import json
+import os
 import re
 import threading
 import time
@@ -182,6 +183,41 @@ class EpicClient:
     # session.json on disk is the whole point of moving here.
     _SECRETS_PROVIDER = "epic_session"
 
+    @staticmethod
+    def _is_secrets_unavailable(exc: BaseException) -> bool:
+        """True only for keyring/secrets/permission failures — not unexpected bugs."""
+        from auth.secrets import SecretsCorruptError
+
+        if isinstance(exc, (SecretsCorruptError, PermissionError, OSError)):
+            return True
+        try:
+            from keyring.errors import KeyringError
+
+            if isinstance(exc, KeyringError):
+                return True
+        except ImportError:
+            pass
+        text = str(exc).lower()
+        return "keyring" in text
+
+    @staticmethod
+    def _restrict_plaintext_session_acl(path: Path) -> None:
+        """Best-effort user-only ACL on the plaintext fallback file."""
+        try:
+            if os.name == "nt":
+                import subprocess
+
+                subprocess.run(
+                    ["icacls", str(path), "/inheritance:r", "/grant:r", f"{os.getlogin()}:F"],
+                    check=False,
+                    capture_output=True,
+                    timeout=10,
+                )
+            else:
+                os.chmod(path, 0o600)
+        except Exception:  # noqa: BLE001 - ACL is best-effort
+            pass
+
     def _save_session(self) -> None:
         blob = {"refresh_token": self._refresh_token, "account_id": self._account_id}
         try:
@@ -190,11 +226,14 @@ class EpicClient:
             _secrets.set_provider_blob(self._SECRETS_PROVIDER, blob)
             self._purge_plaintext_session()
             return
-        except Exception as exc:  # noqa: BLE001 - keep Epic working without keyring
+        except Exception as exc:
+            if not self._is_secrets_unavailable(exc):
+                raise
             print(f"  epic session: secrets store unavailable ({exc}); using local file")
-        # Resilience fallback only — e.g. no OS keyring available.
+        # Resilience fallback only — e.g. no OS keyring / corrupt secrets store.
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._session_file.write_text(json.dumps(blob, indent=2), encoding="utf-8")
+        self._restrict_plaintext_session_acl(self._session_file)
 
     def _purge_plaintext_session(self) -> None:
         """Delete any plaintext session.json once the token lives in secrets."""

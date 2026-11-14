@@ -3,6 +3,7 @@ the active profile — never as a plaintext session.json on disk."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -97,3 +98,51 @@ def test_epic_migrates_plaintext_session_into_secrets(
     assert get_provider_blob("epic_session").get("refresh_token") == "old"
     assert not profile_session.is_file()
     assert not (legacy_dir / "session.json").is_file()
+
+
+def test_epic_unexpected_secrets_error_does_not_write_plaintext(
+    isolated_profiles: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_profile("Work")
+    monkeypatch.setenv("BAKLOG_PROFILE", "work")
+    reset_cache()
+
+    cache_dir = default_epic_cache_dir()
+    client = EpicClient(cache_dir=cache_dir)
+    client._refresh_token = "refresh"
+    client._account_id = "acct"
+
+    def _boom(*_a, **_k):  # noqa: ANN001
+        raise RuntimeError("unexpected secrets bug")
+
+    monkeypatch.setattr("auth.secrets.set_provider_blob", _boom)
+    with pytest.raises(RuntimeError, match="unexpected secrets bug"):
+        client._save_session()
+    assert not (cache_dir / "session.json").is_file()
+
+
+def test_epic_secrets_corrupt_falls_back_to_plaintext(
+    isolated_profiles: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from auth.secrets import SecretsCorruptError
+
+    create_profile("Work")
+    monkeypatch.setenv("BAKLOG_PROFILE", "work")
+    reset_cache()
+
+    cache_dir = default_epic_cache_dir()
+    client = EpicClient(cache_dir=cache_dir)
+    client._refresh_token = "refresh"
+    client._account_id = "acct"
+
+    def _corrupt(*_a, **_k):  # noqa: ANN001
+        raise SecretsCorruptError("cannot read secrets")
+
+    monkeypatch.setattr("auth.secrets.set_provider_blob", _corrupt)
+    monkeypatch.setattr(EpicClient, "_restrict_plaintext_session_acl", staticmethod(lambda _p: None))
+    client._save_session()
+    session = cache_dir / "session.json"
+    assert session.is_file()
+    assert json.loads(session.read_text(encoding="utf-8"))["refresh_token"] == "refresh"

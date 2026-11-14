@@ -37,6 +37,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.09] - 2026-11-13
+
+### Fixed
+
+- Hiding a wishlist title (or adding a wishlist note) no longer hides or edits the same title in your owned library, and the reverse.
+- Spotlight slides fade between cards more smoothly, including when the system prefers reduced motion.
+- After you sign in, Pro background store refresh uses your account library instead of a leftover empty Default profile.
+
 ## [0.9.08] - 2026-11-08
 
 ### Fixed

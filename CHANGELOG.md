@@ -37,6 +37,15 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-11-14
+
+### Fixed
+
+- Failed GOG or Steam wishlist refreshes no longer replace real titles with placeholder GOG or Steam id names.
+- Library and wishlist reloads are less likely to flash empty or clobber each other when refreshes overlap.
+- Spotlight swaps hold the fade until the next slide is ready; store, claim, deal, and update links ignore unsafe URLs.
+- Uninstall wipe data reports failure if cleanup did not finish; portable wipe leaves the app binaries in place.
+
 ## [0.9.1] - 2026-11-13
 
 ### Fixed

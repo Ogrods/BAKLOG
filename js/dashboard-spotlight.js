@@ -326,6 +326,8 @@ let _rotationWanted = false;
 let _spotlightFadeTimer = null;
 /** Cancels a pending double-rAF that drops .is-incoming after a slide swap. */
 let _spotlightIncomingRaf = 0;
+/** Timeout fallback while waiting for cover art-fit before releasing .is-incoming. */
+let _spotlightIncomingFitTimer = null;
 let _spotlightIndex = 0;
 let _spotlightPool = [];
 let _spotlightCurrentKey = null;
@@ -390,12 +392,6 @@ function nextSpotlightIndex() {
   return (_spotlightIndex + 1) % len;
 }
 
-function prefersReducedMotion() {
-  return (
-    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
-  );
-}
-
 export function getSpotlightPaused() {
   return _spotlightPaused;
 }
@@ -419,35 +415,92 @@ export function setSpotlightCurrentKey(key) {
   _spotlightCurrentKey = key;
 }
 
-function cancelSpotlightIncomingRelease() {
-  if (_spotlightIncomingRaf) {
-    cancelAnimationFrame(_spotlightIncomingRaf);
-    _spotlightIncomingRaf = 0;
+function cancelSpotlightIncomingFitWait(el) {
+  if (_spotlightIncomingFitTimer) {
+    clearTimeout(_spotlightIncomingFitTimer);
+    _spotlightIncomingFitTimer = null;
+  }
+  if (el) {
+    el._spotlightPendingIncomingRelease = false;
+    el._spotlightOnArtFitted = null;
   }
 }
 
-function releaseSpotlightIncoming(el) {
-  cancelSpotlightIncomingRelease();
+function cancelSpotlightIncomingRelease(el) {
+  if (_spotlightIncomingRaf) {
+    globalThis.cancelAnimationFrame(_spotlightIncomingRaf);
+    _spotlightIncomingRaf = 0;
+  }
+  cancelSpotlightIncomingFitWait(el);
+}
+
+/** Double-rAF: hold opacity 0 for one painted frame, then fade the new slide in. */
+function scheduleSpotlightIncomingRelease(el) {
+  cancelSpotlightIncomingRelease(el);
   if (!el) return;
-  // Hold .is-incoming for one painted frame so opacity starts at 0, then drop it
-  // so the CSS transition can fade the new slide in (primeSpotlightArt / onload
-  // may already have added .is-loaded in the same turn as the HTML swap).
   el.classList.add("is-incoming");
-  _spotlightIncomingRaf = requestAnimationFrame(() => {
-    _spotlightIncomingRaf = requestAnimationFrame(() => {
+  const raf = globalThis.requestAnimationFrame.bind(globalThis);
+  _spotlightIncomingRaf = raf(() => {
+    _spotlightIncomingRaf = raf(() => {
       _spotlightIncomingRaf = 0;
       el.classList.remove("is-incoming");
     });
   });
 }
 
+/**
+ * Cover slides: wait for applySpotlightArtFit (or a short timeout) before the
+ * double-rAF release so fade-in does not start under the wrong landscape /
+ * portrait / lowres treatment. Logo slides have no cover img - release now.
+ */
+function releaseSpotlightIncoming(el) {
+  cancelSpotlightIncomingRelease(el);
+  if (!el) return;
+
+  if (el.classList.contains("has-logo-art")) {
+    scheduleSpotlightIncomingRelease(el);
+    return;
+  }
+
+  const img = el.querySelector(".dash-spotlight-art");
+  if (
+    !img ||
+    img.classList.contains("dash-spotlight-art-placeholder") ||
+    (img.complete && img.naturalWidth > 0 && img.classList.contains("is-loaded"))
+  ) {
+    scheduleSpotlightIncomingRelease(el);
+    return;
+  }
+
+  // Hold opacity 0 until art-fit (or timeout), then double-rAF fade-in.
+  el.classList.add("is-incoming");
+  el._spotlightPendingIncomingRelease = true;
+  el._spotlightOnArtFitted = () => {
+    if (!el._spotlightPendingIncomingRelease) return;
+    el._spotlightPendingIncomingRelease = false;
+    el._spotlightOnArtFitted = null;
+    if (_spotlightIncomingFitTimer) {
+      clearTimeout(_spotlightIncomingFitTimer);
+      _spotlightIncomingFitTimer = null;
+    }
+    scheduleSpotlightIncomingRelease(el);
+  };
+  _spotlightIncomingFitTimer = setTimeout(() => {
+    _spotlightIncomingFitTimer = null;
+    if (!el._spotlightPendingIncomingRelease) return;
+    el._spotlightPendingIncomingRelease = false;
+    el._spotlightOnArtFitted = null;
+    scheduleSpotlightIncomingRelease(el);
+  }, SPOTLIGHT_FADE_MS);
+}
+
 export function stopSpotlightRotation() {
   if (_spotlightTimer) clearInterval(_spotlightTimer);
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
-  cancelSpotlightIncomingRelease();
+  const el = document.getElementById("dashboardSpotlight");
+  cancelSpotlightIncomingRelease(el);
   _spotlightTimer = null;
   _spotlightFadeTimer = null;
-  const el = document.getElementById("dashboardSpotlight");
   if (el) el.classList.remove("is-fading", "is-incoming");
   // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
   // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
@@ -1367,11 +1420,12 @@ function applySpotlightSlide(el, next) {
     delete el.dataset.sponsorUrl;
     el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
   }
-  // Add is-incoming before clearing is-fading so the new art never paints at
-  // opacity 1 in the same turn as the HTML swap.
-  releaseSpotlightIncoming(el);
+  // Hold is-incoming before clearing is-fading so the new art never paints at
+  // opacity 1 in the same turn as the HTML swap. primeSpotlightArt may fit a
+  // cached cover sync; otherwise release waits for onload art-fit (or timeout).
   el.classList.remove("is-fading");
   primeSpotlightArt(el);
+  releaseSpotlightIncoming(el);
   _spotlightCurrentKey = gameKey(next);
   recordSpotlightShown(_spotlightCurrentKey);
   el._spotlightSyncHover?.();
@@ -1380,7 +1434,7 @@ function applySpotlightSlide(el, next) {
 }
 
 function fadeToSpotlight(el, next) {
-  cancelSpotlightIncomingRelease();
+  cancelSpotlightIncomingRelease(el);
   el.classList.remove("is-incoming");
   el.classList.add("is-fading");
   // Point dataset.key at the incoming slide immediately so a mid-fade click
@@ -1703,8 +1757,10 @@ export function startSpotlightRotation(pool) {
   }
   _rotationWanted = true;
   if (!el) return;
+  // Always autoplay when the pool has multiple slides unless the user paused.
+  // OS prefers-reduced-motion must not leave the control stuck on Play.
   if (!_spotlightPausedByUser) {
-    _spotlightPaused = prefersReducedMotion();
+    _spotlightPaused = false;
   }
   const domMatches = !!pool[0] && el.dataset.key === gameKey(pool[0]);
   _spotlightPool = pool;

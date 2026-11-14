@@ -3722,7 +3722,10 @@ body.bulk-bar-open {
   }
   .dash-spotlight,
   .dash-spotlight-art,
-  .dash-spotlight-art-bg {
+  .dash-spotlight-art-bg,
+  .dash-spotlight-body,
+  .dash-spotlight.has-logo-art .dash-spotlight-logo-lockup,
+  .dash-spotlight.has-logo-art .dash-spotlight-logo-backdrop {
     transition: none !important;
     animation: none !important;
   }
@@ -7046,6 +7049,22 @@ html[data-theme="ember"] .brand-logo-pills {
 .dash-spotlight.is-incoming .dash-spotlight-art-bg,
 .dash-spotlight.is-incoming .dash-spotlight-body {
   opacity: 0;
+}
+/* Hold hero zoom / portrait float / logo zoom until fade-in completes so a
+   cross-kind swap does not restart motion under opacity 0. */
+.dash-spotlight.is-fading:not(.has-portrait-art):not(.is-lowres-art)
+  .dash-spotlight-art.is-loaded,
+.dash-spotlight.is-incoming:not(.has-portrait-art):not(.is-lowres-art)
+  .dash-spotlight-art.is-loaded,
+.dash-spotlight.is-fading.has-portrait-art .dash-spotlight-art.is-loaded,
+.dash-spotlight.is-incoming.has-portrait-art .dash-spotlight-art.is-loaded,
+.dash-spotlight.is-fading.has-portrait-art .dash-spotlight-art-bg.is-loaded,
+.dash-spotlight.is-incoming.has-portrait-art .dash-spotlight-art-bg.is-loaded,
+.dash-spotlight.is-fading.has-portrait-art .dash-spotlight-sheen::before,
+.dash-spotlight.is-incoming.has-portrait-art .dash-spotlight-sheen::before,
+.dash-spotlight.is-fading.has-logo-art .dash-spotlight-logo-mark svg,
+.dash-spotlight.is-incoming.has-logo-art .dash-spotlight-logo-mark svg {
+  animation: none !important;
 }
 .dash-spotlight-art-bg {
   position: absolute;

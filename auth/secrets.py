@@ -76,6 +76,8 @@ _MPW_SALT_MAGIC = b"BKMPW1\n"
 
 _lock = threading.RLock()
 _cache: dict[str, Any] | None = None
+# Stamp so JWT/ContextVar profile pins cannot reuse another profile's decrypted doc.
+_cache_key: tuple[str, str] | None = None
 _master_password: str | None = None
 _warned_plaintext_master_key = False
 # Set by _get_master_key (password path) when the on-disk store used an older
@@ -107,10 +109,11 @@ def _ensure_dir() -> None:
 
 def set_master_password_override(password: str | None) -> None:
     """Optional portable encryption passphrase (Phase 5)."""
-    global _master_password, _cache
+    global _master_password, _cache, _cache_key
     with _lock:
         _master_password = (password or "").strip() or None
         _cache = None
+        _cache_key = None
 
 
 def _derive_key_from_password(
@@ -412,11 +415,16 @@ def _effective_profile_id() -> str:
     return get_active_profile_id() or "default"
 
 
+def _current_cache_key() -> tuple[str, str]:
+    return (_effective_profile_id(), str(_secrets_file()))
+
+
 def reset_cache() -> None:
     """Drop the decrypted secrets cache (call after the active profile changes)."""
-    global _cache
+    global _cache, _cache_key
     with _lock:
         _cache = None
+        _cache_key = None
 
 
 def _get_profile_key(profile_id: str | None = None) -> bytes:
@@ -521,13 +529,15 @@ def _maybe_upgrade_mpw_kdf(doc: dict[str, Any]) -> None:
 
 
 def load_doc() -> dict[str, Any]:
-    global _cache
+    global _cache, _cache_key
     with _lock:
-        if _cache is not None:
+        key = _current_cache_key()
+        if _cache is not None and _cache_key == key:
             return json.loads(json.dumps(_cache))
         secrets = _secrets_file()
         if not secrets.exists():
             _cache = _empty_doc()
+            _cache_key = key
             return json.loads(json.dumps(_cache))
         try:
             raw = secrets.read_bytes()
@@ -535,7 +545,10 @@ def load_doc() -> dict[str, Any]:
             _cache = _decrypt_blob(raw, pid)
             _maybe_migrate_legacy_blob(raw, _cache, pid)
             _maybe_upgrade_mpw_kdf(_cache)
+            _cache_key = key
         except Exception as exc:
+            _cache = None
+            _cache_key = None
             raise SecretsCorruptError(
                 f"cannot read {_secrets_file()}: corrupt or wrong passphrase"
             ) from exc
@@ -543,10 +556,11 @@ def load_doc() -> dict[str, Any]:
 
 
 def save_doc(doc: dict[str, Any]) -> None:
-    global _cache
+    global _cache, _cache_key
     with _lock:
         _atomic_write_secrets(_encrypt_doc(doc, _effective_profile_id()))
         _cache = json.loads(json.dumps(doc))
+        _cache_key = _current_cache_key()
 
 
 def get_provider_blob(provider: str) -> dict[str, Any]:
@@ -572,9 +586,10 @@ def secrets_store_corrupt() -> bool:
 
 def reset_secrets_store(*, archive: bool = True) -> None:
     """Remove an unreadable secrets bundle so the profile can reconnect stores."""
-    global _cache
+    global _cache, _cache_key
     with _lock:
         _cache = None
+        _cache_key = None
         path = _secrets_file()
         if path.is_file():
             if archive:
@@ -590,6 +605,7 @@ def reset_secrets_store(*, archive: bool = True) -> None:
         if bak.is_file():
             bak.unlink(missing_ok=True)
         _cache = _empty_doc()
+        _cache_key = _current_cache_key()
 
 
 def set_provider_blob(provider: str, blob: dict[str, Any]) -> None:

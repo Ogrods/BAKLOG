@@ -154,12 +154,14 @@ def _with_profile_secrets(profile_id: str):
                 _secrets.SECRETS_FILE,
                 _secrets.MASTER_KEY_FILE,
                 _secrets._cache,
+                _secrets._cache_key,
                 _secrets.PROFILE_ID_OVERRIDE,
             )
             _secrets.AUTH_DIR = target_dir
             _secrets.SECRETS_FILE = target_dir / "secrets.bin"
             _secrets.MASTER_KEY_FILE = target_dir / ".master_key"
             _secrets._cache = None
+            _secrets._cache_key = None
             # Derive the HKDF subkey for *this* profile, not the live active one.
             _secrets.PROFILE_ID_OVERRIDE = profile_id
             try:
@@ -170,6 +172,7 @@ def _with_profile_secrets(profile_id: str):
                     _secrets.SECRETS_FILE,
                     _secrets.MASTER_KEY_FILE,
                     _secrets._cache,
+                    _secrets._cache_key,
                     _secrets.PROFILE_ID_OVERRIDE,
                 ) = saved
 

@@ -13,6 +13,18 @@ def test_redact_log_line_oauth_and_itad() -> None:
     assert "[redacted]" in out
 
 
+def test_redact_log_line_scrubs_steam_query_key() -> None:
+    line = (
+        "HTTP Error 500: "
+        "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+        "?key=STEAMSECRETKEY99&steamid=1"
+    )
+    out = redact_log_line(line)
+    assert "STEAMSECRETKEY99" not in out
+    assert "key=[redacted]" in out
+    assert "steamid=1" in out
+
+
 def test_redact_diagnostics_payload_list_tails() -> None:
     payload = {
         "refresh_log_tail": ["Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig", "ok"],

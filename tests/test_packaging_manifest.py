@@ -171,6 +171,8 @@ def test_inno_installer_uninstall_data_choice() -> None:
     assert "--uninstall-wipe-user-data" in iss
     assert "--uninstall-cleanup" in iss
     assert "WipeUserData" in iss
+    assert "WipeSucceeded" in iss
+    assert "did not finish cleanly" in iss
     assert "taskkill.exe" in iss
     assert "DelTree(ExpandConstant('{localappdata}\\BAKLOG-Data')" not in iss
 

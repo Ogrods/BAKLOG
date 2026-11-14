@@ -629,10 +629,14 @@ def main() -> int:
         return 0
     if "--uninstall-wipe-user-data" in sys.argv:
         from shared.install_paths import resolved_data_dir_for_uninstall
-        from shared.uninstall_cleanup import wipe_user_data
+        from shared.uninstall_cleanup import WipeIncompleteError, wipe_user_data
 
-        for note in wipe_user_data(resolved_data_dir_for_uninstall()):
-            print(f"[uninstall] {note}", file=sys.stderr, flush=True)
+        try:
+            for note in wipe_user_data(resolved_data_dir_for_uninstall()):
+                print(f"[uninstall] {note}", file=sys.stderr, flush=True)
+        except WipeIncompleteError as exc:
+            print(f"[uninstall] {exc}", file=sys.stderr, flush=True)
+            return 1
         return 0
     if not acquire_tray_lock():
         print("[tray] another BAKLOG tray instance is already running", file=sys.stderr, flush=True)

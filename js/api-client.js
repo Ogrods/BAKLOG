@@ -303,7 +303,7 @@ export async function baklogFetch(url, init = {}) {
  *  Pass runId for fetcher streams, or sessionId for Connect auth streams. */
 export async function mintStreamTicket(runIdOrOpts = null, maybeOpts = undefined) {
   if (!isAccountAuthMode()) return null;
-  let runId = null;
+  let runId;
   let sessionId = null;
   if (runIdOrOpts && typeof runIdOrOpts === "object" && !Array.isArray(runIdOrOpts)) {
     runId = runIdOrOpts.runId ?? null;

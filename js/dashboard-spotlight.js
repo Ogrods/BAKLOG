@@ -80,7 +80,8 @@ function isOnSale(g) {
 }
 
 export const SPOTLIGHT_INTERVAL_MS = 9000;
-export const SPOTLIGHT_FADE_MS = 300;
+/** Must match app.css --spotlight-fade on .dash-spotlight (art opacity transition). */
+export const SPOTLIGHT_FADE_MS = 450;
 const RECENT_SPOTLIGHT_CAP = 5;
 const RECENT_QUOTA = 5;
 
@@ -323,6 +324,8 @@ function pickStinkerGame(eligible) {
 let _spotlightTimer = null;
 let _rotationWanted = false;
 let _spotlightFadeTimer = null;
+/** Cancels a pending double-rAF that drops .is-incoming after a slide swap. */
+let _spotlightIncomingRaf = 0;
 let _spotlightIndex = 0;
 let _spotlightPool = [];
 let _spotlightCurrentKey = null;
@@ -416,13 +419,36 @@ export function setSpotlightCurrentKey(key) {
   _spotlightCurrentKey = key;
 }
 
+function cancelSpotlightIncomingRelease() {
+  if (_spotlightIncomingRaf) {
+    cancelAnimationFrame(_spotlightIncomingRaf);
+    _spotlightIncomingRaf = 0;
+  }
+}
+
+function releaseSpotlightIncoming(el) {
+  cancelSpotlightIncomingRelease();
+  if (!el) return;
+  // Hold .is-incoming for one painted frame so opacity starts at 0, then drop it
+  // so the CSS transition can fade the new slide in (primeSpotlightArt / onload
+  // may already have added .is-loaded in the same turn as the HTML swap).
+  el.classList.add("is-incoming");
+  _spotlightIncomingRaf = requestAnimationFrame(() => {
+    _spotlightIncomingRaf = requestAnimationFrame(() => {
+      _spotlightIncomingRaf = 0;
+      el.classList.remove("is-incoming");
+    });
+  });
+}
+
 export function stopSpotlightRotation() {
   if (_spotlightTimer) clearInterval(_spotlightTimer);
   if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
+  cancelSpotlightIncomingRelease();
   _spotlightTimer = null;
   _spotlightFadeTimer = null;
   const el = document.getElementById("dashboardSpotlight");
-  if (el) el.classList.remove("is-fading");
+  if (el) el.classList.remove("is-fading", "is-incoming");
   // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
   // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
 }
@@ -1341,6 +1367,9 @@ function applySpotlightSlide(el, next) {
     delete el.dataset.sponsorUrl;
     el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
   }
+  // Add is-incoming before clearing is-fading so the new art never paints at
+  // opacity 1 in the same turn as the HTML swap.
+  releaseSpotlightIncoming(el);
   el.classList.remove("is-fading");
   primeSpotlightArt(el);
   _spotlightCurrentKey = gameKey(next);
@@ -1351,6 +1380,8 @@ function applySpotlightSlide(el, next) {
 }
 
 function fadeToSpotlight(el, next) {
+  cancelSpotlightIncomingRelease();
+  el.classList.remove("is-incoming");
   el.classList.add("is-fading");
   // Point dataset.key at the incoming slide immediately so a mid-fade click
   // does not drill the previous game still painted in the DOM.

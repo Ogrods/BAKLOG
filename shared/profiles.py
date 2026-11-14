@@ -192,19 +192,27 @@ def _copy_auth_for_migration(auth_src: Path, dest_auth: Path) -> int:
     return copied
 
 
-def create_profile(label: str) -> dict[str, Any]:
+def create_profile(label: str, *, owner_user_id: str | None = None) -> dict[str, Any]:
     """Add a new empty profile; migrates legacy root into profiles/default/ first."""
     label = _validate_label(label)
     if is_legacy_layout():
         ensure_default_profile_dir()
     profile_id: str
+    owner = (owner_user_id or "").strip().lower() or None
     with mutate_index() as doc:
         profile_id = unique_profile_id_for_doc(label, doc)
         profiles = doc.setdefault("profiles", [])
         if not isinstance(profiles, list):
             profiles = []
             doc["profiles"] = profiles
-        profiles.append({"id": profile_id, "label": label, "created_at": _now_iso()})
+        entry: dict[str, Any] = {
+            "id": profile_id,
+            "label": label,
+            "created_at": _now_iso(),
+        }
+        if owner:
+            entry["owner_user_id"] = owner
+        profiles.append(entry)
     dest = profile_data_dir(profile_id)
     try:
         dest.mkdir(parents=True, exist_ok=True)

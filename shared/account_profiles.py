@@ -34,11 +34,31 @@ def _index_has_profile(pid: str) -> bool:
     return any(isinstance(p, dict) and p.get("id") == pid for p in profiles)
 
 
+def _activate_account_profile(pid: str) -> None:
+    """Point index.active at the signed-in account profile.
+
+    Account-auth mode (Supabase on, BAKLOG_LOCAL_PROFILES off) pins request
+    data to the user id via set_request_profile_id, but the Pro background
+    scheduler still reads profiles/index.json. Leaving active on an empty
+    leftover ``default`` makes Steam refresh fail every stagger window while
+    the UI only shows the email profile.
+    """
+    from shared.supabase_auth import local_profiles_enabled
+
+    if local_profiles_enabled():
+        return
+    with mutate_index() as doc:
+        if doc.get("active") == pid:
+            return
+        doc["active"] = pid
+
+
 def ensure_profile_for_user(user_id: str, email: str | None = None) -> str:
     """Create ``profiles/<user_id>/`` and index entry on first login."""
     pid = profile_id_for_user(user_id)
     dest = profile_data_dir(pid)
     if dest.is_dir() and (dest / "data").is_dir() and _index_has_profile(pid):
+        _activate_account_profile(pid)
         return pid
 
     dest.mkdir(parents=True, exist_ok=True)
@@ -52,4 +72,5 @@ def ensure_profile_for_user(user_id: str, email: str | None = None) -> str:
         if not any(isinstance(p, dict) and p.get("id") == pid for p in profiles):
             label = (email or "").strip() or f"Account {pid[:8]}"
             profiles.append({"id": pid, "label": label, "created_at": _now_iso()})
+    _activate_account_profile(pid)
     return pid

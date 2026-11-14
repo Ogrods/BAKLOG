@@ -11,10 +11,11 @@ from urllib.parse import parse_qs, urlparse
 _stream_tickets: dict[str, tuple[str, float, int, str | None]] = {}
 _stream_tickets_lock = threading.Lock()
 
-STREAM_TICKET_TTL_SEC = 90.0
+# Tightened after review: leaked ?ticket= dies faster; still enough for ES reconnect.
+STREAM_TICKET_TTL_SEC = 45.0
 # EventSource auto-reconnects with the same URL; single-use tickets caused 401
 # loops when a failed connect (404/503) consumed the ticket first.
-STREAM_TICKET_MAX_USES = 12
+STREAM_TICKET_MAX_USES = 6
 # Block the stream handler briefly on first connect so a run submitted on another
 # dev-server process (split-brain on localhost) can finish and land in shared history.
 STREAM_ATTACH_SHORT_WAIT_SEC = 2.0

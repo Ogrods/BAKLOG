@@ -37,6 +37,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Spotlight keeps autoplaying by default (Pause is user-only), and fades between cover, logo, sale, and portrait slides wait for art fit so the swap does not flash mid-motion.
+
 ## [0.9.09] - 2026-11-13
 
 ### Fixed

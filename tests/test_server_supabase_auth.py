@@ -371,6 +371,25 @@ def test_head_gated_like_get(auth_server) -> None:
     assert status in (200, 404)
 
 
+def test_proxy_requires_bearer_when_auth_on(auth_server) -> None:
+    base, secret, _tmp = auth_server
+    status, data = _get_json(base, "/api/proxy/steam-search?term=portal")
+    assert status == 401
+    assert "sign in" in str(data.get("error", "")).lower()
+
+    status, _ = _request(
+        base, "/api/proxy/steam-search?term=portal", auth=_bearer(secret)
+    )
+    # May be 200 or 502 (upstream), but must not be auth-gated.
+    assert status != 401
+
+
+def test_proxy_open_when_auth_off(local_server) -> None:
+    base, _tmp = local_server
+    status, _ = _request(base, "/api/proxy/steam-search?term=portal")
+    assert status != 401
+
+
 def test_csrf_bearer_allows_put_personal(auth_server) -> None:
     base, secret, _tmp = auth_server
     body = json.dumps({"profile": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "entries": {}}).encode("utf-8")

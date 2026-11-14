@@ -4,7 +4,7 @@ import {
   ITCH_NON_GAME_CLASSIFICATIONS,
   isCleanupCandidateFromParts,
 } from './state.js';
-import { escapeHtml, escapeAttr } from './dom-util.js';
+import { escapeHtml, escapeAttr, isSafeHttpUrl } from './dom-util.js';
 import { isEarlyAccess } from './table-query.js';
 import { STATUS_LABELS, WISHLIST_STATUS_LABELS } from './row-templates.js';
 import { getPersonal, hasPersonalEntry } from './personal-storage.js';
@@ -523,7 +523,9 @@ export function storeLinkHtml(g, className, labelHtml) {
   const url = storeUrlForGame(g);
   const store = normalizeGame(g).store || 'store';
   const tip = `Open on ${store}`;
-  if (!url) return `<span class="${className}" title="${escapeAttr(tip)}">${labelHtml}</span>`;
+  if (!url || !isSafeHttpUrl(url)) {
+    return `<span class="${className}" title="${escapeAttr(tip)}">${labelHtml}</span>`;
+  }
   return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener" class="${className}" title="${escapeAttr(tip)}">${labelHtml}</a>`;
 }
 

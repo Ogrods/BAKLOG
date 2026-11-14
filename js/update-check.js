@@ -1,7 +1,7 @@
 /** Boot + in-app update flow against /api/update-check and /api/update/* (frozen installs). */
 
 import { baklogFetch } from "./api-client.js";
-import { escapeHtml } from "./dom-util.js";
+import { escapeAttr, escapeHtml, isSafeHttpUrl } from "./dom-util.js";
 
 /** @deprecated legacy session flag; per-version dismiss uses server + localStorage mirror */
 export const UPDATE_BANNER_DISMISS_KEY = "baklog.updateBannerDismissed";
@@ -270,7 +270,10 @@ export function renderApplyBlockedHint(parsed) {
  * }} parsed
  */
 export function renderUpdateBannerHtml(parsed) {
-  const href = parsed.url || "https://github.com/Ogrods/BAKLOG/releases/latest";
+  const rawHref = parsed.url || "https://github.com/Ogrods/BAKLOG/releases/latest";
+  const href = isSafeHttpUrl(rawHref)
+    ? rawHref
+    : "https://github.com/Ogrods/BAKLOG/releases/latest";
   const canUpdateNow = parsed.applySupported && !updateMutationsBlocked(parsed);
   const updateBtn = canUpdateNow
     ? '<button type="button" class="update-available-banner-apply ml-2 text-sky-300 hover:underline">Update now</button>'
@@ -280,7 +283,7 @@ export function renderUpdateBannerHtml(parsed) {
     `<span class="text-amber-400">BAKLOG v${escapeHtml(parsed.latest || "")} is available (you have v${escapeHtml(parsed.current)}).</span> ` +
     updateBtn +
     `<button type="button" class="update-available-banner-notes ml-2 text-sky-300 hover:underline">What's new</button>` +
-    `<a href="${escapeHtml(href)}" class="update-available-banner-release ml-2 text-sky-300 hover:underline" target="_blank" rel="noopener noreferrer">Release page</a>` +
+    `<a href="${escapeAttr(href)}" class="update-available-banner-release ml-2 text-sky-300 hover:underline" target="_blank" rel="noopener noreferrer">Release page</a>` +
     '<button type="button" class="update-available-banner-snooze ml-2 text-slate-400 hover:text-slate-200 text-sm">Remind me later</button>' +
     renderApplyBlockedHint(parsed) +
     "</div>"
@@ -332,7 +335,10 @@ export function renderUpdateProgressHtml(status, { cancellable = false } = {}) {
  * }} parsed
  */
 export function renderUpdateModalHtml(parsed) {
-  const href = parsed.url || "https://github.com/Ogrods/BAKLOG/releases/latest";
+  const rawHref = parsed.url || "https://github.com/Ogrods/BAKLOG/releases/latest";
+  const href = isSafeHttpUrl(rawHref)
+    ? rawHref
+    : "https://github.com/Ogrods/BAKLOG/releases/latest";
   const notes = parsed.releaseNotes
     ? `<pre class="update-modal-notes whitespace-pre-wrap text-sm text-slate-300 max-h-64 overflow-y-auto mt-3 p-3 rounded bg-slate-900/80 border border-slate-700">${escapeHtml(parsed.releaseNotes)}</pre>`
     : '<p class="text-sm text-slate-400 mt-3">See the release page for details.</p>';
@@ -349,7 +355,7 @@ export function renderUpdateModalHtml(parsed) {
     notes +
     `</div>` +
     `<div class="app-modal-actions">` +
-    `<a href="${escapeHtml(href)}" class="update-modal-release text-sm text-sky-300 hover:underline px-3 py-2" target="_blank" rel="noopener noreferrer">Release page</a>` +
+    `<a href="${escapeAttr(href)}" class="update-modal-release text-sm text-sky-300 hover:underline px-3 py-2" target="_blank" rel="noopener noreferrer">Release page</a>` +
     '<button type="button" class="update-modal-later text-sm px-3 py-2 rounded hover:bg-slate-700 text-slate-300">Remind me later</button>' +
     updateBtn +
     "</div></div>"

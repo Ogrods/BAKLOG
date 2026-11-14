@@ -437,6 +437,18 @@ describe('renderUpdateBannerHtml', () => {
     expect(html).toContain('update-available-banner-apply');
     expect(html).toContain('Remind me later');
     expect(html).toContain("What's new");
+    expect(html).toContain('href="https://example.com"');
+  });
+
+  it('rejects javascript: release urls', () => {
+    const html = renderUpdateBannerHtml({
+      current: '0.8.25',
+      latest: '0.9.0',
+      url: 'javascript:alert(1)',
+      applySupported: false,
+    });
+    expect(html).not.toContain('javascript:');
+    expect(html).toContain('href="https://github.com/Ogrods/BAKLOG/releases/latest"');
   });
 });
 

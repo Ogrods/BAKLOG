@@ -185,8 +185,9 @@ export function claimSourceHtml(source, { tag = 'span' } = {}) {
   const meta = CLAIM_SOURCE_META[key];
   if (!meta) return '';
   const label = escapeHtml(meta.label);
-  const inner = (tag === 'a')
-    ? `<a href="${escapeAttr(affiliateUrl(meta.url))}" target="_blank" rel="noopener noreferrer">${label}</a>`
+  const sourceUrl = affiliateUrl(meta.url);
+  const inner = (tag === 'a' && isSafeHttpUrl(sourceUrl))
+    ? `<a href="${escapeAttr(sourceUrl)}" target="_blank" rel="noopener noreferrer">${label}</a>`
     : label;
   return `<span class="claim-source" title="Referenced via ${label}">via ${inner}</span>`;
 }
@@ -247,13 +248,13 @@ function claimDetailClaimActionsHtml(claim, owned) {
   if (isEpicMobileStore(claim.store)) {
     const urls = normalizeClaimUrls(claim.claim_urls);
     const parts = [];
-    if (urls.ios) {
+    if (urls.ios && isSafeHttpUrl(affiliateUrl(urls.ios))) {
       const href = escapeAttr(affiliateUrl(urls.ios));
       parts.push(
         `<a href="${href}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn claim-detail-claim-btn--ios">Claim on iOS</a>`,
       );
     }
-    if (urls.android) {
+    if (urls.android && isSafeHttpUrl(affiliateUrl(urls.android))) {
       const href = escapeAttr(affiliateUrl(urls.android));
       parts.push(
         `<a href="${href}" target="_blank" rel="noopener noreferrer" class="claim-detail-claim-btn claim-detail-claim-btn--android">Claim on Android</a>`,

@@ -78,17 +78,12 @@ export const fetcherRunner = (() => {
   const sourcesByRunId = new Map();
   const reconnectTimers = new Map();
   const reconnectAttempts = new Map();
-  /** CONNECTING onerror streak per run — browser retries briefly; then force reconnect. */
+  // CONNECTING onerror streak; force reconnect after CONNECTING_ERROR_STREAK_MAX.
   const connectingErrorStreak = new Map();
   const CONNECTING_ERROR_STREAK_MAX = 5;
-
-  /** @returns {'wait'|'hard'} wait = keep EventSource; hard = close + reconcile/reconnect. */
+  /** @returns {'wait'|'hard'} readyState 0 = EventSource.CONNECTING (no global; tests). */
   function noteConnectingTransportError(runId, es) {
-    // EventSource.CONNECTING === 0 (avoid EventSource global; missing in some test envs).
-    if (es.readyState !== 0) {
-      connectingErrorStreak.delete(runId);
-      return 'hard';
-    }
+    if (es.readyState !== 0) { connectingErrorStreak.delete(runId); return 'hard'; }
     const streak = (connectingErrorStreak.get(runId) || 0) + 1;
     connectingErrorStreak.set(runId, streak);
     if (streak < CONNECTING_ERROR_STREAK_MAX) return 'wait';
@@ -1850,8 +1845,7 @@ export const fetcherRunner = (() => {
       if (suppressedRunIds.has(runId) || cancelInFlight) return;
       const attached = sourcesByRunId.get(runId);
       if (!attached || attached.es !== es) return;
-      // Let the browser retry briefly with the same ticket URL; after a CONNECTING
-      // streak, close and use scheduleReconnect so a zombie socket cannot stick.
+      // Brief CONNECTING retries share the ticket; then hard reconnect (no zombie).
       if (noteConnectingTransportError(runId, es) === 'wait') return;
       sourcesByRunId.delete(runId);
       es.onerror = null;
@@ -2162,12 +2156,8 @@ export const fetcherRunner = (() => {
     },
     CONNECTING_ERROR_STREAK_MAX,
     noteConnectingTransportErrorForTest: noteConnectingTransportError,
-    getConnectingStreakForTest(runId) {
-      return connectingErrorStreak.get(runId) || 0;
-    },
-    clearConnectingStreakForTest(runId) {
-      connectingErrorStreak.delete(runId);
-    },
+    getConnectingStreakForTest: (runId) => connectingErrorStreak.get(runId) || 0,
+    clearConnectingStreakForTest: (runId) => { connectingErrorStreak.delete(runId); },
     isCancelInFlightForTest: () => cancelInFlight,
     getInFlightCountForTest: () => runStateByKey.size,
     getCancelEpoch,

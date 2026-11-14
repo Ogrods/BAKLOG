@@ -218,8 +218,8 @@ def _authorize_stream(
     handler: SimpleHTTPRequestHandler, *, session_id: str | None = None
 ) -> bool:
     """Legacy helper: prefer peek+commit inside stream handlers (see auth stream)."""
-    from shared.supabase_auth import auth_enabled
     from shared.server_stream_tickets import KIND_AUTH
+    from shared.supabase_auth import auth_enabled
 
     if not auth_enabled():
         return True
@@ -239,8 +239,8 @@ def _commit_auth_stream_ticket(
     handler: SimpleHTTPRequestHandler, *, session_id: str
 ) -> bool:
     """Consume one ticket use only after the auth session is confirmed present."""
-    from shared.supabase_auth import auth_enabled
     from shared.server_stream_tickets import KIND_AUTH
+    from shared.supabase_auth import auth_enabled
 
     if not auth_enabled():
         return True
@@ -2106,8 +2106,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _handle_stream(self, run_id: str) -> None:
         global _sse_connections
-        from shared.supabase_auth import auth_enabled
         from shared.server_stream_tickets import KIND_RUN
+        from shared.supabase_auth import auth_enabled
 
         run_id = run_id.strip("/").split("/", 1)[0].split("?", 1)[0]
         since = _stream_resume_since(self)

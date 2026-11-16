@@ -537,6 +537,57 @@ describe("spotlight rotation safety", () => {
     expect(el.dataset.key).toBe("steam:1");
   });
 
+  it("dash-list click captures incoming key before stop restores paintedKey", async () => {
+    // Mirrors onDashListClick: capture dataset.key, then stopSpotlightRotation,
+    // then focusGame(captured) — stop alone would restore steam:1 and drill wrong.
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    installAnimateStub();
+    const {
+      renderSpotlightHtml,
+      startSpotlightRotation,
+      stopSpotlightRotation,
+      SPOTLIGHT_INTERVAL_MS,
+    } = await import("../js/dashboard-spotlight.js");
+    const games = [
+      {
+        store: "steam",
+        id: "1",
+        name: "A",
+        steam_review_percent: 90,
+        steam_review_count: 500,
+        library_image: "a.jpg",
+        header_image: "a.jpg",
+        _spotlightReason: { eyebrow: "Highly rated", score: 90 },
+      },
+      {
+        store: "steam",
+        id: "2",
+        name: "B",
+        steam_review_percent: 88,
+        steam_review_count: 500,
+        library_image: "b.jpg",
+        header_image: "b.jpg",
+        _spotlightReason: { eyebrow: "Solid pick", score: 85 },
+      },
+    ];
+
+    document.body.innerHTML = renderSpotlightHtml(games[0]);
+    const el = document.getElementById("dashboardSpotlight");
+    startSpotlightRotation(games);
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
+    expect(el.dataset.key).toBe("steam:2");
+
+    const key = el.dataset.key;
+    stopSpotlightRotation();
+    expect(key).toBe("steam:2");
+    expect(el.dataset.key).toBe("steam:1");
+  });
+
   it("fade start retargets dataset.key to the incoming slide", async () => {
     window.matchMedia = vi.fn(() => ({
       matches: false,

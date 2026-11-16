@@ -7041,7 +7041,9 @@ html[data-theme="ember"] .brand-logo-pills {
   transform: translateZ(0);
 }
 /* Slide transition veil: fades to theme bg while art/caption stay put, then the
-   swap happens under full cover. Same left-edge feather as .dash-spotlight-art. */
+   swap happens under full cover. Left edge feathers like the logo backdrop so
+   the page still shows through, but from ~22% rightward the veil is fully
+   opaque so outgoing art/logo never peek during the HTML swap. */
 .dash-spotlight-veil {
   position: absolute;
   inset: 0;
@@ -7053,21 +7055,10 @@ html[data-theme="ember"] .brand-logo-pills {
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 12%,
-    rgba(0, 0, 0, 0.25) 32%,
-    rgba(0, 0, 0, 0.6) 56%,
-    rgba(0, 0, 0, 0.9) 80%,
-    #000 95%
+    #000 22%,
+    #000 100%
   );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 12%,
-    rgba(0, 0, 0, 0.25) 32%,
-    rgba(0, 0, 0, 0.6) 56%,
-    rgba(0, 0, 0, 0.9) 80%,
-    #000 95%
-  );
+  mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
 }
 .dash-spotlight-art-bg {
   position: absolute;

@@ -450,6 +450,17 @@ function cancelSpotlightVeilAnimation(el) {
   } catch {
     /* ignore */
   }
+  // Restore identity to the slide still painted in the DOM (dataset.key was
+  // retargeted at fade start for mid-fade clicks).
+  if (el && t.paintedKey !== undefined) {
+    if (t.paintedKey) {
+      el.dataset.key = t.paintedKey;
+      _spotlightCurrentKey = t.paintedKey;
+    } else {
+      delete el.dataset.key;
+      _spotlightCurrentKey = null;
+    }
+  }
   const veil = spotlightVeil(el);
   if (veil) {
     setVeilOpacity(veil, 0);
@@ -579,10 +590,15 @@ function preloadSlideAfter(next) {
  */
 export function transitionSpotlight(el, next) {
   if (!el || !next) return;
+  const incomingKey = gameKey(next);
+  // Capture the painted slide before retargeting identity for mid-fade clicks.
+  const paintedBefore =
+    el.dataset.key || _spotlightCurrentKey || "";
+
   // Point dataset.key at the incoming slide immediately so a mid-fade click
   // does not drill the previous game still painted in the DOM.
-  el.dataset.key = gameKey(next);
-  _spotlightCurrentKey = gameKey(next);
+  el.dataset.key = incomingKey;
+  _spotlightCurrentKey = incomingKey;
 
   if (_spotlightTransition) {
     _spotlightTransition.pendingNext = next;
@@ -591,7 +607,13 @@ export function transitionSpotlight(el, next) {
   }
 
   const abort = { aborted: false };
-  const state = { pendingNext: next, animation: null, abort, timers: [] };
+  const state = {
+    pendingNext: next,
+    animation: null,
+    abort,
+    timers: [],
+    paintedKey: paintedBefore,
+  };
   _spotlightTransition = state;
   void preloadSpotlightArt(next);
 
@@ -607,6 +629,7 @@ export function transitionSpotlight(el, next) {
 
     if (prefersReducedMotion()) {
       applySpotlightSlide(el, target);
+      state.paintedKey = gameKey(target);
       preloadSlideAfter(target);
       if (state.pendingNext) {
         const again = state.pendingNext;
@@ -631,8 +654,9 @@ export function transitionSpotlight(el, next) {
         // Prefer the latest retarget that arrived during fade-out.
         const swapTarget = state.pendingNext || target;
         state.pendingNext = null;
-        el.dataset.key = gameKey(swapTarget);
-        _spotlightCurrentKey = gameKey(swapTarget);
+        const swapKey = gameKey(swapTarget);
+        el.dataset.key = swapKey;
+        _spotlightCurrentKey = swapKey;
 
         // Swap under full cover in this timer turn (fake-timer friendly).
         // Art was preloaded when the transition started; primeSpotlightArt
@@ -646,6 +670,8 @@ export function transitionSpotlight(el, next) {
         ]);
 
         applySpotlightSlide(el, swapTarget);
+        // Markup now matches swapTarget; cancel must restore this key.
+        state.paintedKey = swapKey;
         const veilAfter = spotlightVeil(el);
         setVeilOpacity(veilAfter, 1);
         void animateVeil(veilAfter, 0, SPOTLIGHT_FADE_IN_MS, abort);

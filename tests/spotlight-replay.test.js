@@ -526,12 +526,15 @@ describe("spotlight rotation safety", () => {
     expect(el.dataset.key).toBe("steam:2"); // retargeted at fade start
 
     stopSpotlightRotation();
+    // Cancel restores identity to the still-painted slide.
+    expect(el.dataset.key).toBe("steam:1");
     await vi.advanceTimersByTimeAsync(
       SPOTLIGHT_FADE_OUT_MS + SPOTLIGHT_FADE_IN_MS + SPOTLIGHT_DECODE_WAIT_MS,
     );
     drainRaf();
     await Promise.resolve();
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("A");
+    expect(el.dataset.key).toBe("steam:1");
   });
 
   it("fade start retargets dataset.key to the incoming slide", async () => {
@@ -578,10 +581,10 @@ describe("spotlight rotation safety", () => {
     expect(el.dataset.key).toBe("steam:2");
   });
 
-  it("veil CSS uses theme bg and matches art left-feather mask", () => {
+  it("veil CSS uses theme bg and fully covers content past the left feather", () => {
     expect(APP_CSS).toMatch(/\.dash-spotlight-veil\s*\{[^}]*background:\s*var\(--bg\)/s);
     expect(APP_CSS).toMatch(
-      /\.dash-spotlight-veil\s*\{[^}]*transparent 12%[\s\S]*#000 95%/s,
+      /\.dash-spotlight-veil[\s\S]*mask-image:\s*linear-gradient\(\s*90deg,\s*transparent 0%,\s*#000 22%,\s*#000 100%\s*\)/s,
     );
     expect(APP_CSS).not.toMatch(/\.dash-spotlight\.is-fading\s+\.dash-spotlight-art/);
     expect(APP_CSS).not.toMatch(/\.dash-spotlight\.is-incoming\s+\.dash-spotlight-art/);

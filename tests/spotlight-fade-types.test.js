@@ -216,13 +216,13 @@ describe("spotlight fade across slide kinds", () => {
     window.applySpotlightArtFit(img);
   }
 
-  it("CSS veil geometry covers theme bg + art feather; no per-layer fade", () => {
+  it("CSS veil geometry covers theme bg + opaque content; no per-layer fade", () => {
     expect(APP_CSS).toMatch(/\.dash-spotlight-veil\s*\{[^}]*z-index:\s*4/s);
     expect(APP_CSS).toMatch(/\.dash-spotlight-veil\s*\{[^}]*background:\s*var\(--bg\)/s);
+    // Fully opaque from 22% so art/logo do not peek during the swap.
     expect(APP_CSS).toMatch(
-      /\.dash-spotlight-veil[\s\S]*mask-image:\s*linear-gradient\([\s\S]*transparent 12%/s,
+      /\.dash-spotlight-veil[\s\S]*mask-image:\s*linear-gradient\(\s*90deg,\s*transparent 0%,\s*#000 22%,\s*#000 100%\s*\)/s,
     );
-    expect(APP_CSS).toMatch(/\.dash-spotlight-veil[\s\S]*#000 95%/s);
     expect(APP_CSS).not.toMatch(
       /\.dash-spotlight\.is-fading\s+\.dash-spotlight-art/,
     );
@@ -370,9 +370,12 @@ describe("spotlight fade across slide kinds", () => {
   it("stop mid-fade cancels cross-kind HTML swap", async () => {
     const pool = [coverSlide("1", "Alpha"), logoSlide()];
     const el = mountPool(pool);
+    const paintedKey = el.dataset.key;
     stepSpotlight(1);
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Alpha");
+    expect(el.dataset.key).toBe(gameKey(pool[1])); // retargeted for mid-fade click
     stopSpotlightRotation();
+    expect(el.dataset.key).toBe(paintedKey); // restored to painted slide
     await vi.advanceTimersByTimeAsync(
       SPOTLIGHT_FADE_OUT_MS + SPOTLIGHT_FADE_IN_MS + SPOTLIGHT_DECODE_WAIT_MS,
     );
@@ -380,5 +383,6 @@ describe("spotlight fade across slide kinds", () => {
     await flushMicrotasks();
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Alpha");
     expect(el.classList.contains("has-logo-art")).toBe(false);
+    expect(el.dataset.key).toBe(paintedKey);
   });
 });

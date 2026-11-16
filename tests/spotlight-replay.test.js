@@ -408,13 +408,47 @@ describe("spotlight rare stinker easter egg", () => {
 });
 
 describe("spotlight rotation safety", () => {
+  let rafQueue;
+
+  function installAnimateStub() {
+    const queue = [];
+    Element.prototype.animate = function animateStub() {
+      let settle;
+      const finished = new Promise((resolve) => {
+        settle = resolve;
+      });
+      const anim = {
+        finished,
+        cancel() {
+          settle();
+        },
+      };
+      queue.push({ settle });
+      return anim;
+    };
+    return {
+      pending: () => queue.length,
+      async finishNext() {
+        const item = queue.shift();
+        if (!item) throw new Error("no pending veil animation");
+        item.settle();
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+    };
+  }
+
+  function drainRaf() {
+    const batch = rafQueue.splice(0).filter(Boolean);
+    for (const cb of batch) cb(0);
+  }
+
   beforeEach(async () => {
     const win = new Window({ url: "http://127.0.0.1:8765/" });
     global.window = win;
     global.document = win.document;
     global.localStorage = win.localStorage;
     win.__dashFailedCovers = new Set();
-    // Do not fake rAF - rotation-safety tests own a manual raf queue.
     vi.useFakeTimers({
       toFake: [
         "setTimeout",
@@ -424,92 +458,7 @@ describe("spotlight rotation safety", () => {
         "Date",
       ],
     });
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("stopSpotlightRotation prevents fade timer from mutating innerHTML after click", async () => {
-    window.matchMedia = vi.fn(() => ({
-      matches: false,
-      media: "",
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
-    const { startSpotlightRotation, stopSpotlightRotation, SPOTLIGHT_INTERVAL_MS } = await import("../js/dashboard-spotlight.js");
-    const games = [
-      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
-      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
-    ];
-    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
-    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
-
-    document.body.innerHTML = `
-      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1">
-        <span id="spot-inner">slide-1</span>
-      </button>
-    `;
-    const el = document.getElementById("dashboardSpotlight");
-    el.dataset.key = "steam:1";
-
-    startSpotlightRotation(games);
-    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
-    expect(el.classList.contains("is-fading")).toBe(true);
-
-    stopSpotlightRotation();
-    const htmlBefore = el.innerHTML;
-    vi.advanceTimersByTime(500);
-    expect(el.innerHTML).toBe(htmlBefore);
-    expect(el.classList.contains("is-fading")).toBe(false);
-  });
-
-  it("fade start retargets dataset.key to the incoming slide", async () => {
-    window.matchMedia = vi.fn(() => ({
-      matches: false,
-      media: "",
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
-    const { startSpotlightRotation, SPOTLIGHT_INTERVAL_MS } = await import("../js/dashboard-spotlight.js");
-    const games = [
-      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
-      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
-    ];
-    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
-    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
-
-    document.body.innerHTML = `
-      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1" data-action="dash-list-jump">
-        <span id="spot-inner">slide-1</span>
-      </button>
-    `;
-    const el = document.getElementById("dashboardSpotlight");
-    startSpotlightRotation(games);
-    expect(el.dataset.key).toBe("steam:1");
-    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
-    expect(el.classList.contains("is-fading")).toBe(true);
-    expect(el.dataset.key).toBe("steam:2");
-  });
-
-  it("SPOTLIGHT_FADE_MS matches app.css --spotlight-fade", async () => {
-    expect(APP_CSS).toMatch(/\.dash-spotlight\s*\{[^}]*--spotlight-fade:\s*450ms/s);
-    expect(APP_CSS).toMatch(
-      /\.dash-spotlight-art\s*\{[^}]*opacity\s+var\(--spotlight-fade\)/s,
-    );
-    const { SPOTLIGHT_FADE_MS } = await import("../js/dashboard-spotlight.js");
-    expect(SPOTLIGHT_FADE_MS).toBe(450);
-  });
-
-  it("holds is-incoming for one painted frame after the fade swap", async () => {
-    window.matchMedia = vi.fn(() => ({
-      matches: false,
-      media: "",
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }));
-    const rafQueue = [];
+    rafQueue = [];
     const raf = (cb) => {
       rafQueue.push(cb);
       return rafQueue.length;
@@ -519,138 +468,135 @@ describe("spotlight rotation safety", () => {
     };
     global.requestAnimationFrame = raf;
     global.cancelAnimationFrame = caf;
-    window.requestAnimationFrame = raf;
-    window.cancelAnimationFrame = caf;
-
-    const {
-      startSpotlightRotation,
-      stopSpotlightRotation,
-      SPOTLIGHT_INTERVAL_MS,
-      SPOTLIGHT_FADE_MS,
-    } = await import("../js/dashboard-spotlight.js");
-    const games = [
-      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
-      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
-    ];
-    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
-    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
-
-    document.body.innerHTML = `
-      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1">
-        <span id="spot-inner">slide-1</span>
-      </button>
-    `;
-    const el = document.getElementById("dashboardSpotlight");
-    startSpotlightRotation(games);
-    rafQueue.length = 0;
-
-    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
-    expect(el.dataset.key).toBe("steam:2");
-    expect(el.classList.contains("is-fading")).toBe(false);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    // Drop any incidental rAFs, then flush art-fit wait if still pending.
-    rafQueue.length = 0;
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    expect(rafQueue.filter(Boolean).length).toBeGreaterThanOrEqual(1);
-
-    // First painted frame: still held at opacity 0 (is-incoming).
-    const firstBatch = rafQueue.splice(0).filter(Boolean);
-    for (const cb of firstBatch) cb(0);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    expect(rafQueue.filter(Boolean).length).toBeGreaterThanOrEqual(1);
-
-    // Second frame releases the hold so CSS can fade the new slide in.
-    const secondBatch = rafQueue.splice(0).filter(Boolean);
-    for (const cb of secondBatch) cb(0);
-    expect(el.classList.contains("is-incoming")).toBe(false);
-
-    stopSpotlightRotation();
+    win.requestAnimationFrame = raf;
+    win.cancelAnimationFrame = caf;
+    vi.resetModules();
   });
 
-  it("stopSpotlightRotation cancels a pending is-incoming release", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("stopSpotlightRotation aborts an in-flight veil transition before the swap", async () => {
     window.matchMedia = vi.fn(() => ({
       matches: false,
       media: "",
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
-    const rafQueue = [];
-    const cancelSpy = vi.fn((id) => {
-      if (id >= 1 && id <= rafQueue.length) rafQueue[id - 1] = null;
-    });
-    const raf = (cb) => {
-      rafQueue.push(cb);
-      return rafQueue.length;
-    };
-    global.requestAnimationFrame = raf;
-    global.cancelAnimationFrame = cancelSpy;
-    window.requestAnimationFrame = raf;
-    window.cancelAnimationFrame = cancelSpy;
-
+    installAnimateStub();
     const {
+      renderSpotlightHtml,
       startSpotlightRotation,
       stopSpotlightRotation,
       SPOTLIGHT_INTERVAL_MS,
-      SPOTLIGHT_FADE_MS,
+      SPOTLIGHT_FADE_OUT_MS,
+      SPOTLIGHT_FADE_IN_MS,
+      SPOTLIGHT_DECODE_WAIT_MS,
     } = await import("../js/dashboard-spotlight.js");
     const games = [
-      { store: "steam", id: "1", name: "A", steam_review_percent: 90, steam_review_count: 500, library_image: "a.jpg", header_image: "a.jpg" },
-      { store: "steam", id: "2", name: "B", steam_review_percent: 88, steam_review_count: 500, library_image: "b.jpg", header_image: "b.jpg" },
+      {
+        store: "steam",
+        id: "1",
+        name: "A",
+        steam_review_percent: 90,
+        steam_review_count: 500,
+        library_image: "a.jpg",
+        header_image: "a.jpg",
+        _spotlightReason: { eyebrow: "Highly rated", score: 90 },
+      },
+      {
+        store: "steam",
+        id: "2",
+        name: "B",
+        steam_review_percent: 88,
+        steam_review_count: 500,
+        library_image: "b.jpg",
+        header_image: "b.jpg",
+        _spotlightReason: { eyebrow: "Solid pick", score: 85 },
+      },
     ];
-    games[0]._spotlightReason = { eyebrow: "Highly rated", score: 90 };
-    games[1]._spotlightReason = { eyebrow: "Solid pick", score: 85 };
 
-    document.body.innerHTML = `
-      <button type="button" class="dash-spotlight" id="dashboardSpotlight" data-key="steam:1">
-        <span id="spot-inner">slide-1</span>
-      </button>
-    `;
+    document.body.innerHTML = renderSpotlightHtml(games[0]);
     const el = document.getElementById("dashboardSpotlight");
     startSpotlightRotation(games);
-    rafQueue.length = 0;
-    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    rafQueue.length = 0;
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.classList.contains("is-incoming")).toBe(true);
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("A");
+    expect(el.dataset.key).toBe("steam:2"); // retargeted at fade start
 
-    // Stop before the first queued incoming-release callback runs.
-    expect(rafQueue.some((cb) => typeof cb === "function")).toBe(true);
-    cancelSpy.mockClear();
-    const pendingBeforeFirst = [...rafQueue];
     stopSpotlightRotation();
-    expect(cancelSpy).toHaveBeenCalled();
-    const cancelledFirst = cancelSpy.mock.calls[0][0];
-    expect(cancelledFirst).toBeGreaterThan(0);
-    expect(rafQueue[cancelledFirst - 1]).toBeNull();
-    expect(el.classList.contains("is-incoming")).toBe(false);
-    expect(el.classList.contains("is-fading")).toBe(false);
-    for (const cb of pendingBeforeFirst) cb?.(0);
-    expect(el.classList.contains("is-incoming")).toBe(false);
+    await vi.advanceTimersByTimeAsync(
+      SPOTLIGHT_FADE_OUT_MS + SPOTLIGHT_FADE_IN_MS + SPOTLIGHT_DECODE_WAIT_MS,
+    );
+    drainRaf();
+    await Promise.resolve();
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("A");
+  });
 
-    // Second path: stop after the first rAF callback while the nested handle is pending.
-    rafQueue.length = 0;
-    cancelSpy.mockClear();
+  it("fade start retargets dataset.key to the incoming slide", async () => {
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      media: "",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    installAnimateStub();
+    const {
+      renderSpotlightHtml,
+      startSpotlightRotation,
+      SPOTLIGHT_INTERVAL_MS,
+    } = await import("../js/dashboard-spotlight.js");
+    const games = [
+      {
+        store: "steam",
+        id: "1",
+        name: "A",
+        steam_review_percent: 90,
+        steam_review_count: 500,
+        library_image: "a.jpg",
+        header_image: "a.jpg",
+        _spotlightReason: { eyebrow: "Highly rated", score: 90 },
+      },
+      {
+        store: "steam",
+        id: "2",
+        name: "B",
+        steam_review_percent: 88,
+        steam_review_count: 500,
+        library_image: "b.jpg",
+        header_image: "b.jpg",
+        _spotlightReason: { eyebrow: "Solid pick", score: 85 },
+      },
+    ];
+
+    document.body.innerHTML = renderSpotlightHtml(games[0]);
+    const el = document.getElementById("dashboardSpotlight");
     startSpotlightRotation(games);
-    rafQueue.length = 0;
-    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + SPOTLIGHT_FADE_MS);
-    rafQueue.length = 0;
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    const firstPendingIdx = rafQueue.findIndex((cb) => typeof cb === "function");
-    expect(firstPendingIdx).toBeGreaterThanOrEqual(0);
-    rafQueue[firstPendingIdx](0);
-    expect(rafQueue.some((cb, i) => i > firstPendingIdx && typeof cb === "function")).toBe(true);
-    cancelSpy.mockClear();
-    const pendingNested = [...rafQueue];
-    stopSpotlightRotation();
-    expect(cancelSpy).toHaveBeenCalled();
-    const cancelledNested = cancelSpy.mock.calls[0][0];
-    expect(cancelledNested).toBeGreaterThan(firstPendingIdx + 1);
-    expect(rafQueue[cancelledNested - 1]).toBeNull();
-    expect(el.classList.contains("is-incoming")).toBe(false);
-    for (const cb of pendingNested) cb?.(0);
-    expect(el.classList.contains("is-incoming")).toBe(false);
+    expect(el.dataset.key).toBe("steam:1");
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
+    expect(el.dataset.key).toBe("steam:2");
+  });
+
+  it("veil CSS uses theme bg and matches art left-feather mask", () => {
+    expect(APP_CSS).toMatch(/\.dash-spotlight-veil\s*\{[^}]*background:\s*var\(--bg\)/s);
+    expect(APP_CSS).toMatch(
+      /\.dash-spotlight-veil\s*\{[^}]*transparent 12%[\s\S]*#000 95%/s,
+    );
+    expect(APP_CSS).not.toMatch(/\.dash-spotlight\.is-fading\s+\.dash-spotlight-art/);
+    expect(APP_CSS).not.toMatch(/\.dash-spotlight\.is-incoming\s+\.dash-spotlight-art/);
+  });
+
+  it("exports veil timing constants", async () => {
+    const {
+      SPOTLIGHT_FADE_OUT_MS,
+      SPOTLIGHT_FADE_IN_MS,
+      SPOTLIGHT_DECODE_WAIT_MS,
+      SPOTLIGHT_FADE_MS,
+    } = await import("../js/dashboard-spotlight.js");
+    expect(SPOTLIGHT_FADE_OUT_MS).toBe(320);
+    expect(SPOTLIGHT_FADE_IN_MS).toBe(480);
+    expect(SPOTLIGHT_DECODE_WAIT_MS).toBe(1200);
+    expect(SPOTLIGHT_FADE_MS).toBe(SPOTLIGHT_FADE_OUT_MS);
   });
 });

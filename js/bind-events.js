@@ -156,6 +156,14 @@ const SUMMARY_FILTER_CHIP_SELECTOR =
 
 let _eventsBound = false;
 
+/** Capture key before stopSpotlightRotation: veil cancel restores paintedKey. */
+export function handleDashListJump(row) {
+  if (!row?.dataset?.key) return;
+  const key = row.dataset.key;
+  if (row.id === "dashboardSpotlight") stopSpotlightRotation();
+  focusGame(key);
+}
+
 function handleSponsoredDismiss(dismissEl) {
   const id = dismissEl.dataset.sponsorId;
   dismissSponsoredDeal(id);
@@ -227,12 +235,8 @@ export function bindEvents() {
 
   const onDashListClick = e => {
     const row = e.target.closest('[data-action="dash-list-jump"]');
-    if (!row || !row.dataset.key) return;
-    // Capture before stopSpotlightRotation: veil cancel restores paintedKey and
-    // would undo mid-fade retarget to the incoming slide (NUC: WWM → letter T).
-    const key = row.dataset.key;
-    if (row.id === "dashboardSpotlight") stopSpotlightRotation();
-    focusGame(key);
+    if (!row) return;
+    handleDashListJump(row);
   };
   document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
   document.getElementById("dashRecentAdditions")?.addEventListener("click", onDashListClick);

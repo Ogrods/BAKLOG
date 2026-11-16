@@ -1,4 +1,4 @@
-/** Cross-kind spotlight fade contract: logo/cover/sale/ad/portrait swaps. */
+/** Cross-kind spotlight veil fade: logo/cover/sale/ad/portrait swaps. */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,9 +15,67 @@ describe("spotlight fade across slide kinds", () => {
   let stopSpotlightRotation;
   let stepSpotlight;
   let renderSpotlightHtml;
-  let SPOTLIGHT_FADE_MS;
+  let SPOTLIGHT_FADE_OUT_MS;
+  let SPOTLIGHT_FADE_IN_MS;
+  let SPOTLIGHT_DECODE_WAIT_MS;
   let gameKey;
   let rafQueue;
+  let anim;
+
+  function installAnimateStub() {
+    const queue = [];
+    Element.prototype.animate = function animateStub() {
+      let settle;
+      const finished = new Promise((resolve) => {
+        settle = resolve;
+      });
+      const animation = {
+        finished,
+        cancel() {
+          settle();
+        },
+      };
+      queue.push({ settle, el: this });
+      return animation;
+    };
+    return {
+      pending: () => queue.length,
+      async finishNext() {
+        const item = queue.shift();
+        if (!item) throw new Error("no pending veil animation");
+        item.settle();
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+    };
+  }
+
+  function drainRaf() {
+    const batch = rafQueue.splice(0).filter(Boolean);
+    for (const cb of batch) cb(0);
+  }
+
+  async function flushMicrotasks() {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  /** Finish veil fade-out (swap) → fade-in settle. */
+  async function completeFadeSwap(el) {
+    const htmlDuringFade = el.innerHTML;
+    expect(el.querySelector(".dash-spotlight-veil")).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_FADE_OUT_MS);
+    await flushMicrotasks();
+    expect(el.innerHTML).not.toBe(htmlDuringFade);
+    expect(el.querySelector(".dash-spotlight-veil")).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_FADE_IN_MS);
+    await flushMicrotasks();
+    // Drain any WAAPI stub finishes kicked in parallel with the timers.
+    while (anim.pending() > 0) {
+      await anim.finishNext().catch(() => {});
+    }
+  }
 
   beforeEach(async () => {
     const win = new Window({ url: "http://127.0.0.1:8765/" });
@@ -31,8 +89,6 @@ describe("spotlight fade across slide kinds", () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
-    // Fake timeouts only - keep rAF under our queue so fit-wait + double-rAF
-    // stay separable (Vitest's fake rAF flushes inside advanceTimersByTime).
     vi.useFakeTimers({
       toFake: [
         "setTimeout",
@@ -54,6 +110,7 @@ describe("spotlight fade across slide kinds", () => {
     global.cancelAnimationFrame = caf;
     win.requestAnimationFrame = raf;
     win.cancelAnimationFrame = caf;
+    anim = installAnimateStub();
 
     vi.resetModules();
     await import("../js/covers.js");
@@ -63,7 +120,9 @@ describe("spotlight fade across slide kinds", () => {
       stopSpotlightRotation,
       stepSpotlight,
       renderSpotlightHtml,
-      SPOTLIGHT_FADE_MS,
+      SPOTLIGHT_FADE_OUT_MS,
+      SPOTLIGHT_FADE_IN_MS,
+      SPOTLIGHT_DECODE_WAIT_MS,
     } = await import("../js/dashboard-spotlight.js"));
   });
 
@@ -130,36 +189,6 @@ describe("spotlight fade across slide kinds", () => {
     return el;
   }
 
-  function drainIncomingRelease(el) {
-    let guard = 0;
-    while (el.classList.contains("is-incoming") && guard++ < 8) {
-      const batch = rafQueue.splice(0).filter(Boolean);
-      if (!batch.length) break;
-      for (const cb of batch) cb(0);
-    }
-  }
-
-  /** Complete fade-out swap, art-fit wait (covers), and double-rAF fade-in. */
-  function completeFadeSwap(el) {
-    expect(el.classList.contains("is-fading")).toBe(true);
-    const htmlDuringFade = el.innerHTML;
-    rafQueue.length = 0;
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.classList.contains("is-fading")).toBe(false);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    expect(el.innerHTML).not.toBe(htmlDuringFade);
-    // Flush art-fit timeout when still waiting; logo/sync-fit already queued rAFs.
-    if (el._spotlightPendingIncomingRelease) {
-      rafQueue.length = 0;
-      vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    }
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    expect(el._spotlightPendingIncomingRelease).toBeFalsy();
-    expect(rafQueue.filter(Boolean).length).toBeGreaterThanOrEqual(1);
-    drainIncomingRelease(el);
-    expect(el.classList.contains("is-incoming")).toBe(false);
-  }
-
   function stubArtFit(el, width, height) {
     Object.defineProperty(el, "clientWidth", {
       value: 1000,
@@ -187,16 +216,37 @@ describe("spotlight fade across slide kinds", () => {
     window.applySpotlightArtFit(img);
   }
 
-  it("CSS suppresses motion while fading or incoming", () => {
+  it("CSS veil geometry covers theme bg + opaque content; no per-layer fade", () => {
+    expect(APP_CSS).toMatch(/\.dash-spotlight-veil\s*\{[^}]*z-index:\s*4/s);
+    expect(APP_CSS).toMatch(/\.dash-spotlight-veil\s*\{[^}]*background:\s*var\(--bg\)/s);
+    // Fully opaque from 22% so art/logo do not peek during the swap.
     expect(APP_CSS).toMatch(
-      /\.dash-spotlight\.is-incoming:not\(\.has-portrait-art\):not\(\.is-lowres-art\)[\s\S]*animation:\s*none\s*!important/s,
+      /\.dash-spotlight-veil[\s\S]*mask-image:\s*linear-gradient\(\s*90deg,\s*transparent 0%,\s*#000 22%,\s*#000 100%\s*\)/s,
     );
+    expect(APP_CSS).not.toMatch(
+      /\.dash-spotlight\.is-fading\s+\.dash-spotlight-art/,
+    );
+    expect(APP_CSS).not.toMatch(
+      /\.dash-spotlight\.is-incoming[\s\S]*animation:\s*none\s*!important/,
+    );
+    // Stacked phone width clears veil mask with art.
     expect(APP_CSS).toMatch(
-      /\.dash-spotlight\.is-incoming\.has-logo-art\s+\.dash-spotlight-logo-mark\s+svg[\s\S]*animation:\s*none\s*!important/s,
+      /\.dash-spotlight-veil,\s*\n\s*\.dash-spotlight\.has-portrait-art\s+\.dash-spotlight-sheen/,
     );
   });
 
-  it("library cover → library cover keeps fade contract", () => {
+  it("cover and logo slides both render a veil", () => {
+    document.body.innerHTML = renderSpotlightHtml(coverSlide("1", "Alpha"));
+    expect(
+      document.querySelector("#dashboardSpotlight .dash-spotlight-veil"),
+    ).toBeTruthy();
+    document.body.innerHTML = renderSpotlightHtml(logoSlide());
+    expect(
+      document.querySelector("#dashboardSpotlight .dash-spotlight-veil"),
+    ).toBeTruthy();
+  });
+
+  it("library cover → library cover keeps veil contract", async () => {
     const pool = [
       coverSlide("1", "Alpha"),
       coverSlide("2", "Beta", "Solid pick"),
@@ -208,65 +258,65 @@ describe("spotlight fade across slide kinds", () => {
     stepSpotlight(1);
     expect(el.dataset.key).toBe(gameKey(pool[1]));
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Alpha");
-    completeFadeSwap(el);
+    await completeFadeSwap(el);
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Beta");
     expect(el.classList.contains("has-logo-art")).toBe(false);
     expect(el.classList.contains("dash-spotlight--ad")).toBe(false);
   });
 
-  it("library → wishlist On sale now", () => {
+  it("library → wishlist On sale now", async () => {
     const pool = [coverSlide("1", "Alpha"), wishlistSaleSlide()];
     const el = mountPool(pool);
     stepSpotlight(1);
-    completeFadeSwap(el);
+    await completeFadeSwap(el);
     expect(el.dataset.key).toBe(gameKey(pool[1]));
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe(
       "Wishlist Sale",
     );
-    // eyebrowVariant may rewrite "On sale now" (e.g. Discounted).
     expect(
       el.querySelector(".dash-spotlight-eyebrow")?.textContent?.length,
     ).toBeGreaterThan(0);
     expect(el.classList.contains("has-logo-art")).toBe(false);
   });
 
-  it("cover → logo Pro house", () => {
+  it("cover → logo Pro house", async () => {
     const pool = [coverSlide("1", "Alpha"), logoSlide()];
     const el = mountPool(pool);
     stepSpotlight(1);
-    expect(el.classList.contains("is-fading")).toBe(true);
-    completeFadeSwap(el);
+    expect(anim.pending()).toBeGreaterThanOrEqual(1);
+    await completeFadeSwap(el);
     expect(el.classList.contains("has-logo-art")).toBe(true);
     expect(el.classList.contains("dash-spotlight--ad")).toBe(true);
     expect(el.dataset.action).toBe("sponsored-deal");
     expect(el.querySelector(".dash-spotlight-art")).toBeNull();
     expect(el.querySelector(".dash-spotlight-logo-lockup")).toBeTruthy();
+    expect(el.querySelector(".dash-spotlight-veil")).toBeTruthy();
   });
 
-  it("logo → cover", () => {
+  it("logo → cover", async () => {
     const pool = [logoSlide(), coverSlide("2", "Beta")];
     const el = mountPool(pool);
     expect(el.classList.contains("has-logo-art")).toBe(true);
     stepSpotlight(1);
-    completeFadeSwap(el);
+    await completeFadeSwap(el);
     expect(el.classList.contains("has-logo-art")).toBe(false);
     expect(el.querySelector(".dash-spotlight-art")).toBeTruthy();
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Beta");
     expect(el.dataset.action).toBe("dash-list-jump");
   });
 
-  it("cover ad → library", () => {
+  it("cover ad → library", async () => {
     const pool = [adCoverSlide(), coverSlide("2", "Beta")];
     const el = mountPool(pool);
     expect(el.classList.contains("dash-spotlight--ad")).toBe(true);
     stepSpotlight(1);
-    completeFadeSwap(el);
+    await completeFadeSwap(el);
     expect(el.classList.contains("dash-spotlight--ad")).toBe(false);
     expect(el.dataset.action).toBe("dash-list-jump");
     expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Beta");
   });
 
-  it("portrait → landscape settles layout classes before fade-in release", () => {
+  it("portrait → landscape settles layout classes under the veil", async () => {
     const pool = [
       coverSlide("1", "Portrait"),
       coverSlide("2", "Landscape", "Solid pick"),
@@ -275,34 +325,64 @@ describe("spotlight fade across slide kinds", () => {
     stubArtFit(el, 600, 900);
     expect(el.classList.contains("has-portrait-art")).toBe(true);
 
-    rafQueue.length = 0;
     stepSpotlight(1);
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    // Simulate cached cover so art-fit runs sync via onload hook path.
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_FADE_OUT_MS);
+    await flushMicrotasks();
     stubArtFit(el, 1920, 1080);
     expect(el.classList.contains("has-portrait-art")).toBe(false);
-    expect(el.classList.contains("is-incoming")).toBe(true);
-    // Fit notify should have queued double-rAF (no need for fit timeout).
-    if (rafQueue.filter(Boolean).length === 0) {
-      vi.advanceTimersByTime(SPOTLIGHT_FADE_MS);
-    }
-    expect(rafQueue.filter(Boolean).length).toBeGreaterThanOrEqual(1);
-    drainIncomingRelease(el);
-    expect(el.classList.contains("is-incoming")).toBe(false);
-    expect(el.classList.contains("has-portrait-art")).toBe(false);
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe(
+      "Landscape",
+    );
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_FADE_IN_MS);
   });
 
-  it("stop mid-fade cancels cross-kind HTML swap", () => {
-    const pool = [coverSlide("1", "Alpha"), logoSlide()];
+  it("rapid steps land on the latest slide (latest-wins)", async () => {
+    const pool = [
+      coverSlide("1", "Alpha"),
+      coverSlide("2", "Beta", "Solid pick"),
+      coverSlide("3", "Gamma", "Solid pick"),
+    ];
     const el = mountPool(pool);
     stepSpotlight(1);
-    expect(el.classList.contains("is-fading")).toBe(true);
-    const htmlBefore = el.innerHTML;
+    stepSpotlight(1);
+    expect(el.dataset.key).toBe(gameKey(pool[2]));
+    // One fade-out for the in-flight transition; retarget happens under the veil.
+    await completeFadeSwap(el);
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Gamma");
+  });
+
+  it("swap still applies when decode is slow (cap does not block HTML)", async () => {
+    const pool = [
+      coverSlide("1", "Alpha"),
+      coverSlide("2", "Beta", "Solid pick"),
+    ];
+    const el = mountPool(pool);
+    stepSpotlight(1);
+    const htmlDuring = el.innerHTML;
+    // Swap is timer-driven at fade-out; decode race is non-blocking.
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_FADE_OUT_MS);
+    await flushMicrotasks();
+    expect(el.innerHTML).not.toBe(htmlDuring);
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Beta");
+    expect(SPOTLIGHT_DECODE_WAIT_MS).toBe(1200);
+  });
+
+  it("stop mid-fade cancels cross-kind HTML swap", async () => {
+    const pool = [coverSlide("1", "Alpha"), logoSlide()];
+    const el = mountPool(pool);
+    const paintedKey = el.dataset.key;
+    stepSpotlight(1);
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Alpha");
+    expect(el.dataset.key).toBe(gameKey(pool[1])); // retargeted for mid-fade click
     stopSpotlightRotation();
-    vi.advanceTimersByTime(SPOTLIGHT_FADE_MS * 2);
-    expect(el.innerHTML).toBe(htmlBefore);
-    expect(el.classList.contains("is-fading")).toBe(false);
-    expect(el.classList.contains("is-incoming")).toBe(false);
+    expect(el.dataset.key).toBe(paintedKey); // restored to painted slide
+    await vi.advanceTimersByTimeAsync(
+      SPOTLIGHT_FADE_OUT_MS + SPOTLIGHT_FADE_IN_MS + SPOTLIGHT_DECODE_WAIT_MS,
+    );
+    drainRaf();
+    await flushMicrotasks();
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).toBe("Alpha");
+    expect(el.classList.contains("has-logo-art")).toBe(false);
+    expect(el.dataset.key).toBe(paintedKey);
   });
 });

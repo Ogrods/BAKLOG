@@ -80,8 +80,14 @@ function isOnSale(g) {
 }
 
 export const SPOTLIGHT_INTERVAL_MS = 9000;
-/** Must match app.css --spotlight-fade on .dash-spotlight (art opacity transition). */
-export const SPOTLIGHT_FADE_MS = 450;
+/** Veil fade-out (current slide → theme bg). */
+export const SPOTLIGHT_FADE_OUT_MS = 320;
+/** Veil fade-in (theme bg → next slide). */
+export const SPOTLIGHT_FADE_IN_MS = 480;
+/** Cap waiting for next-slide art decode under the veil. */
+export const SPOTLIGHT_DECODE_WAIT_MS = 1200;
+/** Compat alias used by rotation-phase tests; equals fade-out duration. */
+export const SPOTLIGHT_FADE_MS = SPOTLIGHT_FADE_OUT_MS;
 const RECENT_SPOTLIGHT_CAP = 5;
 const RECENT_QUOTA = 5;
 
@@ -323,16 +329,15 @@ function pickStinkerGame(eligible) {
 
 let _spotlightTimer = null;
 let _rotationWanted = false;
-let _spotlightFadeTimer = null;
-/** Cancels a pending double-rAF that drops .is-incoming after a slide swap. */
-let _spotlightIncomingRaf = 0;
-/** Timeout fallback while waiting for cover art-fit before releasing .is-incoming. */
-let _spotlightIncomingFitTimer = null;
 let _spotlightIndex = 0;
 let _spotlightPool = [];
 let _spotlightCurrentKey = null;
 let _spotlightPaused = false;
 let _spotlightPausedByUser = false;
+/** In-flight veil transition: latest-wins retarget via .pendingNext. */
+let _spotlightTransition = null;
+/** URL → Promise for Image.decode preload cache. */
+const _spotlightDecodeCache = new Map();
 // Keys of recently-shown slides, oldest first. Persists across pool rebuilds and
 // page reloads (profile-scoped localStorage). Self-capped in recordSpotlightShown.
 let _spotlightRecentKeys = loadSpotlightRecentKeys();
@@ -415,93 +420,293 @@ export function setSpotlightCurrentKey(key) {
   _spotlightCurrentKey = key;
 }
 
-function cancelSpotlightIncomingFitWait(el) {
-  if (_spotlightIncomingFitTimer) {
-    clearTimeout(_spotlightIncomingFitTimer);
-    _spotlightIncomingFitTimer = null;
+function prefersReducedMotion() {
+  return (
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
+  );
+}
+
+function spotlightVeil(el) {
+  return el?.querySelector?.(".dash-spotlight-veil") || null;
+}
+
+function setVeilOpacity(veil, opacity) {
+  if (!veil) return;
+  veil.style.opacity = String(opacity);
+}
+
+function cancelSpotlightVeilAnimation(el) {
+  const t = _spotlightTransition;
+  if (!t) return;
+  // Mark aborted before cancel so the async run loop sees it when finished settles.
+  if (t.abort) t.abort.aborted = true;
+  _spotlightTransition = null;
+  if (t.timers) {
+    for (const id of t.timers) clearTimeout(id);
+    t.timers.length = 0;
   }
-  if (el) {
-    el._spotlightPendingIncomingRelease = false;
-    el._spotlightOnArtFitted = null;
+  try {
+    t.animation?.cancel?.();
+  } catch {
+    /* ignore */
+  }
+  // Restore identity to the slide still painted in the DOM (dataset.key was
+  // retargeted at fade start for mid-fade clicks).
+  if (el && t.paintedKey !== undefined) {
+    if (t.paintedKey) {
+      el.dataset.key = t.paintedKey;
+      _spotlightCurrentKey = t.paintedKey;
+    } else {
+      delete el.dataset.key;
+      _spotlightCurrentKey = null;
+    }
+  }
+  const veil = spotlightVeil(el);
+  if (veil) {
+    setVeilOpacity(veil, 0);
   }
 }
 
-function cancelSpotlightIncomingRelease(el) {
-  if (_spotlightIncomingRaf) {
-    globalThis.cancelAnimationFrame(_spotlightIncomingRaf);
-    _spotlightIncomingRaf = 0;
+function trackTransitionTimer(id) {
+  if (_spotlightTransition?.timers && id != null) {
+    _spotlightTransition.timers.push(id);
   }
-  cancelSpotlightIncomingFitWait(el);
-}
-
-/** Double-rAF: hold opacity 0 for one painted frame, then fade the new slide in. */
-function scheduleSpotlightIncomingRelease(el) {
-  cancelSpotlightIncomingRelease(el);
-  if (!el) return;
-  el.classList.add("is-incoming");
-  const raf = globalThis.requestAnimationFrame.bind(globalThis);
-  _spotlightIncomingRaf = raf(() => {
-    _spotlightIncomingRaf = raf(() => {
-      _spotlightIncomingRaf = 0;
-      el.classList.remove("is-incoming");
-    });
-  });
+  return id;
 }
 
 /**
- * Cover slides: wait for applySpotlightArtFit (or a short timeout) before the
- * double-rAF release so fade-in does not start under the wrong landscape /
- * portrait / lowres treatment. Logo slides have no cover img - release now.
+ * Preload / decode cover art for a slide. Logo slides resolve immediately.
+ * Cached by URL so rotation can warm the slide after next.
  */
-function releaseSpotlightIncoming(el) {
-  cancelSpotlightIncomingRelease(el);
-  if (!el) return;
-
-  if (el.classList.contains("has-logo-art")) {
-    scheduleSpotlightIncomingRelease(el);
-    return;
-  }
-
-  const img = el.querySelector(".dash-spotlight-art");
-  if (
-    !img ||
-    img.classList.contains("dash-spotlight-art-placeholder") ||
-    (img.complete && img.naturalWidth > 0 && img.classList.contains("is-loaded"))
-  ) {
-    scheduleSpotlightIncomingRelease(el);
-    return;
-  }
-
-  // Hold opacity 0 until art-fit (or timeout), then double-rAF fade-in.
-  el.classList.add("is-incoming");
-  el._spotlightPendingIncomingRelease = true;
-  el._spotlightOnArtFitted = () => {
-    if (!el._spotlightPendingIncomingRelease) return;
-    el._spotlightPendingIncomingRelease = false;
-    el._spotlightOnArtFitted = null;
-    if (_spotlightIncomingFitTimer) {
-      clearTimeout(_spotlightIncomingFitTimer);
-      _spotlightIncomingFitTimer = null;
+export function preloadSpotlightArt(g) {
+  if (!g || g._spotlightArtMode === "logo") return Promise.resolve();
+  const url = spotlightArtCandidates(g)[0];
+  if (!url) return Promise.resolve();
+  const cached = _spotlightDecodeCache.get(url);
+  if (cached) return cached;
+  const promise = new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        const done = () => resolve();
+        if (typeof img.decode === "function") {
+          img.decode().then(done, done);
+        } else {
+          done();
+        }
+      };
+      img.onerror = () => resolve();
+      img.src = url;
+      if (img.complete) {
+        if (typeof img.decode === "function") {
+          img.decode().then(resolve, resolve);
+        } else {
+          resolve();
+        }
+      }
+    } catch {
+      resolve();
     }
-    scheduleSpotlightIncomingRelease(el);
+  });
+  _spotlightDecodeCache.set(url, promise);
+  // Bound cache growth (URLs are profile cover CDN paths).
+  if (_spotlightDecodeCache.size > 40) {
+    const first = _spotlightDecodeCache.keys().next().value;
+    _spotlightDecodeCache.delete(first);
+  }
+  return promise;
+}
+
+function animateVeil(veil, toOpacity, durationMs, signal) {
+  if (!veil) return Promise.resolve();
+  if (signal?.aborted) return Promise.resolve();
+  const from =
+    Number.parseFloat(globalThis.getComputedStyle?.(veil)?.opacity) ||
+    Number.parseFloat(veil.style.opacity) ||
+    0;
+  if (
+    prefersReducedMotion() ||
+    typeof veil.animate !== "function" ||
+    durationMs <= 0
+  ) {
+    setVeilOpacity(veil, toOpacity);
+    return Promise.resolve();
+  }
+  try {
+    const anim = veil.animate(
+      [{ opacity: from }, { opacity: toOpacity }],
+      {
+        duration: durationMs,
+        easing: toOpacity > from ? "ease-in" : "ease-out",
+        fill: "forwards",
+      },
+    );
+    if (_spotlightTransition) {
+      _spotlightTransition.animation = anim;
+    }
+    // Race a timer so fake-timer / incomplete WAAPI timelines still advance.
+    // Browsers resolve finished first; tests advance durationMs to complete.
+    return Promise.race([
+      anim.finished.then(
+        () => "anim",
+        () => "anim",
+      ),
+      new Promise((resolve) => {
+        trackTransitionTimer(setTimeout(() => resolve("timer"), durationMs));
+      }),
+    ]).then(() => {
+      if (signal?.aborted) return;
+      setVeilOpacity(veil, toOpacity);
+      try {
+        anim.cancel();
+      } catch {
+        /* ignore */
+      }
+    });
+  } catch {
+    if (!signal?.aborted) setVeilOpacity(veil, toOpacity);
+    return Promise.resolve();
+  }
+}
+
+function preloadSlideAfter(next) {
+  const len = _spotlightPool.length;
+  if (len <= 1 || !next) return;
+  const key = gameKey(next);
+  let idx = _spotlightPool.findIndex((g) => gameKey(g) === key);
+  if (idx < 0) idx = _spotlightIndex;
+  const after = _spotlightPool[(idx + 1) % len];
+  if (after) void preloadSpotlightArt(after);
+}
+
+/**
+ * Fade to theme bg, swap slide under the veil, fade back.
+ * Latest click wins: a second call while running retargets pendingNext.
+ *
+ * Sequencing is timer-driven so Vitest fake timers (and a stalled WAAPI
+ * timeline in happy-dom) still advance. WAAPI runs in parallel for the visual
+ * fade when the browser supports it.
+ */
+export function transitionSpotlight(el, next) {
+  if (!el || !next) return;
+  const incomingKey = gameKey(next);
+  // Capture the painted slide before retargeting identity for mid-fade clicks.
+  const paintedBefore =
+    el.dataset.key || _spotlightCurrentKey || "";
+
+  // Point dataset.key at the incoming slide immediately so a mid-fade click
+  // does not drill the previous game still painted in the DOM.
+  el.dataset.key = incomingKey;
+  _spotlightCurrentKey = incomingKey;
+
+  if (_spotlightTransition) {
+    _spotlightTransition.pendingNext = next;
+    void preloadSpotlightArt(next);
+    return;
+  }
+
+  const abort = { aborted: false };
+  const state = {
+    pendingNext: next,
+    animation: null,
+    abort,
+    timers: [],
+    paintedKey: paintedBefore,
   };
-  _spotlightIncomingFitTimer = setTimeout(() => {
-    _spotlightIncomingFitTimer = null;
-    if (!el._spotlightPendingIncomingRelease) return;
-    el._spotlightPendingIncomingRelease = false;
-    el._spotlightOnArtFitted = null;
-    scheduleSpotlightIncomingRelease(el);
-  }, SPOTLIGHT_FADE_MS);
+  _spotlightTransition = state;
+  void preloadSpotlightArt(next);
+
+  const finishTransition = () => {
+    if (_spotlightTransition === state) _spotlightTransition = null;
+  };
+
+  const runDip = (target) => {
+    if (abort.aborted || !target) {
+      finishTransition();
+      return;
+    }
+
+    if (prefersReducedMotion()) {
+      applySpotlightSlide(el, target);
+      state.paintedKey = gameKey(target);
+      preloadSlideAfter(target);
+      if (state.pendingNext) {
+        const again = state.pendingNext;
+        state.pendingNext = null;
+        runDip(again);
+      } else {
+        finishTransition();
+      }
+      return;
+    }
+
+    const veil = spotlightVeil(el);
+    // Kick WAAPI for the visual; completion is the timeout below.
+    void animateVeil(veil, 1, SPOTLIGHT_FADE_OUT_MS, abort);
+
+    trackTransitionTimer(
+      setTimeout(() => {
+        if (abort.aborted) {
+          finishTransition();
+          return;
+        }
+        // Prefer the latest retarget that arrived during fade-out.
+        const swapTarget = state.pendingNext || target;
+        state.pendingNext = null;
+        const swapKey = gameKey(swapTarget);
+        el.dataset.key = swapKey;
+        _spotlightCurrentKey = swapKey;
+
+        // Swap under full cover in this timer turn (fake-timer friendly).
+        // Art was preloaded when the transition started; primeSpotlightArt
+        // inside apply picks up the warm decode. Cap is kept as a soft wait
+        // only when the caller wants to block on preloadSpotlightArt.
+        void Promise.race([
+          preloadSpotlightArt(swapTarget),
+          new Promise((r) =>
+            trackTransitionTimer(setTimeout(r, SPOTLIGHT_DECODE_WAIT_MS)),
+          ),
+        ]);
+
+        applySpotlightSlide(el, swapTarget);
+        // Markup now matches swapTarget; cancel must restore this key.
+        state.paintedKey = swapKey;
+        const veilAfter = spotlightVeil(el);
+        setVeilOpacity(veilAfter, 1);
+        void animateVeil(veilAfter, 0, SPOTLIGHT_FADE_IN_MS, abort);
+
+        trackTransitionTimer(
+          setTimeout(() => {
+            if (abort.aborted) {
+              finishTransition();
+              return;
+            }
+            setVeilOpacity(spotlightVeil(el), 0);
+            preloadSlideAfter(swapTarget);
+            if (state.pendingNext) {
+              const again = state.pendingNext;
+              state.pendingNext = null;
+              runDip(again);
+            } else {
+              finishTransition();
+            }
+          }, SPOTLIGHT_FADE_IN_MS),
+        );
+      }, SPOTLIGHT_FADE_OUT_MS),
+    );
+  };
+
+  const first = state.pendingNext;
+  state.pendingNext = null;
+  runDip(first);
 }
 
 export function stopSpotlightRotation() {
   if (_spotlightTimer) clearInterval(_spotlightTimer);
-  if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
   const el = document.getElementById("dashboardSpotlight");
-  cancelSpotlightIncomingRelease(el);
+  cancelSpotlightVeilAnimation(el);
   _spotlightTimer = null;
-  _spotlightFadeTimer = null;
-  if (el) el.classList.remove("is-fading", "is-incoming");
   // Intentionally NOT clearing _spotlightIndex / _spotlightCurrentKey / _spotlightPool —
   // see stopDashboardRotations / renderDashboardMega for the "preserve across revisits" rule.
 }
@@ -1218,7 +1423,8 @@ function spotlightLogoInnerHtml(g) {
       ${sloganHtml}
       ${metaHtml}
       ${cta ? `<span class="dash-spotlight-logo-cta">${escapeHtml(cta)} &rarr;</span>` : ""}
-    </div>`;
+    </div>
+    <div class="dash-spotlight-veil" aria-hidden="true"></div>`;
 }
 
 export function spotlightInnerHtml(g) {
@@ -1266,7 +1472,8 @@ export function spotlightInnerHtml(g) {
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
       <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaParts.join(" · ")}</span>
-    </div>`;
+    </div>
+    <div class="dash-spotlight-veil" aria-hidden="true"></div>`;
 }
 
 function spotlightNavHtml() {
@@ -1420,35 +1627,12 @@ function applySpotlightSlide(el, next) {
     delete el.dataset.sponsorUrl;
     el.title = `Jump to ${next.name} in ${spotlightJumpDest(next)}`;
   }
-  // Hold is-incoming before clearing is-fading so the new art never paints at
-  // opacity 1 in the same turn as the HTML swap. primeSpotlightArt may fit a
-  // cached cover sync; otherwise release waits for onload art-fit (or timeout).
-  el.classList.add("is-incoming");
-  el.classList.remove("is-fading");
   primeSpotlightArt(el);
-  releaseSpotlightIncoming(el);
   _spotlightCurrentKey = gameKey(next);
   recordSpotlightShown(_spotlightCurrentKey);
   el._spotlightSyncHover?.();
   announceSpotlightSlide(next);
   updateSpotlightControlsUI();
-}
-
-function fadeToSpotlight(el, next) {
-  cancelSpotlightIncomingRelease(el);
-  el.classList.remove("is-incoming");
-  el.classList.add("is-fading");
-  // Point dataset.key at the incoming slide immediately so a mid-fade click
-  // does not drill the previous game still painted in the DOM.
-  if (next) {
-    el.dataset.key = gameKey(next);
-    _spotlightCurrentKey = gameKey(next);
-  }
-  if (_spotlightFadeTimer) clearTimeout(_spotlightFadeTimer);
-  _spotlightFadeTimer = setTimeout(() => {
-    applySpotlightSlide(el, next);
-    _spotlightFadeTimer = null;
-  }, SPOTLIGHT_FADE_MS);
 }
 
 function stopSpotlightTimer() {
@@ -1466,7 +1650,7 @@ function startSpotlightTimer(el) {
       return;
     }
     _spotlightIndex = nextSpotlightIndex();
-    fadeToSpotlight(el, _spotlightPool[_spotlightIndex]);
+    transitionSpotlight(el, _spotlightPool[_spotlightIndex]);
   }, SPOTLIGHT_INTERVAL_MS);
 }
 
@@ -1739,7 +1923,7 @@ export function stepSpotlight(delta) {
   if (!el) return;
   const len = _spotlightPool.length;
   _spotlightIndex = (_spotlightIndex + delta + len) % len;
-  fadeToSpotlight(el, _spotlightPool[_spotlightIndex]);
+  transitionSpotlight(el, _spotlightPool[_spotlightIndex]);
   if (_rotationWanted && !_spotlightPaused) {
     stopSpotlightTimer();
     startSpotlightTimer(el);

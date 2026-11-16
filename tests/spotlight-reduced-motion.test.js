@@ -89,9 +89,16 @@ describe("spotlight reduced motion", () => {
     mountPool(games);
     expect(getSpotlightPaused()).toBe(false);
     expect(isSpotlightRotationActive()).toBe(true);
-    const keyBefore = document.getElementById("dashboardSpotlight").dataset.key;
-    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS + 500);
-    expect(document.getElementById("dashboardSpotlight").dataset.key).not.toBe(keyBefore);
+    const el = document.getElementById("dashboardSpotlight");
+    const keyBefore = el.dataset.key;
+    const titleBefore = el.querySelector(".dash-spotlight-title")?.textContent;
+    // Reduced motion skips the veil WAAPI path and swaps instantly.
+    vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
+    expect(el.dataset.key).not.toBe(keyBefore);
+    expect(el.querySelector(".dash-spotlight-title")?.textContent).not.toBe(
+      titleBefore,
+    );
+    expect(el.querySelector(".dash-spotlight-veil")).toBeTruthy();
   });
 
   it("still allows user pause under reduced motion", () => {

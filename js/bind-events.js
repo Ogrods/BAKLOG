@@ -228,8 +228,11 @@ export function bindEvents() {
   const onDashListClick = e => {
     const row = e.target.closest('[data-action="dash-list-jump"]');
     if (!row || !row.dataset.key) return;
+    // Capture before stopSpotlightRotation: veil cancel restores paintedKey and
+    // would undo mid-fade retarget to the incoming slide (NUC: WWM → letter T).
+    const key = row.dataset.key;
     if (row.id === "dashboardSpotlight") stopSpotlightRotation();
-    focusGame(row.dataset.key);
+    focusGame(key);
   };
   document.getElementById("dashPicksVersusCard")?.addEventListener("click", onDashListClick);
   document.getElementById("dashRecentAdditions")?.addEventListener("click", onDashListClick);

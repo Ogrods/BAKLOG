@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-11-15
+
 ### Fixed
 
 - Dashboard spotlight fades smoothly through to the background between titles

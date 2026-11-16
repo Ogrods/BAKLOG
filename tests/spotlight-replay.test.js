@@ -537,9 +537,7 @@ describe("spotlight rotation safety", () => {
     expect(el.dataset.key).toBe("steam:1");
   });
 
-  it("dash-list click captures incoming key before stop restores paintedKey", async () => {
-    // Mirrors onDashListClick: capture dataset.key, then stopSpotlightRotation,
-    // then focusGame(captured) — stop alone would restore steam:1 and drill wrong.
+  it("dash-list click focuses incoming key even after stop restores paintedKey", async () => {
     window.matchMedia = vi.fn(() => ({
       matches: false,
       media: "",
@@ -547,12 +545,17 @@ describe("spotlight rotation safety", () => {
       removeEventListener: vi.fn(),
     }));
     installAnimateStub();
+    const focusGame = vi.fn();
+    vi.doMock("../js/table-ui.js", async (importOriginal) => {
+      const actual = await importOriginal();
+      return { ...actual, focusGame };
+    });
     const {
       renderSpotlightHtml,
       startSpotlightRotation,
-      stopSpotlightRotation,
       SPOTLIGHT_INTERVAL_MS,
     } = await import("../js/dashboard-spotlight.js");
+    const { handleDashListJump } = await import("../js/bind-events.js");
     const games = [
       {
         store: "steam",
@@ -582,9 +585,8 @@ describe("spotlight rotation safety", () => {
     vi.advanceTimersByTime(SPOTLIGHT_INTERVAL_MS);
     expect(el.dataset.key).toBe("steam:2");
 
-    const key = el.dataset.key;
-    stopSpotlightRotation();
-    expect(key).toBe("steam:2");
+    handleDashListJump(el);
+    expect(focusGame).toHaveBeenCalledWith("steam:2");
     expect(el.dataset.key).toBe("steam:1");
   });
 

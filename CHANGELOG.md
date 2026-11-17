@@ -37,6 +37,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-11-16
+
+### Fixed
+
+- Clicking a spotlight title while it is transitioning opens that game in Library, not the previous slide
+
 ## [0.9.12] - 2026-11-15
 
 ### Fixed

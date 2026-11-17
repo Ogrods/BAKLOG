@@ -2461,14 +2461,17 @@ function renderBrowserWarn() {
   if (!el) return;
   if (_chromiumAvailable) {
     el.hidden = true;
+    el.classList.add("hidden");
     el.innerHTML = "";
     return;
   }
-  el.hidden = false;
   el.innerHTML = `
     <div class="migration-banner-body">
       <span class="text-amber-400">No Chrome or Edge found. On first Connect, BAKLOG downloads a one-time browser (~150 MB), or install Google Chrome / Microsoft Edge.</span>
     </div>`;
+  void import("./notice-toast.js").then(({ adoptNoticeToast }) => {
+    adoptNoticeToast(el, { variant: "update" });
+  });
 }
 
 export async function refreshConnections() {

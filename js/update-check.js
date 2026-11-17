@@ -390,6 +390,11 @@ function setBannerHtml(html, { hidden = false } = {}) {
   banner.replaceChildren();
   banner.insertAdjacentHTML("beforeend", html);
   banner.classList.toggle("hidden", hidden);
+  if (!hidden) {
+    void import("./notice-toast.js").then(({ adoptNoticeToast }) => {
+      adoptNoticeToast(banner, { variant: "update" });
+    });
+  }
 }
 
 function hideUpdateModal() {

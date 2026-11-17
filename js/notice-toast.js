@@ -19,6 +19,25 @@ export function ensureNoticeToastStack() {
 }
 
 /**
+ * Move an existing banner node into the corner stack (update/boot/conn warn).
+ * @param {HTMLElement | null} el
+ * @param {{ variant?: string, role?: string, live?: string }} [opts]
+ * @returns {HTMLElement | null}
+ */
+export function adoptNoticeToast(el, { variant = "info", role, live } = {}) {
+  if (!el || typeof document === "undefined") return null;
+  const stack = ensureNoticeToastStack();
+  if (!stack) return null;
+  if (el.parentElement !== stack) stack.appendChild(el);
+  el.classList.add("app-notice-toast", `app-notice-toast--${variant}`);
+  el.classList.remove("hidden");
+  el.hidden = false;
+  if (role) el.setAttribute("role", role);
+  if (live) el.setAttribute("aria-live", live);
+  return el;
+}
+
+/**
  * @param {{ id: string, html: string, variant?: string, role?: string, live?: string }} opts
  * @returns {HTMLElement | null}
  */
@@ -45,6 +64,7 @@ export function showNoticeToast({
   el.setAttribute("aria-live", live);
   el.innerHTML = html;
   el.classList.remove("hidden");
+  el.hidden = false;
   return el;
 }
 

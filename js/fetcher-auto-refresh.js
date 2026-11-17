@@ -1,8 +1,17 @@
 /**
  * Auto-refresh scheduling: ITAD, claims, stale-24h, connect, enrich.
  */
+import {
+  clearClaimsPendingAutoRun,
+  markClaimsPendingAutoRun,
+} from './claimable.js';
 import { FETCHER_AUTH_PROVIDER, NO_AUTO_FETCH_KEYS } from './fetcher-registry.js';
-import { fetcherRunner, fetcherSources } from './fetcher-health-shared.js';
+import {
+  clearItadPendingAutoRun,
+  fetcherRunner,
+  fetcherSources,
+  markItadPendingAutoRun,
+} from './fetcher-health-shared.js';
 import {
   LS_AUTO_STALE_LAST_RUN,
   LS_CLAIMS_LAST_AUTO_RUN,
@@ -76,6 +85,23 @@ export function noteItadAutoRunFailed(deps = {}) {
       try { localStorage.setItem(itadLastAutoRunKey(), String(t)); } catch (_) {}
     },
   });
+}
+
+/** Soften claims/ITAD auto cooldown and drop sticky pending-auto banner flags. */
+export function noteFetcherAutoRefreshFailed(key) {
+  if (key === 'claims') {
+    noteClaimsAutoRunFailed();
+    clearClaimsPendingAutoRun();
+  } else if (key === 'itad') {
+    noteItadAutoRunFailed();
+    clearItadPendingAutoRun();
+  }
+}
+
+/** Arm pending-auto banners only after a successful POST submit. */
+export function armPendingAutoRunBanner(key) {
+  if (key === 'itad') markItadPendingAutoRun();
+  else if (key === 'claims') markClaimsPendingAutoRun();
 }
 
 export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;

@@ -100,6 +100,7 @@ export {
   clearClaimsLastAutoRun,
   noteClaimsAutoRunFailed,
   noteItadAutoRunFailed,
+  noteFetcherAutoRefreshFailed,
   CLAIMS_AUTO_FAIL_BACKOFF_MS,
   ITAD_AUTO_FAIL_BACKOFF_MS,
   maybeAutoFetchOnConnect,

@@ -88,37 +88,57 @@ export function noteItadAutoRunFailed(deps = {}) {
 }
 
 /**
- * Soften claims/ITAD auto cooldown after fail/cancel, but only when an auto
- * cycle was armed at POST accept. Manual chip fails must not rewrite lastRun.
+ * Auto-cycle latch (claims/ITAD). Set at POST accept; cleared on success or
+ * after fail/cancel backoff. Kept separate from the banner pending flags so a
+ * mid-run consumeClaims/ItadAutoRunFlag cannot skip fail backoff, and a manual
+ * chip fail cannot rewrite lastRun.
  */
+const autoRefreshCycleArmed = { claims: false, itad: false };
+
+/** Soften claims/ITAD auto cooldown after fail/cancel when a cycle was armed. */
 export function noteFetcherAutoRefreshFailed(key, deps = {}) {
   if (key === 'claims') {
-    if (clearClaimsPendingAutoRun()) noteClaimsAutoRunFailed(deps);
+    clearClaimsPendingAutoRun();
+    if (!autoRefreshCycleArmed.claims) return;
+    autoRefreshCycleArmed.claims = false;
+    noteClaimsAutoRunFailed(deps);
   } else if (key === 'itad') {
-    if (clearItadPendingAutoRun()) noteItadAutoRunFailed(deps);
+    clearItadPendingAutoRun();
+    if (!autoRefreshCycleArmed.itad) return;
+    autoRefreshCycleArmed.itad = false;
+    noteItadAutoRunFailed(deps);
   }
 }
 
 /**
- * Stamp the full auto-refresh interval at POST accept (before snapshot/SSE).
- * Fail/cancel paths overwrite via noteFetcherAutoRefreshFailed so a later
- * maybeAutoRefresh setLastRun cannot replace a short fail backoff.
+ * Stamp the full auto-refresh interval at POST accept (before snapshot/SSE)
+ * and arm the auto-cycle latch. Fail/cancel overwrites via
+ * noteFetcherAutoRefreshFailed so a later maybeAutoRefresh setLastRun cannot
+ * replace a short fail backoff.
  */
 export function noteFetcherAutoRefreshSubmitted(key, deps = {}) {
   const now = deps.now ?? Date.now();
   if (key === 'claims') {
+    autoRefreshCycleArmed.claims = true;
     const setLastRun = deps.setLastRun
       ?? ((t) => {
         try { localStorage.setItem(claimsLastAutoRunKey(), String(t)); } catch (_) {}
       });
     setLastRun(now);
   } else if (key === 'itad') {
+    autoRefreshCycleArmed.itad = true;
     const setLastRun = deps.setLastRun
       ?? ((t) => {
         try { localStorage.setItem(itadLastAutoRunKey(), String(t)); } catch (_) {}
       });
     setLastRun(now);
   }
+}
+
+/** Drop the auto-cycle latch on successful exit without applying fail backoff. */
+export function clearFetcherAutoRefreshCycle(key) {
+  if (key === 'claims') autoRefreshCycleArmed.claims = false;
+  else if (key === 'itad') autoRefreshCycleArmed.itad = false;
 }
 
 /** Arm pending-auto banners only after a successful POST submit. */

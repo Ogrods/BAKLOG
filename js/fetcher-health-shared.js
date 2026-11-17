@@ -97,5 +97,7 @@ export function markItadPendingAutoRun() {
 
 /** Drop a pending ITAD auto flag without treating the next load as an auto run. */
 export function clearItadPendingAutoRun() {
+  const was = itadPendingAutoRun;
   itadPendingAutoRun = false;
+  return was;
 }

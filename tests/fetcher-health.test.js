@@ -14,6 +14,9 @@ import {
   clearClaimsLastAutoRun,
   noteClaimsAutoRunFailed,
   noteItadAutoRunFailed,
+  noteFetcherAutoRefreshSubmitted,
+  noteFetcherAutoRefreshFailed,
+  armPendingAutoRunBanner,
   CLAIMS_AUTO_FAIL_BACKOFF_MS,
   ITAD_AUTO_FAIL_BACKOFF_MS,
   claimsLastAutoRunKey,
@@ -280,37 +283,30 @@ describe('maybeAutoRefreshItad', () => {
 
   it('queues itad when stale and gates pass', async () => {
     const runFn = vi.fn().mockResolvedValue(true);
-    const setLastRun = vi.fn();
-    const now = 4_000_000_000;
     const ok = await maybeAutoRefreshItad({
       getHour: () => 10,
-      now,
+      now: 4_000_000_000,
       getLastRun: () => 0,
-      setLastRun,
       isApiAvailable: () => true,
       stateFor: () => null,
       runFn,
     });
     expect(ok).toBe(true);
     expect(runFn).toHaveBeenCalledWith('itad', { auto: true });
-    expect(setLastRun).toHaveBeenCalledWith(now);
   });
 
-  it('does not stamp lastRun when submit returns false', async () => {
+  it('does not queue when submit returns false', async () => {
     const runFn = vi.fn().mockResolvedValue(false);
-    const setLastRun = vi.fn();
     const ok = await maybeAutoRefreshItad({
       getHour: () => 10,
       now: 4_000_000_000,
       getLastRun: () => 0,
-      setLastRun,
       isApiAvailable: () => true,
       stateFor: () => null,
       runFn,
     });
     expect(ok).toBe(false);
     expect(runFn).toHaveBeenCalledWith('itad', { auto: true });
-    expect(setLastRun).not.toHaveBeenCalled();
   });
 
   it('respects itadAutoRefreshDisabled pref', async () => {
@@ -412,35 +408,28 @@ describe('maybeAutoRefreshClaims', () => {
 
   it('queues claims when stale and gates pass', async () => {
     const runFn = vi.fn().mockResolvedValue(true);
-    const setLastRun = vi.fn();
-    const now = 4_000_000_000;
     const ok = await maybeAutoRefreshClaims({
-      now,
+      now: 4_000_000_000,
       getLastRun: () => 0,
-      setLastRun,
       isApiAvailable: () => true,
       stateFor: () => null,
       runFn,
     });
     expect(ok).toBe(true);
     expect(runFn).toHaveBeenCalledWith('claims', { auto: true });
-    expect(setLastRun).toHaveBeenCalledWith(now);
   });
 
-  it('does not stamp lastRun when submit returns false', async () => {
+  it('does not queue when submit returns false', async () => {
     const runFn = vi.fn().mockResolvedValue(false);
-    const setLastRun = vi.fn();
     const ok = await maybeAutoRefreshClaims({
       now: 4_000_000_000,
       getLastRun: () => 0,
-      setLastRun,
       isApiAvailable: () => true,
       stateFor: () => null,
       runFn,
     });
     expect(ok).toBe(false);
     expect(runFn).toHaveBeenCalledWith('claims', { auto: true });
-    expect(setLastRun).not.toHaveBeenCalled();
   });
 
   it('returns early when last auto-run is within the interval', async () => {
@@ -462,6 +451,46 @@ describe('clearClaimsLastAutoRun', () => {
     const clearLastRun = vi.fn();
     clearClaimsLastAutoRun({ clearLastRun });
     expect(clearLastRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('noteFetcherAutoRefreshSubmitted', () => {
+  it('stamps claims and ITAD success cooldown at POST accept', () => {
+    const setClaims = vi.fn();
+    const setItad = vi.fn();
+    const now = 4_000_000_000;
+    noteFetcherAutoRefreshSubmitted('claims', { now, setLastRun: setClaims });
+    noteFetcherAutoRefreshSubmitted('itad', { now, setLastRun: setItad });
+    expect(setClaims).toHaveBeenCalledWith(now);
+    expect(setItad).toHaveBeenCalledWith(now);
+  });
+
+  it('ignores unrelated fetcher keys', () => {
+    const setLastRun = vi.fn();
+    noteFetcherAutoRefreshSubmitted('steam', { setLastRun });
+    expect(setLastRun).not.toHaveBeenCalled();
+  });
+
+  it('fail backoff can overwrite a prior success stamp (no post-return race)', () => {
+    const setLastRun = vi.fn();
+    const now = 4_000_000_000;
+    noteFetcherAutoRefreshSubmitted('claims', { now, setLastRun });
+    armPendingAutoRunBanner('claims');
+    noteFetcherAutoRefreshFailed('claims', {
+      now: now + 2_000,
+      intervalMs: CLAIMS_AUTO_REFRESH_INTERVAL_MS,
+      backoffMs: CLAIMS_AUTO_FAIL_BACKOFF_MS,
+      setLastRun,
+    });
+    expect(setLastRun).toHaveBeenLastCalledWith(
+      now + 2_000 - CLAIMS_AUTO_REFRESH_INTERVAL_MS + CLAIMS_AUTO_FAIL_BACKOFF_MS,
+    );
+  });
+
+  it('does not rewrite cooldown for manual (non-auto) fails', () => {
+    const setLastRun = vi.fn();
+    noteFetcherAutoRefreshFailed('claims', { setLastRun });
+    expect(setLastRun).not.toHaveBeenCalled();
   });
 });
 
@@ -497,6 +526,7 @@ describe('noteClaimsAutoRunFailed / noteItadAutoRunFailed', () => {
     const before = Date.now() - CLAIMS_AUTO_REFRESH_INTERVAL_MS;
     localStorage.setItem(key, String(before));
     document.body.innerHTML = '<div id="fetcherRunLog"></div><div id="dashboardFetcherHealth"></div>';
+    armPendingAutoRunBanner('claims');
     const t0 = Date.now();
     fetcherRunner.markRunFailedForTest('claims', 'exit 3 refuse');
     const stamped = Number(localStorage.getItem(key));
@@ -509,6 +539,7 @@ describe('noteClaimsAutoRunFailed / noteItadAutoRunFailed', () => {
     const key = itadLastAutoRunKey();
     localStorage.setItem(key, String(Date.now() - ITAD_AUTO_REFRESH_INTERVAL_MS));
     document.body.innerHTML = '<div id="fetcherRunLog"></div><div id="dashboardFetcherHealth"></div>';
+    armPendingAutoRunBanner('itad');
     const t0 = Date.now();
     fetcherRunner.markRunFailedForTest('itad', 'exit 1');
     const stamped = Number(localStorage.getItem(key));

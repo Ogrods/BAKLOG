@@ -28,14 +28,11 @@ import { bindEscapeClose, trapFocus } from '../../focus-trap.js';
 import { authCooldownLabel, clearAuthCooldown } from '../../fetcher-cooldown.js';
 import {
   maybeAutoRefreshItad, maybeAutoRefreshClaims, maybeAutoFetchStale24h,
-  noteFetcherAutoRefreshFailed, armPendingAutoRunBanner,
+  noteFetcherAutoRefreshFailed, noteFetcherAutoRefreshSubmitted, armPendingAutoRunBanner,
 } from '../../fetcher-auto-refresh.js';
 import { autoRefreshDeps } from '../auto-refresh-wire.js';
 import {
-  fetcherSources,
-  fetchSuccessLabels,
-  lastRunFailedByKey,
-  lastRunErrorByKey,
+  fetcherSources, fetchSuccessLabels, lastRunFailedByKey, lastRunErrorByKey,
   summarizeRunFailure,
 } from '../../fetcher-health-shared.js';
 import { startFastAgeTick, stopAgeTicker, stopFastAgeTick } from '../../fetcher-chips.js';
@@ -1055,7 +1052,11 @@ export const fetcherRunner = (() => {
   }
 
   function applyInstantCancelUi({ force = false } = {}) {
-    for (const key of [...runStateByKey.keys()]) markChipState(key, null);
+    const cancelledKeys = [...runStateByKey.keys()];
+    for (const key of cancelledKeys) {
+      markChipState(key, null);
+      noteFetcherAutoRefreshFailed(key);
+    }
     liveRunId = null;
     lastServerInFlight = false;
     lastFetcherLaneInFlight = false;
@@ -1626,7 +1627,7 @@ export const fetcherRunner = (() => {
         return false;
       }
       const { run_id: runId } = await res.json();
-      if (auto) armPendingAutoRunBanner(key);
+      if (auto) { armPendingAutoRunBanner(key); noteFetcherAutoRefreshSubmitted(key); }
       markChipState(key, 'queued', runId);
       ensureInFlightPolling();
       let snapAfterSubmit = null;

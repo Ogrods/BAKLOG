@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-12T23:20:14.189387+00:00",
+  "generated_at": "2026-11-17T01:43:46.163204+00:00",
   "items": [
     {
       "id": "epic-knightica-3be45c",
@@ -110,122 +110,6 @@
       "review_percent": 84,
       "source": "gamerpower",
       "first_seen": "2026-09-07T21:47:23Z"
-    },
-    {
-      "id": "itad-80d26ce907ef",
-      "store": "steam",
-      "title": "Last Gambit - FREE on Steam",
-      "claim_url": "https://isthereanydeal.com/giveaways/16749/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4983490/2171750b5ae85c27e16f9939e4fc8fc68e25e5be/header.jpg?t=1793549442",
-      "genres": [
-        "Indie",
-        "Strategy",
-        "Free To Play",
-        "Early Access"
-      ],
-      "blurb": "Last Gambit",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 4983490,
-      "review_percent": 78,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-76e8e7317ba6",
-      "store": "epic",
-      "title": "Super Kids Racing - Mini Edition - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16760/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2248920/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Super Kids Racing : Mini Edition",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 2248920,
-      "review_percent": 0,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-0427a91be52b",
-      "store": "epic",
-      "title": "Funtoon's World on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16757/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/681090/header.jpg?t=1501886526",
-      "genres": [],
-      "blurb": "Funtoon&#039;s World",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 681090,
-      "review_percent": 53,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-62144c889e7b",
-      "store": "epic",
-      "title": "Maze - The Amazing Labyrinth free on EGS",
-      "claim_url": "https://isthereanydeal.com/giveaways/16754/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2293210/header.jpg?t=1676713019",
-      "genres": [],
-      "blurb": "Maze-The Amazing Labyrinth",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 2293210,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-b20c5c2002a2",
-      "store": "epic",
-      "title": "Horror Adventure on Epic Game Store",
-      "claim_url": "https://isthereanydeal.com/giveaways/16758/",
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2292610/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": "Horror Adventure",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 2292610,
-      "review_percent": 25,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-175470cfaf8d",
-      "store": "epic",
-      "title": "Math Fun - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16763/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/890220/header.jpg?t=1533404522",
-      "genres": [],
-      "blurb": "Math Fun",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 890220,
-      "review_percent": 80,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-b2dc4abeb6d9",
-      "store": "epic",
-      "title": "Mountain Racing - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16762/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/833820/header.jpg?t=1526368279",
-      "genres": [],
-      "blurb": "Mountain Racing",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 833820,
-      "review_percent": 15,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "itad-4e08566b4c8b",
-      "store": "epic",
-      "title": "Balloon Strike - FREE on Epic Games",
-      "claim_url": "https://isthereanydeal.com/giveaways/16764/",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/855030/header.jpg?t=1526665750",
-      "genres": [],
-      "blurb": "Balloon Strike",
-      "ends_at": "2026-11-16T21:59:37Z",
-      "steam_appid": 855030,
-      "review_percent": 50,
-      "source": "itad",
-      "first_seen": "2026-11-02T21:59:37Z"
     }
   ],
   "attribution": [

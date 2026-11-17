@@ -10,7 +10,7 @@ import {
 } from './personal-storage.js';
 import { storeBadgeHtml, wishlistBadgeHtml } from './game-core.js';
 import { storeLogoHtml } from './store-logos.js';
-import { invalidateTableCache, renderTable, pushPersonalUndo } from './table-ui.js';
+import { invalidateTableCacheInPlace, renderTable, pushPersonalUndo } from './table-ui.js';
 import { renderSummary } from './filters-ui.js';
 import { renderPicks } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
@@ -82,7 +82,7 @@ function renderSummaryText(entries) {
 }
 
 function afterHiddenChange() {
-  invalidateTableCache();
+  invalidateTableCacheInPlace();
   renderTable();
   renderSummary();
   renderPicks();

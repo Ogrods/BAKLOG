@@ -1756,62 +1756,61 @@ export async function focusConnectionsProvider(provider) {
 }
 
 function renderReconnectBanner() {
-  const el = document.getElementById("authReconnectBanner");
-
-  if (!el) return;
-
   if (!reconnectProviders.size) {
-    el.classList.add("hidden");
-
-    el.innerHTML = "";
-
+    void import("./notice-toast.js").then(({ hideNoticeToast }) => {
+      hideNoticeToast("authReconnectBanner");
+    });
     return;
   }
 
   const names = [...reconnectProviders]
-
     .map((k) => getAuthStatusSnapshot().find((p) => p.key === k)?.label || k)
-
     .join(", ");
 
-  el.classList.remove("hidden");
+  const html = `
+    <div class="migration-banner-body">
+      <span>Session expired for <strong>${escapeHtml(names)}</strong>.</span>
+      <span class="migration-banner-actions">
+        <button type="button" class="underline" data-jump-connections title="Open Connections to refresh expired sessions">Reconnect in Connections</button>
+        <button type="button" class="opacity-70" data-dismiss-auth-banner aria-label="Dismiss" title="Dismiss session expired banner">&times;</button>
+      </span>
+    </div>`;
 
-  el.innerHTML = `
-
-    <span>Session expired for <strong>${escapeHtml(names)}</strong>.</span>
-
-    <button type="button" class="underline ml-2" data-jump-connections title="Open Connections to refresh expired sessions">Reconnect in Connections</button>
-
-    <button type="button" class="ml-2 opacity-70" data-dismiss-auth-banner aria-label="Dismiss" title="Dismiss session expired banner">&times;</button>
-
-  `;
-
-  el.querySelector("[data-jump-connections]")?.addEventListener("click", () => {
-    const target =
-      _lastReconnectFocusProvider || [...reconnectProviders].at(-1) || null;
-    document.querySelector('.view-tab[data-view="connections"]')?.click();
-    if (target) void focusConnectionsProvider(target);
-    else renderConnections();
+  void import("./notice-toast.js").then(({ showNoticeToast, hideNoticeToast }) => {
+    const el = showNoticeToast({
+      id: "authReconnectBanner",
+      html,
+      variant: "auth",
+      role: "alert",
+      live: "assertive",
+    });
+    if (!el) return;
+    el.querySelector("[data-jump-connections]")?.addEventListener("click", () => {
+      const target =
+        _lastReconnectFocusProvider || [...reconnectProviders].at(-1) || null;
+      document.querySelector('.view-tab[data-view="connections"]')?.click();
+      if (target) void focusConnectionsProvider(target);
+      else renderConnections();
+    });
+    el.querySelector("[data-dismiss-auth-banner]")?.addEventListener(
+      "click",
+      () => {
+        const providers = [...reconnectProviders];
+        reconnectProviders.clear();
+        _lastReconnectFocusProvider = null;
+        hideNoticeToast("authReconnectBanner");
+        try {
+          document.dispatchEvent(
+            new CustomEvent("baklog:reconnect-dismiss", {
+              detail: { providers },
+            }),
+          );
+        } catch (_) {
+          /* no DOM (tests) */
+        }
+      },
+    );
   });
-
-  el.querySelector("[data-dismiss-auth-banner]")?.addEventListener(
-    "click",
-    () => {
-      const providers = [...reconnectProviders];
-      reconnectProviders.clear();
-      _lastReconnectFocusProvider = null;
-      renderReconnectBanner();
-      try {
-        document.dispatchEvent(
-          new CustomEvent("baklog:reconnect-dismiss", {
-            detail: { providers },
-          }),
-        );
-      } catch (_) {
-        /* no DOM (tests) */
-      }
-    },
-  );
 }
 
 function connectionStatusErrorMessage(err) {
@@ -1893,15 +1892,13 @@ export function secretsStoreCorrupt() {
 }
 
 function renderSecretsCorruptBanner() {
-  const el = document.getElementById("authSecretsBanner");
-  if (!el) return;
   if (!_secretsCorrupt) {
-    el.classList.add("hidden");
-    el.innerHTML = "";
+    void import("./notice-toast.js").then(({ hideNoticeToast }) => {
+      hideNoticeToast("authSecretsBanner");
+    });
     return;
   }
-  el.classList.remove("hidden");
-  el.innerHTML = `
+  const html = `
     <div class="migration-banner-body">
       <span><strong>Secrets store corrupt.</strong> Restore from a backup on Connections, or reset the store and reconnect stores.</span>
       <span class="migration-banner-actions">
@@ -1910,18 +1907,28 @@ function renderSecretsCorruptBanner() {
       </span>
     </div>
   `;
-  el.querySelector("[data-jump-connections-secrets]")?.addEventListener(
-    "click",
-    () => {
-      document.querySelector('.view-tab[data-view="connections"]')?.click();
-    },
-  );
-  el.querySelector("[data-reset-secrets-store]")?.addEventListener(
-    "click",
-    () => {
-      void resetSecretsStoreFromBanner();
-    },
-  );
+  void import("./notice-toast.js").then(({ showNoticeToast }) => {
+    const el = showNoticeToast({
+      id: "authSecretsBanner",
+      html,
+      variant: "auth",
+      role: "alert",
+      live: "assertive",
+    });
+    if (!el) return;
+    el.querySelector("[data-jump-connections-secrets]")?.addEventListener(
+      "click",
+      () => {
+        document.querySelector('.view-tab[data-view="connections"]')?.click();
+      },
+    );
+    el.querySelector("[data-reset-secrets-store]")?.addEventListener(
+      "click",
+      () => {
+        void resetSecretsStoreFromBanner();
+      },
+    );
+  });
 }
 
 async function resetSecretsStoreFromBanner() {

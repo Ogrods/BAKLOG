@@ -15,7 +15,8 @@ import {
 } from './library-load.js';
 import { applyPrefsChange, switchView } from './filters-ui.js';
 import { syncFilterDomFromState } from './prefs.js';
-import { invalidateTableCache, renderTable } from './table-ui.js';
+import { invalidateTableCacheInPlace, renderTable } from './table-ui.js';
+import { showNoticeToast, hideNoticeToast } from './notice-toast.js';
 
 function watchLsKey() {
   return profileScopedStorageKey(LS_LIBRARY_WATCH);
@@ -92,10 +93,8 @@ function postDesktopNotification(title, body) {
 }
 
 function showFoundBanner(watch, game) {
-  const el = document.getElementById('libraryWatchBanner');
-  if (!el) return;
   const displayName = game?.name || watch.name;
-  el.innerHTML = `
+  const html = `
     <div class="migration-banner-body library-watch-found">
       <span><strong>${escapeHtml(displayName)}</strong> is now in your Steam library.</span>
       <span class="migration-banner-actions">
@@ -103,33 +102,35 @@ function showFoundBanner(watch, game) {
         <button type="button" class="fh-log-btn" data-lw-dismiss>Dismiss</button>
       </span>
     </div>`;
-  el.classList.remove('hidden');
+  const el = showNoticeToast({
+    id: 'libraryWatchBanner',
+    html,
+    variant: 'watch',
+  });
+  if (!el) return;
   el.querySelector('[data-lw-view]')?.addEventListener('click', () => {
-    el.classList.add('hidden');
+    hideNoticeToast('libraryWatchBanner');
     applyPrefsChange({ sessionPrefs: { search: displayName } });
     syncFilterDomFromState();
     if (state.activeView !== 'library') switchView('library');
     else {
-      invalidateTableCache();
+      invalidateTableCacheInPlace();
       renderTable();
     }
   }, { once: true });
   el.querySelector('[data-lw-dismiss]')?.addEventListener('click', () => {
-    el.classList.add('hidden');
+    hideNoticeToast('libraryWatchBanner');
   }, { once: true });
 }
 
 export function renderWaitingBanner() {
-  const el = document.getElementById('libraryWatchBanner');
-  if (!el) return;
   const watches = loadDoc();
   if (!watches.length) {
-    el.classList.add('hidden');
-    el.innerHTML = '';
+    hideNoticeToast('libraryWatchBanner');
     return;
   }
   const labels = watches.map(w => escapeHtml(w.name)).join(', ');
-  el.innerHTML = `
+  const html = `
     <div class="migration-banner-body library-watch-waiting">
       <span>Waiting for <strong>${labels}</strong> in your Steam library.
         Steam's API can lag behind the client - we'll alert you when the next sync includes it.</span>
@@ -138,7 +139,12 @@ export function renderWaitingBanner() {
         <button type="button" class="fh-log-btn" data-lw-cancel-watch>Stop watching</button>
       </span>
     </div>`;
-  el.classList.remove('hidden');
+  const el = showNoticeToast({
+    id: 'libraryWatchBanner',
+    html,
+    variant: 'watch',
+  });
+  if (!el) return;
   el.querySelector('[data-lw-run-steam]')?.addEventListener('click', () => {
     import('./fetcher-health.js').then(({ fetcherRunner }) => {
       fetcherRunner.run('steam', { auto: false }).catch(() => {});
@@ -146,7 +152,7 @@ export function renderWaitingBanner() {
   });
   el.querySelector('[data-lw-cancel-watch]')?.addEventListener('click', () => {
     saveDoc([]);
-    el.classList.add('hidden');
+    hideNoticeToast('libraryWatchBanner');
     stopWatchPoll();
   });
 }

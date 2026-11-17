@@ -337,8 +337,10 @@ describe('Pro activation UX', () => {
     const { proWelcomeSessionKey } = await import('../js/profiles.js');
     sessionStorage.setItem(proWelcomeSessionKey(), '1');
     showProWelcomeBanner();
+    await vi.waitFor(() => {
+      expect(document.getElementById('proWelcomeBanner')?.classList.contains('hidden')).toBe(false);
+    });
     const banner = document.getElementById('proWelcomeBanner');
-    expect(banner.classList.contains('hidden')).toBe(false);
     expect(banner.textContent).toContain("You're on Pro");
     expect(sessionStorage.getItem(proWelcomeSessionKey())).toBeNull();
     banner.querySelector('.pro-welcome-dismiss')?.click();

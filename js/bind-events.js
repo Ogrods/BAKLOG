@@ -22,7 +22,7 @@ import {
 } from './prefs.js';
 import {
   renderTable,
-  invalidateTableCache,
+  invalidateTableCacheInPlace,
   updateBulkBar,
   updateRowInPlace,
   updateHasNotesIndicatorInPlace,
@@ -646,7 +646,7 @@ export function bindEvents() {
     if (e.target.checked) list.forEach(g => state.selectedKeys.add(gameKey(g)));
     else list.forEach(g => state.selectedKeys.delete(gameKey(g)));
     updateBulkBar();
-    invalidateTableCache();
+    invalidateTableCacheInPlace();
     renderTable();
   });
   document.getElementById("brandMark")?.addEventListener("click", () => {
@@ -706,7 +706,7 @@ export function bindEvents() {
       if (removed) {
         state.selectedKeys.clear();
         updateBulkBar();
-        invalidateTableCache();
+        invalidateTableCacheInPlace();
         renderTable();
         renderCustomPickTabs();
         renderCustomListFilterChips();
@@ -725,7 +725,7 @@ export function bindEvents() {
       document.getElementById("bulkAddToListBtn")?.setAttribute("aria-expanded", "false");
       state.selectedKeys.clear();
       updateBulkBar();
-      invalidateTableCache();
+      invalidateTableCacheInPlace();
       renderTable();
       renderCustomPickTabs();
       renderCustomListFilterChips();
@@ -759,7 +759,7 @@ export function bindEvents() {
   document.getElementById("bulkClear").addEventListener("click", () => {
     state.selectedKeys.clear();
     updateBulkBar();
-    invalidateTableCache();
+    invalidateTableCacheInPlace();
     renderTable();
   });
   document.getElementById("tbody").addEventListener("keydown", e => {

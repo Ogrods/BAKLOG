@@ -440,15 +440,13 @@ export const personalStore = (() => {
 window.addEventListener('beforeunload', () => personalStore.flushSync());
 
 export function showMigrationBanner(snap, { escapeHtml, onUploaded }) {
-  const host = document.getElementById('migrationBanner');
-  if (!host) return;
   const personalCount = Object.keys(snap.personal || {}).filter(k => k !== '__migrated_v3').length;
   const manualCount = (snap.manual || []).length;
   const parts = [];
   if (personalCount) parts.push(`${personalCount} personal edit${personalCount === 1 ? '' : 's'}`);
   if (manualCount) parts.push(`${manualCount} manual game${manualCount === 1 ? '' : 's'}`);
   const summary = parts.join(' + ') || 'your local data';
-  host.innerHTML = `
+  const html = `
     <div class="migration-banner-body">
       <div>
         <strong>Server file is empty.</strong>
@@ -462,30 +460,35 @@ export function showMigrationBanner(snap, { escapeHtml, onUploaded }) {
       </div>
     </div>
   `;
-  host.classList.remove('hidden');
-  const close = () => {
-    host.classList.add('hidden');
-    host.innerHTML = '';
-  };
-  document.getElementById('migrationUpload').addEventListener('click', async () => {
-    const btn = document.getElementById('migrationUpload');
-    btn.disabled = true;
-    btn.textContent = 'Uploading…';
-    const ok = await personalStore.uploadLocalToServer();
-    if (ok) {
+  void import('./notice-toast.js').then(({ showNoticeToast, hideNoticeToast }) => {
+    const host = showNoticeToast({
+      id: 'migrationBanner',
+      html,
+      variant: 'info',
+    });
+    if (!host) return;
+    const close = () => hideNoticeToast('migrationBanner');
+    host.querySelector('#migrationUpload')?.addEventListener('click', async () => {
+      const btn = host.querySelector('#migrationUpload');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.textContent = 'Uploading…';
+      const ok = await personalStore.uploadLocalToServer();
+      if (ok) {
+        close();
+        if (onUploaded) onUploaded();
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Retry upload';
+        const note = document.createElement('div');
+        note.className = 'text-xs text-rose-300 mt-1';
+        note.textContent = 'Upload failed. Check the server terminal for details.';
+        host.querySelector('.migration-banner-body')?.appendChild(note);
+      }
+    });
+    host.querySelector('#migrationDismiss')?.addEventListener('click', () => {
+      personalStore.dismissMigration();
       close();
-      if (onUploaded) onUploaded();
-    } else {
-      btn.disabled = false;
-      btn.textContent = 'Retry upload';
-      const note = document.createElement('div');
-      note.className = 'text-xs text-rose-300 mt-1';
-      note.textContent = 'Upload failed. Check the server terminal for details.';
-      host.querySelector('.migration-banner-body')?.appendChild(note);
-    }
-  });
-  document.getElementById('migrationDismiss').addEventListener('click', () => {
-    personalStore.dismissMigration();
-    close();
+    });
   });
 }

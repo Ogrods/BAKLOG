@@ -11,7 +11,9 @@ export function bindClaimableEvents() {
     document.getElementById('claimableNowModule')?.addEventListener('click', (e) => {
       claimable.handleClaimableClick(e);
     });
-    document.getElementById('claimableBanner')?.addEventListener('click', (e) => {
+    // Claimable notice may live on #noticeToastStack (corner overlay).
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest?.('#claimableBanner')) return;
       claimable.handleClaimableBannerClick(e);
     });
     document.getElementById('claimDetailDialog')?.addEventListener('click', (e) => {

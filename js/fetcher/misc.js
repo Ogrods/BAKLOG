@@ -8,6 +8,7 @@ export {
   noteItadAutoRunFailed,
   noteFetcherAutoRefreshFailed,
   noteFetcherAutoRefreshSubmitted,
+  clearFetcherAutoRefreshCycle,
   armPendingAutoRunBanner,
   CLAIMS_AUTO_FAIL_BACKOFF_MS,
   ITAD_AUTO_FAIL_BACKOFF_MS,

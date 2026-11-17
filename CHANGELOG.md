@@ -37,6 +37,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Free and ITAD auto-refresh stamp their interval when a run actually starts, then use a short retry delay after a failed or cancelled auto run instead of waiting the full interval or hammering every poll
+- Manual Free/ITAD chip failures no longer rewrite the auto-refresh cooldown
+
 ## [0.9.14] - 2026-11-17
 
 ### Fixed

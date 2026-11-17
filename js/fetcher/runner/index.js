@@ -28,7 +28,8 @@ import { bindEscapeClose, trapFocus } from '../../focus-trap.js';
 import { authCooldownLabel, clearAuthCooldown } from '../../fetcher-cooldown.js';
 import {
   maybeAutoRefreshItad, maybeAutoRefreshClaims, maybeAutoFetchStale24h,
-  noteFetcherAutoRefreshFailed, noteFetcherAutoRefreshSubmitted, armPendingAutoRunBanner,
+  noteFetcherAutoRefreshFailed, noteFetcherAutoRefreshSubmitted,
+  clearFetcherAutoRefreshCycle, armPendingAutoRunBanner,
 } from '../../fetcher-auto-refresh.js';
 import { autoRefreshDeps } from '../auto-refresh-wire.js';
 import {
@@ -1805,6 +1806,7 @@ export const fetcherRunner = (() => {
           // Clear the chip before client-side reload so a slow hosted-feed merge
           // cannot leave the claims fetcher spinning after the subprocess exited.
           markChipState(key, null);
+          clearFetcherAutoRefreshCycle(key);
           if (runId !== _lastAppliedDoneRunId) {
             _lastAppliedDoneRunId = runId;
             await refreshAfterFetch(key);

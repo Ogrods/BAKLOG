@@ -16,6 +16,7 @@ import {
   noteItadAutoRunFailed,
   noteFetcherAutoRefreshSubmitted,
   noteFetcherAutoRefreshFailed,
+  clearFetcherAutoRefreshCycle,
   armPendingAutoRunBanner,
   CLAIMS_AUTO_FAIL_BACKOFF_MS,
   ITAD_AUTO_FAIL_BACKOFF_MS,
@@ -475,7 +476,22 @@ describe('noteFetcherAutoRefreshSubmitted', () => {
     const setLastRun = vi.fn();
     const now = 4_000_000_000;
     noteFetcherAutoRefreshSubmitted('claims', { now, setLastRun });
-    armPendingAutoRunBanner('claims');
+    noteFetcherAutoRefreshFailed('claims', {
+      now: now + 2_000,
+      intervalMs: CLAIMS_AUTO_REFRESH_INTERVAL_MS,
+      backoffMs: CLAIMS_AUTO_FAIL_BACKOFF_MS,
+      setLastRun,
+    });
+    expect(setLastRun).toHaveBeenLastCalledWith(
+      now + 2_000 - CLAIMS_AUTO_REFRESH_INTERVAL_MS + CLAIMS_AUTO_FAIL_BACKOFF_MS,
+    );
+  });
+
+  it('fail backoff uses the cycle latch, not the banner pending flag', () => {
+    const setLastRun = vi.fn();
+    const now = 4_000_000_000;
+    // Submitted arms the latch; banner pending is intentionally left unset.
+    noteFetcherAutoRefreshSubmitted('claims', { now, setLastRun });
     noteFetcherAutoRefreshFailed('claims', {
       now: now + 2_000,
       intervalMs: CLAIMS_AUTO_REFRESH_INTERVAL_MS,
@@ -491,6 +507,16 @@ describe('noteFetcherAutoRefreshSubmitted', () => {
     const setLastRun = vi.fn();
     noteFetcherAutoRefreshFailed('claims', { setLastRun });
     expect(setLastRun).not.toHaveBeenCalled();
+  });
+
+  it('does not rewrite cooldown after a successful cycle clear', () => {
+    const setLastRun = vi.fn();
+    const now = 4_000_000_000;
+    noteFetcherAutoRefreshSubmitted('claims', { now, setLastRun });
+    clearFetcherAutoRefreshCycle('claims');
+    noteFetcherAutoRefreshFailed('claims', { setLastRun });
+    expect(setLastRun).toHaveBeenCalledTimes(1);
+    expect(setLastRun).toHaveBeenCalledWith(now);
   });
 });
 
@@ -523,11 +549,10 @@ describe('noteClaimsAutoRunFailed / noteItadAutoRunFailed', () => {
 
   it('markRunFailed applies claims fail backoff instead of clearing cooldown', () => {
     const key = claimsLastAutoRunKey();
-    const before = Date.now() - CLAIMS_AUTO_REFRESH_INTERVAL_MS;
-    localStorage.setItem(key, String(before));
     document.body.innerHTML = '<div id="fetcherRunLog"></div><div id="dashboardFetcherHealth"></div>';
-    armPendingAutoRunBanner('claims');
     const t0 = Date.now();
+    noteFetcherAutoRefreshSubmitted('claims', { now: t0 });
+    armPendingAutoRunBanner('claims');
     fetcherRunner.markRunFailedForTest('claims', 'exit 3 refuse');
     const stamped = Number(localStorage.getItem(key));
     expect(stamped).toBeGreaterThan(t0 - CLAIMS_AUTO_REFRESH_INTERVAL_MS);
@@ -537,10 +562,10 @@ describe('noteClaimsAutoRunFailed / noteItadAutoRunFailed', () => {
 
   it('markRunFailed applies ITAD fail backoff', () => {
     const key = itadLastAutoRunKey();
-    localStorage.setItem(key, String(Date.now() - ITAD_AUTO_REFRESH_INTERVAL_MS));
     document.body.innerHTML = '<div id="fetcherRunLog"></div><div id="dashboardFetcherHealth"></div>';
-    armPendingAutoRunBanner('itad');
     const t0 = Date.now();
+    noteFetcherAutoRefreshSubmitted('itad', { now: t0 });
+    armPendingAutoRunBanner('itad');
     fetcherRunner.markRunFailedForTest('itad', 'exit 1');
     const stamped = Number(localStorage.getItem(key));
     expect(stamped).toBeGreaterThan(t0 - ITAD_AUTO_REFRESH_INTERVAL_MS);

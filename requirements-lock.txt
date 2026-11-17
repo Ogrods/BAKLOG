@@ -38,7 +38,7 @@ pycparser==3.12
 pycryptodomex==3.24.2
 Pygments==2.21.0
 pyinstaller==6.22.3
-pyinstaller-hooks-contrib==2026.9
+pyinstaller-hooks-contrib==2026.10
 PyJWT==2.15.1
 pyrate-limiter==4.5.1
 pystray==0.19.5
@@ -49,11 +49,11 @@ python-dotenv==1.2.4
 pywin32==312
 pywin32-ctypes==0.2.3
 requests==2.34.2
-ruff==0.17.4
+ruff==0.17.5
 setuptools==84.2.1
 shadowcopy==0.0.4
 six==1.17.0
-soupsieve==4.0.1
+soupsieve==4.1
 termcolor==3.3.0
 typing_extensions==4.16.0
 urllib3==2.8.0

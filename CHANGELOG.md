@@ -40,6 +40,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 - Removing or bulk-editing games no longer snaps the library, wishlist, or itch table back to the top
 - ITAD “Prices refreshed” and similar status alerts show as corner toasts instead of full-width banners that push the page down
+- Update, boot, and Connections browser warnings join the same corner stack so they no longer overlap status toasts
 
 ## [0.9.13] - 2026-11-16
 

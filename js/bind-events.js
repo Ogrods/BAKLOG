@@ -885,6 +885,9 @@ export function bindEvents() {
     const tone = error ? 'text-red-400' : 'text-amber-400';
     banner.innerHTML = `<div class="migration-banner-body"><span class="${tone}">${escapeHtml(message)}</span></div>`;
     banner.classList.remove('hidden');
+    void import('./notice-toast.js').then(({ adoptNoticeToast }) => {
+      adoptNoticeToast(banner, { variant: 'boot', role: error ? 'alert' : 'status' });
+    });
   }
 
   for (const btn of document.querySelectorAll("#reportBug, #reportBugHeader")) {
@@ -971,11 +974,7 @@ export function bindEvents() {
     } catch (err) {
       console.warn('[importNotes] invalid JSON', err);
       reportError(err, { source: 'importNotes', kind: 'import' });
-      const banner = document.getElementById('bootErrorBanner');
-      if (banner) {
-        banner.textContent = 'Personal data import failed - file is not valid JSON.';
-        banner.classList.remove('hidden');
-      }
+      showKebabBanner('Personal data import failed - file is not valid JSON.', { error: true });
     }
     e.target.value = "";
   });

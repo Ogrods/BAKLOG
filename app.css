@@ -5764,25 +5764,9 @@ html[data-theme="ember"] .brand-logo-pills {
 .app-notice-toast--pro {
   border-color: color-mix(in srgb, #a78bfa 40%, var(--border));
 }
-/* Header update/boot banners: overlay instead of pushing header chrome */
-#updateAvailableBanner:not(.hidden),
-#bootErrorBanner:not(.hidden) {
-  position: fixed;
-  right: 1.25rem;
-  bottom: 5.5rem;
-  z-index: 54;
-  max-width: min(24rem, calc(100vw - 2rem));
-  margin: 0 !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-#connBrowserWarn:not(.hidden) {
-  position: fixed;
-  right: 1.25rem;
-  bottom: 5.5rem;
-  z-index: 54;
-  max-width: min(24rem, calc(100vw - 2rem));
-  margin: 0 !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+.app-notice-toast--update,
+.app-notice-toast--boot {
+  border-color: color-mix(in srgb, #22d3ee 40%, var(--border));
 }
 .update-notice-toast {
   position: fixed;

@@ -33,9 +33,24 @@ describe("notice-toast", () => {
     expect(isNoticeToastVisible("itadAlertBanner")).toBe(false);
   });
 
-  it("CSS pins notice stack and update banners without shell margin push", () => {
+  it("CSS pins notice stack without shell margin push", () => {
     expect(APP_CSS).toMatch(/\.notice-toast-stack\s*\{[^}]*position:\s*fixed/s);
     expect(APP_CSS).toMatch(/\.app-notice-toast\s*\{/);
-    expect(APP_CSS).toMatch(/#updateAvailableBanner:not\(\.hidden\)/);
+    expect(APP_CSS).not.toMatch(/#updateAvailableBanner:not\(\.hidden\)\s*\{[^}]*position:\s*fixed/s);
+  });
+
+  it("adoptNoticeToast moves existing banners into the stack", async () => {
+    const { adoptNoticeToast, ensureNoticeToastStack } = await import(
+      "../js/notice-toast.js"
+    );
+    const banner = document.createElement("div");
+    banner.id = "updateAvailableBanner";
+    banner.className = "migration-banner";
+    banner.innerHTML = "<span>Update available</span>";
+    document.body.appendChild(banner);
+    adoptNoticeToast(banner, { variant: "update" });
+    expect(banner.parentElement?.id).toBe("noticeToastStack");
+    expect(banner.classList.contains("app-notice-toast--update")).toBe(true);
+    expect(ensureNoticeToastStack()?.contains(banner)).toBe(true);
   });
 });

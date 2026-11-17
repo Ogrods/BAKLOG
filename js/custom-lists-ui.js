@@ -180,16 +180,18 @@ export function initCustomListsUi() {
 let _briefTimer = null;
 
 export function showCustomListNotice(message) {
-  const host = document.getElementById('migrationBanner');
-  if (!host) return;
-  host.textContent = message;
-  host.classList.remove('hidden');
-  if (_briefTimer) clearTimeout(_briefTimer);
-  _briefTimer = setTimeout(() => {
-    host.classList.add('hidden');
-    host.textContent = '';
-    _briefTimer = null;
-  }, 5000);
+  void import('./notice-toast.js').then(({ showNoticeToast, hideNoticeToast }) => {
+    showNoticeToast({
+      id: 'customListNotice',
+      html: `<div class="migration-banner-body"><span>${escapeHtml(message)}</span></div>`,
+      variant: 'info',
+    });
+    if (_briefTimer) clearTimeout(_briefTimer);
+    _briefTimer = setTimeout(() => {
+      hideNoticeToast('customListNotice');
+      _briefTimer = null;
+    }, 5000);
+  });
 }
 
 export function renderBulkAddToListMenu() {

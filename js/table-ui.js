@@ -383,7 +383,7 @@ function restorePersonalFromSnapshot(snap) {
   window._dataVersion = (window._dataVersion || 0) + 1;
   bumpPersonalMemo();
   savePersonal();
-  invalidateTableCache();
+  invalidateTableCacheInPlace();
   recomputeCrossStoreHidden();
   renderTable();
   renderSummary();
@@ -401,7 +401,7 @@ export function bulkSetStatus(status) {
   }
   state.selectedKeys.clear();
   updateBulkBar();
-  invalidateTableCache();
+  invalidateTableCacheInPlace();
   renderTable();
   const statusLabel = (STATUS_LABELS && STATUS_LABELS[status]) || status;
   pushUndo({
@@ -482,7 +482,7 @@ export function bulkRemove() {
   bumpPersonalMemo();
   state.selectedKeys.clear();
   updateBulkBar();
-  invalidateTableCache();
+  invalidateTableCacheInPlace();
   recomputeCrossStoreHidden();
   refreshAfterManualChange();
   renderTable();
@@ -1183,6 +1183,11 @@ export function invalidateTableCache({ keepDom = false } = {}) {
     const tbody = document.getElementById("tbody");
     if (tbody) tbody.innerHTML = "";
   }
+}
+
+/** Soft invalidate for in-view mutations (remove/status/hide) so scrollY is not clamped. */
+export function invalidateTableCacheInPlace() {
+  invalidateTableCache({ keepDom: true });
 }
 
 /** Survives invalidateTableCache so a drill-back-to-library doesn't re-query 1700 rows. */

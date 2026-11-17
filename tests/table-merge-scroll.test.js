@@ -42,6 +42,18 @@ describe("table merge scroll preserve", () => {
     expect(window.scrollY).toBe(1800);
   });
 
+  it("invalidateTableCacheInPlace matches soft keepDom path", async () => {
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = `<tr data-row-index="12"><td>row</td></tr>`;
+    window.scrollY = 2200;
+
+    const { invalidateTableCacheInPlace } = await import("../js/table-ui.js");
+    invalidateTableCacheInPlace();
+
+    expect(tbody.querySelector("tr[data-row-index='12']")).toBeTruthy();
+    expect(window.scrollY).toBe(2200);
+  });
+
   it("invalidateTableCache() hard clear empties tbody (view/filter path)", async () => {
     const tbody = document.getElementById("tbody");
     tbody.innerHTML = `<tr data-row-index="1"><td>x</td></tr>`;

@@ -141,8 +141,6 @@ export async function loadItadPrices() {
 
 export function showItadAlertBanner({ newSales, newHistoricalLows }) {
   if (!isItadDealsAvailable()) return;
-  const el = document.getElementById("itadAlertBanner");
-  if (!el) return;
   const parts = [];
   if (newSales > 0)
     parts.push(`${newSales} new sale${newSales === 1 ? "" : "s"}`);
@@ -152,7 +150,7 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
     );
   }
   if (!parts.length) return;
-  el.innerHTML = `
+  const html = `
     <div class="migration-banner-body">
       <span><strong>Prices refreshed</strong> - ${escapeHtml(parts.join(" · "))}.
         <button type="button" class="text-sky-300 hover:text-sky-200 underline ml-1" data-itad-view-deals>View deals →</button>
@@ -161,35 +159,43 @@ export function showItadAlertBanner({ newSales, newHistoricalLows }) {
         <button type="button" class="fh-log-btn" data-itad-dismiss>Dismiss</button>
       </span>
     </div>`;
-  el.classList.remove("hidden");
-  el.querySelector("[data-itad-dismiss]")?.addEventListener(
-    "click",
-    () => {
-      state.prefs.itadAlertLastDismissedAt = Date.now();
-      savePrefs();
-      el.classList.add("hidden");
-    },
-    { once: true },
-  );
-  el.querySelector("[data-itad-view-deals]")?.addEventListener(
-    "click",
-    () => {
-      state.prefs.itadAlertLastDismissedAt = Date.now();
-      savePrefs();
-      el.classList.add("hidden");
-      if (state.activeView !== "wishlist") {
-        switchView("wishlist");
-      } else {
-        state.prefs.picksTab = "wishlistDeals";
+  // Dynamic import keeps notice-toast off the library-load critical path.
+  void import("./notice-toast.js").then(({ showNoticeToast, hideNoticeToast }) => {
+    const el = showNoticeToast({
+      id: "itadAlertBanner",
+      html,
+      variant: "itad",
+    });
+    if (!el) return;
+    el.querySelector("[data-itad-dismiss]")?.addEventListener(
+      "click",
+      () => {
+        state.prefs.itadAlertLastDismissedAt = Date.now();
         savePrefs();
-        document.querySelectorAll(".pick-tab").forEach((btn) => {
-          btn.classList.toggle("active", btn.dataset.tab === "wishlistDeals");
-        });
-        renderPicks();
-      }
-    },
-    { once: true },
-  );
+        hideNoticeToast("itadAlertBanner");
+      },
+      { once: true },
+    );
+    el.querySelector("[data-itad-view-deals]")?.addEventListener(
+      "click",
+      () => {
+        state.prefs.itadAlertLastDismissedAt = Date.now();
+        savePrefs();
+        hideNoticeToast("itadAlertBanner");
+        if (state.activeView !== "wishlist") {
+          switchView("wishlist");
+        } else {
+          state.prefs.picksTab = "wishlistDeals";
+          savePrefs();
+          document.querySelectorAll(".pick-tab").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.tab === "wishlistDeals");
+          });
+          renderPicks();
+        }
+      },
+      { once: true },
+    );
+  });
 }
 
 export async function loadCacheMeta(url, metaKey) {

@@ -5722,6 +5722,68 @@ html[data-theme="ember"] .brand-logo-pills {
   gap: 0.4rem;
   flex-shrink: 0;
 }
+/* Corner status stack - ITAD / claims / watch / auth / migration (no layout shift) */
+.notice-toast-stack {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5.5rem;
+  z-index: 54;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+.notice-toast-stack > .app-notice-toast {
+  pointer-events: auto;
+}
+.app-notice-toast {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.app-notice-toast.hidden {
+  display: none;
+}
+.app-notice-toast--itad {
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--border));
+}
+.app-notice-toast--claim {
+  border-color: color-mix(in srgb, #fb923c 45%, var(--border));
+}
+.app-notice-toast--watch {
+  border-color: color-mix(in srgb, #38bdf8 40%, var(--border));
+}
+.app-notice-toast--auth {
+  border-color: color-mix(in srgb, #f87171 45%, var(--border));
+}
+.app-notice-toast--pro {
+  border-color: color-mix(in srgb, #a78bfa 40%, var(--border));
+}
+/* Header update/boot banners: overlay instead of pushing header chrome */
+#updateAvailableBanner:not(.hidden),
+#bootErrorBanner:not(.hidden) {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5.5rem;
+  z-index: 54;
+  max-width: min(24rem, calc(100vw - 2rem));
+  margin: 0 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+#connBrowserWarn:not(.hidden) {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5.5rem;
+  z-index: 54;
+  max-width: min(24rem, calc(100vw - 2rem));
+  margin: 0 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
 .update-notice-toast {
   position: fixed;
   bottom: 1.25rem;

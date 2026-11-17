@@ -697,10 +697,9 @@ export function renderClaimableModule() {
 }
 
 export function showClaimableBanner(newCount) {
-  const el = document.getElementById('claimableBanner');
-  if (!el || !newCount) return;
+  if (!newCount) return;
   const n = newCount;
-  el.innerHTML = `
+  const html = `
     <div class="migration-banner-body">
       <span><strong>${n} free game${n === 1 ? '' : 's'}</strong> ready to claim right now.
         <button type="button" class="text-sky-300 hover:text-sky-200 underline ml-1" data-claim-view>View claims →</button>
@@ -709,15 +708,18 @@ export function showClaimableBanner(newCount) {
         <button type="button" class="fh-log-btn" data-claim-banner-dismiss>Dismiss</button>
       </span>
     </div>`;
-  el.classList.remove('hidden');
+  void import('./notice-toast.js').then(({ showNoticeToast }) => {
+    showNoticeToast({ id: 'claimableBanner', html, variant: 'claim' });
+  });
 }
 
 export function updateClaimableBanner() {
-  const el = document.getElementById('claimableBanner');
-  if (!el || el.classList.contains('hidden')) return;
-  const prevKeys = loadClaimsSnapshotKeys();
-  const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
-  if (newCount <= 0) el.classList.add('hidden');
+  void import('./notice-toast.js').then(({ isNoticeToastVisible, hideNoticeToast }) => {
+    if (!isNoticeToastVisible('claimableBanner')) return;
+    const prevKeys = loadClaimsSnapshotKeys();
+    const { newCount } = diffClaims(prevKeys, state.claimableFeed?.items || []);
+    if (newCount <= 0) hideNoticeToast('claimableBanner');
+  });
 }
 
 export function openClaimDetail(id) {
@@ -861,12 +863,16 @@ export function handleClaimableClick(e) {
 export function handleClaimableBannerClick(e) {
   if (e.target.closest('[data-claim-banner-dismiss]')) {
     saveClaimsSnapshot(state.claimableFeed?.items || []);
-    document.getElementById('claimableBanner')?.classList.add('hidden');
+    void import('./notice-toast.js').then(({ hideNoticeToast }) => {
+      hideNoticeToast('claimableBanner');
+    });
     return true;
   }
   if (e.target.closest('[data-claim-view]')) {
     saveClaimsSnapshot(state.claimableFeed?.items || []);
-    document.getElementById('claimableBanner')?.classList.add('hidden');
+    void import('./notice-toast.js').then(({ hideNoticeToast }) => {
+      hideNoticeToast('claimableBanner');
+    });
     if (state.activeView !== 'wishlist') switchView('wishlist');
     else renderClaimableModule();
     requestAnimationFrame(() => {

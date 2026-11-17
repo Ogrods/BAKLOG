@@ -382,12 +382,10 @@ export function showProWelcomeBanner() {
     flagged = sessionStorage.getItem(proWelcomeSessionKey()) === '1';
   } catch (_) { /* private mode */ }
   if (!flagged || !isPro()) return;
-  const host = document.getElementById('proWelcomeBanner');
-  if (!host) return;
   try {
     sessionStorage.removeItem(proWelcomeSessionKey());
   } catch (_) { /* private mode */ }
-  host.innerHTML = `<div class="migration-banner-body">
+  const html = `<div class="migration-banner-body">
       <div>
         <strong>You&apos;re on Pro.</strong>
         Sponsored deal slots are off. Perks apply on this machine.
@@ -396,10 +394,16 @@ export function showProWelcomeBanner() {
         <button type="button" class="pro-welcome-dismiss bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-sm">Dismiss</button>
       </div>
     </div>`;
-  host.classList.remove('hidden');
-  host.querySelector('.pro-welcome-dismiss')?.addEventListener('click', () => {
-    host.classList.add('hidden');
-    host.innerHTML = '';
+  // Lazy import keeps notice-toast off pro-view boot path; tests flush microtasks.
+  void import('./notice-toast.js').then(({ showNoticeToast, hideNoticeToast }) => {
+    const host = showNoticeToast({
+      id: 'proWelcomeBanner',
+      html,
+      variant: 'pro',
+    });
+    host?.querySelector('.pro-welcome-dismiss')?.addEventListener('click', () => {
+      hideNoticeToast('proWelcomeBanner');
+    });
   });
 }
 

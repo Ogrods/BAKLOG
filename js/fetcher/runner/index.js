@@ -23,14 +23,12 @@ import {
   LS_FETCHER_LAST_SEQ,
   profileScopedStorageKey,
 } from '../../profiles.js';
-import { markClaimsPendingAutoRun } from '../../claimable.js';
 import { savePrefs } from '../../prefs.js';
 import { bindEscapeClose, trapFocus } from '../../focus-trap.js';
 import { authCooldownLabel, clearAuthCooldown } from '../../fetcher-cooldown.js';
 import {
-  maybeAutoRefreshItad,
-  maybeAutoRefreshClaims,
-  maybeAutoFetchStale24h,
+  maybeAutoRefreshItad, maybeAutoRefreshClaims, maybeAutoFetchStale24h,
+  noteFetcherAutoRefreshFailed, armPendingAutoRunBanner,
 } from '../../fetcher-auto-refresh.js';
 import { autoRefreshDeps } from '../auto-refresh-wire.js';
 import {
@@ -39,7 +37,6 @@ import {
   lastRunFailedByKey,
   lastRunErrorByKey,
   summarizeRunFailure,
-  markItadPendingAutoRun,
 } from '../../fetcher-health-shared.js';
 import { startFastAgeTick, stopAgeTicker, stopFastAgeTick } from '../../fetcher-chips.js';
 import { FETCH_TIMEOUT_MS, fetchWithTimeout } from '../http.js';
@@ -1217,6 +1214,7 @@ export const fetcherRunner = (() => {
           }
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
+          noteFetcherAutoRefreshFailed(key);
         } else {
           markRunFailed(key, summarizeRunFailure('', hist.exit_code));
         }
@@ -1491,6 +1489,7 @@ export const fetcherRunner = (() => {
     });
     markChipState(key, 'failed');
     scheduleFailedChipClear(key);
+    noteFetcherAutoRefreshFailed(key);
   }
 
   function clearRunFailed(key) {
@@ -1568,11 +1567,7 @@ export const fetcherRunner = (() => {
       return false;
     }
 
-    if (auto && key === 'itad') {
-      markItadPendingAutoRun();
-    } else if (auto && key === 'claims') {
-      markClaimsPendingAutoRun();
-    } else {
+    if (!auto) {
       ensurePanel(src);
       if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) {
         const hint = humanizeMissingRequirements(src.missingRequirements);
@@ -1590,7 +1585,7 @@ export const fetcherRunner = (() => {
       };
       const cmdSuffix = refresh ? (refreshArgHint[key] || ' --refresh') : '';
       logEvent('cmd', `$ ${src.cmd}${cmdSuffix}`);
-      if (!auto) scrollPopoverModule('console');
+      scrollPopoverModule('console');
     }
 
     const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
@@ -1631,6 +1626,7 @@ export const fetcherRunner = (() => {
         return false;
       }
       const { run_id: runId } = await res.json();
+      if (auto) armPendingAutoRunBanner(key);
       markChipState(key, 'queued', runId);
       ensureInFlightPolling();
       let snapAfterSubmit = null;
@@ -1820,6 +1816,7 @@ export const fetcherRunner = (() => {
           }
         } else if (cancelled) {
           markChipState(key, null);
+          noteFetcherAutoRefreshFailed(key);
         } else {
           markRunFailed(key, summarizeRunFailure(recentLog.join('\n'), data.exit_code));
           handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
@@ -1882,6 +1879,7 @@ export const fetcherRunner = (() => {
             clearAuthCooldown(key);
           } else if (cancelled) {
             markChipState(key, null);
+            noteFetcherAutoRefreshFailed(key);
           } else {
             markRunFailed(key, summarizeRunFailure('', finished.exit_code));
             handleFetcherAuthOutcome(key, finished, '');
@@ -2029,17 +2027,17 @@ export const fetcherRunner = (() => {
     // running while the window is minimized/unfocused (best-effort, subject to
     // browser background-timer throttling).
     await syncFromServer();
-    maybeAutoRefreshItad(autoRefreshDeps());
-    maybeAutoRefreshClaims(autoRefreshDeps());
+    await maybeAutoRefreshItad(autoRefreshDeps());
+    await maybeAutoRefreshClaims(autoRefreshDeps());
     maybeAutoFetchStale24h(autoRefreshDeps());
   }
 
   function startDashboardPolling() {
     _dashboardPollWanted = true;
     if (pollTimer || !isApiAvailable()) return;
-    void syncFromServer().then(() => {
-      maybeAutoRefreshItad(autoRefreshDeps());
-      maybeAutoRefreshClaims(autoRefreshDeps());
+    void syncFromServer().then(async () => {
+      await maybeAutoRefreshItad(autoRefreshDeps());
+      await maybeAutoRefreshClaims(autoRefreshDeps());
       maybeAutoFetchStale24h(autoRefreshDeps());
     });
     pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);

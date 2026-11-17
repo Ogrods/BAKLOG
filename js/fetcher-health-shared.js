@@ -94,3 +94,8 @@ export function consumeItadAutoRunFlag() {
 export function markItadPendingAutoRun() {
   itadPendingAutoRun = true;
 }
+
+/** Drop a pending ITAD auto flag without treating the next load as an auto run. */
+export function clearItadPendingAutoRun() {
+  itadPendingAutoRun = false;
+}

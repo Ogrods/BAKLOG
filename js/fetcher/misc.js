@@ -3,6 +3,12 @@ import { consumeItadAutoRunFlag } from '../fetcher-health-shared.js';
 export {
   itadLastAutoRunKey,
   claimsLastAutoRunKey,
+  clearClaimsLastAutoRun,
+  noteClaimsAutoRunFailed,
+  noteItadAutoRunFailed,
+  noteFetcherAutoRefreshFailed,
+  CLAIMS_AUTO_FAIL_BACKOFF_MS,
+  ITAD_AUTO_FAIL_BACKOFF_MS,
   ITAD_AUTO_REFRESH_INTERVAL_MS,
   ITAD_AUTO_QUIET_HOUR_END,
   itadAutoRefreshIntervalMs,

@@ -87,14 +87,37 @@ export function noteItadAutoRunFailed(deps = {}) {
   });
 }
 
-/** Soften claims/ITAD auto cooldown and drop sticky pending-auto banner flags. */
-export function noteFetcherAutoRefreshFailed(key) {
+/**
+ * Soften claims/ITAD auto cooldown after fail/cancel, but only when an auto
+ * cycle was armed at POST accept. Manual chip fails must not rewrite lastRun.
+ */
+export function noteFetcherAutoRefreshFailed(key, deps = {}) {
   if (key === 'claims') {
-    noteClaimsAutoRunFailed();
-    clearClaimsPendingAutoRun();
+    if (clearClaimsPendingAutoRun()) noteClaimsAutoRunFailed(deps);
   } else if (key === 'itad') {
-    noteItadAutoRunFailed();
-    clearItadPendingAutoRun();
+    if (clearItadPendingAutoRun()) noteItadAutoRunFailed(deps);
+  }
+}
+
+/**
+ * Stamp the full auto-refresh interval at POST accept (before snapshot/SSE).
+ * Fail/cancel paths overwrite via noteFetcherAutoRefreshFailed so a later
+ * maybeAutoRefresh setLastRun cannot replace a short fail backoff.
+ */
+export function noteFetcherAutoRefreshSubmitted(key, deps = {}) {
+  const now = deps.now ?? Date.now();
+  if (key === 'claims') {
+    const setLastRun = deps.setLastRun
+      ?? ((t) => {
+        try { localStorage.setItem(claimsLastAutoRunKey(), String(t)); } catch (_) {}
+      });
+    setLastRun(now);
+  } else if (key === 'itad') {
+    const setLastRun = deps.setLastRun
+      ?? ((t) => {
+        try { localStorage.setItem(itadLastAutoRunKey(), String(t)); } catch (_) {}
+      });
+    setLastRun(now);
   }
 }
 
@@ -153,15 +176,10 @@ export async function maybeAutoRefreshItad(deps = {}) {
   const lastRun = deps.getLastRun
     ?? (() => Number(localStorage.getItem(itadLastAutoRunKey()) || 0));
   if (now - lastRun() < itadAutoRefreshIntervalMs()) return false;
-  const setLastRun = deps.setLastRun
-    ?? (t => localStorage.setItem(itadLastAutoRunKey(), String(t)));
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
-  // Stamp cooldown only after a successful submit. Premature stamps blocked
-  // retries for a full interval when queue/API/409 bailed before the run started.
-  const submitted = await runFn('itad', { auto: true });
-  if (!submitted) return false;
-  setLastRun(now);
-  return true;
+  // Cooldown is stamped inside run() at POST accept (noteFetcherAutoRefreshSubmitted)
+  // so a fail during snapshot wait can overwrite with the short backoff.
+  return !!(await runFn('itad', { auto: true }));
 }
 
 export async function maybeAutoRefreshClaims(deps = {}) {
@@ -178,15 +196,10 @@ export async function maybeAutoRefreshClaims(deps = {}) {
   const lastRun = deps.getLastRun
     ?? (() => Number(localStorage.getItem(claimsLastAutoRunKey()) || 0));
   if (now - lastRun() < claimsAutoRefreshIntervalMs()) return false;
-  const setLastRun = deps.setLastRun
-    ?? (t => localStorage.setItem(claimsLastAutoRunKey(), String(t)));
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
-  // Stamp cooldown only after submit succeeds so a queue/API miss does not burn
-  // the full interval. Pending-auto banner flag is armed inside run() after POST.
-  const submitted = await runFn('claims', { auto: true });
-  if (!submitted) return false;
-  setLastRun(now);
-  return true;
+  // Cooldown stamped in run() at POST accept; fail/cancel overwrites via
+  // noteFetcherAutoRefreshFailed without a post-return setLastRun race.
+  return !!(await runFn('claims', { auto: true }));
 }
 
 export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {

@@ -561,6 +561,11 @@ export function markClaimsPendingAutoRun() {
   claimsPendingAutoRun = true;
 }
 
+/** Drop a pending auto flag without treating the next load as an auto run. */
+export function clearClaimsPendingAutoRun() {
+  claimsPendingAutoRun = false;
+}
+
 function showHiddenClaimsButtonHtml(count) {
   if (!count) return '';
   const n = count;

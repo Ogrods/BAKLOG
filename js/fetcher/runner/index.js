@@ -23,7 +23,10 @@ import {
   LS_FETCHER_LAST_SEQ,
   profileScopedStorageKey,
 } from '../../profiles.js';
-import { markClaimsPendingAutoRun } from '../../claimable.js';
+import {
+  markClaimsPendingAutoRun,
+  clearClaimsPendingAutoRun,
+} from '../../claimable.js';
 import { savePrefs } from '../../prefs.js';
 import { bindEscapeClose, trapFocus } from '../../focus-trap.js';
 import { authCooldownLabel, clearAuthCooldown } from '../../fetcher-cooldown.js';
@@ -31,6 +34,8 @@ import {
   maybeAutoRefreshItad,
   maybeAutoRefreshClaims,
   maybeAutoFetchStale24h,
+  noteClaimsAutoRunFailed,
+  noteItadAutoRunFailed,
 } from '../../fetcher-auto-refresh.js';
 import { autoRefreshDeps } from '../auto-refresh-wire.js';
 import {
@@ -40,6 +45,7 @@ import {
   lastRunErrorByKey,
   summarizeRunFailure,
   markItadPendingAutoRun,
+  clearItadPendingAutoRun,
 } from '../../fetcher-health-shared.js';
 import { startFastAgeTick, stopAgeTicker, stopFastAgeTick } from '../../fetcher-chips.js';
 import { FETCH_TIMEOUT_MS, fetchWithTimeout } from '../http.js';
@@ -1217,6 +1223,7 @@ export const fetcherRunner = (() => {
           }
         } else if (hist.status === 'cancelled') {
           markChipState(key, null);
+          noteAutoRefreshFailed(key);
         } else {
           markRunFailed(key, summarizeRunFailure('', hist.exit_code));
         }
@@ -1481,6 +1488,20 @@ export const fetcherRunner = (() => {
     failedChipClearTimers.set(key, timer);
   }
 
+  /**
+   * Soften auto-refresh cooldown after claims/ITAD fail or cancel, and drop
+   * sticky pending-auto banner flags so a later manual run is not mislabeled.
+   */
+  function noteAutoRefreshFailed(key) {
+    if (key === 'claims') {
+      noteClaimsAutoRunFailed();
+      clearClaimsPendingAutoRun();
+    } else if (key === 'itad') {
+      noteItadAutoRunFailed();
+      clearItadPendingAutoRun();
+    }
+  }
+
   /** Sticky failed chip + 10s flash. Used by done/history/stream/submit give-up. */
   function markRunFailed(key, message = 'unknown error') {
     const at = Date.now();
@@ -1491,6 +1512,9 @@ export const fetcherRunner = (() => {
     });
     markChipState(key, 'failed');
     scheduleFailedChipClear(key);
+    // Auto-refresh stamps lastRun on submit; refuse/error must not burn the
+    // full interval, and must not hammer every 30s poll either.
+    noteAutoRefreshFailed(key);
   }
 
   function clearRunFailed(key) {
@@ -1568,11 +1592,7 @@ export const fetcherRunner = (() => {
       return false;
     }
 
-    if (auto && key === 'itad') {
-      markItadPendingAutoRun();
-    } else if (auto && key === 'claims') {
-      markClaimsPendingAutoRun();
-    } else {
+    if (!auto) {
       ensurePanel(src);
       if (src.missingRequirements?.length && !fetcherCredentialsSatisfied(key)) {
         const hint = humanizeMissingRequirements(src.missingRequirements);
@@ -1590,7 +1610,7 @@ export const fetcherRunner = (() => {
       };
       const cmdSuffix = refresh ? (refreshArgHint[key] || ' --refresh') : '';
       logEvent('cmd', `$ ${src.cmd}${cmdSuffix}`);
-      if (!auto) scrollPopoverModule('console');
+      scrollPopoverModule('console');
     }
 
     const url = `/api/run/${encodeURIComponent(key)}${refresh ? '?refresh=1' : ''}`;
@@ -1631,6 +1651,10 @@ export const fetcherRunner = (() => {
         return false;
       }
       const { run_id: runId } = await res.json();
+      // Arm pending-auto banners only after POST succeeds so a queue/API miss
+      // cannot leave the flag stuck for a later manual chip click.
+      if (auto && key === 'itad') markItadPendingAutoRun();
+      else if (auto && key === 'claims') markClaimsPendingAutoRun();
       markChipState(key, 'queued', runId);
       ensureInFlightPolling();
       let snapAfterSubmit = null;
@@ -1820,6 +1844,7 @@ export const fetcherRunner = (() => {
           }
         } else if (cancelled) {
           markChipState(key, null);
+          noteAutoRefreshFailed(key);
         } else {
           markRunFailed(key, summarizeRunFailure(recentLog.join('\n'), data.exit_code));
           handleFetcherAuthOutcome(key, data, recentLog.join('\n'));
@@ -1882,6 +1907,7 @@ export const fetcherRunner = (() => {
             clearAuthCooldown(key);
           } else if (cancelled) {
             markChipState(key, null);
+            noteAutoRefreshFailed(key);
           } else {
             markRunFailed(key, summarizeRunFailure('', finished.exit_code));
             handleFetcherAuthOutcome(key, finished, '');
@@ -2029,17 +2055,17 @@ export const fetcherRunner = (() => {
     // running while the window is minimized/unfocused (best-effort, subject to
     // browser background-timer throttling).
     await syncFromServer();
-    maybeAutoRefreshItad(autoRefreshDeps());
-    maybeAutoRefreshClaims(autoRefreshDeps());
+    await maybeAutoRefreshItad(autoRefreshDeps());
+    await maybeAutoRefreshClaims(autoRefreshDeps());
     maybeAutoFetchStale24h(autoRefreshDeps());
   }
 
   function startDashboardPolling() {
     _dashboardPollWanted = true;
     if (pollTimer || !isApiAvailable()) return;
-    void syncFromServer().then(() => {
-      maybeAutoRefreshItad(autoRefreshDeps());
-      maybeAutoRefreshClaims(autoRefreshDeps());
+    void syncFromServer().then(async () => {
+      await maybeAutoRefreshItad(autoRefreshDeps());
+      await maybeAutoRefreshClaims(autoRefreshDeps());
       maybeAutoFetchStale24h(autoRefreshDeps());
     });
     pollTimer = setInterval(() => { void _runDashboardPollTick(); }, 30_000);

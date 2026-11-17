@@ -1,7 +1,6 @@
 /**
  * Auto-refresh scheduling: ITAD, claims, stale-24h, connect, enrich.
  */
-import { markClaimsPendingAutoRun } from './claimable.js';
 import { FETCHER_AUTH_PROVIDER, NO_AUTO_FETCH_KEYS } from './fetcher-registry.js';
 import { fetcherRunner, fetcherSources } from './fetcher-health-shared.js';
 import {
@@ -28,6 +27,55 @@ export function itadLastAutoRunKey() {
 
 export function claimsLastAutoRunKey() {
   return profileScopedStorageKey(LS_CLAIMS_LAST_AUTO_RUN);
+}
+
+/** Drop claims auto-refresh cooldown entirely (tests / manual reset). */
+export function clearClaimsLastAutoRun(deps = {}) {
+  const clearFn = deps.clearLastRun
+    ?? (() => {
+      try { localStorage.removeItem(claimsLastAutoRunKey()); } catch (_) {}
+    });
+  clearFn();
+}
+
+/**
+ * After a failed/cancelled auto-refresh run, delay the next attempt without
+ * burning the full user interval (and without retrying every 30s poll).
+ * Gate is (now - lastRun) < interval → lastRun = now - interval + backoff.
+ */
+export const CLAIMS_AUTO_FAIL_BACKOFF_MS = 15 * 60_000;
+export const ITAD_AUTO_FAIL_BACKOFF_MS = 5 * 60_000;
+
+function noteAutoRunFailed(deps, {
+  intervalMs,
+  backoffMs,
+  defaultSetLastRun,
+}) {
+  const now = deps.now ?? Date.now();
+  const interval = deps.intervalMs ?? intervalMs;
+  const backoff = Math.min(deps.backoffMs ?? backoffMs, interval);
+  const setLastRun = deps.setLastRun ?? defaultSetLastRun;
+  setLastRun(now - interval + backoff);
+}
+
+export function noteClaimsAutoRunFailed(deps = {}) {
+  noteAutoRunFailed(deps, {
+    intervalMs: claimsAutoRefreshIntervalMs(),
+    backoffMs: CLAIMS_AUTO_FAIL_BACKOFF_MS,
+    defaultSetLastRun: (t) => {
+      try { localStorage.setItem(claimsLastAutoRunKey(), String(t)); } catch (_) {}
+    },
+  });
+}
+
+export function noteItadAutoRunFailed(deps = {}) {
+  noteAutoRunFailed(deps, {
+    intervalMs: itadAutoRefreshIntervalMs(),
+    backoffMs: ITAD_AUTO_FAIL_BACKOFF_MS,
+    defaultSetLastRun: (t) => {
+      try { localStorage.setItem(itadLastAutoRunKey(), String(t)); } catch (_) {}
+    },
+  });
 }
 
 export const ITAD_AUTO_REFRESH_INTERVAL_MS = 15 * 60_000;
@@ -61,7 +109,7 @@ const ENRICH_ORDER = ['steamReviews', 'steamTags', 'steamCovers', 'protondb', 'h
 let autoEnrichCooldownUntil = 0;
 const AUTO_ENRICH_COOLDOWN_MS = 3000;
 
-export function maybeAutoRefreshItad(deps = {}) {
+export async function maybeAutoRefreshItad(deps = {}) {
   if (state.prefs.itadAutoRefreshDisabled) return false;
   const disconnectedFn = deps.isFetcherDisconnected ?? wired.isFetcherDisconnected;
   if (disconnectedFn?.('itad')) return false;
@@ -81,13 +129,16 @@ export function maybeAutoRefreshItad(deps = {}) {
   if (now - lastRun() < itadAutoRefreshIntervalMs()) return false;
   const setLastRun = deps.setLastRun
     ?? (t => localStorage.setItem(itadLastAutoRunKey(), String(t)));
-  setLastRun(now);
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
-  runFn('itad', { auto: true });
+  // Stamp cooldown only after a successful submit. Premature stamps blocked
+  // retries for a full interval when queue/API/409 bailed before the run started.
+  const submitted = await runFn('itad', { auto: true });
+  if (!submitted) return false;
+  setLastRun(now);
   return true;
 }
 
-export function maybeAutoRefreshClaims(deps = {}) {
+export async function maybeAutoRefreshClaims(deps = {}) {
   if (state.prefs.claimsAutoRefreshDisabled) return false;
   const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner?.isApiAvailable());
   if (!isApiAvailableFn()) return false;
@@ -103,10 +154,12 @@ export function maybeAutoRefreshClaims(deps = {}) {
   if (now - lastRun() < claimsAutoRefreshIntervalMs()) return false;
   const setLastRun = deps.setLastRun
     ?? (t => localStorage.setItem(claimsLastAutoRunKey(), String(t)));
-  setLastRun(now);
-  markClaimsPendingAutoRun();
   const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
-  runFn('claims', { auto: true });
+  // Stamp cooldown only after submit succeeds so a queue/API miss does not burn
+  // the full interval. Pending-auto banner flag is armed inside run() after POST.
+  const submitted = await runFn('claims', { auto: true });
+  if (!submitted) return false;
+  setLastRun(now);
   return true;
 }
 

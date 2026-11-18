@@ -175,9 +175,16 @@ class _FakeContext:
 
 
 class _FakePage:
-    def __init__(self, url: str, *, fail_goto: bool = False) -> None:
+    def __init__(
+        self,
+        url: str,
+        *,
+        fail_goto: bool = False,
+        html: str = "",
+    ) -> None:
         self.url = url
         self._fail_goto = fail_goto
+        self._html = html
         self.goto_calls = 0
         self.wait_ms: list[int] = []
 
@@ -189,6 +196,9 @@ class _FakePage:
 
     def wait_for_timeout(self, ms: int) -> None:
         self.wait_ms.append(ms)
+
+    def content(self) -> str:
+        return self._html
 
 
 def test_extract_humble_session_rejects_auth_host_only() -> None:
@@ -244,6 +254,8 @@ def test_extract_humble_session_rejects_goto_failure() -> None:
 
 
 def test_page_looks_signed_out_url_detection() -> None:
+    from fetchers.fetch_humble import _page_on_cloudflare
+
     assert _page_looks_signed_out(
         _FakePage("https://auth.humblebundle.com/login?flow=abc")
     )
@@ -251,6 +263,12 @@ def test_page_looks_signed_out_url_detection() -> None:
     assert not _page_looks_signed_out(
         _FakePage("https://www.humblebundle.com/home/library")
     )
+    cf_page = _FakePage(
+        "https://www.humblebundle.com/home/library",
+        html="<html><title>Just a moment...</title><div id='cf_challenge_container'></div></html>",
+    )
+    assert _page_on_cloudflare(cf_page)
+    assert not _page_looks_signed_out(cf_page)
 
 
 def test_goto_humble_library_retries_on_new_page() -> None:

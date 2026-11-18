@@ -1933,15 +1933,15 @@ def run_browser_auth(provider: str, session: AuthSession) -> dict[str, str] | No
     with launch_persistent_profile(
         user_data,
         headless=False,
-        # EA + GOG: load the login page during CDP attach so the first raised
-        # window is not about:blank (GOG previously navigated only inside extract).
-        initial_url=spec.login_url if provider in ("ea", "gog") else None,
+        # EA + GOG + Humble: load the login page during CDP attach so the first
+        # raised window is not about:blank (Humble needs www cookies before Ory).
+        initial_url=spec.login_url if provider in ("ea", "gog", "humble") else None,
     ) as context:
         try:
-            # Epic: skip heavy STEALTH_INIT — fake plugins/permissions/hardware
-            # worsen Cloudflare Bot Management scores. Launch already applies the
-            # light webdriver mask (_AUTOMATION_MASK_SCRIPT).
-            if provider not in ("epic", "epic_wishlist"):
+            # Epic + Humble: skip heavy STEALTH_INIT — fake plugins/permissions/
+            # hardware worsen Cloudflare Bot Management scores. Launch already
+            # applies the light webdriver mask (_AUTOMATION_MASK_SCRIPT).
+            if provider not in ("epic", "epic_wishlist", "humble"):
                 context.add_init_script(_STEALTH_INIT)
             # Paint a persistent, click-through banner inside the popup so users see
             # the same guidance there (not just on the dashboard). Keep it in sync

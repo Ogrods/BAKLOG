@@ -424,6 +424,8 @@ def _page_on_cloudflare(page) -> bool:
 
 def _page_looks_signed_out(page) -> bool:
     """True when the session is gone — not during an in-progress CF challenge."""
+    from auth.connect_extractors import humble_page_title_looks_login
+
     raw = getattr(page, "url", None) or ""
     try:
         parsed = urlparse(raw)
@@ -436,6 +438,9 @@ def _page_looks_signed_out(page) -> bool:
     if host == "auth.humblebundle.com":
         return True
     if path.rstrip("/").endswith("/login") or "/login" in path.split("/"):
+        return True
+    # History showed /home/library with a Login title while mid-redirect.
+    if humble_page_title_looks_login(page):
         return True
     return False
 
@@ -565,6 +570,30 @@ def fetch_library_items(
             pass
 
         page = _goto_humble_library(page, ctx, on_response=on_response)
+        # Short settle so Ory redirects / Login titles surface before a long wait.
+        try:
+            page.wait_for_timeout(2000)
+        except Exception:  # noqa: BLE001
+            pass
+        if not _page_on_cloudflare(page) and _page_looks_signed_out(page):
+            raise RuntimeError(_session_expired_message(page))
+        try:
+            status_resp = ctx.request.get(SESSION_STATUS_URL, timeout=15_000)
+            if status_resp.status == 200:
+                body = (status_resp.text() or "").strip()
+                if body.startswith("{"):
+                    from auth.connect_extractors import humble_session_status_authenticated
+
+                    if (
+                        not humble_session_status_authenticated(json.loads(body))
+                        and not _page_on_cloudflare(page)
+                        and not captured_payloads
+                    ):
+                        raise RuntimeError(_session_expired_message(page))
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001
+            pass
         discovered = _discover_filter_user_library_action_from_page(page, request_client=ctx.request)
         if discovered:
             known_actions.add(discovered)

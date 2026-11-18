@@ -1260,9 +1260,8 @@ class CdpContext:
         page = self.new_page()
         return page._session_id or None
 
-    def cookies(self) -> list[dict[str, Any]]:
-        # Network.getAllCookies must run on a page session — the browser-level
-        # connection has no Network domain enabled and rejects the command.
+    def raw_cookies(self) -> list[dict[str, Any]]:
+        """Full CDP cookie objects (for flush/sidecar restore)."""
         sid = self._first_page_session()
         result: dict[str, Any] = {}
         if sid:
@@ -1271,13 +1270,21 @@ class CdpContext:
             except Exception:
                 result = {}
         if not result.get("cookies"):
-            # Storage.getCookies works at the browser level as a fallback.
             try:
                 result = self._send("Storage.getCookies")
             except Exception:
                 result = result or {}
         out: list[dict[str, Any]] = []
         for c in result.get("cookies") or []:
+            if isinstance(c, dict):
+                out.append(dict(c))
+        return out
+
+    def cookies(self) -> list[dict[str, Any]]:
+        # Network.getAllCookies must run on a page session — the browser-level
+        # connection has no Network domain enabled and rejects the command.
+        out: list[dict[str, Any]] = []
+        for c in self.raw_cookies():
             out.append(
                 {
                     "name": c.get("name", ""),
@@ -1286,6 +1293,75 @@ class CdpContext:
                 }
             )
         return out
+
+    def set_cookies(self, cookies: list[dict[str, Any]]) -> int:
+        """Apply cookies via Network.setCookie. Returns how many succeeded."""
+        if not cookies:
+            return 0
+        sid = self._first_page_session()
+        ok = 0
+        for c in cookies:
+            name = c.get("name")
+            value = c.get("value")
+            if not name or value is None:
+                continue
+            params: dict[str, Any] = {
+                "name": str(name),
+                "value": str(value),
+            }
+            for key in (
+                "url",
+                "domain",
+                "path",
+                "secure",
+                "httpOnly",
+                "sameSite",
+                "expires",
+                "priority",
+                "sameParty",
+                "sourceScheme",
+                "sourcePort",
+                "partitionKey",
+            ):
+                if key in c and c[key] is not None:
+                    params[key] = c[key]
+            # __Host- cookies require secure + path=/ and no domain attribute.
+            if str(name).startswith("__Host-"):
+                params["secure"] = True
+                params["path"] = "/"
+                params.pop("domain", None)
+                if "url" not in params:
+                    params["url"] = "https://www.humblebundle.com/"
+            try:
+                if sid:
+                    self._send("Network.setCookie", params, session_id=sid)
+                else:
+                    self._send("Network.setCookie", params)
+                ok += 1
+            except Exception:  # noqa: BLE001
+                # Retry with url-only for __Host- failures.
+                try:
+                    retry = {
+                        "name": str(name),
+                        "value": str(value),
+                        "url": params.get("url") or "https://www.humblebundle.com/",
+                        "secure": True,
+                        "path": params.get("path") or "/",
+                    }
+                    if c.get("httpOnly") is not None:
+                        retry["httpOnly"] = c["httpOnly"]
+                    if c.get("sameSite") is not None:
+                        retry["sameSite"] = c["sameSite"]
+                    if c.get("expires") is not None:
+                        retry["expires"] = c["expires"]
+                    if sid:
+                        self._send("Network.setCookie", retry, session_id=sid)
+                    else:
+                        self._send("Network.setCookie", retry)
+                    ok += 1
+                except Exception:  # noqa: BLE001
+                    pass
+        return ok
 
     def cookies_for_urls(
         self,
@@ -1581,8 +1657,17 @@ class CdpContext:
             CdpContext._id_counter += 1
             return CdpContext._id_counter
 
-    def close(self) -> None:
+    def close(self, *, graceful_wait_sec: float | None = None) -> None:
+        """Quit the browser. Prefer a clean Browser.close so session cookies flush.
+
+        ``graceful_wait_sec`` (or ``self._graceful_wait_sec``) is how long to wait
+        after Browser.close before terminate/kill. Humble Ory session cookies are
+        often session-scoped and only hit disk on a clean exit.
+        """
         port = int(getattr(self, "_port", 0) or 0)
+        if graceful_wait_sec is None:
+            graceful_wait_sec = float(getattr(self, "_graceful_wait_sec", 8.0) or 8.0)
+        wait_sec = max(0.0, float(graceful_wait_sec))
         for page in list(getattr(self, "pages", ())):
             try:
                 if not page.is_closed:
@@ -1593,15 +1678,13 @@ class CdpContext:
         # often refers to a short-lived launcher whose child keeps the real
         # window alive after poll() is already non-None — skipping Browser.close
         # in that case leaves the sign-in window open after a successful connect.
-        # Short timeout: the process terminate/kill + port-kill fallbacks below
-        # do the real teardown, so we never block the UI ~60s on a dead socket.
         try:
             self._send("Browser.close", timeout=5)
         except Exception:  # noqa: BLE001
             pass
-        if self._proc.poll() is None:
+        if self._proc.poll() is None and wait_sec > 0:
             try:
-                self._proc.wait(timeout=8)
+                self._proc.wait(timeout=wait_sec)
             except Exception:
                 pass
         try:

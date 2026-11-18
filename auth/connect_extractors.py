@@ -6,6 +6,7 @@ import json
 import queue
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -20,6 +21,10 @@ HUMBLE_SUCCESS_URL_PATTERN = r"humblebundle\.com/(home|store)"
 # Let Edge flush cookies before Connect closes the persistent profile.
 # Short settles were marking ready from a live window that did not survive restart.
 HUMBLE_CONNECT_SETTLE_MS = 4000
+# Sidecar under the Chromium profile so cold probe/fetch can restore session cookies
+# that Chromium drops when Connect force-closes before a clean flush.
+HUMBLE_COOKIE_SIDECAR = "baklog_humble_cookies.json"
+_HUMBLE_COOKIE_DIAG_LOGGED = False
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
 # Per-message-key dedupe interval kept for tests that monkeypatch these.
@@ -97,6 +102,75 @@ def humble_page_title_looks_login(page: Any) -> bool:
     if not title:
         return False
     return "login" in title or "sign in" in title or "sign-in" in title
+
+
+def humble_is_durable_session_cookie_name(name: str) -> bool:
+    """True for Ory session cookies — not browser-flow / continuity / csrf noise."""
+    n = (name or "").strip()
+    if not n:
+        return False
+    lower = n.lower()
+    if "browser" in lower or "continuity" in lower:
+        return False
+    if n == "ory_kratos_session" or n == "__Host-ory_kratos_session":
+        return True
+    # Humble may suffix the host hash onto the session cookie name.
+    if lower.startswith("ory_kratos_session") or lower.startswith("__host-ory_kratos_session"):
+        return True
+    return False
+
+
+def humble_session_cookie_names(cookies: list[dict[str, Any]]) -> list[str]:
+    """Return durable Humble/Ory session cookie names present in ``cookies``."""
+    found: list[str] = []
+    seen: set[str] = set()
+    for c in cookies or []:
+        name = str(c.get("name") or "")
+        if not humble_is_durable_session_cookie_name(name):
+            continue
+        if not c.get("value"):
+            continue
+        domain = (c.get("domain") or "").lstrip(".").lower()
+        # Prefer www / parent humblebundle.com; allow auth host only if name is session.
+        if domain and "humblebundle.com" not in domain:
+            continue
+        if name not in seen:
+            seen.add(name)
+            found.append(name)
+    return found
+
+
+def humble_has_durable_session_cookies(context: Any) -> bool:
+    """True when the live jar has a real Ory session cookie (not browser-flow only)."""
+    try:
+        cookies = context.cookies()
+    except Exception:  # noqa: BLE001
+        return False
+    return bool(humble_session_cookie_names(cookies if isinstance(cookies, list) else []))
+
+
+def _humble_log_cookie_names_once(context: Any, *, reason: str) -> None:
+    global _HUMBLE_COOKIE_DIAG_LOGGED
+    if _HUMBLE_COOKIE_DIAG_LOGGED:
+        return
+    _HUMBLE_COOKIE_DIAG_LOGGED = True
+    try:
+        from auth.connect_log import connect_log
+
+        names = sorted(
+            {
+                str(c.get("name") or "")
+                for c in (context.cookies() or [])
+                if "humble" in (c.get("domain") or "").lower()
+            }
+        )
+        connect_log(
+            "humble",
+            f"durable-session wait ({reason}); cookie_names={names}",
+            key="durable_cookies",
+        )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _humble_has_session(context: Any) -> bool:
@@ -245,13 +319,44 @@ def gog_connect_hint(page: Any) -> str:
     )
 
 
-def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
-    """Complete Connect only after www library loads and session-status still holds.
+def _humble_page_on_auth_host(page: Any) -> bool:
+    url = getattr(page, "url", None) or ""
+    host = hostname_of(url)
+    return bool(host and host_matches(host, "auth.humblebundle.com"))
 
-    A live Connect window can look authenticated while the on-disk jar still lacks
-    a durable www session. Settle, then re-check URL + title + session-status
-    before returning ready (post-Connect probe re-opens the profile cold).
+
+def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
+    """Complete Connect only after www library + durable Ory session cookies hold.
+
+    Live session-status alone is not enough: auth-host ``__Host-ory_kratos_browser_*``
+    can look signed-in while the disk jar has no www session. Require a real
+    ``ory_kratos_session`` cookie, settle, then re-check (cold probe re-opens profile).
     """
+    # Stay on auth host until Ory redirects; do not mark ready mid-flow.
+    if _humble_page_on_auth_host(page):
+        return None
+
+    if not humble_has_durable_session_cookies(context):
+        _humble_log_cookie_names_once(context, reason="pre-nav missing session cookie")
+        try:
+            page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
+            page.wait_for_timeout(800)
+        except Exception:  # noqa: BLE001
+            return None
+        if not humble_has_durable_session_cookies(context):
+            try:
+                page.reload(wait_until="domcontentloaded", timeout=20_000)
+                page.wait_for_timeout(1000)
+            except Exception:  # noqa: BLE001
+                try:
+                    page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
+                    page.wait_for_timeout(1000)
+                except Exception:  # noqa: BLE001
+                    pass
+        if not humble_has_durable_session_cookies(context):
+            _humble_log_cookie_names_once(context, reason="post-nav still missing session cookie")
+            return None
+
     if not _humble_has_session(context):
         return None
     try:
@@ -264,8 +369,7 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
         return None
     if humble_page_title_looks_login(page):
         return None
-    # Re-check after navigation so a mid-Ory blip cannot mark the profile ready.
-    if not _humble_has_session(context):
+    if not _humble_has_session(context) or not humble_has_durable_session_cookies(context):
         return None
     try:
         page.wait_for_timeout(HUMBLE_CONNECT_SETTLE_MS)
@@ -276,7 +380,7 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
         return None
     if humble_page_title_looks_login(page):
         return None
-    if not _humble_has_session(context):
+    if not _humble_has_session(context) or not humble_has_durable_session_cookies(context):
         return None
     return {"HUMBLE_PROFILE": "ready"}
 
@@ -285,9 +389,81 @@ def humble_connect_hint(page: Any) -> str:
     url = (getattr(page, "url", None) or "").lower()
     if "login" in url or "sign" in url and "library" not in url:
         return "Sign in to Humble Bundle in the browser window (email or Google)."
+    if "auth.humblebundle.com" in url:
+        return "Finish sign-in - wait until your library opens (do not close early)."
     if "humblebundle.com" not in url:
         return "Open humblebundle.com and sign in if prompted."
-    return "On humblebundle.com? We'll open your library to confirm the session."
+    return (
+        "Wait until your Humble library finishes loading - do not close early. "
+        "We'll save the session once it sticks."
+    )
+
+
+def humble_cookie_sidecar_path(profile: Path | str) -> Path:
+    return Path(profile) / HUMBLE_COOKIE_SIDECAR
+
+
+def dump_humble_session_cookies(context: Any, profile: Path | str) -> int:
+    """Persist durable Humble cookies next to the Chromium profile. Returns count."""
+    raw_fn = getattr(context, "raw_cookies", None)
+    try:
+        raw = raw_fn() if callable(raw_fn) else context.cookies()
+    except Exception:  # noqa: BLE001
+        return 0
+    durable: list[dict[str, Any]] = []
+    for c in raw or []:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("name") or "")
+        if not humble_is_durable_session_cookie_name(name):
+            continue
+        if not c.get("value"):
+            continue
+        domain = (c.get("domain") or "").lstrip(".").lower()
+        if domain and "humblebundle.com" not in domain:
+            continue
+        durable.append(dict(c))
+    # Also keep csrf + continuity so www requests look like a real browser.
+    for c in raw or []:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("name") or "")
+        domain = (c.get("domain") or "").lstrip(".").lower()
+        if "humblebundle.com" not in domain:
+            continue
+        if name.startswith("csrf_token") or name == "ory_kratos_continuity":
+            durable.append(dict(c))
+    path = humble_cookie_sidecar_path(profile)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"cookies": durable}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        return 0
+    return len(durable)
+
+
+def restore_humble_session_cookies(context: Any, profile: Path | str) -> int:
+    """Load sidecar cookies into a live CDP context. Returns how many were set."""
+    path = humble_cookie_sidecar_path(profile)
+    if not path.is_file():
+        return 0
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    cookies = data.get("cookies") if isinstance(data, dict) else None
+    if not isinstance(cookies, list) or not cookies:
+        return 0
+    setter = getattr(context, "set_cookies", None)
+    if not callable(setter):
+        return 0
+    try:
+        return int(setter(cookies) or 0)
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 def _battlenet_xsrf_from_cookies(cookies: list[dict]) -> str:

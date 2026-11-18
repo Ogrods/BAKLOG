@@ -1425,17 +1425,19 @@ def _extract_humble_inline(page, context, session) -> dict[str, str]:
     """Open humblebundle.com/home/library, wait for sign-in, return marker cred."""
     from auth.connect_extractors import (
         HUMBLE_LIBRARY_URL,
+        dump_humble_session_cookies,
         extract_humble_session,
         humble_connect_hint,
     )
     from auth.connect_loop import run_connect_poll
+    from auth.secrets import profile_dir
 
     try:
         page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=25_000)
     except Exception:  # noqa: BLE001
         pass
 
-    return run_connect_poll(
+    creds = run_connect_poll(
         context=context,
         session=session,
         deadline=time.time() + SUCCESS_WAIT_SEC,
@@ -1447,6 +1449,22 @@ def _extract_humble_inline(page, context, session) -> dict[str, str]:
             "and keep the window open until it closes."
         ),
     )
+    # Flush durable Ory cookies to a sidecar before Chromium closes (session
+    # cookies often never hit the SQLite jar on a fast Connect teardown).
+    try:
+        n = dump_humble_session_cookies(context, profile_dir("humble"))
+        if n:
+            from auth.connect_log import connect_log
+
+            connect_log("humble", f"wrote cookie sidecar count={n}", key="cookie_sidecar")
+    except Exception:  # noqa: BLE001
+        pass
+    # Ask CdpContext.close (via __exit__) to wait longer for a clean cookie flush.
+    try:
+        context._graceful_wait_sec = 15.0  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        pass
+    return creds
 
 
 UBISOFT_SUCCESS_URL = "connect.ubisoft.com/logged-in.html"

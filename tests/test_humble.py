@@ -276,6 +276,28 @@ def test_extract_humble_session_rejects_auth_host_only() -> None:
     page = _FakePage("https://auth.humblebundle.com/login?flow=abc")
     # Stays on auth host — extract must not mark ready mid-Ory.
     assert extract_humble_session(ctx, page) is None
+    assert page.goto_calls == 0
+    assert page.reload_calls == 0
+
+
+def test_extract_humble_session_leaves_login_alone_while_anonymous() -> None:
+    """Poll must not goto/reload library before sign-in (flashes the login page)."""
+    ctx = _FakeContext(
+        {"status": "anonymous"},
+        cookies=[
+            {"name": "__cf_bm", "value": "1", "domain": ".humblebundle.com"},
+            {"name": "sift_session_id", "value": "1", "domain": ".humblebundle.com"},
+        ],
+    )
+    login = _FakePage("https://www.humblebundle.com/login?next=/home/library")
+    assert extract_humble_session(ctx, login) is None
+    assert login.goto_calls == 0
+    assert login.reload_calls == 0
+
+    home = _FakePage("https://www.humblebundle.com/")
+    assert extract_humble_session(ctx, home) is None
+    assert home.goto_calls == 0
+    assert home.reload_calls == 0
 
 
 def test_extract_humble_session_rejects_browser_only_cookies() -> None:

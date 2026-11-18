@@ -325,45 +325,63 @@ def _humble_page_on_auth_host(page: Any) -> bool:
     return bool(host and host_matches(host, "auth.humblebundle.com"))
 
 
+def _humble_page_looks_login_url(page: Any) -> bool:
+    url = (getattr(page, "url", None) or "").lower()
+    if not url:
+        return False
+    if "login" in url:
+        return True
+    # Sign-in paths, but not /home/library-style URLs that happen to mention sign.
+    if "sign" in url and "library" not in url and "store" not in url:
+        return True
+    return False
+
+
 def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
     """Complete Connect only after www library + durable Ory session cookies hold.
 
     Live session-status alone is not enough: auth-host ``__Host-ory_kratos_browser_*``
     can look signed-in while the disk jar has no www session. Require a real
     ``ory_kratos_session`` cookie, settle, then re-check (cold probe re-opens profile).
+
+    While the user is still signing in (auth host / login URL / anonymous), do not
+    goto or reload the library on every poll - that flashes the tab and blocks login.
     """
     # Stay on auth host until Ory redirects; do not mark ready mid-flow.
     if _humble_page_on_auth_host(page):
         return None
+    if _humble_page_looks_login_url(page):
+        return None
 
     if not humble_has_durable_session_cookies(context):
-        _humble_log_cookie_names_once(context, reason="pre-nav missing session cookie")
-        try:
-            page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
-            page.wait_for_timeout(800)
-        except Exception:  # noqa: BLE001
+        _humble_log_cookie_names_once(context, reason="waiting for durable session cookie")
+        # Anonymous / not-yet-signed-in: leave the tab alone so the user can log in.
+        if not _humble_has_session(context):
             return None
-        if not humble_has_durable_session_cookies(context):
+        # Live session-status looks signed in but jar lacks ory_kratos_session -
+        # mint www library once if we are not already there. No poll-loop reload.
+        url = getattr(page, "url", None) or ""
+        if not humble_page_is_confirmed_library_or_store(url):
             try:
-                page.reload(wait_until="domcontentloaded", timeout=20_000)
-                page.wait_for_timeout(1000)
+                page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
+                page.wait_for_timeout(800)
             except Exception:  # noqa: BLE001
-                try:
-                    page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
-                    page.wait_for_timeout(1000)
-                except Exception:  # noqa: BLE001
-                    pass
+                return None
         if not humble_has_durable_session_cookies(context):
-            _humble_log_cookie_names_once(context, reason="post-nav still missing session cookie")
+            _humble_log_cookie_names_once(
+                context, reason="post-mint still missing session cookie"
+            )
             return None
 
     if not _humble_has_session(context):
         return None
-    try:
-        page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
-        page.wait_for_timeout(800)
-    except Exception:  # noqa: BLE001
-        return None
+    url = getattr(page, "url", None) or ""
+    if not humble_page_is_confirmed_library_or_store(url):
+        try:
+            page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
+            page.wait_for_timeout(800)
+        except Exception:  # noqa: BLE001
+            return None
     url = getattr(page, "url", None) or ""
     if not humble_page_is_confirmed_library_or_store(url):
         return None

@@ -8,6 +8,8 @@ from pathlib import Path
 from auth.connect_extractors import (
     HUMBLE_LIBRARY_URL,
     HUMBLE_SUCCESS_URL_PATTERN,
+    extract_humble_session,
+    humble_page_is_confirmed_library_or_store,
     humble_session_status_authenticated,
 )
 from fetchers.fetch_humble import (
@@ -19,6 +21,7 @@ from fetchers.fetch_humble import (
     _extract_filter_user_library_payload,
     _item_from_library_result,
     _looks_like_filter_user_library_payload,
+    _page_looks_signed_out,
     _parse_order_detail,
     _subproduct_is_game,
 )
@@ -118,8 +121,24 @@ def test_humble_library_landing_constants() -> None:
     assert FILTER_USER_LIBRARY_ACTION
     pat = re.compile(HUMBLE_SUCCESS_URL_PATTERN)
     assert pat.search("https://www.humblebundle.com/home/library")
-    assert pat.search("https://auth.humblebundle.com/login?flow=abc")
     assert pat.search("https://www.humblebundle.com/store/wishlist")
+    assert not pat.search("https://auth.humblebundle.com/login?flow=abc")
+
+
+def test_humble_page_is_confirmed_library_or_store() -> None:
+    assert humble_page_is_confirmed_library_or_store(
+        "https://www.humblebundle.com/home/library"
+    )
+    assert humble_page_is_confirmed_library_or_store(
+        "https://www.humblebundle.com/store/wishlist"
+    )
+    assert not humble_page_is_confirmed_library_or_store(
+        "https://auth.humblebundle.com/login?flow=abc"
+    )
+    assert not humble_page_is_confirmed_library_or_store(
+        "https://www.humblebundle.com/login"
+    )
+    assert not humble_page_is_confirmed_library_or_store("")
 
 
 def test_humble_session_status_authenticated() -> None:
@@ -127,6 +146,110 @@ def test_humble_session_status_authenticated() -> None:
     assert not humble_session_status_authenticated({})
     assert humble_session_status_authenticated({"status": "authenticated"})
     assert humble_session_status_authenticated({"authenticated": True})
+
+
+class _FakeResp:
+    def __init__(self, status: int, body: str) -> None:
+        self.status = status
+        self._body = body
+
+    def text(self) -> str:
+        return self._body
+
+
+class _FakeRequest:
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    def get(self, url: str, timeout: int = 0) -> _FakeResp:  # noqa: ARG002
+        return _FakeResp(200, json.dumps(self._payload))
+
+
+class _FakeContext:
+    def __init__(self, status_payload: dict) -> None:
+        self.request = _FakeRequest(status_payload)
+
+    def cookies(self) -> list:
+        return []
+
+
+class _FakePage:
+    def __init__(self, url: str, *, fail_goto: bool = False) -> None:
+        self.url = url
+        self._fail_goto = fail_goto
+        self.goto_calls = 0
+        self.wait_ms: list[int] = []
+
+    def goto(self, url: str, wait_until: str = "", timeout: int = 0) -> None:  # noqa: ARG002
+        self.goto_calls += 1
+        if self._fail_goto:
+            raise RuntimeError("goto failed")
+        self.url = url
+
+    def wait_for_timeout(self, ms: int) -> None:
+        self.wait_ms.append(ms)
+
+
+def test_extract_humble_session_rejects_auth_host_only() -> None:
+    ctx = _FakeContext({"status": "authenticated"})
+    page = _FakePage("https://auth.humblebundle.com/login?flow=abc")
+    # goto would set library URL; force staying on auth by overriding after goto.
+    original_goto = page.goto
+
+    def stay_on_auth(url: str, wait_until: str = "", timeout: int = 0) -> None:  # noqa: ARG002
+        original_goto(url, wait_until=wait_until, timeout=timeout)
+        page.url = "https://auth.humblebundle.com/login?flow=abc"
+
+    page.goto = stay_on_auth  # type: ignore[method-assign]
+    assert extract_humble_session(ctx, page) is None
+
+
+def test_extract_humble_session_accepts_www_library() -> None:
+    ctx = _FakeContext({"status": "authenticated"})
+    page = _FakePage("https://www.humblebundle.com/")
+    creds = extract_humble_session(ctx, page)
+    assert creds == {"HUMBLE_PROFILE": "ready"}
+    assert page.url == HUMBLE_LIBRARY_URL
+    assert page.goto_calls == 1
+    assert any(ms >= 1500 for ms in page.wait_ms)
+
+
+def test_extract_humble_session_rejects_anonymous_after_library() -> None:
+    calls = {"n": 0}
+
+    class FlipRequest:
+        def get(self, url: str, timeout: int = 0) -> _FakeResp:  # noqa: ARG002
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return _FakeResp(200, json.dumps({"status": "authenticated"}))
+            return _FakeResp(200, json.dumps({"status": "anonymous"}))
+
+    class FlipContext:
+        def __init__(self) -> None:
+            self.request = FlipRequest()
+
+        def cookies(self) -> list:
+            return []
+
+    ctx = FlipContext()
+    page = _FakePage("https://www.humblebundle.com/")
+    assert extract_humble_session(ctx, page) is None
+
+
+def test_extract_humble_session_rejects_goto_failure() -> None:
+    ctx = _FakeContext({"status": "authenticated"})
+    page = _FakePage("https://www.humblebundle.com/", fail_goto=True)
+    assert extract_humble_session(ctx, page) is None
+
+
+def test_page_looks_signed_out_url_detection() -> None:
+    assert _page_looks_signed_out(
+        _FakePage("https://auth.humblebundle.com/login?flow=abc")
+    )
+    assert _page_looks_signed_out(_FakePage("https://www.humblebundle.com/login"))
+    assert not _page_looks_signed_out(
+        _FakePage("https://www.humblebundle.com/home/library")
+    )
 
 
 def test_extract_filter_user_library_payload_plain_json() -> None:

@@ -490,7 +490,7 @@ def fetch_library_items(
 
         page.on("response", on_response)
 
-        # Session probe (new auth); fail fast when clearly anonymous.
+        # Soft diagnostic only — cold cookies often look anonymous until library loads.
         try:
             status_resp = ctx.request.get(SESSION_STATUS_URL, timeout=15_000)
             if status_resp.status == 200:
@@ -499,9 +499,11 @@ def fetch_library_items(
                     from auth.connect_extractors import humble_session_status_authenticated
 
                     if not humble_session_status_authenticated(json.loads(body)):
-                        raise RuntimeError("Humble session expired")
-        except RuntimeError:
-            raise
+                        print(
+                            "[humble] session-status anonymous before navigate; "
+                            "continuing to library",
+                            flush=True,
+                        )
         except Exception:  # noqa: BLE001
             pass
 

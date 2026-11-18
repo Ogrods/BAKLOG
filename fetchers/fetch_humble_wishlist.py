@@ -271,7 +271,7 @@ def _discover_wishlist_action_ids(text: str) -> list[str]:
     return out
 
 
-def _discover_wishlist_actions_from_page(page) -> list[str]:
+def _discover_wishlist_actions_from_page(page, request_client=None) -> list[str]:
     try:
         srcs = page.evaluate(
             """() => Array.from(document.querySelectorAll('script[src]'))
@@ -293,10 +293,17 @@ def _discover_wishlist_actions_from_page(page) -> list[str]:
     except Exception:  # noqa: BLE001
         inline = ""
     found.extend(_discover_wishlist_action_ids(inline if isinstance(inline, str) else ""))
-    origin = "https://www.humblebundle.com"
-    api = getattr(page, "request", None) or getattr(getattr(page, "context", None), "request", None)
+    api = request_client
     if api is None:
-        return found
+        # Dedupe what we have from inline scripts only.
+        out: list[str] = []
+        seen: set[str] = set()
+        for aid in found:
+            if aid not in seen:
+                seen.add(aid)
+                out.append(aid)
+        return out
+    origin = "https://www.humblebundle.com"
     for src in srcs:
         if not isinstance(src, str) or "/_next/" not in src:
             continue
@@ -309,8 +316,8 @@ def _discover_wishlist_actions_from_page(page) -> list[str]:
         except Exception:  # noqa: BLE001
             continue
     # Dedupe
-    out: list[str] = []
-    seen: set[str] = set()
+    out = []
+    seen = set()
     for aid in found:
         if aid not in seen:
             seen.add(aid)
@@ -324,7 +331,10 @@ def _looks_like_wishlist_payload(obj: Any) -> bool:
     if isinstance(obj.get("wishlist"), list):
         return True
     results = obj.get("results")
-    if isinstance(results, list) and results:
+    if isinstance(results, list):
+        if not results:
+            # Successful empty redesigned list (do not treat as "no payload").
+            return "pagination" in obj or obj.get("success") is True
         sample = results[0]
         if isinstance(sample, str):
             return True
@@ -334,7 +344,9 @@ def _looks_like_wishlist_payload(obj: Any) -> bool:
         ):
             return True
     products = obj.get("products")
-    if isinstance(products, list) and products:
+    if isinstance(products, list):
+        if not products:
+            return "pagination" in obj or obj.get("success") is True
         return True
     return False
 
@@ -351,6 +363,7 @@ def _extract_wishlist_payload(text: str) -> dict[str, Any] | None:
                 return obj
         except json.JSONDecodeError:
             pass
+    decoder = json.JSONDecoder()
     best: dict[str, Any] | None = None
     best_score = -1
     for key in ("wishlist", "results", "products"):
@@ -358,20 +371,8 @@ def _extract_wishlist_payload(text: str) -> dict[str, Any] | None:
             start = text.rfind("{", 0, m.start())
             if start < 0:
                 continue
-            depth = 0
-            end = None
-            for i, ch in enumerate(text[start:], start):
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        end = i + 1
-                        break
-            if end is None:
-                continue
             try:
-                obj = json.loads(text[start:end])
+                obj, _end = decoder.raw_decode(text, start)
             except json.JSONDecodeError:
                 continue
             if not _looks_like_wishlist_payload(obj):
@@ -458,17 +459,27 @@ def _read_wishlist_state(page) -> dict:
         return {}
 
 
-def _dom_wishlist_rows(page) -> list[dict]:
-    """Scrape product links from the wishlist page as a soft fallback."""
+def _dom_wishlist_capture(page) -> tuple[bool, list[dict]]:
+    """Return ``(ready, rows)`` from a loaded wishlist container only.
+
+    ``ready`` is False while the wishlist root is missing so recommendations /
+    nav store links elsewhere on the page cannot poison capture. An empty but
+    ready container is a successful empty wishlist.
+    """
     raw = page.evaluate(
         """() => {
+          const root =
+            document.querySelector('[data-testid*="wishlist" i]')
+            || document.querySelector('[aria-label*="wishlist" i]')
+            || document.querySelector('#wishlist, .wishlist, [class*="wishlist" i]');
+          if (!root) return JSON.stringify({ ready: false, rows: [] });
           const skip = new Set([
             'wishlist','cart','search','keys','home','about','support',
             'login','logout','settings','wallet','coupons','choice','monthly'
           ]);
           const out = [];
           const seen = new Set();
-          for (const a of document.querySelectorAll('a[href*="/store/"]')) {
+          for (const a of root.querySelectorAll('a[href*="/store/"]')) {
             const href = a.getAttribute('href') || '';
             const m = href.match(/\\/store\\/([^/?#]+)/);
             if (!m) continue;
@@ -485,15 +496,18 @@ def _dom_wishlist_rows(page) -> list[dict]:
               href: href.startsWith('http') ? href : ('https://www.humblebundle.com' + href),
             });
           }
-          return JSON.stringify(out);
+          return JSON.stringify({ ready: true, rows: out });
         }""",
         timeout=20,
     )
     try:
-        rows = json.loads(raw) if isinstance(raw, str) else raw
+        payload = json.loads(raw) if isinstance(raw, str) else raw
     except (json.JSONDecodeError, TypeError):
-        return []
-    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+        return False, []
+    if not isinstance(payload, dict) or not payload.get("ready"):
+        return False, []
+    rows = payload.get("rows")
+    return True, ([r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else [])
 
 
 def _lookup_products(page, slugs: list[str]) -> list[dict]:
@@ -531,6 +545,44 @@ def _items_need_lookup(items: list[WishlistItem]) -> bool:
     if not items:
         return False
     return any(not it.price or not it.image_url or it.title == it.product_id for it in items)
+
+
+def _merge_lookup_into_items(
+    row_items: list[WishlistItem],
+    looked_up: list[WishlistItem],
+) -> list[WishlistItem]:
+    """Enrich captured rows with lookup data; keep rows lookup did not return."""
+    by_id = {it.product_id: it for it in looked_up}
+    merged: list[WishlistItem] = []
+    seen: set[str] = set()
+    for row in row_items:
+        rich = by_id.pop(row.product_id, None)
+        seen.add(row.product_id)
+        if rich is None:
+            merged.append(row)
+            continue
+        merged.append(
+            WishlistItem(
+                product_id=row.product_id,
+                title=rich.title or row.title,
+                image_url=rich.image_url or row.image_url,
+                store_url=rich.store_url or row.store_url,
+                price=rich.price if rich.price is not None else row.price,
+                price_initial=(
+                    rich.price_initial if rich.price_initial is not None else row.price_initial
+                ),
+                discount_percent=(
+                    rich.discount_percent
+                    if rich.discount_percent is not None
+                    else row.discount_percent
+                ),
+                currency=rich.currency or row.currency,
+            )
+        )
+    for leftover in by_id.values():
+        if leftover.product_id not in seen:
+            merged.append(leftover)
+    return merged
 
 
 def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
@@ -609,12 +661,13 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
             pass
 
         page.goto(WISHLIST_URL, wait_until="domcontentloaded", timeout=60_000)
-        for aid in _discover_wishlist_actions_from_page(page):
+        for aid in _discover_wishlist_actions_from_page(page, request_client=ctx.request):
             known_actions.add(aid)
             print(f"[humble] wishlist action id discovered: {aid[:12]}…", flush=True)
 
         slugs: list[str] | None = None
         row_items: list[WishlistItem] = []
+        list_resolved = False
         unavailable = False
         deadline = time.time() + _CLEARANCE_WAIT_SEC
         while time.time() < deadline:
@@ -628,25 +681,29 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
                 return [], True
             if state.get("state") == "ok":
                 slugs = [s for s in (state.get("wishlist") or []) if isinstance(s, str)]
+                list_resolved = True
                 break
             if captured_payloads:
                 payload = captured_payloads[-1]
                 slugs = _slugs_from_payload(payload)
+                row_items = []
                 for raw in _rows_from_payload(payload):
                     item = _item_from_wishlist_row(raw)
                     if item:
                         row_items.append(item)
-                if slugs or row_items:
-                    break
-            dom_rows = _dom_wishlist_rows(page)
-            if dom_rows:
+                # Empty redesigned envelope counts as resolved (not auth failure).
+                list_resolved = True
+                break
+            dom_ready, dom_rows = _dom_wishlist_capture(page)
+            if dom_ready:
+                row_items = []
                 for raw in dom_rows:
                     item = _item_from_wishlist_row(raw)
                     if item:
                         row_items.append(item)
                 slugs = [r["machine_name"] for r in dom_rows if r.get("machine_name")]
-                if slugs:
-                    break
+                list_resolved = True
+                break
             page.wait_for_timeout(1000)
 
         if unavailable:
@@ -674,12 +731,12 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
                 "Library sync is unaffected; retry wishlist after Humble restores it."
             )
 
-        if slugs is None and not row_items:
+        if not list_resolved and slugs is None and not row_items:
             if _page_looks_signed_out(page):
                 return [], True
             raise RuntimeError(
                 "Humble wishlist did not expose a list payload "
-                "(no user_json, no Next action results, no store product DOM rows)."
+                "(no user_json, no Next action results, no wishlist DOM rows)."
             )
 
         # Prefer rich row items; enrich via lookup when prices/images are missing.
@@ -687,10 +744,14 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
         if row_items and not _items_need_lookup(row_items):
             items = row_items
         else:
-            lookup_slugs = slugs or [it.product_id for it in row_items]
+            lookup_slugs = slugs if slugs is not None else [it.product_id for it in row_items]
             lookup_results = _lookup_products(page, lookup_slugs) if lookup_slugs else []
             looked_up = [it for it in (_item_from_lookup(o) for o in lookup_results) if it]
-            items = looked_up if looked_up else row_items
+            if row_items:
+                items = _merge_lookup_into_items(row_items, looked_up)
+            else:
+                # Legacy slug-only path: lookup is the sole source of rows.
+                items = looked_up
 
         if dump:
             dump_json().parent.mkdir(parents=True, exist_ok=True)

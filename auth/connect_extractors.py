@@ -11,7 +11,11 @@ from typing import Any
 from auth.url_hosts import cookie_domain_matches, host_matches
 
 HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
+# Legacy orders API (404 after the Nov 2026 redesign); kept for fallback probes.
 HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
+HUMBLE_SESSION_STATUS_URL = "https://www.humblebundle.com/api/auth/session-status"
+# Matches library + store after sign-in, and the Ory login host during Connect.
+HUMBLE_SUCCESS_URL_PATTERN = r"(humblebundle\.com/(home|store)|auth\.humblebundle\.com)"
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
 # Per-message-key dedupe interval kept for tests that monkeypatch these.
@@ -52,7 +56,36 @@ def _cookie_header(cookies: list[dict], domains: tuple[str, ...]) -> str:
     return "; ".join(parts)
 
 
+def humble_session_status_authenticated(payload: Any) -> bool:
+    """True when /api/auth/session-status reports a signed-in Humble session."""
+    if not isinstance(payload, dict):
+        return False
+    status = str(payload.get("status") or "").strip().lower()
+    if status and status not in ("anonymous", "unauthenticated", "signed_out", "none"):
+        return True
+    if payload.get("authenticated") is True:
+        return True
+    if payload.get("is_logged_in") is True:
+        return True
+    return False
+
+
 def _humble_has_session(context: Any) -> bool:
+    # Post-redesign: Ory session via session-status (orders API is gone / 404).
+    try:
+        resp = context.request.get(HUMBLE_SESSION_STATUS_URL, timeout=15_000)
+        if resp.status == 200:
+            body = (resp.text() or "").strip()
+            if body.startswith("{"):
+                try:
+                    return humble_session_status_authenticated(json.loads(body))
+                except json.JSONDecodeError:
+                    pass
+        if resp.status in (401, 403):
+            return False
+    except Exception:  # noqa: BLE001
+        pass
+    # Legacy fallback if Humble restores the orders JSON API.
     try:
         resp = context.request.get(HUMBLE_ORDERS_API, timeout=15_000)
         if resp.status == 200:

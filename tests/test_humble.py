@@ -2,11 +2,21 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
+from auth.connect_extractors import (
+    HUMBLE_LIBRARY_URL,
+    HUMBLE_SUCCESS_URL_PATTERN,
+    humble_session_status_authenticated,
+)
 from fetchers.fetch_humble import (
+    FILTER_USER_LIBRARY_ACTION,
+    LIBRARY_URL,
     LibraryItem,
     _build_row,
+    _extract_filter_user_library_payload,
+    _item_from_library_result,
     _parse_order_detail,
     _subproduct_is_game,
 )
@@ -20,6 +30,9 @@ from fetchers.fetch_humble_wishlist import (
 
 ORDER_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_order_detail.json"
 LOOKUP_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_lookup.json"
+LIBRARY_FILTER_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "humble_library_filter_page.json"
+)
 
 
 def test_subproduct_is_game_heuristics() -> None:
@@ -83,6 +96,59 @@ def test_item_from_lookup_requires_title_and_machine() -> None:
     assert _item_from_lookup({}) is None
     assert _item_from_lookup({"machine_name": "x"}) is None
     assert _item_from_lookup({"human_name": "X"}) is None
+
+
+def test_humble_library_landing_constants() -> None:
+    assert LIBRARY_URL == HUMBLE_LIBRARY_URL == "https://www.humblebundle.com/home/library"
+    assert FILTER_USER_LIBRARY_ACTION
+    pat = re.compile(HUMBLE_SUCCESS_URL_PATTERN)
+    assert pat.search("https://www.humblebundle.com/home/library")
+    assert pat.search("https://auth.humblebundle.com/login?flow=abc")
+    assert pat.search("https://www.humblebundle.com/store/wishlist")
+
+
+def test_humble_session_status_authenticated() -> None:
+    assert not humble_session_status_authenticated({"status": "anonymous"})
+    assert not humble_session_status_authenticated({})
+    assert humble_session_status_authenticated({"status": "authenticated"})
+    assert humble_session_status_authenticated({"authenticated": True})
+
+
+def test_extract_filter_user_library_payload_plain_json() -> None:
+    data = json.loads(LIBRARY_FILTER_FIXTURE.read_text(encoding="utf-8"))
+    extracted = _extract_filter_user_library_payload(json.dumps(data))
+    assert extracted is not None
+    assert len(extracted["results"]) == 3
+    assert extracted["pagination"]["totalPages"] == 2
+
+
+def test_extract_filter_user_library_payload_flight_embedded() -> None:
+    data = json.loads(LIBRARY_FILTER_FIXTURE.read_text(encoding="utf-8"))
+    flight = f'0:["$@1"]\n1:{json.dumps(data)}'
+    extracted = _extract_filter_user_library_payload(flight)
+    assert extracted is not None
+    assert extracted["results"][0]["title"] == "Celeste"
+
+
+def test_item_from_library_result_games_only() -> None:
+    data = json.loads(LIBRARY_FILTER_FIXTURE.read_text(encoding="utf-8"))
+    items = [
+        it
+        for it in (
+            _item_from_library_result(row, include_nongames=False)
+            for row in data["results"]
+        )
+        if it
+    ]
+    names = {it.name for it in items}
+    assert "Celeste" in names
+    assert "Hollow Knight" in names
+    assert "Sample Ebook Only" not in names
+    from urllib.parse import urlparse
+
+    celeste = next(it for it in items if it.name == "Celeste")
+    assert celeste.steam_app_id == "504230"
+    assert urlparse(celeste.store_url).hostname == "store.steampowered.com"
 
 
 def test_build_wishlist_row_schema() -> None:

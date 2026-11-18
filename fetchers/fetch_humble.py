@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Fetch Humble Bundle library into games_humble.json.
 
-Uses the saved Humble browser profile (Connections -> Humble Bundle) and the
-documented Humble API:
-  GET /api/v1/user/order
-  GET /api/v1/order/{gamekey}?all_tpkds=true
+Uses the saved Humble browser profile (Connections -> Humble Bundle).
+
+After Humble's Nov 2026 redesign the legacy JSON endpoints
+(``/api/v1/user/order``, ``/api/v1/order/{gamekey}``) return 404. The site
+library at ``/home/library`` loads via a Next.js server action
+(``filterUserLibrary``). This fetcher drives that page in a headed off-screen
+Chrome (same Cloudflare approach as the Humble wishlist fetcher), captures
+action payloads and/or DOM rows, and paginates until exhausted.
 
 Emits games-only rows by default (drops ebooks, comics, audiobooks, software).
 """
@@ -20,7 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from dotenv import load_dotenv
 
@@ -44,12 +48,28 @@ from fetchers._base import (
 from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_with_heartbeat, started
 
 GAMES_HUMBLE_JSON = Path("games_humble.json")
+LIBRARY_URL = "https://www.humblebundle.com/home/library"
+# Next.js server action id for filterUserLibrary (from /home/library client bundle).
+FILTER_USER_LIBRARY_ACTION = "60199147c9d010842d98602b018a506278c5317f8e"
+# Legacy endpoints (kept for dump/fallback; redesign returns 404 HTML).
 ORDERS_URL = "https://www.humblebundle.com/api/v1/user/order"
 ORDER_DETAIL_URL = "https://www.humblebundle.com/api/v1/order/{gamekey}?all_tpkds=true"
+SESSION_STATUS_URL = "https://www.humblebundle.com/api/auth/session-status"
+
+# Headed but off-screen: same real-browser fingerprint as Connect / wishlist.
+_LIB_WINDOW_POS = (-32000, 0)
+_LIB_WINDOW_SIZE = (1280, 900)
+_CLEARANCE_WAIT_SEC = 45
+_PAGE_LIMIT = 5
+_PAGE_DELAY_SEC = 0.6
+
+
 def dump_path() -> Path:
     from shared.profile_paths import profile_cache_dir
 
     return profile_cache_dir() / "humble" / "library_dump.json"
+
+
 HLTB_DELAY_SEC = 1.0
 ORDER_DELAY_SEC = 0.35
 
@@ -58,6 +78,9 @@ _GAME_KEY_TYPES = frozenset({
     "steam", "origin", "uplay", "ubisoft", "epic", "gog", "battlenet", "external",
 })
 _NONGAME_KEY_TYPES = frozenset({
+    "ebook", "audiobook", "comic", "software", "soundtrack", "asmjs", "video",
+})
+_NONGAME_PRODUCT_TYPES = frozenset({
     "ebook", "audiobook", "comic", "software", "soundtrack", "asmjs", "video",
 })
 
@@ -71,18 +94,6 @@ class LibraryItem:
     gamekey: str
     redeemed: bool | None
     steam_app_id: str | None
-
-
-def _launch_humble_ctx(*, headless: bool = True):
-    from auth.cdp_browser import launch_persistent_profile
-
-    profile = profile_dir("humble")
-    if not profile.exists():
-        raise RuntimeError(
-            "No saved Humble profile at cache/auth/profiles/humble. "
-            "Open the Connections page and connect Humble Bundle first."
-        )
-    return launch_persistent_profile(str(profile), headless=headless)
 
 
 def _api_get(ctx, url: str, *, timeout_ms: int = 45_000) -> Any:
@@ -202,40 +213,316 @@ def _parse_order_detail(data: dict, *, include_nongames: bool) -> list[LibraryIt
     return items
 
 
+def _extract_filter_user_library_payload(text: str) -> dict[str, Any] | None:
+    """Pull ``{results, pagination, success}`` out of a Next.js action / RSC body."""
+    if not text:
+        return None
+    stripped = text.strip()
+    if stripped.startswith("{") and '"results"' in stripped:
+        try:
+            obj = json.loads(stripped)
+            if isinstance(obj, dict) and isinstance(obj.get("results"), list):
+                return obj
+        except json.JSONDecodeError:
+            pass
+    # Flight / RSC bodies embed JSON objects; take the richest results blob.
+    best: dict[str, Any] | None = None
+    for m in re.finditer(r"\"results\"\s*:\s*\[", text):
+        start = text.rfind("{", 0, m.start())
+        if start < 0:
+            continue
+        depth = 0
+        end = None
+        for i, ch in enumerate(text[start:], start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        if end is None:
+            continue
+        try:
+            obj = json.loads(text[start:end])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("results"), list):
+            if best is None or len(obj["results"]) >= len(best.get("results") or []):
+                best = obj
+    return best
+
+
+def _library_result_is_game(obj: dict) -> bool:
+    product_type = str(obj.get("productType") or obj.get("type") or "").strip().lower()
+    if product_type in _NONGAME_PRODUCT_TYPES:
+        return False
+    title = str(obj.get("title") or obj.get("human_name") or "").lower()
+    if any(tok in title for tok in ("soundtrack only", "ebook", "audiobook", "comic book")):
+        return False
+    return True
+
+
+def _steam_app_from_library_result(obj: dict) -> str | None:
+    ents = obj.get("entitlements") if isinstance(obj.get("entitlements"), dict) else {}
+    for key in ("keys", "downloads"):
+        for ent in ents.get(key) or []:
+            if not isinstance(ent, dict):
+                continue
+            for field in ("steam_app_id", "steam_appid", "steamAppId"):
+                val = ent.get(field)
+                if val is not None and str(val).strip():
+                    return str(val).strip()
+    return None
+
+
+def _item_from_library_result(obj: dict, *, include_nongames: bool) -> LibraryItem | None:
+    """Map one filterUserLibrary / DOM row into a LibraryItem."""
+    if not isinstance(obj, dict):
+        return None
+    if not include_nongames and not _library_result_is_game(obj):
+        return None
+    ent_id = str(
+        obj.get("productEntitlementId")
+        or obj.get("id")
+        or obj.get("machine_name")
+        or ""
+    ).strip()
+    name = str(obj.get("title") or obj.get("human_name") or ent_id or "").strip()
+    if not ent_id and not name:
+        return None
+    machine = ent_id or name
+    image = None
+    for key in ("image", "icon", "header_image", "library_image", "cover"):
+        val = obj.get(key)
+        if isinstance(val, str) and val.startswith("http"):
+            image = val
+            break
+    steam_id = _steam_app_from_library_result(obj)
+    methods = obj.get("deliveryMethods") or []
+    redeemed = obj.get("redeemed") if isinstance(obj.get("redeemed"), bool) else None
+    if redeemed is None and isinstance(methods, list) and "steam" in [str(m).lower() for m in methods]:
+        # List UI no longer exposes redeemed clearly; leave unknown.
+        redeemed = None
+    store_url = _store_url(machine, steam_id)
+    if not steam_id and ent_id:
+        store_url = f"https://www.humblebundle.com/home/library/{quote(ent_id, safe='')}"
+    gamekey = str(obj.get("orderId") or obj.get("gamekey") or ent_id or "")
+    return LibraryItem(
+        machine_name=machine,
+        name=name or machine,
+        image_url=image,
+        store_url=store_url,
+        gamekey=gamekey,
+        redeemed=redeemed,
+        steam_app_id=steam_id,
+    )
+
+
+def _dom_library_rows(page) -> list[dict]:
+    raw = page.evaluate(
+        """() => {
+          const out = [];
+          const seen = new Set();
+          for (const a of document.querySelectorAll('a[href*="/home/library/"]')) {
+            const href = a.getAttribute('href') || '';
+            const m = href.match(/\\/home\\/library\\/(?!content\\/|group\\/)([^/?#]+)/);
+            if (!m) continue;
+            const id = decodeURIComponent(m[1]);
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            const title = (a.getAttribute('title') || a.textContent || '').replace(/\\s+/g, ' ').trim();
+            out.push({ id, productEntitlementId: id, title, href });
+          }
+          return JSON.stringify(out);
+        }""",
+        timeout=20,
+    )
+    try:
+        rows = json.loads(raw) if isinstance(raw, str) else raw
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def _page_looks_signed_out(page) -> bool:
+    raw = getattr(page, "url", None) or ""
+    try:
+        parsed = urlparse(raw)
+    except Exception:  # noqa: BLE001
+        return False
+    host = (parsed.hostname or "").lower()
+    path = (parsed.path or "").lower()
+    if host == "auth.humblebundle.com":
+        return True
+    if path.rstrip("/").endswith("/login") or "/login" in path.split("/"):
+        return True
+    return False
+
+
 def fetch_library_items(
     *,
     include_nongames: bool = False,
     dump: bool = False,
 ) -> list[LibraryItem]:
-    """Fetch all library items using the saved Humble profile."""
-    with _launch_humble_ctx(headless=True) as ctx:
-        try:
-            orders_raw = _api_get(ctx, ORDERS_URL)
-        except Exception as exc:  # noqa: BLE001
-            if _signed_out(exc):
-                raise RuntimeError("Humble session expired") from exc
-            raise
+    """Fetch all library items using the saved Humble profile (redesign UI path)."""
+    from auth.cdp_browser import STEALTH_INIT_SCRIPT, close_browser_bounded, launch_persistent_profile
 
-        if not isinstance(orders_raw, list):
-            raise RuntimeError("Unexpected Humble orders API response (expected a list)")
+    profile = profile_dir("humble")
+    if not profile.exists():
+        raise RuntimeError(
+            "No saved Humble profile at cache/auth/profiles/humble. "
+            "Open the Connections page and connect Humble Bundle first."
+        )
+
+    captured_payloads: list[dict[str, Any]] = []
+    dump_samples: list[dict[str, Any]] = []
+
+    ctx = launch_persistent_profile(
+        str(profile),
+        headless=False,
+        window_position=_LIB_WINDOW_POS,
+        window_size=_LIB_WINDOW_SIZE,
+    )
+    try:
+        ctx.add_init_script(STEALTH_INIT_SCRIPT)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+
+        def on_response(resp) -> None:
+            try:
+                req = getattr(resp, "request", None)
+                headers = {k.lower(): v for k, v in (getattr(req, "headers", None) or {}).items()}
+                action = headers.get("next-action") or ""
+                url = (getattr(resp, "url", None) or "").lower()
+                if action != FILTER_USER_LIBRARY_ACTION and "home/library" not in url:
+                    return
+                if action and action != FILTER_USER_LIBRARY_ACTION:
+                    return
+                if int(getattr(resp, "status", 0) or 0) != 200:
+                    return
+                text = resp.text()
+                payload = _extract_filter_user_library_payload(text)
+                if payload:
+                    captured_payloads.append(payload)
+                    if dump:
+                        dump_samples.append({"url": getattr(resp, "url", ""), "payload": payload})
+            except Exception:  # noqa: BLE001
+                pass
+
+        page.on("response", on_response)
+
+        # Session probe (new auth); fail fast when clearly anonymous.
+        try:
+            status_resp = ctx.request.get(SESSION_STATUS_URL, timeout=15_000)
+            if status_resp.status == 200:
+                body = (status_resp.text() or "").strip()
+                if body.startswith("{"):
+                    from auth.connect_extractors import humble_session_status_authenticated
+
+                    if not humble_session_status_authenticated(json.loads(body)):
+                        raise RuntimeError("Humble session expired")
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001
+            pass
+
+        page.goto(LIBRARY_URL, wait_until="domcontentloaded", timeout=60_000)
+        deadline = time.time() + _CLEARANCE_WAIT_SEC
+        while time.time() < deadline:
+            if _page_looks_signed_out(page):
+                raise RuntimeError("Humble session expired")
+            if captured_payloads or _dom_library_rows(page):
+                break
+            page.wait_for_timeout(1000)
+
+        if _page_looks_signed_out(page):
+            raise RuntimeError("Humble session expired")
+
+        found: dict[str, LibraryItem] = {}
+        page_num = 1
+        total_pages = 1
+        empty_streak = 0
+
+        while page_num <= max(total_pages, page_num) and page_num <= 500:
+            if page_num > 1:
+                target = f"{LIBRARY_URL}?page={page_num}"
+                print(f"[library page {page_num}] {target}", flush=True)
+                before = len(captured_payloads)
+                page.goto(target, wait_until="domcontentloaded", timeout=60_000)
+                wait_deadline = time.time() + 15
+                while time.time() < wait_deadline and len(captured_payloads) == before:
+                    if _page_looks_signed_out(page):
+                        raise RuntimeError("Humble session expired")
+                    page.wait_for_timeout(500)
+
+            page_items: list[LibraryItem] = []
+            # Prefer the newest matching action payload for this page.
+            for payload in reversed(captured_payloads):
+                pag = payload.get("pagination") if isinstance(payload.get("pagination"), dict) else {}
+                payload_page = int(pag.get("page") or 0) or page_num
+                if payload_page not in (0, page_num):
+                    continue
+                total_pages = max(total_pages, int(pag.get("totalPages") or total_pages) or 1)
+                for raw in payload.get("results") or []:
+                    item = _item_from_library_result(raw, include_nongames=include_nongames)
+                    if item:
+                        page_items.append(item)
+                if page_items:
+                    break
+
+            if not page_items:
+                for raw in _dom_library_rows(page):
+                    item = _item_from_library_result(raw, include_nongames=include_nongames)
+                    if item:
+                        page_items.append(item)
+
+            new_count = 0
+            for item in page_items:
+                if item.machine_name not in found:
+                    found[item.machine_name] = item
+                    new_count += 1
+
+            print(
+                f"  page {page_num}: {len(page_items)} rows ({new_count} new), "
+                f"totalPages~{total_pages}",
+                flush=True,
+            )
+
+            if not page_items:
+                empty_streak += 1
+                if empty_streak >= 2:
+                    break
+            else:
+                empty_streak = 0
+
+            if page_num >= total_pages and total_pages > 1:
+                break
+            # If pagination metadata never arrived, stop when a page adds nothing.
+            if total_pages == 1 and page_num > 1 and new_count == 0:
+                break
+            if total_pages == 1 and page_num == 1 and page_items:
+                # Try page 2 once to discover whether more pages exist.
+                total_pages = 2
+            page_num += 1
+            time.sleep(_PAGE_DELAY_SEC)
 
         if dump:
             dump_path().parent.mkdir(parents=True, exist_ok=True)
-            sample: list[dict] = []
-            for entry in orders_raw[:3]:
-                if not isinstance(entry, dict):
-                    continue
-                gk = entry.get("gamekey")
-                if not gk:
-                    continue
-                try:
-                    detail = _api_get(ctx, ORDER_DETAIL_URL.format(gamekey=gk))
-                    sample.append({"gamekey": gk, "detail": detail})
-                except Exception as err:  # noqa: BLE001
-                    sample.append({"gamekey": gk, "error": str(err)})
             dump_path().write_text(
                 json.dumps(
-                    {"order_count": len(orders_raw), "sample_orders": sample},
+                    {
+                        "payload_count": len(captured_payloads),
+                        "samples": dump_samples[:5] or captured_payloads[:3],
+                        "item_count": len(found),
+                        "items": [
+                            {
+                                "machine_name": it.machine_name,
+                                "name": it.name,
+                                "store_url": it.store_url,
+                            }
+                            for it in list(found.values())[:20]
+                        ],
+                    },
                     indent=2,
                     default=str,
                     ensure_ascii=False,
@@ -245,25 +532,37 @@ def fetch_library_items(
             print(f"  wrote {dump_path()}", flush=True)
             return []
 
-        found: dict[str, LibraryItem] = {}
-        for i, entry in enumerate(orders_raw, 1):
-            if not isinstance(entry, dict):
-                continue
-            gamekey = entry.get("gamekey")
-            if not gamekey:
-                continue
-            print(f"[order {i}/{len(orders_raw)}] {gamekey}", flush=True)
+        if not found:
+            # Last resort: legacy orders API if Humble restores it.
             try:
-                detail = _api_get(ctx, ORDER_DETAIL_URL.format(gamekey=gamekey))
+                orders_raw = _api_get(ctx, ORDERS_URL)
             except Exception as exc:  # noqa: BLE001
-                print(f"  skip order {gamekey}: {exc}", flush=True)
-                time.sleep(ORDER_DELAY_SEC)
-                continue
-            for item in _parse_order_detail(detail, include_nongames=include_nongames):
-                found[item.machine_name] = item
-            time.sleep(ORDER_DELAY_SEC)
+                if _signed_out(exc):
+                    raise RuntimeError("Humble session expired") from exc
+                raise RuntimeError(
+                    "Humble library page returned no items (redesign UI empty or blocked)"
+                ) from exc
+            if isinstance(orders_raw, list) and orders_raw:
+                for i, entry in enumerate(orders_raw, 1):
+                    if not isinstance(entry, dict):
+                        continue
+                    gamekey = entry.get("gamekey")
+                    if not gamekey:
+                        continue
+                    print(f"[legacy order {i}/{len(orders_raw)}] {gamekey}", flush=True)
+                    try:
+                        detail = _api_get(ctx, ORDER_DETAIL_URL.format(gamekey=gamekey))
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"  skip order {gamekey}: {exc}", flush=True)
+                        time.sleep(ORDER_DELAY_SEC)
+                        continue
+                    for item in _parse_order_detail(detail, include_nongames=include_nongames):
+                        found[item.machine_name] = item
+                    time.sleep(ORDER_DELAY_SEC)
 
         return sorted(found.values(), key=lambda x: x.name.lower())
+    finally:
+        close_browser_bounded(ctx)
 
 
 def _build_row(item: LibraryItem, hltb: dict | None) -> dict:
@@ -345,11 +644,11 @@ def main() -> int:
     stats = RunStats()
     load_dotenv()
 
-    print("Fetching Humble library via API...", flush=True)
+    print("Fetching Humble library via /home/library...", flush=True)
     try:
         items = run_with_heartbeat(
             lambda: fetch_library_items(include_nongames=args.include_nongames, dump=args.dump),
-            "Humble library API",
+            "Humble library page",
         )
     except Exception as exc:  # noqa: BLE001
         msg = str(exc)

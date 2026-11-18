@@ -37,6 +37,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Humble Connect and library sync work with Humble's redesigned site (session check + `/home/library` list) after the old orders API stopped responding
+
 ## [0.9.15] - 2026-11-17
 
 ### Fixed

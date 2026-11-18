@@ -381,7 +381,9 @@ PROVIDERS: dict[str, ProviderSpec] = {
         description="Your Humble library (purchases and keys) and Humble Store wishlist.",
         env_keys=("HUMBLE_PROFILE",),
         login_url="https://www.humblebundle.com/home/library",
-        success_url_pattern=r"humblebundle\.com/(home|store)",
+        success_url_pattern=(
+            r"(humblebundle\.com/(home|store)|auth\.humblebundle\.com)"
+        ),
         expiry_days=30,
         fetcher_keys=("humble", "wishlistHumble"),
         tips=(

@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.21] - 2026-11-18
+
 ### Fixed
 
 - Humble Connect waits for a real saved login cookie before finishing, so library refresh can use the session after the window closes

@@ -37,11 +37,33 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.22] - 2026-11-18
+
 ### Fixed
 
-- Humble Connect no longer reloads the library in a loop while you are still signing in
-- After Humble library loads, Connect retries a couple of quiet refreshes to save the login cookie instead of hanging
-- Humble Connect recognizes Humble's newer `ory_session_…` login cookies (not only `ory_kratos_session`)
+- Humble Connect after Humble's site/auth redesign: stays signed in, waits for a real login cookie (including newer `ory_session_…` cookies), stops login-page flash/reload loops, and cold-checks the profile before auto-fetch
+- Humble library sync path updated for the redesigned site (Cloudflare wait, session keep); library refresh can still fail on some machines - dig-in continues
+- Humble wishlist: redesign-aware capture; empty wishlist no longer marks login expired; WL Humble chip stays visible but paused while Humble has wishlist offline
+- Free/ITAD auto-refresh cooldowns stamp when a run starts and back off briefly after a failed/cancelled auto run
+- Library/wishlist tables no longer jump to the top after refresh, remove, or bulk edit; status alerts use corner toasts instead of full-width banners
+- Spotlight: smoother fades, fewer mid-swap flashes, title click opens the right game, autoplay stays on unless you Pause
+- Wishlist hide/note no longer affects the owned-library copy of the same title (and the reverse)
+- After sign-in, Pro background store refresh uses your account library instead of a leftover empty Default profile
+- Store chips and session-expired banners open the matching Connections card; failed chips stay red until a real reconnect or successful refresh
+- GOG/Steam wishlist failures no longer replace titles with placeholder ids; overlapping library reloads are less likely to flash empty
+- EA Connect returns sooner with clearer progress; headed Connect is less noisy about "Server unreachable"
+- Steals "view all" matches the Steals card rules; unsafe spotlight/claim/deal/update links are ignored
+- Uninstall wipe-data reports failure if cleanup did not finish; portable wipe leaves app binaries in place
+- PSN fetch shows progress sooner; itch retries once on temporary 429/5xx; store HTTP errors no longer dump raw HTML into logs
+- Privacy pages document Pro Cloud sync, analytics cookies, optional bug-report contact fields, and Clear cloud library
+
+### Changed
+
+- Pro Cloud sync / mirror viewer polish, Clear cloud library, Import Replace vs Merge
+- Opt-in deal alerts (wishlist price drops + free games) with tray snooze
+- Buy Pro in-app (Polar); Windows code-signing / publisher name
+- ITAD prices across connected wishlists, not only Steam
+- Landing copy: deal and watchlist alerts described as live (opt-in)
 
 ## [0.9.21] - 2026-11-18
 

@@ -29,6 +29,7 @@ from fetchers.fetch_humble_wishlist import (
     _item_from_lookup,
     _item_from_wishlist_row,
     _looks_like_wishlist_payload,
+    _merge_lookup_into_items,
     _slugs_from_payload,
     text_shows_wishlist_unavailable,
 )
@@ -234,5 +235,48 @@ def test_discover_wishlist_action_ids() -> None:
     ids = _discover_wishlist_action_ids(snippet)
     assert "60aabbccddeeff00112233445566778899aabbccdd" in ids
     assert _discover_wishlist_action_ids("nope") == []
+
+
+def test_empty_wishlist_results_envelope_is_valid() -> None:
+    empty = {"results": [], "pagination": {"page": 1, "totalPages": 0}, "success": True}
+    assert _looks_like_wishlist_payload(empty)
+    assert _extract_wishlist_payload(json.dumps(empty)) == empty
+    assert not _looks_like_wishlist_payload({"results": []})
+
+
+def test_extract_wishlist_payload_handles_braces_in_titles() -> None:
+    data = {
+        "results": [{"machine_name": "weird", "human_name": "Game } Edition", "title": "Game } Edition"}],
+        "success": True,
+    }
+    flight = f'0:["$@1"]\n1:{json.dumps(data)}'
+    extracted = _extract_wishlist_payload(flight)
+    assert extracted is not None
+    assert extracted["results"][0]["human_name"] == "Game } Edition"
+
+
+def test_merge_lookup_keeps_rows_missing_from_partial_lookup() -> None:
+    rows = [
+        WishlistItem("a", "A", None, "https://www.humblebundle.com/store/a", None, None, None, None),
+        WishlistItem("b", "B", None, "https://www.humblebundle.com/store/b", None, None, None, None),
+    ]
+    looked = [
+        WishlistItem(
+            "a",
+            "A",
+            "https://img/a.jpg",
+            "https://www.humblebundle.com/store/a",
+            "$1.00",
+            "$2.00",
+            50,
+            "USD",
+        ),
+    ]
+    merged = _merge_lookup_into_items(rows, looked)
+    by_id = {it.product_id: it for it in merged}
+    assert set(by_id) == {"a", "b"}
+    assert by_id["a"].price == "$1.00"
+    assert by_id["a"].image_url == "https://img/a.jpg"
+    assert by_id["b"].title == "B"
 
 

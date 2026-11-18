@@ -238,7 +238,7 @@ def _discover_filter_user_library_action(text: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _discover_filter_user_library_action_from_page(page) -> str | None:
+def _discover_filter_user_library_action_from_page(page, request_client=None) -> str | None:
     """Scrape linked /home/library chunks for the live filterUserLibrary action id."""
     try:
         srcs = page.evaluate(
@@ -263,6 +263,9 @@ def _discover_filter_user_library_action_from_page(page) -> str | None:
     found = _discover_filter_user_library_action(inline if isinstance(inline, str) else "")
     if found:
         return found
+    api = request_client
+    if api is None:
+        return None
     origin = "https://www.humblebundle.com"
     for src in srcs:
         if not isinstance(src, str) or not src:
@@ -271,9 +274,6 @@ def _discover_filter_user_library_action_from_page(page) -> str | None:
         if "/_next/" not in url:
             continue
         try:
-            api = getattr(page, "request", None) or getattr(getattr(page, "context", None), "request", None)
-            if api is None:
-                break
             resp = api.get(url, timeout=20_000)
             if int(getattr(resp, "status", 0) or 0) != 200:
                 continue
@@ -298,25 +298,14 @@ def _extract_filter_user_library_payload(text: str) -> dict[str, Any] | None:
         except json.JSONDecodeError:
             pass
     # Flight / RSC bodies embed JSON objects; take the richest results blob.
+    decoder = json.JSONDecoder()
     best: dict[str, Any] | None = None
     for m in re.finditer(r"\"results\"\s*:\s*\[", text):
         start = text.rfind("{", 0, m.start())
         if start < 0:
             continue
-        depth = 0
-        end = None
-        for i, ch in enumerate(text[start:], start):
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-        if end is None:
-            continue
         try:
-            obj = json.loads(text[start:end])
+            obj, _end = decoder.raw_decode(text, start)
         except json.JSONDecodeError:
             continue
         if _looks_like_filter_user_library_payload(obj):
@@ -517,7 +506,7 @@ def fetch_library_items(
             pass
 
         page.goto(LIBRARY_URL, wait_until="domcontentloaded", timeout=60_000)
-        discovered = _discover_filter_user_library_action_from_page(page)
+        discovered = _discover_filter_user_library_action_from_page(page, request_client=ctx.request)
         if discovered:
             known_actions.add(discovered)
             if discovered != FILTER_USER_LIBRARY_ACTION:

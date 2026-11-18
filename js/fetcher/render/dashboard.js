@@ -67,6 +67,7 @@ export function renderDashboardFetcherHealth() {
   const staleRows = rows.filter(r => r.status === 'stale');
   const missingRows = rows.filter(r => r.status === 'missing');
   const runnableStale = rows.filter(r => {
+    if ((r.src.pausedReason || '').trim()) return false;
     if (r.status !== 'stale' && r.status !== 'missing') return false;
     if (r.src.missingRequirements?.length && !fetcherCredentialsSatisfied(r.src.key)) return false;
     if (fetcherRunner.stateFor(r.src.key)) return false;
@@ -75,6 +76,7 @@ export function renderDashboardFetcherHealth() {
   });
   const runnableFailed = rows.filter(r => {
     const key = r.src.key;
+    if ((r.src.pausedReason || '').trim()) return false;
     const runState = fetcherRunner.stateFor(key);
     const failedFlash = runState === 'failed';
     if (!lastRunFailedByKey.has(key) && !failedFlash) return false;

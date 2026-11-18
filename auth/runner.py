@@ -1418,29 +1418,16 @@ def _extract_nintendo_wishlist_inline(page, context, session) -> dict[str, str]:
     )
 
 
-HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
-HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
 HUMBLE_POLL_SEC = 2.5
-
-
-def _humble_has_session(context) -> bool:
-    """True when the orders API accepts the profile (stale cookies alone are not enough)."""
-    try:
-        resp = context.request.get(HUMBLE_ORDERS_API, timeout=15_000)
-        if resp.status == 200:
-            body = resp.text().strip()
-            if body.startswith("[") or body.startswith("{"):
-                return True
-        if resp.status == 401 or resp.status == 403:
-            return False
-    except Exception:  # noqa: BLE001
-        pass
-    return False
 
 
 def _extract_humble_inline(page, context, session) -> dict[str, str]:
     """Open humblebundle.com/home/library, wait for sign-in, return marker cred."""
-    from auth.connect_extractors import extract_humble_session, humble_connect_hint
+    from auth.connect_extractors import (
+        HUMBLE_LIBRARY_URL,
+        extract_humble_session,
+        humble_connect_hint,
+    )
     from auth.connect_loop import run_connect_poll
 
     try:

@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "id": "ent-celeste",
+      "productEntitlementId": "ent-celeste",
+      "title": "Celeste",
+      "type": "storefront",
+      "deliveryMethods": ["steam"],
+      "entitlements": {
+        "keys": [{ "steam_app_id": "504230" }],
+        "downloads": []
+      }
+    },
+    {
+      "id": "ent-ebook",
+      "productEntitlementId": "ent-ebook",
+      "title": "Sample Ebook Only",
+      "type": "ebook",
+      "deliveryMethods": [],
+      "entitlements": { "keys": [], "downloads": [] }
+    },
+    {
+      "id": "ent-bundle-game",
+      "title": "Hollow Knight",
+      "type": "bundle",
+      "deliveryMethods": ["steam", "epic"]
+    }
+  ],
+  "pagination": { "page": 1, "totalPages": 2, "totalDocs": 7 },
+  "success": true
+}

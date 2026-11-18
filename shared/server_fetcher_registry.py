@@ -174,6 +174,10 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
                 # <= 0 = "no cap" sentinel (kept verbatim); else 60s floor.
                 if max_run_seconds > 0:
                     max_run_seconds = max(60.0, max_run_seconds)
+        paused_reason = entry.get("pausedReason")
+        if paused_reason is not None and not isinstance(paused_reason, str):
+            paused_reason = None
+        paused_reason = (paused_reason or "").strip() or None
         fetchers[key] = {
             "label": label,
             # Absolute script path so the launch never depends on subprocess cwd.
@@ -185,6 +189,7 @@ def _load_fetchers() -> dict[str, dict[str, Any]]:
             "requires": requires,
             "platforms": [str(p) for p in platforms],
             "maxRunSeconds": max_run_seconds,
+            "pausedReason": paused_reason,
         }
     return fetchers
 

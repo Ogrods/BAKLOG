@@ -66,4 +66,4 @@ export const FETCHER_AUTH_PROVIDER = {
   "itad": "itad"
 };
 
-export const NO_AUTO_FETCH_KEYS = new Set(["amazon", "gog"]);
+export const NO_AUTO_FETCH_KEYS = new Set(["amazon", "gog", "wishlistHumble"]);

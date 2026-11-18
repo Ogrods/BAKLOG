@@ -225,20 +225,25 @@ export function renderDashboardFetcherHealth() {
       titleLines.push(`Auth failed - cooling down ${authCooldownLabel(authCooldownMs)}. Reconnect in Connections to clear, or wait it out.`);
     }
     const platformUnavailable = src.available === false;
+    const pausedReason = (src.pausedReason || '').trim();
+    const pausedUnavailable = !!pausedReason;
     if (platformUnavailable) {
       const plats = formatPlatformList(src.platforms);
       titleLines.push(`Unavailable on this OS - ${src.label} runs on ${plats} only.`);
     }
+    if (pausedUnavailable) {
+      titleLines.push(pausedReason);
+    }
     const title = titleLines.join('\n');
     // When navProvider is set, the chip routes to Connections (bind-events) instead of running.
-    const disabled = platformUnavailable || !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere
+    const disabled = platformUnavailable || pausedUnavailable || !apiReady || runState === 'running' || runState === 'queued' || queueFullElsewhere
       || ((inAuthCooldown || needsReconnect) && !navProvider);
     const needsClass = needsConfig ? ' fh-chip-needs-config' : '';
     const readonlyClass = !apiReady ? ' fh-chip-readonly' : '';
     const cooldownClass = inAuthCooldown ? ' fh-chip-auth-cooldown' : '';
     const reconnectClass = needsReconnect ? ' fh-chip-reconnect-required' : '';
     const disconnectedClass = disconnected ? ' fh-chip-disconnected' : '';
-    const unavailableClass = platformUnavailable ? ' fh-chip-unavailable' : '';
+    const unavailableClass = (platformUnavailable || pausedUnavailable) ? ' fh-chip-unavailable' : '';
     const warnBadge = needsConfig
       ? '<span class="fh-chip-warn" title="Missing credentials for this profile - Connections">!</span>'
       : '';
@@ -270,7 +275,7 @@ export function renderDashboardFetcherHealth() {
         'fh-chip-auth-cooldown': inAuthCooldown,
         'fh-chip-reconnect-required': needsReconnect,
         'fh-chip-disconnected': disconnected,
-        'fh-chip-unavailable': platformUnavailable,
+        'fh-chip-unavailable': platformUnavailable || pausedUnavailable,
       },
     });
     const chipBtn = `<button type="button" class="fh-chip fh-chip-${escapeAttr(displayStatus)}${needsClass}${readonlyClass}${cooldownClass}${reconnectClass}${disconnectedClass}${unavailableClass}" data-fetcher-key="${escapeAttr(src.key)}" data-status="${escapeAttr(status)}"${connectAttr} style="border-left: 3px solid ${escapeAttr(src.color)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(chipAriaLabel)}"${disabled ? ' disabled' : ''} aria-disabled="${disabled ? 'true' : 'false'}">

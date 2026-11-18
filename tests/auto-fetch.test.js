@@ -145,6 +145,54 @@ describe('maybeAutoFetchOnConnect', () => {
     expect(runFn.mock.calls[0][0]).toBe('wishlistEpic');
   });
 
+  it('skips paused wishlistHumble and still runs Humble library on connect', async () => {
+    const runFn = vi.fn().mockResolvedValue(undefined);
+    const ok = await maybeAutoFetchOnConnect(['humble', 'wishlistHumble'], {
+      isApiAvailable: () => true,
+      loadFetcherSources: async () => {},
+      sources: [
+        { key: 'humble', label: 'Humble', group: 'library', missingRequirements: [] },
+        {
+          key: 'wishlistHumble',
+          label: 'WL Humble',
+          group: 'wishlist',
+          missingRequirements: [],
+          pausedReason: 'Humble has wishlist offline during their site upgrade.',
+        },
+      ],
+      runFn,
+      openFetcherLog: () => {},
+      waitForQueueSlot: async () => {},
+      getCancelEpoch: () => 1,
+    });
+    expect(ok).toBe(true);
+    expect(runFn).toHaveBeenCalledTimes(1);
+    expect(runFn.mock.calls[0][0]).toBe('humble');
+  });
+
+  it('does not auto-fetch when the only key is paused', async () => {
+    const runFn = vi.fn();
+    const ok = await maybeAutoFetchOnConnect(['wishlistHumble'], {
+      isApiAvailable: () => true,
+      loadFetcherSources: async () => {},
+      sources: [
+        {
+          key: 'wishlistHumble',
+          label: 'WL Humble',
+          group: 'wishlist',
+          missingRequirements: [],
+          pausedReason: 'Humble has wishlist offline during their site upgrade.',
+        },
+      ],
+      runFn,
+      openFetcherLog: () => {},
+      waitForQueueSlot: async () => {},
+      getCancelEpoch: () => 1,
+    });
+    expect(ok).toBe(false);
+    expect(runFn).not.toHaveBeenCalled();
+  });
+
   it('returns false when API is unavailable', async () => {
     const runFn = vi.fn();
     const ok = await maybeAutoFetchOnConnect(['steam'], {

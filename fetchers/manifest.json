@@ -357,6 +357,8 @@
       ],
       "metaKey": "wishlistHumble",
       "color": "#cc2929",
+      "autoFetch": false,
+      "pausedReason": "Humble has wishlist offline during their site upgrade. Library sync still works.",
       "requires": [
         {
           "note": "Reuses your Humble browser profile (cache/auth/profiles/humble); no extra env vars"

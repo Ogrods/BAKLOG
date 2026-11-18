@@ -234,7 +234,13 @@ export async function maybeAutoFetchOnConnect(fetcherKeys, deps = {}) {
   await loadFn();
 
   const sources = deps.sources ?? fetcherSources;
-  const keys = (fetcherKeys || []).filter((key) => sources.some((s) => s.key === key));
+  const keys = (fetcherKeys || []).filter((key) => {
+    if (NO_AUTO_FETCH_KEYS.has(key)) return false;
+    const src = sources.find((s) => s.key === key);
+    if (!src) return false;
+    if ((src.pausedReason || '').trim()) return false;
+    return true;
+  });
   if (!keys.length) return false;
 
   const openLogFn = deps.openFetcherLog ?? (() => fetcherRunner?.openFetcherLog({ focusPanel: false }));
@@ -293,6 +299,7 @@ export function maybeAutoFetchStale24h(deps = {}) {
     // Local launchers (GOG Galaxy, Amazon) can't refresh unattended — only
     // web/API stores auto-fetch. See fetchers/manifest.json autoFetch:false.
     if (NO_AUTO_FETCH_KEYS.has(src.key)) return false;
+    if ((src.pausedReason || '').trim()) return false;
     if (!FETCHER_AUTH_PROVIDER[src.key]) return false;
     const { ageMs } = freshnessFn(src);
     if (ageMs < AUTO_STALE_AGE_MS) return false;

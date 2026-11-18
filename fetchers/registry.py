@@ -155,11 +155,11 @@ def _script_flags(script: str) -> set[str]:
 
 
 def no_auto_fetch_keys(path: Path | None = None) -> list[str]:
-    """Fetcher keys marked autoFetch:false (local launchers — need the app open).
+    """Fetcher keys marked autoFetch:false (skip unattended refresh).
 
-    Launcher-backed sources (GOG Galaxy, Amazon Games) scan a locally installed
-    client, so they can't refresh unattended like web/API stores. Auto-refresh
-    (browser loop + background scheduler) skips them.
+    Used for local launchers (GOG Galaxy, Amazon Games) that need the desktop
+    client open, and for temporarily paused sources (e.g. Humble wishlist while
+    Humble's store wishlist is offline). Auto-refresh skips them.
     """
     return sorted(
         e["key"]

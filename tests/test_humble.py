@@ -244,6 +244,8 @@ class _FakePage:
 def test_humble_durable_session_cookie_helpers() -> None:
     assert humble_is_durable_session_cookie_name("__Host-ory_kratos_session")
     assert humble_is_durable_session_cookie_name("ory_kratos_session")
+    assert humble_is_durable_session_cookie_name("ory_session_stoiccohens510ht9xek")
+    assert humble_is_durable_session_cookie_name("__Host-ory_session_abc")
     assert not humble_is_durable_session_cookie_name(
         "__Host-ory_kratos_browser_abc123"
     )

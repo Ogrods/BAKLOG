@@ -41,6 +41,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 - Humble Connect no longer reloads the library in a loop while you are still signing in
 - After Humble library loads, Connect retries a couple of quiet refreshes to save the login cookie instead of hanging
+- Humble Connect recognizes Humble's newer `ory_session_…` login cookies (not only `ory_kratos_session`)
 
 ## [0.9.21] - 2026-11-18
 

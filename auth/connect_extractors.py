@@ -113,7 +113,11 @@ def humble_page_title_looks_login(page: Any) -> bool:
 
 
 def humble_is_durable_session_cookie_name(name: str) -> bool:
-    """True for Ory session cookies — not browser-flow / continuity / csrf noise."""
+    """True for Ory session cookies — not browser-flow / continuity / csrf noise.
+
+    Humble's live jar has used both classic ``ory_kratos_session`` / ``__Host-…``
+    names and newer ``ory_session_<id>`` cookies (seen upstairs Connect 2026-11-18).
+    """
     n = (name or "").strip()
     if not n:
         return False
@@ -124,6 +128,11 @@ def humble_is_durable_session_cookie_name(name: str) -> bool:
         return True
     # Humble may suffix the host hash onto the session cookie name.
     if lower.startswith("ory_kratos_session") or lower.startswith("__host-ory_kratos_session"):
+        return True
+    # Post-redesign / stoic Ory: ory_session_<tenantOrHash>
+    if lower.startswith("ory_session_"):
+        return True
+    if lower.startswith("__host-ory_session_"):
         return True
     return False
 

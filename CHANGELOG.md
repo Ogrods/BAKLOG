@@ -37,6 +37,14 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-11-17
+
+### Fixed
+
+- An empty Humble wishlist no longer marks your Humble login as expired
+- The paused WL Humble chip stays out of Run stale / Retry failed
+- Humble wishlist capture is safer when the list comes back (wishlist-only DOM scrape, keep rows if price lookup is partial)
+
 ## [0.9.16] - 2026-11-17
 
 ### Fixed

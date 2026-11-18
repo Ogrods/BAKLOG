@@ -144,9 +144,11 @@ def test_item_from_library_result_games_only() -> None:
     assert "Celeste" in names
     assert "Hollow Knight" in names
     assert "Sample Ebook Only" not in names
+    from urllib.parse import urlparse
+
     celeste = next(it for it in items if it.name == "Celeste")
     assert celeste.steam_app_id == "504230"
-    assert "steampowered.com" in celeste.store_url
+    assert urlparse(celeste.store_url).hostname == "store.steampowered.com"
 
 
 def test_build_wishlist_row_schema() -> None:

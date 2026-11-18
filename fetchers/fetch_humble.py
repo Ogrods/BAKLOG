@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from dotenv import load_dotenv
 
@@ -346,8 +346,16 @@ def _dom_library_rows(page) -> list[dict]:
 
 
 def _page_looks_signed_out(page) -> bool:
-    url = (getattr(page, "url", None) or "").lower()
-    if "auth.humblebundle.com" in url or "/login" in url:
+    raw = getattr(page, "url", None) or ""
+    try:
+        parsed = urlparse(raw)
+    except Exception:  # noqa: BLE001
+        return False
+    host = (parsed.hostname or "").lower()
+    path = (parsed.path or "").lower()
+    if host == "auth.humblebundle.com":
+        return True
+    if path.rstrip("/").endswith("/login") or "/login" in path.split("/"):
         return True
     return False
 

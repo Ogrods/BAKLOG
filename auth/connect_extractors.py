@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import queue
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -24,7 +25,14 @@ HUMBLE_CONNECT_SETTLE_MS = 4000
 # Sidecar under the Chromium profile so cold probe/fetch can restore session cookies
 # that Chromium drops when Connect force-closes before a clean flush.
 HUMBLE_COOKIE_SIDECAR = "baklog_humble_cookies.json"
-_HUMBLE_COOKIE_DIAG_LOGGED = False
+# Throttled cookie-name diag + rate-limited library mint after the login page
+# is gone (avoids flash loops while still unsigned-in).
+_HUMBLE_COOKIE_DIAG_LAST = 0.0
+_HUMBLE_LIBRARY_MINT_COUNT = 0
+_HUMBLE_LIBRARY_MINT_LAST = 0.0
+HUMBLE_COOKIE_DIAG_INTERVAL_S = 12.0
+HUMBLE_LIBRARY_MINT_MAX = 2
+HUMBLE_LIBRARY_MINT_GAP_S = 12.0
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
 # Per-message-key dedupe interval kept for tests that monkeypatch these.
@@ -149,11 +157,13 @@ def humble_has_durable_session_cookies(context: Any) -> bool:
     return bool(humble_session_cookie_names(cookies if isinstance(cookies, list) else []))
 
 
-def _humble_log_cookie_names_once(context: Any, *, reason: str) -> None:
-    global _HUMBLE_COOKIE_DIAG_LOGGED
-    if _HUMBLE_COOKIE_DIAG_LOGGED:
+def _humble_log_cookie_names(context: Any, *, reason: str, force: bool = False) -> None:
+    """Log Humble cookie names (throttled) so post-login jar changes are visible."""
+    global _HUMBLE_COOKIE_DIAG_LAST
+    now = time.monotonic()
+    if not force and (now - _HUMBLE_COOKIE_DIAG_LAST) < HUMBLE_COOKIE_DIAG_INTERVAL_S:
         return
-    _HUMBLE_COOKIE_DIAG_LOGGED = True
+    _HUMBLE_COOKIE_DIAG_LAST = now
     try:
         from auth.connect_log import connect_log
 
@@ -171,6 +181,50 @@ def _humble_log_cookie_names_once(context: Any, *, reason: str) -> None:
         )
     except Exception:  # noqa: BLE001
         pass
+
+
+def _humble_library_ui_ready(page: Any) -> bool:
+    """True when the tab looks like a post-login library/store surface."""
+    if _humble_page_on_auth_host(page) or _humble_page_looks_login_url(page):
+        return False
+    url = getattr(page, "url", None) or ""
+    if not humble_page_is_confirmed_library_or_store(url):
+        return False
+    if humble_page_title_looks_login(page):
+        return False
+    return True
+
+
+def _humble_maybe_mint_library(page: Any) -> bool:
+    """Rate-limited library goto/reload after login UI is up. Returns True if navigated."""
+    global _HUMBLE_LIBRARY_MINT_COUNT, _HUMBLE_LIBRARY_MINT_LAST
+    if _HUMBLE_LIBRARY_MINT_COUNT >= HUMBLE_LIBRARY_MINT_MAX:
+        return False
+    now = time.monotonic()
+    if _HUMBLE_LIBRARY_MINT_COUNT and (now - _HUMBLE_LIBRARY_MINT_LAST) < HUMBLE_LIBRARY_MINT_GAP_S:
+        return False
+    url = getattr(page, "url", None) or ""
+    try:
+        if humble_page_is_confirmed_library_or_store(url):
+            page.reload(wait_until="domcontentloaded", timeout=20_000)
+        else:
+            page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
+        page.wait_for_timeout(1000)
+    except Exception:  # noqa: BLE001
+        return False
+    _HUMBLE_LIBRARY_MINT_COUNT += 1
+    _HUMBLE_LIBRARY_MINT_LAST = time.monotonic()
+    try:
+        from auth.connect_log import connect_log
+
+        connect_log(
+            "humble",
+            f"library mint #{_HUMBLE_LIBRARY_MINT_COUNT} after login UI",
+            key="library_mint",
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return True
 
 
 def _humble_has_session(context: Any) -> bool:
@@ -344,48 +398,47 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
     can look signed-in while the disk jar has no www session. Require a real
     ``ory_kratos_session`` cookie, settle, then re-check (cold probe re-opens profile).
 
-    While the user is still signing in (auth host / login URL / anonymous), do not
-    goto or reload the library on every poll - that flashes the tab and blocks login.
+    While the user is still signing in (auth host / login URL), do not goto/reload.
+    Once the library/store UI is up, allow a few rate-limited reloads to mint the
+    durable cookie instead of hanging forever on a signed-in library page.
     """
-    # Stay on auth host until Ory redirects; do not mark ready mid-flow.
+    # Stay on auth host / login URL until Ory redirects; do not flash the login form.
     if _humble_page_on_auth_host(page):
         return None
     if _humble_page_looks_login_url(page):
         return None
 
+    library_ui = _humble_library_ui_ready(page)
+    has_session = _humble_has_session(context)
+
     if not humble_has_durable_session_cookies(context):
-        _humble_log_cookie_names_once(context, reason="waiting for durable session cookie")
-        # Anonymous / not-yet-signed-in: leave the tab alone so the user can log in.
-        if not _humble_has_session(context):
+        _humble_log_cookie_names(
+            context,
+            reason=(
+                "library UI up, waiting for durable cookie"
+                if library_ui
+                else "waiting for durable session cookie"
+            ),
+        )
+        # Pre-login (not on library UI yet, anonymous): leave the tab alone.
+        if not library_ui and not has_session:
             return None
-        # Live session-status looks signed in but jar lacks ory_kratos_session -
-        # mint www library once if we are not already there. No poll-loop reload.
-        url = getattr(page, "url", None) or ""
-        if not humble_page_is_confirmed_library_or_store(url):
-            try:
-                page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=20_000)
-                page.wait_for_timeout(800)
-            except Exception:  # noqa: BLE001
-                return None
+        # Post-login library UI (or live session without durable cookie): mint a
+        # few times, then keep waiting without hammering every poll.
+        if library_ui or has_session:
+            _humble_maybe_mint_library(page)
         if not humble_has_durable_session_cookies(context):
-            _humble_log_cookie_names_once(
-                context, reason="post-mint still missing session cookie"
-            )
             return None
 
     if not _humble_has_session(context):
         return None
-    url = getattr(page, "url", None) or ""
-    if not humble_page_is_confirmed_library_or_store(url):
+    if not _humble_library_ui_ready(page):
         try:
             page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
             page.wait_for_timeout(800)
         except Exception:  # noqa: BLE001
             return None
-    url = getattr(page, "url", None) or ""
-    if not humble_page_is_confirmed_library_or_store(url):
-        return None
-    if humble_page_title_looks_login(page):
+    if not _humble_library_ui_ready(page):
         return None
     if not _humble_has_session(context) or not humble_has_durable_session_cookies(context):
         return None
@@ -393,10 +446,7 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
         page.wait_for_timeout(HUMBLE_CONNECT_SETTLE_MS)
     except Exception:  # noqa: BLE001
         pass
-    url = getattr(page, "url", None) or ""
-    if not humble_page_is_confirmed_library_or_store(url):
-        return None
-    if humble_page_title_looks_login(page):
+    if not _humble_library_ui_ready(page):
         return None
     if not _humble_has_session(context) or not humble_has_durable_session_cookies(context):
         return None

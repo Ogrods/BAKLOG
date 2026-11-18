@@ -282,6 +282,10 @@ def test_extract_humble_session_rejects_auth_host_only() -> None:
 
 def test_extract_humble_session_leaves_login_alone_while_anonymous() -> None:
     """Poll must not goto/reload library before sign-in (flashes the login page)."""
+    import auth.connect_extractors as ce
+
+    ce._HUMBLE_LIBRARY_MINT_COUNT = 0
+    ce._HUMBLE_LIBRARY_MINT_LAST = 0.0
     ctx = _FakeContext(
         {"status": "anonymous"},
         cookies=[
@@ -298,6 +302,28 @@ def test_extract_humble_session_leaves_login_alone_while_anonymous() -> None:
     assert extract_humble_session(ctx, home) is None
     assert home.goto_calls == 0
     assert home.reload_calls == 0
+
+
+def test_extract_humble_session_mints_library_ui_without_durable_cookie() -> None:
+    """On library UI without ory session cookie, allow a quiet rate-limited reload."""
+    import auth.connect_extractors as ce
+
+    ce._HUMBLE_LIBRARY_MINT_COUNT = 0
+    ce._HUMBLE_LIBRARY_MINT_LAST = 0.0
+    ctx = _FakeContext(
+        {"status": "authenticated"},
+        cookies=[
+            {
+                "name": "__Host-ory_kratos_browser_abc",
+                "value": "1",
+                "domain": "auth.humblebundle.com",
+            }
+        ],
+    )
+    page = _FakePage("https://www.humblebundle.com/home/library")
+    assert extract_humble_session(ctx, page) is None
+    assert page.reload_calls == 1
+    assert page.goto_calls == 0
 
 
 def test_extract_humble_session_rejects_browser_only_cookies() -> None:

@@ -421,6 +421,37 @@ def _page_looks_signed_out(page) -> bool:
     return False
 
 
+def _goto_humble_library(page, ctx, *, on_response=None):
+    """Navigate to /home/library; retry once on a fresh tab if CDP navigate fails."""
+    last_exc: Exception | None = None
+    current = page
+    for attempt in range(2):
+        try:
+            current.goto(LIBRARY_URL, wait_until="commit", timeout=60_000)
+            url = (getattr(current, "url", None) or "").lower()
+            if not url.startswith("chrome://"):
+                return current
+            last_exc = RuntimeError(f"stuck on {getattr(current, 'url', None) or url}")
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt == 0:
+                print(
+                    f"[humble] library navigate failed ({exc}); retrying on a new tab",
+                    flush=True,
+                )
+        if attempt == 0:
+            try:
+                current = ctx.new_page()
+                if on_response is not None:
+                    current.on("response", on_response)
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                break
+    if last_exc:
+        raise last_exc
+    return current
+
+
 def fetch_library_items(
     *,
     include_nongames: bool = False,
@@ -507,7 +538,7 @@ def fetch_library_items(
         except Exception:  # noqa: BLE001
             pass
 
-        page.goto(LIBRARY_URL, wait_until="domcontentloaded", timeout=60_000)
+        page = _goto_humble_library(page, ctx, on_response=on_response)
         discovered = _discover_filter_user_library_action_from_page(page, request_client=ctx.request)
         if discovered:
             known_actions.add(discovered)

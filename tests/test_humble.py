@@ -19,6 +19,7 @@ from fetchers.fetch_humble import (
     _build_row,
     _discover_filter_user_library_action,
     _extract_filter_user_library_payload,
+    _goto_humble_library,
     _item_from_library_result,
     _looks_like_filter_user_library_payload,
     _page_looks_signed_out,
@@ -250,6 +251,24 @@ def test_page_looks_signed_out_url_detection() -> None:
     assert not _page_looks_signed_out(
         _FakePage("https://www.humblebundle.com/home/library")
     )
+
+
+def test_goto_humble_library_retries_on_new_page() -> None:
+    class Ctx:
+        def __init__(self) -> None:
+            self.pages: list = []
+
+        def new_page(self):
+            p = _FakePage("about:blank")
+            self.pages.append(p)
+            return p
+
+    first = _FakePage("about:blank", fail_goto=True)
+    ctx = Ctx()
+    page = _goto_humble_library(first, ctx)
+    assert page is not first
+    assert page.url == LIBRARY_URL
+    assert page.goto_calls == 1
 
 
 def test_extract_filter_user_library_payload_plain_json() -> None:

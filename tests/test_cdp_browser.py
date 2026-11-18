@@ -1074,3 +1074,92 @@ class TestFocusWindow:
         ]
         assert "minimized" in bound_states
         assert bound_states[-1] == "normal"
+
+
+class TestGotoNavigateRpc:
+    def _page(self, send) -> CdpPage:
+        ctx = _bare_context()
+        ctx._send = send  # type: ignore[method-assign]
+        page = CdpPage.__new__(CdpPage)
+        page._context = ctx
+        page._target_id = "t1"
+        page._session_id = "s1"
+        page._url = "about:blank"
+        page._closed = False
+        return page
+
+    def test_goto_succeeds_when_navigate_rpc_times_out_but_history_advances(self) -> None:
+        history_calls = {"n": 0}
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):  # noqa: ARG001
+            if method == "Page.navigate":
+                raise TimeoutError("CDP command timed out: Page.navigate")
+            if method == "Page.getNavigationHistory":
+                history_calls["n"] += 1
+                if history_calls["n"] >= 2:
+                    return {
+                        "currentIndex": 0,
+                        "entries": [{"url": "https://www.humblebundle.com/home/library"}],
+                    }
+                return {
+                    "currentIndex": 0,
+                    "entries": [{"url": "about:blank"}],
+                }
+            if method == "Runtime.evaluate":
+                return {"result": {"type": "boolean", "value": True}}
+            return {}
+
+        page = self._page(fake_send)
+        page.goto(
+            "https://www.humblebundle.com/home/library",
+            wait_until="domcontentloaded",
+            timeout=2_000,
+        )
+        assert "humblebundle.com/home/library" in (page._url or "")
+
+    def test_goto_commit_succeeds_when_navigate_rpc_times_out(self) -> None:
+        def fake_send(method, params=None, *, session_id=None, timeout=60):  # noqa: ARG001
+            if method == "Page.navigate":
+                raise TimeoutError("CDP command timed out: Page.navigate")
+            if method == "Page.getNavigationHistory":
+                return {
+                    "currentIndex": 0,
+                    "entries": [{"url": "https://www.humblebundle.com/home/library"}],
+                }
+            return {}
+
+        page = self._page(fake_send)
+        page.goto(
+            "https://www.humblebundle.com/home/library",
+            wait_until="commit",
+            timeout=2_000,
+        )
+        assert page._url == "https://www.humblebundle.com/home/library"
+
+    def test_goto_raises_when_history_stuck_on_blank(self) -> None:
+        def fake_send(method, params=None, *, session_id=None, timeout=60):  # noqa: ARG001
+            if method == "Page.navigate":
+                raise TimeoutError("CDP command timed out: Page.navigate")
+            if method == "Page.getNavigationHistory":
+                return {"currentIndex": 0, "entries": [{"url": "about:blank"}]}
+            if method == "Runtime.evaluate":
+                return {"result": {"type": "boolean", "value": False}}
+            return {}
+
+        page = self._page(fake_send)
+        with pytest.raises(TimeoutError, match="timed out"):
+            page.goto(
+                "https://www.humblebundle.com/home/library",
+                wait_until="commit",
+                timeout=400,
+            )
+
+    def test_goto_raises_on_navigate_error_text(self) -> None:
+        def fake_send(method, params=None, *, session_id=None, timeout=60):  # noqa: ARG001
+            if method == "Page.navigate":
+                return {"errorText": "net::ERR_NAME_NOT_RESOLVED"}
+            return {}
+
+        page = self._page(fake_send)
+        with pytest.raises(RuntimeError, match="ERR_NAME_NOT_RESOLVED"):
+            page.goto("https://example.invalid/", wait_until="commit", timeout=1_000)

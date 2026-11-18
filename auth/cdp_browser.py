@@ -858,11 +858,22 @@ class CdpPage:
         wait_until: str = "domcontentloaded",
         timeout: float = 30_000,
     ) -> None:
-        self._context._send(
-            "Page.navigate",
-            {"url": url},
-            session_id=self._session_id,
-        )
+        # Chrome/Edge often never answers Page.navigate on first load / renderer
+        # process swap even when the tab does navigate. Short RPC wait; treat a
+        # missing reply as non-fatal and settle via history + readyState instead.
+        navigate_rpc_timeout = min(5.0, max(1.0, timeout / 1000.0))
+        try:
+            nav_result = self._context._send(
+                "Page.navigate",
+                {"url": url},
+                session_id=self._session_id,
+                timeout=navigate_rpc_timeout,
+            )
+        except TimeoutError:
+            nav_result = {}
+        error_text = str((nav_result or {}).get("errorText") or "").strip()
+        if error_text:
+            raise RuntimeError(f"Navigation to {url!r} failed: {error_text}")
         if wait_until == "commit":
             deadline = time.time() + timeout / 1000.0
             while time.time() < deadline:
@@ -880,9 +891,10 @@ class CdpPage:
                 except Exception:
                     pass
                 time.sleep(0.15)
-            return
+            raise TimeoutError(f"Navigation to {url!r} timed out after {timeout}ms")
         deadline = time.time() + timeout / 1000.0
         while time.time() < deadline:
+            nav_url = ""
             try:
                 result = self._context._send(
                     "Page.getNavigationHistory", session_id=self._session_id
@@ -890,10 +902,16 @@ class CdpPage:
                 entries = result.get("entries") or []
                 idx = result.get("currentIndex", -1)
                 if 0 <= idx < len(entries):
-                    self._url = entries[idx].get("url") or url
+                    nav_url = entries[idx].get("url") or ""
+                    self._url = nav_url or url
             except Exception:
                 pass
             if wait_until == "domcontentloaded":
+                # about:blank is often already interactive; do not treat it as the
+                # destination after a navigate whose RPC reply was dropped.
+                if not nav_url or nav_url in ("about:blank", ""):
+                    time.sleep(0.15)
+                    continue
                 # Bounded readyState probe: a busy SPA renderer can stall a single
                 # Runtime.evaluate. Treat a timeout/error as "not ready yet" and keep
                 # polling against the caller's deadline instead of dying on one eval.

@@ -85,6 +85,14 @@ def probe_humble_session(_creds: dict[str, str]) -> str | None:
             window_position=(-32000, 0),
             window_size=(1280, 900),
         )
+        # Restore sidecar cookies dumped at end of Connect (session cookies that
+        # Chromium may not have flushed into the SQLite jar).
+        try:
+            from auth.connect_extractors import restore_humble_session_cookies
+
+            restore_humble_session_cookies(ctx, profile)
+        except Exception:  # noqa: BLE001
+            pass
         try:
             resp = ctx.request.get(HUMBLE_SESSION_STATUS_URL, timeout=15_000)
             body = (resp.text() or "").strip() if int(getattr(resp, "status", 0) or 0) == 200 else ""

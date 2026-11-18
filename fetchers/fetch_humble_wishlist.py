@@ -628,6 +628,12 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
     )
     try:
         # Skip heavy STEALTH_INIT (same as Humble library / Epic Connect).
+        try:
+            from auth.connect_extractors import restore_humble_session_cookies
+
+            restore_humble_session_cookies(ctx, profile)
+        except Exception:  # noqa: BLE001
+            pass
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         def on_response(resp) -> None:

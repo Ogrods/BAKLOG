@@ -511,6 +511,14 @@ def fetch_library_items(
         # Skip heavy STEALTH_INIT (Epic Connect model): fake plugins/permissions
         # worsen Cloudflare Bot Management. Launch already applies the light
         # webdriver mask.
+        try:
+            from auth.connect_extractors import restore_humble_session_cookies
+
+            restored = restore_humble_session_cookies(ctx, profile)
+            if restored:
+                print(f"[humble] restored {restored} cookie(s) from Connect sidecar", flush=True)
+        except Exception:  # noqa: BLE001
+            pass
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         def on_response(resp) -> None:

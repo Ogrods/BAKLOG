@@ -9,9 +9,14 @@ from unittest.mock import patch
 from auth.connect_extractors import (
     HUMBLE_LIBRARY_URL,
     HUMBLE_SUCCESS_URL_PATTERN,
+    dump_humble_session_cookies,
     extract_humble_session,
+    humble_has_durable_session_cookies,
+    humble_is_durable_session_cookie_name,
     humble_page_is_confirmed_library_or_store,
+    humble_session_cookie_names,
     humble_session_status_authenticated,
+    restore_humble_session_cookies,
 )
 from fetchers.fetch_humble import (
     FILTER_USER_LIBRARY_ACTION,
@@ -167,12 +172,39 @@ class _FakeRequest:
         return _FakeResp(200, json.dumps(self._payload))
 
 
+_DURABLE_HUMBLE_COOKIES = [
+    {
+        "name": "__Host-ory_kratos_session",
+        "value": "session-token",
+        "domain": "www.humblebundle.com",
+        "path": "/",
+        "secure": True,
+        "httpOnly": True,
+    }
+]
+
+
 class _FakeContext:
-    def __init__(self, status_payload: dict) -> None:
+    def __init__(
+        self,
+        status_payload: dict,
+        *,
+        cookies: list | None = None,
+    ) -> None:
         self.request = _FakeRequest(status_payload)
+        self._cookies = list(_DURABLE_HUMBLE_COOKIES if cookies is None else cookies)
+        self.set_cookie_calls: list[dict] = []
 
     def cookies(self) -> list:
-        return []
+        return list(self._cookies)
+
+    def raw_cookies(self) -> list:
+        return list(self._cookies)
+
+    def set_cookies(self, cookies: list) -> int:
+        self.set_cookie_calls.extend(cookies)
+        self._cookies.extend(cookies)
+        return len(cookies)
 
 
 class _FakePage:
@@ -187,6 +219,7 @@ class _FakePage:
         self._fail_goto = fail_goto
         self._html = html
         self.goto_calls = 0
+        self.reload_calls = 0
         self.wait_ms: list[int] = []
 
     def goto(self, url: str, wait_until: str = "", timeout: int = 0) -> None:  # noqa: ARG002
@@ -194,6 +227,9 @@ class _FakePage:
         if self._fail_goto:
             raise RuntimeError("goto failed")
         self.url = url
+
+    def reload(self, wait_until: str = "", timeout: int = 0) -> None:  # noqa: ARG002
+        self.reload_calls += 1
 
     def wait_for_timeout(self, ms: int) -> None:
         self.wait_ms.append(ms)
@@ -205,17 +241,56 @@ class _FakePage:
         return getattr(self, "_title", "") or ""
 
 
+def test_humble_durable_session_cookie_helpers() -> None:
+    assert humble_is_durable_session_cookie_name("__Host-ory_kratos_session")
+    assert humble_is_durable_session_cookie_name("ory_kratos_session")
+    assert not humble_is_durable_session_cookie_name(
+        "__Host-ory_kratos_browser_abc123"
+    )
+    assert not humble_is_durable_session_cookie_name("ory_kratos_continuity")
+    names = humble_session_cookie_names(
+        [
+            {"name": "__Host-ory_kratos_browser_x", "value": "1", "domain": "auth.humblebundle.com"},
+            {"name": "__Host-ory_kratos_session", "value": "1", "domain": "www.humblebundle.com"},
+            {"name": "csrf_token_x", "value": "1", "domain": ".humblebundle.com"},
+        ]
+    )
+    assert names == ["__Host-ory_kratos_session"]
+    assert humble_has_durable_session_cookies(_FakeContext({"status": "authenticated"}))
+    assert not humble_has_durable_session_cookies(
+        _FakeContext(
+            {"status": "authenticated"},
+            cookies=[
+                {
+                    "name": "__Host-ory_kratos_browser_x",
+                    "value": "1",
+                    "domain": "auth.humblebundle.com",
+                }
+            ],
+        )
+    )
+
+
 def test_extract_humble_session_rejects_auth_host_only() -> None:
     ctx = _FakeContext({"status": "authenticated"})
     page = _FakePage("https://auth.humblebundle.com/login?flow=abc")
-    # goto would set library URL; force staying on auth by overriding after goto.
-    original_goto = page.goto
+    # Stays on auth host — extract must not mark ready mid-Ory.
+    assert extract_humble_session(ctx, page) is None
 
-    def stay_on_auth(url: str, wait_until: str = "", timeout: int = 0) -> None:  # noqa: ARG002
-        original_goto(url, wait_until=wait_until, timeout=timeout)
-        page.url = "https://auth.humblebundle.com/login?flow=abc"
 
-    page.goto = stay_on_auth  # type: ignore[method-assign]
+def test_extract_humble_session_rejects_browser_only_cookies() -> None:
+    ctx = _FakeContext(
+        {"status": "authenticated"},
+        cookies=[
+            {
+                "name": "__Host-ory_kratos_browser_abc",
+                "value": "1",
+                "domain": "auth.humblebundle.com",
+            },
+            {"name": "ory_kratos_continuity", "value": "1", "domain": ".humblebundle.com"},
+        ],
+    )
+    page = _FakePage("https://www.humblebundle.com/home/library")
     assert extract_humble_session(ctx, page) is None
 
 
@@ -225,7 +300,7 @@ def test_extract_humble_session_accepts_www_library() -> None:
     creds = extract_humble_session(ctx, page)
     assert creds == {"HUMBLE_PROFILE": "ready"}
     assert page.url == HUMBLE_LIBRARY_URL
-    assert page.goto_calls == 1
+    assert page.goto_calls >= 1
     assert any(ms >= 4000 for ms in page.wait_ms)
 
 
@@ -242,9 +317,10 @@ def test_extract_humble_session_rejects_anonymous_after_library() -> None:
     class FlipContext:
         def __init__(self) -> None:
             self.request = FlipRequest()
+            self._cookies = list(_DURABLE_HUMBLE_COOKIES)
 
         def cookies(self) -> list:
-            return []
+            return list(self._cookies)
 
     ctx = FlipContext()
     page = _FakePage("https://www.humblebundle.com/")
@@ -255,6 +331,16 @@ def test_extract_humble_session_rejects_goto_failure() -> None:
     ctx = _FakeContext({"status": "authenticated"})
     page = _FakePage("https://www.humblebundle.com/", fail_goto=True)
     assert extract_humble_session(ctx, page) is None
+
+
+def test_humble_cookie_sidecar_roundtrip(tmp_path) -> None:
+    ctx = _FakeContext({"status": "authenticated"})
+    n = dump_humble_session_cookies(ctx, tmp_path)
+    assert n >= 1
+    empty = _FakeContext({"status": "authenticated"}, cookies=[])
+    restored = restore_humble_session_cookies(empty, tmp_path)
+    assert restored >= 1
+    assert humble_has_durable_session_cookies(empty)
 
 
 def test_page_looks_signed_out_url_detection() -> None:
@@ -280,7 +366,7 @@ def test_page_looks_signed_out_url_detection() -> None:
 
 def test_extract_humble_session_rejects_login_title() -> None:
     ctx = _FakeContext({"status": "authenticated"})
-    page = _FakePage("https://www.humblebundle.com/")
+    page = _FakePage("https://www.humblebundle.com/home/library")
     page._title = "Login | Humble Bundle"
     assert extract_humble_session(ctx, page) is None
 

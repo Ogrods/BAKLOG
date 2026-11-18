@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-11-17
+
 ### Fixed
 
 - Humble stays signed in after Connect so library refresh can use the saved session

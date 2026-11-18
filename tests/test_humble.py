@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from unittest.mock import patch
 
 from auth.connect_extractors import (
     HUMBLE_LIBRARY_URL,
@@ -175,9 +176,16 @@ class _FakeContext:
 
 
 class _FakePage:
-    def __init__(self, url: str, *, fail_goto: bool = False) -> None:
+    def __init__(
+        self,
+        url: str,
+        *,
+        fail_goto: bool = False,
+        html: str = "",
+    ) -> None:
         self.url = url
         self._fail_goto = fail_goto
+        self._html = html
         self.goto_calls = 0
         self.wait_ms: list[int] = []
 
@@ -189,6 +197,12 @@ class _FakePage:
 
     def wait_for_timeout(self, ms: int) -> None:
         self.wait_ms.append(ms)
+
+    def content(self) -> str:
+        return self._html
+
+    def title(self) -> str:
+        return getattr(self, "_title", "") or ""
 
 
 def test_extract_humble_session_rejects_auth_host_only() -> None:
@@ -212,7 +226,7 @@ def test_extract_humble_session_accepts_www_library() -> None:
     assert creds == {"HUMBLE_PROFILE": "ready"}
     assert page.url == HUMBLE_LIBRARY_URL
     assert page.goto_calls == 1
-    assert any(ms >= 1500 for ms in page.wait_ms)
+    assert any(ms >= 4000 for ms in page.wait_ms)
 
 
 def test_extract_humble_session_rejects_anonymous_after_library() -> None:
@@ -244,6 +258,8 @@ def test_extract_humble_session_rejects_goto_failure() -> None:
 
 
 def test_page_looks_signed_out_url_detection() -> None:
+    from fetchers.fetch_humble import _page_on_cloudflare
+
     assert _page_looks_signed_out(
         _FakePage("https://auth.humblebundle.com/login?flow=abc")
     )
@@ -251,6 +267,38 @@ def test_page_looks_signed_out_url_detection() -> None:
     assert not _page_looks_signed_out(
         _FakePage("https://www.humblebundle.com/home/library")
     )
+    login_title = _FakePage("https://www.humblebundle.com/home/library")
+    login_title._title = "Login | Humble Bundle"
+    assert _page_looks_signed_out(login_title)
+    cf_page = _FakePage(
+        "https://www.humblebundle.com/home/library",
+        html="<html><title>Just a moment...</title><div id='cf_challenge_container'></div></html>",
+    )
+    assert _page_on_cloudflare(cf_page)
+    assert not _page_looks_signed_out(cf_page)
+
+
+def test_extract_humble_session_rejects_login_title() -> None:
+    ctx = _FakeContext({"status": "authenticated"})
+    page = _FakePage("https://www.humblebundle.com/")
+    page._title = "Login | Humble Bundle"
+    assert extract_humble_session(ctx, page) is None
+
+
+def test_probe_humble_session_routes_and_missing_profile(tmp_path, monkeypatch) -> None:
+    from auth.session_probe import PROBEABLE_BROWSER, probe_browser_session, probe_humble_session
+
+    assert "humble" in PROBEABLE_BROWSER
+    monkeypatch.setattr(
+        "auth.secrets.profile_dir",
+        lambda _p: tmp_path / "missing-humble-profile",
+    )
+    err = probe_humble_session({"HUMBLE_PROFILE": "ready"})
+    assert err is not None
+    assert "No saved Humble browser profile" in err
+    with patch("auth.session_probe.probe_humble_session", return_value=None) as mock:
+        assert probe_browser_session("humble", {"HUMBLE_PROFILE": "ready"}) is None
+        mock.assert_called_once()
 
 
 def test_goto_humble_library_retries_on_new_page() -> None:

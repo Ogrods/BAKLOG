@@ -9,6 +9,7 @@ Pro background scheduler to flip the connection light without running a fetch.
 
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
@@ -16,7 +17,7 @@ from clients.gog_client import GOG_AUTH_MESSAGE, GogAuthError, GogClient
 ProbeResult = Literal["ok", "auth_fail", "unreachable"]
 
 # Providers that have a probe implementation in this module.
-PROBEABLE_BROWSER = frozenset({"gog", "xbox_wishlist", "battlenet"})
+PROBEABLE_BROWSER = frozenset({"gog", "xbox_wishlist", "battlenet", "humble"})
 
 # Cheap/no-browser providers eligible for silent hourly health checks.
 PROBEABLE_QUIET = frozenset({"gog", "epic", "steam", "itch", "itad", "psn"})
@@ -38,7 +39,98 @@ def probe_browser_session(provider: str, creds: dict[str, str]) -> str | None:
         return probe_xbox_wishlist_session(creds)
     if provider == "battlenet":
         return probe_battlenet_session(creds.get("BATTLENET_COOKIE", ""))
+    if provider == "humble":
+        return probe_humble_session(creds)
     return None
+
+
+def probe_humble_session(_creds: dict[str, str]) -> str | None:
+    """Relaunch the Humble profile cold and require a durable www session.
+
+    Connect can look authenticated in the live window while the on-disk jar only
+    keeps auth-host Ory cookies. Auto-fetch then hits anonymous session-status
+    and redirects to login. Veto mark_connected until a fresh launch stays signed in.
+    """
+    from auth.cdp_browser import (
+        close_browser_bounded,
+        launch_persistent_profile,
+        release_chromium_profile_lock,
+    )
+    from auth.connect_extractors import (
+        HUMBLE_LIBRARY_URL,
+        HUMBLE_SESSION_STATUS_URL,
+        humble_page_is_confirmed_library_or_store,
+        humble_page_title_looks_login,
+        humble_session_status_authenticated,
+    )
+    from auth.secrets import profile_dir
+
+    if not (_creds.get("HUMBLE_PROFILE") or "").strip():
+        return (
+            "No Humble profile marker captured — sign in at humblebundle.com "
+            "and wait until your library loads."
+        )
+    profile = profile_dir("humble")
+    if not profile.exists():
+        return (
+            "No saved Humble browser profile — Connect again and wait until "
+            "your library loads."
+        )
+    release_chromium_profile_lock(str(profile), wait_sec=3.0)
+    ctx = None
+    try:
+        ctx = launch_persistent_profile(
+            str(profile),
+            headless=False,
+            window_position=(-32000, 0),
+            window_size=(1280, 900),
+        )
+        try:
+            resp = ctx.request.get(HUMBLE_SESSION_STATUS_URL, timeout=15_000)
+            body = (resp.text() or "").strip() if int(getattr(resp, "status", 0) or 0) == 200 else ""
+            if not (
+                body.startswith("{")
+                and humble_session_status_authenticated(json.loads(body))
+            ):
+                return (
+                    "Humble session did not survive Connect. Sign in again and wait "
+                    "until your library stays open before the window closes."
+                )
+        except Exception as exc:  # noqa: BLE001
+            return f"Could not verify Humble session-status after Connect: {exc}"
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        try:
+            page.goto(HUMBLE_LIBRARY_URL, wait_until="commit", timeout=45_000)
+            page.wait_for_timeout(2500)
+        except Exception as exc:  # noqa: BLE001
+            return f"Could not open Humble library after Connect: {exc}"
+        url = getattr(page, "url", None) or ""
+        if not humble_page_is_confirmed_library_or_store(url) or humble_page_title_looks_login(
+            page
+        ):
+            return (
+                "Humble library redirected to login after Connect. Sign in again and "
+                "keep the library open until BAKLOG finishes saving the session."
+            )
+        try:
+            resp = ctx.request.get(HUMBLE_SESSION_STATUS_URL, timeout=15_000)
+            body = (resp.text() or "").strip() if int(getattr(resp, "status", 0) or 0) == 200 else ""
+            if not (
+                body.startswith("{")
+                and humble_session_status_authenticated(json.loads(body))
+            ):
+                return (
+                    "Humble session went anonymous after opening the library. "
+                    "Reconnect and wait until the library finishes loading."
+                )
+        except Exception as exc:  # noqa: BLE001
+            return f"Could not re-check Humble session-status: {exc}"
+        return None
+    except Exception as exc:  # noqa: BLE001
+        return f"Could not verify Humble session after Connect: {exc}"
+    finally:
+        if ctx is not None:
+            close_browser_bounded(ctx)
 
 
 def probe_battlenet_session(cookie: str) -> str | None:

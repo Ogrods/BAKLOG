@@ -69,7 +69,7 @@ _WISHLIST_UNAVAILABLE_MARKERS = (
 # (so Cloudflare lets the store API through) without stealing focus.
 _WL_WINDOW_POS = (-32000, 0)
 _WL_WINDOW_SIZE = (1280, 900)
-_CLEARANCE_WAIT_SEC = 45
+_CLEARANCE_WAIT_SEC = 90
 _LOOKUP_BATCH = 20
 
 HLTB_DELAY_SEC = 1.0
@@ -226,7 +226,23 @@ def _page_shows_wishlist_unavailable(page) -> bool:
     return text_shows_wishlist_unavailable(raw if isinstance(raw, str) else "")
 
 
+def _page_html_snippet(page) -> str:
+    try:
+        html = page.content()
+    except Exception:  # noqa: BLE001
+        return ""
+    return html if isinstance(html, str) else ""
+
+
+def _page_on_cloudflare(page) -> bool:
+    from auth.epic_wishlist_session import cloudflare_interstitial
+
+    raw = getattr(page, "url", None) or ""
+    return cloudflare_interstitial(_page_html_snippet(page), raw)
+
+
 def _page_looks_signed_out(page) -> bool:
+    """True when the session is gone — not during an in-progress CF challenge."""
     raw = getattr(page, "url", None) or ""
     try:
         parsed = urlparse(raw)
@@ -234,6 +250,8 @@ def _page_looks_signed_out(page) -> bool:
         return False
     host = (parsed.hostname or "").lower()
     path = (parsed.path or "").lower()
+    if _page_on_cloudflare(page):
+        return False
     if host == "auth.humblebundle.com":
         return True
     if path.rstrip("/").endswith("/login") or "/login" in path.split("/"):
@@ -587,7 +605,7 @@ def _merge_lookup_into_items(
 
 def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
     """Return (items, signed_out) from the headed Humble wishlist page."""
-    from auth.cdp_browser import STEALTH_INIT_SCRIPT, close_browser_bounded, launch_persistent_profile
+    from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 
     profile = profile_dir("humble")
     if not profile.exists():
@@ -609,7 +627,7 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
         window_size=_WL_WINDOW_SIZE,
     )
     try:
-        ctx.add_init_script(STEALTH_INIT_SCRIPT)
+        # Skip heavy STEALTH_INIT (same as Humble library / Epic Connect).
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         def on_response(resp) -> None:
@@ -647,7 +665,7 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
 
         page.on("response", on_response)
 
-        # Session probe (same as library); fail fast when clearly anonymous.
+        # Soft diagnostic only — cold cookies often look anonymous until page loads.
         try:
             status_resp = ctx.request.get(SESSION_STATUS_URL, timeout=15_000)
             if status_resp.status == 200:
@@ -656,7 +674,11 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
                     from auth.connect_extractors import humble_session_status_authenticated
 
                     if not humble_session_status_authenticated(json.loads(body)):
-                        return [], True
+                        print(
+                            "[humble] wishlist session-status anonymous before navigate; "
+                            "continuing to wishlist",
+                            flush=True,
+                        )
         except Exception:  # noqa: BLE001
             pass
 
@@ -670,7 +692,17 @@ def _fetch_wishlist(*, dump: bool = False) -> tuple[list[WishlistItem], bool]:
         list_resolved = False
         unavailable = False
         deadline = time.time() + _CLEARANCE_WAIT_SEC
+        cf_logged = False
         while time.time() < deadline:
+            if _page_on_cloudflare(page):
+                if not cf_logged:
+                    print(
+                        "[humble] Cloudflare challenge on wishlist; waiting for clearance",
+                        flush=True,
+                    )
+                    cf_logged = True
+                page.wait_for_timeout(1000)
+                continue
             if _page_looks_signed_out(page):
                 return [], True
             if _page_shows_wishlist_unavailable(page):

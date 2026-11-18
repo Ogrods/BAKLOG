@@ -37,6 +37,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Humble library refresh waits out Cloudflare and keeps the Connect session (same approach as Epic)
+- Humble Connect only marks ready after a cold profile re-check so auto-fetch does not open a dead login page
+
 ## [0.9.19] - 2026-11-17
 
 ### Fixed

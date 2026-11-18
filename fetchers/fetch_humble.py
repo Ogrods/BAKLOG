@@ -65,7 +65,8 @@ SESSION_STATUS_URL = "https://www.humblebundle.com/api/auth/session-status"
 # Headed but off-screen: same real-browser fingerprint as Connect / wishlist.
 _LIB_WINDOW_POS = (-32000, 0)
 _LIB_WINDOW_SIZE = (1280, 900)
-_CLEARANCE_WAIT_SEC = 45
+# Epic wishlist keeps polling through CF; Humble needs the same runway.
+_CLEARANCE_WAIT_SEC = 90
 _PAGE_LIMIT = 5
 _PAGE_DELAY_SEC = 0.6
 
@@ -406,7 +407,25 @@ def _dom_library_rows(page) -> list[dict]:
     return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
 
 
+def _page_html_snippet(page) -> str:
+    try:
+        html = page.content()
+    except Exception:  # noqa: BLE001
+        return ""
+    return html if isinstance(html, str) else ""
+
+
+def _page_on_cloudflare(page) -> bool:
+    from auth.epic_wishlist_session import cloudflare_interstitial
+
+    raw = getattr(page, "url", None) or ""
+    return cloudflare_interstitial(_page_html_snippet(page), raw)
+
+
 def _page_looks_signed_out(page) -> bool:
+    """True when the session is gone — not during an in-progress CF challenge."""
+    from auth.connect_extractors import humble_page_title_looks_login
+
     raw = getattr(page, "url", None) or ""
     try:
         parsed = urlparse(raw)
@@ -414,11 +433,21 @@ def _page_looks_signed_out(page) -> bool:
         return False
     host = (parsed.hostname or "").lower()
     path = (parsed.path or "").lower()
+    if _page_on_cloudflare(page):
+        return False
     if host == "auth.humblebundle.com":
         return True
     if path.rstrip("/").endswith("/login") or "/login" in path.split("/"):
         return True
+    # History showed /home/library with a Login title while mid-redirect.
+    if humble_page_title_looks_login(page):
+        return True
     return False
+
+
+def _session_expired_message(page) -> str:
+    url = getattr(page, "url", None) or ""
+    return f"Humble session expired (url={url!r})"
 
 
 def _goto_humble_library(page, ctx, *, on_response=None):
@@ -458,7 +487,7 @@ def fetch_library_items(
     dump: bool = False,
 ) -> list[LibraryItem]:
     """Fetch all library items using the saved Humble profile (redesign UI path)."""
-    from auth.cdp_browser import STEALTH_INIT_SCRIPT, close_browser_bounded, launch_persistent_profile
+    from auth.cdp_browser import close_browser_bounded, launch_persistent_profile
 
     profile = profile_dir("humble")
     if not profile.exists():
@@ -479,7 +508,9 @@ def fetch_library_items(
         window_size=_LIB_WINDOW_SIZE,
     )
     try:
-        ctx.add_init_script(STEALTH_INIT_SCRIPT)
+        # Skip heavy STEALTH_INIT (Epic Connect model): fake plugins/permissions
+        # worsen Cloudflare Bot Management. Launch already applies the light
+        # webdriver mask.
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         def on_response(resp) -> None:
@@ -539,6 +570,30 @@ def fetch_library_items(
             pass
 
         page = _goto_humble_library(page, ctx, on_response=on_response)
+        # Short settle so Ory redirects / Login titles surface before a long wait.
+        try:
+            page.wait_for_timeout(2000)
+        except Exception:  # noqa: BLE001
+            pass
+        if not _page_on_cloudflare(page) and _page_looks_signed_out(page):
+            raise RuntimeError(_session_expired_message(page))
+        try:
+            status_resp = ctx.request.get(SESSION_STATUS_URL, timeout=15_000)
+            if status_resp.status == 200:
+                body = (status_resp.text() or "").strip()
+                if body.startswith("{"):
+                    from auth.connect_extractors import humble_session_status_authenticated
+
+                    if (
+                        not humble_session_status_authenticated(json.loads(body))
+                        and not _page_on_cloudflare(page)
+                        and not captured_payloads
+                    ):
+                        raise RuntimeError(_session_expired_message(page))
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001
+            pass
         discovered = _discover_filter_user_library_action_from_page(page, request_client=ctx.request)
         if discovered:
             known_actions.add(discovered)
@@ -548,15 +603,30 @@ def fetch_library_items(
                     flush=True,
                 )
         deadline = time.time() + _CLEARANCE_WAIT_SEC
+        cf_logged = False
         while time.time() < deadline:
+            if _page_on_cloudflare(page):
+                if not cf_logged:
+                    print(
+                        "[humble] Cloudflare challenge on library; waiting for clearance",
+                        flush=True,
+                    )
+                    cf_logged = True
+                page.wait_for_timeout(1000)
+                continue
             if _page_looks_signed_out(page):
-                raise RuntimeError("Humble session expired")
+                raise RuntimeError(_session_expired_message(page))
             if captured_payloads or _dom_library_rows(page):
                 break
             page.wait_for_timeout(1000)
 
+        if _page_on_cloudflare(page):
+            raise RuntimeError(
+                f"Humble library blocked by Cloudflare "
+                f"(url={getattr(page, 'url', None)!r})"
+            )
         if _page_looks_signed_out(page):
-            raise RuntimeError("Humble session expired")
+            raise RuntimeError(_session_expired_message(page))
 
         found: dict[str, LibraryItem] = {}
         page_num = 1
@@ -571,8 +641,11 @@ def fetch_library_items(
                 page.goto(target, wait_until="domcontentloaded", timeout=60_000)
                 wait_deadline = time.time() + 15
                 while time.time() < wait_deadline and len(captured_payloads) == before:
+                    if _page_on_cloudflare(page):
+                        page.wait_for_timeout(500)
+                        continue
                     if _page_looks_signed_out(page):
-                        raise RuntimeError("Humble session expired")
+                        raise RuntimeError(_session_expired_message(page))
                     page.wait_for_timeout(500)
 
             page_items: list[LibraryItem] = []
@@ -658,7 +731,7 @@ def fetch_library_items(
                 orders_raw = _api_get(ctx, ORDERS_URL)
             except Exception as exc:  # noqa: BLE001
                 if _signed_out(exc):
-                    raise RuntimeError("Humble session expired") from exc
+                    raise RuntimeError(_session_expired_message(page)) from exc
                 raise RuntimeError(
                     "Humble library page returned no items (redesign UI empty or blocked)"
                 ) from exc

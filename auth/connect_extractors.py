@@ -18,7 +18,8 @@ HUMBLE_SESSION_STATUS_URL = "https://www.humblebundle.com/api/auth/session-statu
 # Post-login only (not the Ory login host) so Connect cannot complete mid-auth.
 HUMBLE_SUCCESS_URL_PATTERN = r"humblebundle\.com/(home|store)"
 # Let Edge flush cookies before Connect closes the persistent profile.
-HUMBLE_CONNECT_SETTLE_MS = 1500
+# Short settles were marking ready from a live window that did not survive restart.
+HUMBLE_CONNECT_SETTLE_MS = 4000
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
 # Per-message-key dedupe interval kept for tests that monkeypatch these.
@@ -85,6 +86,17 @@ def humble_page_is_confirmed_library_or_store(url: str) -> bool:
         return False
     path = (urlparse(raw if "://" in raw else f"https://{raw}").path or "").lower()
     return path.startswith("/home/") or path.startswith("/store/")
+
+
+def humble_page_title_looks_login(page: Any) -> bool:
+    """True when the document title is a login page (URL alone can still say /home/library)."""
+    try:
+        title = (page.title() or "").strip().lower()
+    except Exception:  # noqa: BLE001
+        return False
+    if not title:
+        return False
+    return "login" in title or "sign in" in title or "sign-in" in title
 
 
 def _humble_has_session(context: Any) -> bool:
@@ -234,7 +246,12 @@ def gog_connect_hint(page: Any) -> str:
 
 
 def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
-    """Complete Connect only after www library loads and session-status still holds."""
+    """Complete Connect only after www library loads and session-status still holds.
+
+    A live Connect window can look authenticated while the on-disk jar still lacks
+    a durable www session. Settle, then re-check URL + title + session-status
+    before returning ready (post-Connect probe re-opens the profile cold).
+    """
     if not _humble_has_session(context):
         return None
     try:
@@ -245,6 +262,8 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
     url = getattr(page, "url", None) or ""
     if not humble_page_is_confirmed_library_or_store(url):
         return None
+    if humble_page_title_looks_login(page):
+        return None
     # Re-check after navigation so a mid-Ory blip cannot mark the profile ready.
     if not _humble_has_session(context):
         return None
@@ -252,6 +271,13 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
         page.wait_for_timeout(HUMBLE_CONNECT_SETTLE_MS)
     except Exception:  # noqa: BLE001
         pass
+    url = getattr(page, "url", None) or ""
+    if not humble_page_is_confirmed_library_or_store(url):
+        return None
+    if humble_page_title_looks_login(page):
+        return None
+    if not _humble_has_session(context):
+        return None
     return {"HUMBLE_PROFILE": "ready"}
 
 

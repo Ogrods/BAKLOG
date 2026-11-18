@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.19] - 2026-11-17
+
 ### Fixed
 
 - Humble library refresh no longer dies when the browser navigate reply hangs

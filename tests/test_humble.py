@@ -261,7 +261,16 @@ def test_merge_lookup_keeps_rows_missing_from_partial_lookup() -> None:
         WishlistItem("b", "B", None, "https://www.humblebundle.com/store/b", None, None, None, None),
     ]
     looked = [
-        WishlistItem("a", "A", "https://img/a.jpg", "https://www.humblebundle.com/store/a", "$1.00", "$2.00", 50, "USD"),
+        WishlistItem(
+            "a",
+            "A",
+            "https://img/a.jpg",
+            "https://www.humblebundle.com/store/a",
+            "$1.00",
+            "$2.00",
+            50,
+            "USD",
+        ),
     ]
     merged = _merge_lookup_into_items(rows, looked)
     by_id = {it.product_id: it for it in merged}

@@ -7,15 +7,18 @@ import queue
 import threading
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
-from auth.url_hosts import cookie_domain_matches, host_matches
+from auth.url_hosts import cookie_domain_matches, host_matches, hostname_of
 
 HUMBLE_LIBRARY_URL = "https://www.humblebundle.com/home/library"
 # Legacy orders API (404 after the Nov 2026 redesign); kept for fallback probes.
 HUMBLE_ORDERS_API = "https://www.humblebundle.com/api/v1/user/order"
 HUMBLE_SESSION_STATUS_URL = "https://www.humblebundle.com/api/auth/session-status"
-# Matches library + store after sign-in, and the Ory login host during Connect.
-HUMBLE_SUCCESS_URL_PATTERN = r"(humblebundle\.com/(home|store)|auth\.humblebundle\.com)"
+# Post-login only (not the Ory login host) so Connect cannot complete mid-auth.
+HUMBLE_SUCCESS_URL_PATTERN = r"humblebundle\.com/(home|store)"
+# Let Edge flush cookies before Connect closes the persistent profile.
+HUMBLE_CONNECT_SETTLE_MS = 1500
 BATTLENET_GAMES_URL = "https://account.battle.net/games"
 BATTLENET_ACCOUNT_API = "https://account.battle.net/api/games-and-subs"
 # Per-message-key dedupe interval kept for tests that monkeypatch these.
@@ -68,6 +71,20 @@ def humble_session_status_authenticated(payload: Any) -> bool:
     if payload.get("is_logged_in") is True:
         return True
     return False
+
+
+def humble_page_is_confirmed_library_or_store(url: str) -> bool:
+    """True when the page is on www Humble /home/* or /store/* (not Ory login)."""
+    raw = (url or "").strip()
+    if not raw:
+        return False
+    host = hostname_of(raw)
+    if not host or host_matches(host, "auth.humblebundle.com"):
+        return False
+    if not host_matches(host, "humblebundle.com"):
+        return False
+    path = (urlparse(raw if "://" in raw else f"https://{raw}").path or "").lower()
+    return path.startswith("/home/") or path.startswith("/store/")
 
 
 def _humble_has_session(context: Any) -> bool:
@@ -217,14 +234,25 @@ def gog_connect_hint(page: Any) -> str:
 
 
 def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
-    if _humble_has_session(context):
-        try:
-            page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
-            page.wait_for_timeout(800)
-        except Exception:  # noqa: BLE001
-            pass
-        return {"HUMBLE_PROFILE": "ready"}
-    return None
+    """Complete Connect only after www library loads and session-status still holds."""
+    if not _humble_has_session(context):
+        return None
+    try:
+        page.goto(HUMBLE_LIBRARY_URL, wait_until="domcontentloaded", timeout=15_000)
+        page.wait_for_timeout(800)
+    except Exception:  # noqa: BLE001
+        return None
+    url = getattr(page, "url", None) or ""
+    if not humble_page_is_confirmed_library_or_store(url):
+        return None
+    # Re-check after navigation so a mid-Ory blip cannot mark the profile ready.
+    if not _humble_has_session(context):
+        return None
+    try:
+        page.wait_for_timeout(HUMBLE_CONNECT_SETTLE_MS)
+    except Exception:  # noqa: BLE001
+        pass
+    return {"HUMBLE_PROFILE": "ready"}
 
 
 def humble_connect_hint(page: Any) -> str:

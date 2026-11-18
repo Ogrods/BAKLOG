@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.20] - 2026-11-18
+
 ### Fixed
 
 - Humble library refresh waits out Cloudflare and keeps the Connect session (same approach as Epic)

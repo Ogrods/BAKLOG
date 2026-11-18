@@ -15,14 +15,22 @@ from fetchers.fetch_humble import (
     LIBRARY_URL,
     LibraryItem,
     _build_row,
+    _discover_filter_user_library_action,
     _extract_filter_user_library_payload,
     _item_from_library_result,
+    _looks_like_filter_user_library_payload,
     _parse_order_detail,
     _subproduct_is_game,
 )
 from fetchers.fetch_humble_wishlist import (
     WishlistItem,
+    _discover_wishlist_action_ids,
+    _extract_wishlist_payload,
     _item_from_lookup,
+    _item_from_wishlist_row,
+    _looks_like_wishlist_payload,
+    _slugs_from_payload,
+    text_shows_wishlist_unavailable,
 )
 from fetchers.fetch_humble_wishlist import (
     _build_row as _build_wishlist_row,
@@ -30,6 +38,12 @@ from fetchers.fetch_humble_wishlist import (
 
 ORDER_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_order_detail.json"
 LOOKUP_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_lookup.json"
+WISHLIST_ACTION_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_action_page.json"
+)
+WISHLIST_INTERSTITIAL_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_interstitial.html"
+)
 LIBRARY_FILTER_FIXTURE = (
     Path(__file__).resolve().parent / "fixtures" / "humble_library_filter_page.json"
 )
@@ -120,6 +134,7 @@ def test_extract_filter_user_library_payload_plain_json() -> None:
     assert extracted is not None
     assert len(extracted["results"]) == 3
     assert extracted["pagination"]["totalPages"] == 2
+    assert _looks_like_filter_user_library_payload(extracted)
 
 
 def test_extract_filter_user_library_payload_flight_embedded() -> None:
@@ -128,6 +143,18 @@ def test_extract_filter_user_library_payload_flight_embedded() -> None:
     extracted = _extract_filter_user_library_payload(flight)
     assert extracted is not None
     assert extracted["results"][0]["title"] == "Celeste"
+
+
+def test_discover_filter_user_library_action_from_bundle_snippet() -> None:
+    action = "60199147c9d010842d98602b018a506278c5317f8e"
+    snippet = (
+        f'e.s("next-flight-loader","{action}",rn.callServer,void 0,'
+        'rn.findSourceMapURL,"filterUserLibrary");'
+    )
+    assert _discover_filter_user_library_action(snippet) == action
+    assert _discover_filter_user_library_action("nope") is None
+    assert not _looks_like_filter_user_library_payload({"results": "bad"})
+    assert _looks_like_filter_user_library_payload({"results": [{"title": "X"}]})
 
 
 def test_item_from_library_result_games_only() -> None:
@@ -167,5 +194,45 @@ def test_build_wishlist_row_schema() -> None:
     assert row["wishlist_store"] == "humble"
     assert row["id"] == "humble-hollow_knight"
     assert row["humble_product_id"] == "hollow_knight"
+
+
+def test_wishlist_interstitial_detection() -> None:
+    html = WISHLIST_INTERSTITIAL_FIXTURE.read_text(encoding="utf-8")
+    assert text_shows_wishlist_unavailable(html)
+    assert not text_shows_wishlist_unavailable("<html><body>Your Wishlist</body></html>")
+
+
+def test_extract_wishlist_action_payload() -> None:
+    data = json.loads(WISHLIST_ACTION_FIXTURE.read_text(encoding="utf-8"))
+    extracted = _extract_wishlist_payload(json.dumps(data))
+    assert extracted is not None
+    assert _looks_like_wishlist_payload(extracted)
+    slugs = _slugs_from_payload(extracted)
+    assert "hollow_knight" in slugs
+    assert "celeste" in slugs
+    items = [it for it in (_item_from_wishlist_row(r) for r in extracted["results"]) if it]
+    names = {it.title for it in items}
+    assert "Hollow Knight" in names
+    assert "Celeste" in names
+    hollow = next(it for it in items if it.title == "Hollow Knight")
+    assert hollow.price == "$14.99"
+
+
+def test_extract_wishlist_payload_flight_embedded() -> None:
+    data = json.loads(WISHLIST_ACTION_FIXTURE.read_text(encoding="utf-8"))
+    flight = f'0:["$@1"]\n1:{json.dumps(data)}'
+    extracted = _extract_wishlist_payload(flight)
+    assert extracted is not None
+    assert extracted["results"][0]["machine_name"] == "hollow_knight"
+
+
+def test_discover_wishlist_action_ids() -> None:
+    snippet = (
+        'e.s("x","60aabbccddeeff00112233445566778899aabbccdd",rn.callServer,void 0,'
+        'rn.findSourceMapURL,"filterUserWishlist");'
+    )
+    ids = _discover_wishlist_action_ids(snippet)
+    assert "60aabbccddeeff00112233445566778899aabbccdd" in ids
+    assert _discover_wishlist_action_ids("nope") == []
 
 

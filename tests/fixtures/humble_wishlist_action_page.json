@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "machine_name": "hollow_knight",
+      "human_name": "Hollow Knight",
+      "human_url": "hollow-knight",
+      "large_capsule": "https://cdn.humblebundle.com/images/hollow_knight.jpg",
+      "current_price": { "currency": "USD", "amount": 14.99 },
+      "full_price": { "currency": "USD", "amount": 14.99 }
+    },
+    {
+      "machine_name": "celeste",
+      "title": "Celeste",
+      "slug": "celeste"
+    }
+  ],
+  "pagination": { "page": 1, "totalPages": 1 },
+  "success": true
+}

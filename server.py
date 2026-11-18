@@ -1519,6 +1519,7 @@ class Handler(SimpleHTTPRequestHandler):
                         "supports_refresh": bool(v.get("refreshArgs")),
                         "platforms": v.get("platforms") or [],
                         "available": platform_supported(v.get("platforms")),
+                        "pausedReason": v.get("pausedReason"),
                     }
                     for k, v in FETCHERS.items()
                 ],
@@ -1869,6 +1870,10 @@ class Handler(SimpleHTTPRequestHandler):
                 "error": f"{FETCHERS[key]['label']} is only available on {allowed} "
                          f"(this server runs on {sys.platform})."
             })
+            return
+        paused_reason = (FETCHERS[key].get("pausedReason") or "").strip()
+        if paused_reason:
+            _send_json(self, HTTPStatus.BAD_REQUEST, {"error": paused_reason})
             return
         if refresh and not FETCHERS[key].get("refreshArgs"):
             _send_json(self, HTTPStatus.BAD_REQUEST, {"error": f"{key} does not support refresh"})

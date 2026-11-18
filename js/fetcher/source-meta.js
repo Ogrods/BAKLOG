@@ -63,7 +63,7 @@ const CLICK_HINTS = {
   wishlistUbisoft: 'Sync your Ubisoft Store wishlist',
   wishlistXbox: 'Sync your Xbox Store wishlist',
   wishlistNintendo: 'Sync your Nintendo Store wishlist',
-  wishlistHumble: 'Sync your Humble Store wishlist',
+  wishlistHumble: 'Humble wishlist is offline during their site upgrade (library sync still works)',
   itad: 'Refresh wishlist price quotes from IsThereAnyDeal',
   claims: 'Download free claimable games (aggregated via Epic, GamerPower, IsThereAnyDeal)',
   hltb: "Look up HowLongToBeat hours for games we haven't checked yet",
@@ -375,6 +375,7 @@ export async function loadFetcherSources(force = false) {
         supportsRefresh: !!(entry.supports_refresh || refreshByKey[entry.key]),
         available: entry.available !== false,
         platforms: entry.platforms || [],
+        pausedReason: entry.pausedReason || null,
       })));
       return fetcherSources;
     }
@@ -395,6 +396,9 @@ export async function loadFetcherSources(force = false) {
         requires: entry.requires || [],
         missingRequirements: [],
         supportsRefresh: !!refreshByKey[entry.key],
+        available: entry.available !== false,
+        platforms: entry.platforms || [],
+        pausedReason: entry.pausedReason || null,
       })));
     }
   } catch (_) {}

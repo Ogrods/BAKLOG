@@ -49,8 +49,14 @@ from fetchers._progress import EXIT_CODE_AUTH, HeartbeatTimer, RunStats, run_wit
 
 GAMES_HUMBLE_JSON = Path("games_humble.json")
 LIBRARY_URL = "https://www.humblebundle.com/home/library"
-# Next.js server action id for filterUserLibrary (from /home/library client bundle).
+# Last-known-good Next.js server action id for filterUserLibrary. Prefer runtime
+# discovery from the /home/library client bundle; accept any parseable library
+# payload when the hash rotates on a Humble deploy.
 FILTER_USER_LIBRARY_ACTION = "60199147c9d010842d98602b018a506278c5317f8e"
+_FILTER_USER_LIBRARY_ACTION_RE = re.compile(
+    r"""["']([a-f0-9]{40,44})["'].{0,160}?filterUserLibrary""",
+    re.DOTALL,
+)
 # Legacy endpoints (kept for dump/fallback; redesign returns 404 HTML).
 ORDERS_URL = "https://www.humblebundle.com/api/v1/user/order"
 ORDER_DETAIL_URL = "https://www.humblebundle.com/api/v1/order/{gamekey}?all_tpkds=true"
@@ -213,6 +219,72 @@ def _parse_order_detail(data: dict, *, include_nongames: bool) -> list[LibraryIt
     return items
 
 
+def _looks_like_filter_user_library_payload(obj: Any) -> bool:
+    """True when ``obj`` matches the filterUserLibrary `{results, ...}` shape."""
+    if not isinstance(obj, dict) or not isinstance(obj.get("results"), list):
+        return False
+    # Prefer payloads that also carry pagination/success, but accept a plain
+    # results list so a Humble deploy that trims metadata still syncs.
+    if "pagination" in obj or "success" in obj:
+        return True
+    return bool(obj["results"])
+
+
+def _discover_filter_user_library_action(text: str) -> str | None:
+    """Extract the current filterUserLibrary Next.js action id from JS/HTML."""
+    if not text or "filterUserLibrary" not in text:
+        return None
+    m = _FILTER_USER_LIBRARY_ACTION_RE.search(text)
+    return m.group(1) if m else None
+
+
+def _discover_filter_user_library_action_from_page(page) -> str | None:
+    """Scrape linked /home/library chunks for the live filterUserLibrary action id."""
+    try:
+        srcs = page.evaluate(
+            """() => Array.from(document.querySelectorAll('script[src]'))
+                .map(s => s.getAttribute('src') || '')
+                .filter(Boolean)""",
+            timeout=10,
+        )
+    except Exception:  # noqa: BLE001
+        srcs = []
+    if not isinstance(srcs, list):
+        srcs = []
+    # Inline scripts first (cheap), then same-origin chunks that mention the action.
+    try:
+        inline = page.evaluate(
+            """() => Array.from(document.querySelectorAll('script:not([src])'))
+                .map(s => s.textContent || '').join('\\n')""",
+            timeout=10,
+        )
+    except Exception:  # noqa: BLE001
+        inline = ""
+    found = _discover_filter_user_library_action(inline if isinstance(inline, str) else "")
+    if found:
+        return found
+    origin = "https://www.humblebundle.com"
+    for src in srcs:
+        if not isinstance(src, str) or not src:
+            continue
+        url = src if src.startswith("http") else f"{origin}{src}" if src.startswith("/") else f"{origin}/{src}"
+        if "/_next/" not in url:
+            continue
+        try:
+            api = getattr(page, "request", None) or getattr(getattr(page, "context", None), "request", None)
+            if api is None:
+                break
+            resp = api.get(url, timeout=20_000)
+            if int(getattr(resp, "status", 0) or 0) != 200:
+                continue
+            found = _discover_filter_user_library_action(resp.text() or "")
+            if found:
+                return found
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
 def _extract_filter_user_library_payload(text: str) -> dict[str, Any] | None:
     """Pull ``{results, pagination, success}`` out of a Next.js action / RSC body."""
     if not text:
@@ -221,7 +293,7 @@ def _extract_filter_user_library_payload(text: str) -> dict[str, Any] | None:
     if stripped.startswith("{") and '"results"' in stripped:
         try:
             obj = json.loads(stripped)
-            if isinstance(obj, dict) and isinstance(obj.get("results"), list):
+            if _looks_like_filter_user_library_payload(obj):
                 return obj
         except json.JSONDecodeError:
             pass
@@ -247,7 +319,7 @@ def _extract_filter_user_library_payload(text: str) -> dict[str, Any] | None:
             obj = json.loads(text[start:end])
         except json.JSONDecodeError:
             continue
-        if isinstance(obj, dict) and isinstance(obj.get("results"), list):
+        if _looks_like_filter_user_library_payload(obj):
             if best is None or len(obj["results"]) >= len(best.get("results") or []):
                 best = obj
     return best
@@ -377,6 +449,8 @@ def fetch_library_items(
 
     captured_payloads: list[dict[str, Any]] = []
     dump_samples: list[dict[str, Any]] = []
+    # Preferred action ids: last-known-good + anything discovered from page JS.
+    known_actions: set[str] = {FILTER_USER_LIBRARY_ACTION}
 
     ctx = launch_persistent_profile(
         str(profile),
@@ -394,18 +468,34 @@ def fetch_library_items(
                 headers = {k.lower(): v for k, v in (getattr(req, "headers", None) or {}).items()}
                 action = headers.get("next-action") or ""
                 url = (getattr(resp, "url", None) or "").lower()
-                if action != FILTER_USER_LIBRARY_ACTION and "home/library" not in url:
-                    return
-                if action and action != FILTER_USER_LIBRARY_ACTION:
+                on_library = "home/library" in url
+                # Prefer known/discovered action ids; also accept /home/library
+                # responses so a rotated hash still syncs via payload shape.
+                if action:
+                    if action not in known_actions and not on_library:
+                        return
+                elif not on_library:
                     return
                 if int(getattr(resp, "status", 0) or 0) != 200:
                     return
                 text = resp.text()
+                # Learn the live action id from JS chunks that mention it.
+                discovered = _discover_filter_user_library_action(text)
+                if discovered:
+                    known_actions.add(discovered)
                 payload = _extract_filter_user_library_payload(text)
                 if payload:
+                    if action:
+                        known_actions.add(action)
                     captured_payloads.append(payload)
                     if dump:
-                        dump_samples.append({"url": getattr(resp, "url", ""), "payload": payload})
+                        dump_samples.append(
+                            {
+                                "url": getattr(resp, "url", ""),
+                                "next_action": action or None,
+                                "payload": payload,
+                            }
+                        )
             except Exception:  # noqa: BLE001
                 pass
 
@@ -427,6 +517,14 @@ def fetch_library_items(
             pass
 
         page.goto(LIBRARY_URL, wait_until="domcontentloaded", timeout=60_000)
+        discovered = _discover_filter_user_library_action_from_page(page)
+        if discovered:
+            known_actions.add(discovered)
+            if discovered != FILTER_USER_LIBRARY_ACTION:
+                print(
+                    f"[humble] filterUserLibrary action id updated: {discovered[:12]}…",
+                    flush=True,
+                )
         deadline = time.time() + _CLEARANCE_WAIT_SEC
         while time.time() < deadline:
             if _page_looks_signed_out(page):

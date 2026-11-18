@@ -40,6 +40,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Humble Connect and library sync work with Humble's redesigned site (session check + `/home/library` list) after the old orders API stopped responding
+- Humble library sync discovers the live `filterUserLibrary` Next.js action id from `/home/library` bundles (and accepts parseable library payloads) so a Humble client deploy that rotates the action hash does not hard-break capture; DOM row fallback remains
+- Humble wishlist sync matches the redesigned store shell (session check, Next action sniffing + discovery, DOM product-link fallback, `/store/api/lookup` price enrich). While Humble shows the "Wishlist Will Be Back ASAP" interstitial the fetcher exits cleanly without invalidating the shared Humble login
+- WL Humble chip stays visible but disabled (with a pause tooltip) and skips auto-fetch while Humble has wishlist offline; remove `pausedReason` / re-enable `autoFetch` when they restore it
 
 ## [0.9.15] - 2026-11-17
 

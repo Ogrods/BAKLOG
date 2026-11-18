@@ -40,6 +40,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 
 - Humble Connect no longer reloads the library in a loop while you are still signing in
+- After Humble library loads, Connect retries a couple of quiet refreshes to save the login cookie instead of hanging
 
 ## [0.9.21] - 2026-11-18
 

@@ -1,22 +1,6 @@
 {
-  "generated_at": "2026-11-19T21:34:20.008891+00:00",
+  "generated_at": "2026-11-19T22:44:35.310117+00:00",
   "items": [
-    {
-      "id": "epic_mobile-lonesome-village",
-      "store": "epic_mobile",
-      "title": "Lonesome Village",
-      "claim_urls": {
-        "ios": "https://store.epicgames.com/p/lonesome-village-ios-2a807f",
-        "android": "https://store.epicgames.com/p/lonesome-village-android-15d165"
-      },
-      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/1418360/library_600x900_2x.jpg",
-      "genres": [],
-      "blurb": null,
-      "ends_at": "2026-11-26T07:59:59Z",
-      "steam_appid": 1418360,
-      "review_percent": 76,
-      "first_seen": "2026-11-19T21:34:17Z"
-    },
     {
       "id": "epic-mark-of-the-deep-f7dc08",
       "store": "epic",

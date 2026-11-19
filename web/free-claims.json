@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-11-18T01:02:32.069697+00:00",
+  "generated_at": "2026-11-19T18:54:58.257845+00:00",
   "items": [
     {
-      "id": "epic-knightica-3be45c",
+      "id": "epic-mark-of-the-deep-f7dc08",
       "store": "epic",
-      "title": "Knightica",
-      "claim_url": "https://store.epicgames.com/en-US/p/knightica-3be45c",
-      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3093400/header.jpg?t=1794935214",
+      "title": "Mark of the Deep",
+      "claim_url": "https://store.epicgames.com/en-US/p/mark-of-the-deep-f7dc08",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1933370/d353e340086cd4d46263cfe02c25469b56c87862/header.jpg?t=1788364373",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-11-19T16:00:00Z",
-      "steam_appid": 3093400,
-      "review_percent": 75,
+      "ends_at": "2026-11-26T16:00:00Z",
+      "steam_appid": 1933370,
+      "review_percent": 72,
       "source": "epic",
-      "first_seen": "2026-11-18T01:01:55Z"
+      "first_seen": "2026-11-19T18:54:18Z"
     },
     {
       "id": "gamerpower-3852",

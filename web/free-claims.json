@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-19T22:44:35.310117+00:00",
+  "generated_at": "2026-11-23T06:30:44.721849+00:00",
   "items": [
     {
       "id": "epic-mark-of-the-deep-f7dc08",
@@ -40,18 +40,6 @@
       "review_percent": 64,
       "source": "gamerpower",
       "first_seen": "2026-11-02T21:59:37Z"
-    },
-    {
-      "id": "gamerpower-3830",
-      "store": "itch",
-      "title": "Free itch.io Games Bundle",
-      "claim_url": "https://www.gamerpower.com/open/free-itch-io-games-bundle",
-      "header_image": "https://www.gamerpower.com/offers/1b/6ae264e50edb5.jpg",
-      "genres": [],
-      "blurb": "Claim this bundle (worth $384) and download 116 games for free on itch.io! No strings attached!",
-      "ends_at": "2026-11-22T23:59:00Z",
-      "source": "gamerpower",
-      "first_seen": "2026-10-29T23:12:10Z"
     },
     {
       "id": "gamerpower-3340",

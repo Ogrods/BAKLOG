@@ -173,7 +173,7 @@
       box-sizing: border-box;
     }
 
-    /* Ambient mesh glow behind the hero (sweep + accel/decel, desynced layers) */
+    /* Ambient mesh glow behind the hero (sweep + opacity wash, desynced layers) */
     .hero::before,
     .hero::after {
       content: "";
@@ -186,18 +186,17 @@
       inset: -20% -10% auto -10%;
       height: 120%;
       background:
-        radial-gradient(50% 45% at 50% 18%, rgba(56, 189, 248, 0.20), transparent 70%),
-        radial-gradient(45% 40% at 78% 10%, rgba(168, 85, 247, 0.16), transparent 70%),
-        radial-gradient(40% 38% at 20% 22%, rgba(34, 211, 238, 0.12), transparent 70%);
+        radial-gradient(50% 45% at 50% 18%, rgba(56, 189, 248, 0.30), transparent 70%),
+        radial-gradient(45% 40% at 78% 10%, rgba(168, 85, 247, 0.24), transparent 70%),
+        radial-gradient(40% 38% at 20% 22%, rgba(34, 211, 238, 0.18), transparent 70%);
     }
     .hero::after {
       inset: -28% -16% auto -16%;
       height: 135%;
       background:
-        radial-gradient(42% 40% at 22% 28%, rgba(56, 189, 248, 0.22), transparent 68%),
-        radial-gradient(48% 42% at 88% 8%, rgba(168, 85, 247, 0.18), transparent 65%),
-        radial-gradient(36% 34% at 62% 42%, rgba(34, 211, 238, 0.12), transparent 70%);
-      opacity: 0.7;
+        radial-gradient(42% 40% at 22% 28%, rgba(56, 189, 248, 0.32), transparent 68%),
+        radial-gradient(48% 42% at 88% 8%, rgba(168, 85, 247, 0.26), transparent 65%),
+        radial-gradient(36% 34% at 62% 42%, rgba(34, 211, 238, 0.18), transparent 70%);
     }
     @media (prefers-reduced-motion: no-preference) {
       .hero::before {
@@ -209,24 +208,24 @@
       }
     }
     @keyframes hero-mesh-a {
-      0%   { transform: translate3d(-11%, 3%, 0) scale(1.04); opacity: 0.65; }
-      18%  { transform: translate3d(-11%, 3%, 0) scale(1.04); opacity: 0.65; }
-      50%  { transform: translate3d(12%, -4%, 0) scale(1.14); opacity: 1; }
-      82%  { transform: translate3d(12%, -4%, 0) scale(1.14); opacity: 1; }
-      100% { transform: translate3d(-11%, 3%, 0) scale(1.04); opacity: 0.65; }
+      0%   { transform: translate3d(-14%, 3%, 0) scale(1.03); opacity: 0.72; }
+      18%  { transform: translate3d(-14%, 3%, 0) scale(1.03); opacity: 0.78; }
+      50%  { transform: translate3d(14%, -5%, 0) scale(1.16); opacity: 1; }
+      82%  { transform: translate3d(14%, -5%, 0) scale(1.16); opacity: 0.94; }
+      100% { transform: translate3d(-14%, 3%, 0) scale(1.03); opacity: 0.72; }
     }
     @keyframes hero-mesh-b {
-      0%   { transform: translate3d(12%, -3%, 0) scale(1.10); opacity: 0.95; }
-      18%  { transform: translate3d(12%, -3%, 0) scale(1.10); opacity: 0.95; }
-      50%  { transform: translate3d(-12%, 4%, 0) scale(1.04); opacity: 0.3; }
-      82%  { transform: translate3d(-12%, 4%, 0) scale(1.04); opacity: 0.3; }
-      100% { transform: translate3d(12%, -3%, 0) scale(1.10); opacity: 0.95; }
+      0%   { transform: translate3d(14%, -3%, 0) scale(1.12); opacity: 0.95; }
+      18%  { transform: translate3d(14%, -3%, 0) scale(1.12); opacity: 0.88; }
+      50%  { transform: translate3d(-15%, 5%, 0) scale(1.03); opacity: 0.55; }
+      82%  { transform: translate3d(-15%, 5%, 0) scale(1.03); opacity: 0.62; }
+      100% { transform: translate3d(14%, -3%, 0) scale(1.12); opacity: 0.95; }
     }
 
     .hero-mark-wrap {
       display: inline-block;
       line-height: 0;
-      filter: drop-shadow(0 12px 40px rgba(56, 189, 248, 0.28));
+      filter: drop-shadow(0 12px 44px rgba(56, 189, 248, 0.36));
     }
 
     .hero-mark {

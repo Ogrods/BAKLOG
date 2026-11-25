@@ -187,17 +187,31 @@ class GogClient:
         products: list[dict] = []
         page = 1
         total_pages = 1
+        seen_page_ids: set[tuple] = set()
         while True:
             hb.tick_progress(page, total_pages, "GOG library pages", f"{len(products)} products")
             data = self.get_filtered_products(page, refresh=refresh)
             batch = data.get("products", [])
             if not batch:
                 break
+            page_ids = tuple(str(p.get("id") or "") for p in batch)
+            if page_ids in seen_page_ids:
+                break
+            seen_page_ids.add(page_ids)
             products.extend(batch)
-            total_pages = data.get("totalPages") or data.get("total_pages") or page
-            if page >= total_pages:
+            reported = data.get("totalPages") or data.get("total_pages")
+            if reported:
+                total_pages = int(reported)
+                if page >= total_pages:
+                    break
+            elif len(batch) < 50:
+                # No totals and a short page - treat as last page.
                 break
             page += 1
+            if page > 200:
+                break
+            if not reported:
+                total_pages = page
         heartbeat(progress_line(page, total_pages, "GOG library", f"{len(products)} products"))
         return products
 

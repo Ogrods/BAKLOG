@@ -15,6 +15,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 
 from auth import mark_invalid, resolve_env
@@ -247,6 +248,9 @@ def main() -> int:
         stats.error(str(e))
         mark_invalid("itad", error=str(e))
         return stats.finish("fetch_itad", t0, exit_code=EXIT_CODE_AUTH)
+    except requests.HTTPError as e:
+        stats.error(f"ITAD request failed: {e}")
+        return stats.finish("fetch_itad", t0, exit_code=1)
 
     by_key: dict[str, dict] = {}
     for key, plain in plain_by_key.items():

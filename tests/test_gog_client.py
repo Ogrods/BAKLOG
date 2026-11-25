@@ -91,3 +91,33 @@ class TestValidateSession:
 
         with patch.object(client.session, "get", side_effect=fake_get):
             assert client.validate_session() is True
+
+
+class TestGetAllFilteredProducts:
+    def test_stops_when_total_pages_missing_and_page_repeats(self, client: GogClient):
+        """Without totalPages, identical page payloads must not loop forever."""
+        page_payload = {
+            "products": [{"id": i, "title": f"G{i}"} for i in range(50)],
+        }
+        calls = {"n": 0}
+
+        def side_effect(page: int, refresh: bool = False):
+            calls["n"] += 1
+            return page_payload
+
+        with patch.object(client, "get_filtered_products", side_effect=side_effect):
+            products = client.get_all_filtered_products(refresh=True)
+
+        assert len(products) == 50
+        assert calls["n"] == 2  # page 1 + duplicate page 2 then stop
+
+    def test_honors_total_pages(self, client: GogClient):
+        def side_effect(page: int, refresh: bool = False):
+            return {
+                "products": [{"id": page, "title": f"P{page}"}],
+                "totalPages": 2,
+            }
+
+        with patch.object(client, "get_filtered_products", side_effect=side_effect):
+            products = client.get_all_filtered_products(refresh=True)
+        assert [p["id"] for p in products] == [1, 2]

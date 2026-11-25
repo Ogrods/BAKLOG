@@ -371,6 +371,7 @@ class PsnClient:
                 url=WISHLIST_GQL_URL,
                 params=params,
                 headers=headers,
+                timeout=30,
             )
         except PSNAWPAuthenticationError as exc:
             raise PsnAuthError(

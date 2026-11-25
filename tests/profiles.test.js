@@ -36,6 +36,8 @@ import {
   clearProfileLocalStorage,
   resetProfileClientCache,
   friendlyPinError,
+  isRunsStoppingError,
+  postActiveProfileWithStoppingRetry,
   profileDisplayLabel,
   activeProfileId,
 } from '../js/profiles.js';
@@ -173,6 +175,44 @@ describe('profiles storage keys', () => {
       'too many PIN attempts - try again in 30 seconds',
     );
     expect(friendlyPinError('')).toBe('Could not switch profile.');
+  });
+
+  it('isRunsStoppingError matches code or still-stopping message', () => {
+    expect(isRunsStoppingError({ code: 'runs_stopping', message: 'x' })).toBe(true);
+    expect(
+      isRunsStoppingError({
+        message: 'A refresh is still stopping. Try again in a few seconds.',
+      }),
+    ).toBe(true);
+    expect(isRunsStoppingError({ code: 'pin_required', message: 'pin_required' })).toBe(false);
+  });
+
+  it('postActiveProfileWithStoppingRetry retries once on runs_stopping then succeeds', async () => {
+    const sleeps = [];
+    const postActive = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('A refresh is still stopping. Try again in a few seconds.'), {
+          code: 'runs_stopping',
+        }),
+      )
+      .mockResolvedValueOnce({ ok: true });
+    await postActiveProfileWithStoppingRetry(postActive, { id: 'work' }, {
+      delayMs: 10,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    expect(postActive).toHaveBeenCalledTimes(2);
+    expect(sleeps).toEqual([10]);
+  });
+
+  it('postActiveProfileWithStoppingRetry does not retry unrelated errors', async () => {
+    const postActive = vi.fn().mockRejectedValueOnce(new Error('incorrect_pin'));
+    await expect(
+      postActiveProfileWithStoppingRetry(postActive, { id: 'work' }, { delayMs: 10, sleep: async () => {} }),
+    ).rejects.toThrow('incorrect_pin');
+    expect(postActive).toHaveBeenCalledTimes(1);
   });
 
   it('uses localStorage active profile when local profiles enabled under account auth', () => {

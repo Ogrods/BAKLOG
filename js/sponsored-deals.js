@@ -41,6 +41,7 @@
  */
 import { state } from './state.js';
 import { escapeHtml, escapeAttr, isSafeHttpUrl, formatNum } from './dom-util.js';
+import { metaText } from './spotlight-meta.js';
 import { normalizeNameForDedup, combinedPlaytime } from './game-core.js';
 import { isOwnedByTitle } from './deals.js';
 import { dataFetch } from './api-client.js';
@@ -1638,9 +1639,9 @@ export function sponsorToSpotlightGame(item) {
     _spotlightReason: {
       eyebrow: isHouse ? 'BAKLOG Pro' : disclosure,
       score: 100 - (item.priority ?? 50),
-      // metaParts is joined into innerHTML by cover-art spotlight slides;
-      // escape feed text here. Logo slides read the raw `tagline` field.
-      metaParts: tagline ? [escapeHtml(tagline)] : [],
+      // Cover-art spotlight renders metaParts via renderMetaParts ({text} escaped).
+      // Logo slides read the raw `tagline` field.
+      metaParts: tagline ? [metaText(tagline)] : [],
       tagline,
       slogan,
       isSponsored: true,

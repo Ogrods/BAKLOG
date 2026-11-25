@@ -49,11 +49,14 @@ from fetchers.fetch_humble_wishlist import (
     _build_row as _build_wishlist_row,
 )
 from fetchers.humble_library_api import (
+    EMPTY_LIBRARY_ACTION_STATE,
     extract_bundle_items,
     item_from_result,
+    library_action_form_fields,
     match_cached_row,
     order_entitlements,
     parse_flight_rows,
+    prev_state_from_action_body,
 )
 
 ORDER_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_order_detail.json"
@@ -498,6 +501,42 @@ def test_extract_filter_user_library_payload_flight_embedded() -> None:
     assert extracted["results"][0]["title"] == "Celeste"
     rows = parse_flight_rows(flight)
     assert "1" in rows
+
+
+def test_prev_state_from_action_body_preserves_undefined() -> None:
+    """Chained field 0 must keep raw $undefined (parse/stringify stalls page 2+)."""
+    raw_payload = (
+        '{"results":[{"id":"x","title":"T","downloads":"$undefined"}],'
+        '"pagination":{"page":1,"totalPages":2,"totalDocs":6},"success":true}'
+    )
+    flight = f'0:{{"a":"$@1"}}\n1:{raw_payload}\n'
+    prev = prev_state_from_action_body(flight)
+    assert prev is not None
+    assert prev.startswith("[{")
+    assert prev.endswith(',"$K1"]')
+    assert '"$undefined"' in prev
+    assert prev == f'[{raw_payload},"$K1"]'
+    assert prev_state_from_action_body("") is None
+    assert prev_state_from_action_body("0:ok\n") is None
+
+
+def test_library_action_form_fields_chains_prev_state() -> None:
+    chained = '[{"results":[],"pagination":{"page":1,"totalPages":1,"totalDocs":0},"success":true},"$K1"]'
+    fields = library_action_form_fields(
+        page=2,
+        limit=5,
+        cursor=10,
+        request_id="bk2",
+        prev_state=chained,
+    )
+    assert fields["0"] == chained
+    assert fields["_1_page"] == "2"
+    assert fields["_1_cursor"] == "10"
+    assert fields["_1_limit"] == "5"
+    empty = library_action_form_fields(
+        page=1, limit=5, cursor=0, request_id="bk1"
+    )
+    assert empty["0"] == EMPTY_LIBRARY_ACTION_STATE
 
 
 def test_discover_filter_user_library_action_from_bundle_snippet() -> None:

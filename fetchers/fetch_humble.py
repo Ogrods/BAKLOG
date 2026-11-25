@@ -7,9 +7,9 @@ After Humble's Nov 2026 redesign the legacy JSON endpoints
 (``/api/v1/user/order``, ``/api/v1/order/{gamekey}``) return 404. The site
 library at ``/home/library`` loads via a Next.js server action
 (``filterUserLibrary``). This fetcher lands on that page in a headed
-off-screen Chrome, discovers the live action id, then pages the library with
-in-page ``fetch`` (limit=100) so Cloudflare clearance and cookies stay in the
-real browser. No response-body sniffing.
+off-screen Chrome, discovers the live action id, then pages via in-page
+``fetch`` (limit=5, cursor=5*page) while chaining useActionState field ``0``
+so Cloudflare clearance and cookies stay in the real browser.
 
 Emits games-only rows by default (drops ebooks, comics, audiobooks, software).
 """
@@ -60,6 +60,7 @@ from fetchers.humble_library_api import (
     match_cached_row,
     norm_title_key,
     order_entitlements,
+    prev_state_from_action_body,
     rsc_headers,
     steam_app_from_library_result,
 )
@@ -78,8 +79,11 @@ SESSION_STATUS_URL = "https://www.humblebundle.com/api/auth/session-status"
 _LIB_WINDOW_POS = (-32000, 0)
 _LIB_WINDOW_SIZE = (1280, 900)
 _CLEARANCE_WAIT_SEC = 90
-_ACTION_PAGE_LIMIT = 100
+# Humble's library UI hardcodes limit=5 and cursor=5*page (see client chunk).
+# Page 2+ requires chaining useActionState field ``0`` from the prior response.
+_ACTION_PAGE_LIMIT = 5
 _ACTION_PAGE_DELAY_SEC = 0.35
+_ACTION_MAX_PAGES = 100
 _CHROME_STUCK_MSG = (
     "Humble page did not load; close other BAKLOG browser windows and retry"
 )
@@ -478,18 +482,23 @@ def _in_page_library_action(
     page_num: int,
     limit: int,
     cursor: int,
+    prev_state: str = EMPTY_LIBRARY_ACTION_STATE,
 ) -> dict[str, Any]:
-    """POST filterUserLibrary via in-page fetch; returns status + body text."""
+    """POST filterUserLibrary via in-page fetch; returns status + body text.
+
+    The previous-state blob (field ``0``) is staged on ``window`` first. Embedding
+    multi-KB prev JSON in the evaluate source string corrupts FormData so page /
+    cursor / requestId never reach the action and pagination stalls on page 1.
+    """
+    # Numeric requestId matches the live client (++counter); echoed into next prev.
     fields = library_action_form_fields(
         page=page_num,
         limit=limit,
         cursor=cursor,
-        request_id=f"bk{page_num}",
-        prev_state=EMPTY_LIBRARY_ACTION_STATE,
+        request_id=str(page_num),
+        prev_state=prev_state,
     )
-    # Build the router tree in-page with encodeURIComponent (matches the live
-    # site / Cursor-tab probe that honors limit=100). Pre-quoted Python headers
-    # were ignored by Humble and always returned page 1 / limit 5.
+    # Live Next-Router-State-Tree (matches intercepted /home/library POSTs).
     tree_json = json.dumps(
         [
             "",
@@ -531,33 +540,42 @@ def _in_page_library_action(
                     },
                     None,
                     None,
-                    24,
+                    8,
                 ]
             },
             None,
             None,
-            True,
+            24,
         ]
     )
-    args_json = json.dumps(
-        {"fields": fields, "actionId": action_id, "treeJson": tree_json}
+    path = "/home/library" if page_num <= 1 else f"/home/library?page={page_num}"
+    meta = {k: v for k, v in fields.items() if k != "0"}
+    # Stage large prev separately so evaluate source stays small.
+    page.evaluate(
+        f"() => {{ window.__baklogHumblePrev = {json.dumps(prev_state)}; "
+        f"window.__baklogHumbleMeta = {json.dumps(meta)}; }}"
     )
     result = page.evaluate(
         f"""async () => {{
-          const args = {args_json};
           const fd = new FormData();
-          for (const [k, v] of Object.entries(args.fields)) fd.append(k, String(v));
-          const r = await fetch('/home/library', {{
+          const meta = window.__baklogHumbleMeta || {{}};
+          for (const [k, v] of Object.entries(meta)) fd.append(k, String(v));
+          fd.append('0', String(window.__baklogHumblePrev || ''));
+          const r = await fetch({json.dumps(path)}, {{
             method: 'POST',
             headers: {{
               'Accept': 'text/x-component',
-              'Next-Action': args.actionId,
-              'Next-Router-State-Tree': encodeURIComponent(args.treeJson),
+              'Next-Action': {json.dumps(action_id)},
+              'Next-Router-State-Tree': encodeURIComponent({json.dumps(tree_json)}),
             }},
             body: fd,
             credentials: 'include',
           }});
           const text = await r.text();
+          try {{
+            delete window.__baklogHumblePrev;
+            delete window.__baklogHumbleMeta;
+          }} catch (e) {{}}
           return {{
             status: r.status,
             url: r.url || '',
@@ -597,6 +615,47 @@ def _raise_if_auth_status(status: int, page) -> None:
         raise RuntimeError(_session_expired_message(page))
 
 
+def _ingest_action_payload(
+    payload: dict[str, Any],
+    *,
+    found: dict[str, LibraryItem],
+    include_nongames: bool,
+    dump_samples: list[dict[str, Any]] | None,
+    status: int,
+) -> tuple[int, int, int, int]:
+    """Merge one filterUserLibrary payload. Returns page, total_pages, total_docs, new_items."""
+    pag = payload.get("pagination") if isinstance(payload.get("pagination"), dict) else {}
+    payload_page = int(pag.get("page") or 0) or 1
+    total_pages = int(pag.get("totalPages") or 1) or 1
+    total_docs = int(pag.get("totalDocs") or 0)
+    if dump_samples is not None and len(dump_samples) < 5:
+        dump_samples.append(
+            {
+                "via": "filterUserLibrary",
+                "page": payload_page,
+                "status": status,
+                "payload": _scrub_payload_for_dump(payload),
+            }
+        )
+    results = [r for r in (payload.get("results") or []) if isinstance(r, dict)]
+    new_items = 0
+    page_items = 0
+    for row in results:
+        item = item_from_result(row, include_nongames=include_nongames)
+        if not item:
+            continue
+        page_items += 1
+        if item.machine_name not in found:
+            found[item.machine_name] = item
+            new_items += 1
+    print(
+        f"  page {payload_page}: {page_items} rows ({new_items} new), "
+        f"totalPages={total_pages} totalDocs~{total_docs} collected={len(found)}",
+        flush=True,
+    )
+    return payload_page, total_pages, total_docs, new_items
+
+
 def _fetch_via_action(
     page,
     *,
@@ -604,12 +663,24 @@ def _fetch_via_action(
     include_nongames: bool,
     dump_samples: list[dict[str, Any]] | None,
 ) -> list[LibraryItem]:
+    """POST filterUserLibrary with the live site's limit/cursor/prev-state formula.
+
+    Humble's client uses ``limit=5``, ``cursor=5*page`` (1-based), and field ``0``
+    as the previous action result (``[{payload},\"$K1\"]``). Chaining the raw flight
+    row advances pages; empty prev on every request stalls on page 1.
+    """
     found: dict[str, LibraryItem] = {}
     page_num = 1
     total_pages = 1
-    cursor = 0
-    stall_count = 0
-    while page_num <= max(total_pages, 1) and page_num <= 500:
+    total_docs = 0
+    prev_state = EMPTY_LIBRARY_ACTION_STATE
+    print(
+        f"[library action] filterUserLibrary limit={_ACTION_PAGE_LIMIT}",
+        flush=True,
+    )
+    while page_num <= max(total_pages, 1) and page_num <= _ACTION_MAX_PAGES:
+        # Live client: cursor = 5 * page for page >= 2; first empty-state call uses 0.
+        cursor = 0 if page_num == 1 else _ACTION_PAGE_LIMIT * page_num
         print(
             f"[library action page {page_num}] limit={_ACTION_PAGE_LIMIT} cursor={cursor}",
             flush=True,
@@ -620,6 +691,7 @@ def _fetch_via_action(
             page_num=page_num,
             limit=_ACTION_PAGE_LIMIT,
             cursor=cursor,
+            prev_state=prev_state,
         )
         status = int(raw.get("status") or 0)
         _raise_if_auth_status(status, page)
@@ -631,60 +703,34 @@ def _fetch_via_action(
             if page_num == 1:
                 return []
             break
-        if dump_samples is not None and len(dump_samples) < 5:
-            dump_samples.append(
-                {
-                    "via": "filterUserLibrary",
-                    "page": page_num,
-                    "status": status,
-                    "payload": _scrub_payload_for_dump(payload),
-                }
-            )
-        pag = payload.get("pagination") if isinstance(payload.get("pagination"), dict) else {}
-        payload_page = int(pag.get("page") or 0) or page_num
-        total_pages = max(total_pages, int(pag.get("totalPages") or 1) or 1)
-        total_docs = int(pag.get("totalDocs") or 0)
-        results = [r for r in (payload.get("results") or []) if isinstance(r, dict)]
-        page_items = 0
-        new_items = 0
-        for row in results:
-            item = item_from_result(row, include_nongames=include_nongames)
-            if not item:
-                continue
-            page_items += 1
-            if item.machine_name not in found:
-                found[item.machine_name] = item
-                new_items += 1
-        print(
-            f"  page {page_num}: {page_items} rows ({new_items} new), "
-            f"payloadPage={payload_page} totalPages={total_pages} "
-            f"totalDocs~{total_docs} collected={len(found)}",
-            flush=True,
+        payload_page, total_pages_p, total_docs_p, new_items = _ingest_action_payload(
+            payload,
+            found=found,
+            include_nongames=include_nongames,
+            dump_samples=dump_samples,
+            status=status,
         )
-        # Humble sometimes ignores our limit/cursor and keeps returning page 1.
+        total_pages = max(total_pages, total_pages_p)
+        total_docs = max(total_docs, total_docs_p)
+        next_prev = prev_state_from_action_body(text)
+        if next_prev:
+            prev_state = next_prev
         if payload_page != page_num or (page_num > 1 and new_items == 0):
-            stall_count += 1
-        else:
-            stall_count = 0
-        if stall_count >= 1 and page_num == 1 and total_pages > 1 and len(results) < total_docs:
             print(
-                "[humble] filterUserLibrary ignored page/limit; falling back to RSC orders",
+                "[humble] filterUserLibrary pagination stalled; keeping partial action results",
                 flush=True,
             )
-            return []
-        if stall_count >= 2:
-            print(
-                "[humble] filterUserLibrary pagination stalled; falling back to RSC orders",
-                flush=True,
-            )
-            return []
+            break
         if page_num >= total_pages:
             break
-        # Advance cursor by the effective page size Humble actually returned.
-        effective_limit = len(results) or _ACTION_PAGE_LIMIT
-        cursor = page_num * effective_limit
         page_num += 1
         time.sleep(_ACTION_PAGE_DELAY_SEC)
+    if found:
+        print(
+            f"[library action] done items={len(found)} totalDocs~{total_docs} "
+            f"pagesSeen~{page_num}/{total_pages}",
+            flush=True,
+        )
     return list(found.values())
 
 
@@ -709,7 +755,7 @@ def _fetch_via_rsc_orders(
     dump_samples: list[dict[str, Any]] | None,
 ) -> list[LibraryItem]:
     """Fallback: RSC order list + per-order entitlement pages."""
-    print("[humble] filterUserLibrary empty/failed; trying RSC order list", flush=True)
+    print("[humble] RSC order list fallback", flush=True)
     listing = _in_page_rsc_get(page, "/home/library")
     _raise_if_auth_status(int(listing.get("status") or 0), page)
     orders = extract_bundle_items(str(listing.get("text") or ""))
@@ -864,6 +910,8 @@ def fetch_library_items(
                 include_nongames=include_nongames,
                 dump_samples=dump_samples if dump else None,
             )
+        # Safety net only when the action path returned nothing (or we need a
+        # second opinion after a hard failure). Full action pagination is enough.
         if not items:
             items = _fetch_via_rsc_orders(
                 page,

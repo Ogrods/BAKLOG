@@ -22,10 +22,12 @@ _FILTER_USER_LIBRARY_ACTION_RE = re.compile(
 )
 
 LIBRARY_URL = "https://www.humblebundle.com/home/library"
+# Live Next-Router-State-Tree from /home/library filterUserLibrary POSTs
+# (no trailing null,null,true; three null,null,8 levels before 24).
 _LIBRARY_ROUTER_STATE_TREE = (
     '["",{"children":["(default)",{"children":["(account)",{"children":["home",'
     '{"children":["library",{"children":["__PAGE__",{},null,null,0]},null,null,4]}'
-    ",null,null,8]},null,null,8]},null,null,24]},null,null,true]"
+    ",null,null,8]},null,null,8]},null,null,8]},null,null,24]"
 )
 
 _GAME_KEY_TYPES = frozenset({
@@ -44,6 +46,36 @@ EMPTY_LIBRARY_ACTION_STATE = (
     '[{"results":[],"pagination":{"page":1,"totalPages":1,"totalDocs":0},'
     '"success":true},"$K1"]'
 )
+
+
+def prev_state_from_action_body(text: str) -> str | None:
+    """Build useActionState field ``0`` from a filterUserLibrary flight body.
+
+    Next.js expects ``[{...payload},\"$K1\"]`` with the **raw** payload JSON.
+    Parsing then re-stringifying drops ``$undefined`` and stalls pagination.
+    """
+    if not text:
+        return None
+    raw_payload: str | None = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or ":" not in line:
+            continue
+        row_id, rest = line.split(":", 1)
+        if not row_id:
+            continue
+        rest = rest.strip()
+        if not rest.startswith("{") or '"results"' not in rest:
+            continue
+        # Prefer the standard action result row id ``1``.
+        if row_id == "1":
+            raw_payload = rest
+            break
+        if raw_payload is None:
+            raw_payload = rest
+    if not raw_payload:
+        return None
+    return f'[{raw_payload},"$K1"]'
 
 
 @dataclass

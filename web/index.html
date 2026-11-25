@@ -253,7 +253,7 @@
     .hero-mark-wrap {
       display: inline-block;
       line-height: 0;
-      filter: drop-shadow(0 12px 44px rgba(56, 189, 248, 0.36));
+      filter: drop-shadow(0 8px 24px rgba(2, 6, 23, 0.45));
     }
 
     .hero-mark {
@@ -335,15 +335,13 @@
       border-radius: 14px;
       overflow: hidden;
       border: 1px solid var(--border);
-      box-shadow: 0 18px 48px rgba(2, 6, 23, 0.55);
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.4);
       background: var(--bg-panel);
       aspect-ratio: 823 / 415;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      transition: border-color 0.2s ease;
     }
     .hero-peek a:hover {
-      transform: translateY(-3px);
       border-color: rgba(56, 189, 248, 0.45);
-      box-shadow: 0 22px 56px rgba(2, 6, 23, 0.65);
     }
     .hero-peek img {
       display: block;
@@ -425,7 +423,6 @@
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 0.5rem;
-      backdrop-filter: blur(8px);
     }
 
     .waitlist input[type="email"] {
@@ -450,24 +447,30 @@
       font-family: var(--font-display);
       font-weight: 600;
       font-size: 0.95rem;
-      border: none;
-      border-radius: 10px;
-      padding: 0.7rem 1.4rem;
+      border: 1px solid color-mix(in srgb, var(--accent) 55%, #0f172a);
+      border-radius: 8px;
+      padding: 0.7rem 1.35rem;
       cursor: pointer;
       white-space: nowrap;
       color: #04121f;
-      background: linear-gradient(180deg, #7dd3fc 0%, var(--accent) 60%, var(--accent-bright) 100%);
-      box-shadow: 0 6px 18px rgba(56, 189, 248, 0.32);
-      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+      background: var(--accent);
+      box-shadow: none;
+      text-decoration: none;
+      display: inline-block;
+      transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
     }
-    .btn:hover { transform: translateY(-1px); color: #04121f; box-shadow: 0 10px 26px rgba(56, 189, 248, 0.42); filter: brightness(1.04); }
-    .btn:active { transform: translateY(0); }
+    .btn:hover {
+      background: var(--accent-bright);
+      border-color: var(--accent-bright);
+      color: #04121f;
+    }
+    .btn:active { background: #0284c7; border-color: #0284c7; }
     .btn:focus-visible {
       outline: 2px solid #fff;
       outline-offset: 3px;
-      box-shadow: 0 0 0 5px rgba(56, 189, 248, 0.45);
+      box-shadow: none;
     }
-    .btn[disabled] { opacity: 0.6; cursor: default; transform: none; box-shadow: none; }
+    .btn[disabled] { opacity: 0.6; cursor: default; }
 
     .honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
@@ -558,12 +561,10 @@
       border: 1px solid var(--border-subtle);
       border-radius: 16px;
       padding: 1.6rem;
-      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      transition: border-color 0.18s ease;
     }
     .card:hover {
-      transform: translateY(-4px);
       border-color: var(--accent);
-      box-shadow: 0 14px 34px rgba(2, 6, 23, 0.5);
     }
     .card-icon {
       width: 42px; height: 42px;
@@ -649,7 +650,7 @@
     .pro-checkout .btn--secondary:hover {
       color: #04121f;
       background: var(--accent);
-      box-shadow: 0 10px 26px rgba(56, 189, 248, 0.42);
+      border-color: var(--accent);
     }
     .pro-checkout-email-note { flex-basis: 100%; }
     .pro-checkout-email-note,
@@ -809,7 +810,7 @@
       transform: scale(1);
       color: #04121f;
       border-color: transparent;
-      background: linear-gradient(180deg, #7dd3fc, var(--accent));
+      background: var(--accent);
     }
     .magic-count {
       font-family: var(--font-display);
@@ -863,7 +864,7 @@
       display: block;
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, var(--accent), #a855f7);
+      background: var(--accent);
       transform-origin: left center;
     }
     @media (max-width: 900px) {
@@ -951,11 +952,10 @@
       border: 1px solid var(--border-subtle);
       background: var(--bg-panel);
       aspect-ratio: 16 / 10;
-      transition: transform 0.18s ease, border-color 0.18s ease;
+      transition: border-color 0.18s ease;
       cursor: zoom-in;
     }
     .how-proof a:hover {
-      transform: scale(1.015);
       border-color: rgba(56, 189, 248, 0.4);
     }
     @media (hover: none) {
@@ -1198,17 +1198,15 @@
         background: transparent;
         border: none;
         padding: 0;
-        backdrop-filter: none;
       }
       .waitlist input[type="email"] {
         background: rgba(30, 41, 59, 0.7);
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 0.85rem 0.95rem;
-        backdrop-filter: blur(8px);
         min-height: 48px;
       }
-      .btn { width: 100%; min-height: 48px; border-radius: 12px; }
+      .btn { width: 100%; min-height: 48px; border-radius: 8px; }
       .foot-grid { flex-direction: column; align-items: flex-start; }
       .foot-links { grid-template-columns: repeat(2, 1fr); gap: 1.5rem 2rem; }
       .foot-col a {

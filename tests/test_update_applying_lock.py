@@ -41,6 +41,17 @@ def test_stale_applying_lock_ignored(tmp_path: Path) -> None:
     assert is_update_apply_in_progress(tmp_path, max_age_sec=60) is False
 
 
+def test_future_mtime_lock_still_counts_as_in_progress(tmp_path: Path) -> None:
+    """Windows CI can report a just-written lock mtime slightly ahead of time.time()."""
+    import os
+
+    write_applying_lock(tmp_path, version="0.8.37")
+    lock = tmp_path / APPLYING_LOCK_FILENAME
+    future = time.time() + 2.0
+    os.utime(lock, (future, future))
+    assert is_update_apply_in_progress(tmp_path) is True
+
+
 def test_clear_apply_result_also_clears_lock(tmp_path: Path) -> None:
     write_applying_lock(tmp_path, version="0.8.37")
     (tmp_path / "apply-result.json").write_text('{"ok": true}', encoding="utf-8")

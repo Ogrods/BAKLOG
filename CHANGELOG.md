@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.25] - 2026-11-25
+
 ### Fixed
 
 - Dashboard spotlight: portrait cover titles no longer clip on float; square covers stay large; soft landscape art shows as a wide cover card with top/bottom breathing room

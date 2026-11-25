@@ -66,6 +66,42 @@ function isValidBundle(bundle) {
     && Array.isArray(bundle.errors.persisted);
 }
 
+const MAX_STACK_CHARS = 4 * 1024;
+
+function redactText(raw) {
+  if (typeof raw !== "string") return "";
+  return raw
+    .replace(/[A-Za-z]:\\Users\\[^\\/\s"'`]+/gi, "C:\\Users\\<user>")
+    .replace(/\/Users\/[^/\s"'`]+/g, "/Users/<user>")
+    .replace(/\/home\/[^/\s"'`]+/g, "/home/<user>")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "<email>")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "<jwt>")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer <token>");
+}
+
+function redactErrorEntry(entry) {
+  if (!entry || typeof entry !== "object") return entry;
+  const out = { ...entry };
+  if (typeof out.message === "string") out.message = redactText(out.message).slice(0, 500);
+  if (typeof out.stack === "string") out.stack = redactText(out.stack).slice(0, MAX_STACK_CHARS);
+  if (typeof out.name === "string") out.name = String(out.name).slice(0, 120);
+  return out;
+}
+
+/** Strip paths, emails, and tokens from a bug bundle before store/email. */
+export function redactBundle(bundle) {
+  if (!bundle || typeof bundle !== "object") return bundle;
+  const out = { ...bundle };
+  if (typeof out.ua === "string") out.ua = String(out.ua).slice(0, 256);
+  if (out.errors && typeof out.errors === "object") {
+    const errors = { ...out.errors };
+    if (Array.isArray(errors.session)) errors.session = errors.session.map(redactErrorEntry);
+    if (Array.isArray(errors.persisted)) errors.persisted = errors.persisted.map(redactErrorEntry);
+    out.errors = errors;
+  }
+  return out;
+}
+
 function topErrorSummary(bundle) {
   const session = bundle.errors?.session || [];
   const persisted = bundle.errors?.persisted || [];
@@ -75,7 +111,7 @@ function topErrorSummary(bundle) {
   }
   return {
     message: String(latest.message || "(no message)").slice(0, 500),
-    stack: String(latest.stack || "").slice(0, 2000),
+    stack: String(latest.stack || "").slice(0, MAX_STACK_CHARS),
     name: String(latest.name || "Error"),
   };
 }
@@ -194,6 +230,7 @@ export default {
     // valid email; otherwise free-text would let a submitter inject a bogus
     // reply address (and Resend rejects malformed reply_to outright).
     const replyTo = EMAIL_RE.test(contact) ? contact : undefined;
+    const safeBundle = redactBundle(bundle);
 
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.NOTIFY_FROM;
@@ -204,14 +241,16 @@ export default {
     }
 
     const reportTime = new Date().toISOString();
-    const top = topErrorSummary(bundle);
-    const view = bundle.runtime?.view || "unknown";
-    const appVersion = bundle.app_version || "unknown";
+    const top = topErrorSummary(safeBundle);
+    const view = safeBundle.runtime?.view || "unknown";
+    const appVersion = safeBundle.app_version || "unknown";
+    const errorCount = (safeBundle.errors?.session_count ?? safeBundle.errors?.session?.length ?? 0)
+      + (safeBundle.errors?.persisted_count ?? safeBundle.errors?.persisted?.length ?? 0);
 
     console.log(`bug_report\t${reportTime}\t${appVersion}\t${view}\t${contact ? "contact=yes" : "contact=no"}`);
 
     try {
-      await logToSupabase({ bundle, contact, note, ip, time: reportTime });
+      await logToSupabase({ bundle: safeBundle, contact, note, ip, time: reportTime });
     } catch (err) {
       console.error("report: supabase log failed", err);
     }
@@ -222,13 +261,12 @@ export default {
       `View: ${view}`,
       `Contact: ${contact || "(none)"}`,
       note ? `Note: ${note}` : null,
+      `Error count: ${errorCount}`,
       "",
       `Latest error: ${top.name}: ${top.message}`,
-      top.stack ? `\nStack:\n${top.stack}` : null,
+      top.stack ? `\nStack (redacted):\n${top.stack}` : null,
       "",
-      "Full bundle attached below.",
-      "",
-      JSON.stringify(bundle, null, 2),
+      "Full bundle omitted from email - open the bug_reports row in Supabase.",
     ].filter(Boolean).join("\n");
 
     try {

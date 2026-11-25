@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import reportHandler from "../web/api/report.js";
+import reportHandler, { redactBundle } from "../web/api/report.js";
 
 const { fetch: handleReport } = reportHandler;
 
@@ -155,6 +155,36 @@ describe("web/api/report.js", () => {
     expect(payload.to).toBe("founder@example.com");
     expect(payload.reply_to).toBe("tester@example.com");
     expect(payload.subject).toContain("BAKLOG bug report");
+    expect(payload.text).toContain("Full bundle omitted from email");
+    expect(payload.text).not.toContain('"bundle": "baklog-bug-bundle"');
+  });
+
+  it("redacts paths, emails, and tokens from bug bundles", () => {
+    const redacted = redactBundle({
+      ...validBundle(),
+      errors: {
+        session: [{
+          name: "Error",
+          message: "fail for dan@example.com at C:\\Users\\Dan\\AppData\\BAKLOG",
+          stack: [
+            "at run (C:\\Users\\Dan\\app.js:1)",
+            "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.aaa.bbb",
+            "Authorization: Bearer opaque_session_token_value",
+          ].join("\n"),
+        }],
+        persisted: [],
+      },
+    });
+    const msg = redacted.errors.session[0].message;
+    const stack = redacted.errors.session[0].stack;
+    expect(msg).toContain("<email>");
+    expect(msg).toContain("C:\\Users\\<user>");
+    expect(msg).not.toContain("dan@example.com");
+    expect(msg).not.toContain("C:\\Users\\Dan");
+    expect(stack).toContain("Bearer <jwt>");
+    expect(stack).toContain("Bearer <token>");
+    expect(stack).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+    expect(stack).not.toContain("opaque_session_token_value");
   });
 
   it("uses ManualReport subject when the bundle has no captured errors", async () => {

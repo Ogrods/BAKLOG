@@ -56,10 +56,8 @@ import {
   parseStallLogLine,
   updateStallNotice,
 } from './stall-notice.js';
-import {
-  parseProgressSummary,
-  SOFT_STALL_NO_PROGRESS_MS,
-} from '../progress-summary.js';
+import { parseProgressSummary } from '../progress-summary.js';
+import { createLiveProgressController } from './live-progress.js';
 
 export const fetcherRunner = (() => {
   let apiAvailable = null;
@@ -385,11 +383,6 @@ export const fetcherRunner = (() => {
   let liveRunId = null;
   let lastLineText = '';
   let lastLineKind = 'stdout';
-  let lastProgressSummary = '';
-  let lastProgressAt = 0;
-  let softStallTimer = null;
-  let softStallShowing = false;
-  let serverStallActive = false;
   let lastBarSummary = 'Fetcher health';
   let pollTimer = null;
   let _dashboardPollWanted = false;
@@ -397,62 +390,6 @@ export const fetcherRunner = (() => {
   /** Avoid re-running refreshAfterFetch on every dashboard tab return when syncFromServer
    *  keeps seeing the same recent "done" run in the 5-minute window. */
   let _lastAppliedDoneRunId = null;
-
-  function clearSoftStallWatch() {
-    if (softStallTimer) {
-      clearTimeout(softStallTimer);
-      softStallTimer = null;
-    }
-  }
-
-  function clearSoftStallNotice() {
-    softStallShowing = false;
-    if (!serverStallActive) updateStallNotice(logPanel(), null);
-  }
-
-  function scheduleSoftStallWatch() {
-    clearSoftStallWatch();
-    if (!liveRunId) return;
-    softStallTimer = setTimeout(() => {
-      softStallTimer = null;
-      if (!liveRunId || serverStallActive) return;
-      const ageMs = Date.now() - (lastProgressAt || 0);
-      if (ageMs < SOFT_STALL_NO_PROGRESS_MS) {
-        scheduleSoftStallWatch();
-        return;
-      }
-      softStallShowing = true;
-      updateStallNotice(logPanel(), {
-        seconds: Math.round(ageMs / 1000),
-        fatal: false,
-        soft: true,
-      });
-    }, SOFT_STALL_NO_PROGRESS_MS);
-  }
-
-  function applyProgressSummary(summary, key = null) {
-    if (!summary) return;
-    lastProgressSummary = summary;
-    lastProgressAt = Date.now();
-    softStallShowing = false;
-    if (!serverStallActive) updateStallNotice(logPanel(), null);
-    if (liveRunId) setStatus('running', summary);
-    const chipKey = key || sourcesByRunId.get(liveRunId)?.key;
-    if (chipKey && /^[A-Za-z0-9_-]+$/.test(chipKey)) {
-      const chip = document.querySelector(`.fh-chip[data-fetcher-key="${chipKey}"]`);
-      if (chip) chip.title = summary;
-    }
-    scheduleSoftStallWatch();
-  }
-
-  function endLiveProgressTracking() {
-    clearSoftStallWatch();
-    serverStallActive = false;
-    softStallShowing = false;
-    lastProgressSummary = '';
-    lastProgressAt = 0;
-    updateStallNotice(logPanel(), null);
-  }
 
   function isFetcherInFlight() {
     return runStateByKey.size > 0 || lastServerInFlight || cancelInFlight;
@@ -861,7 +798,7 @@ export const fetcherRunner = (() => {
     }
     const body = logPanelApi.logBody();
     if (body) body.innerHTML = '';
-    serverStallActive = false;
+    clearServerStallFlag();
     clearSoftStallWatch();
     clearSoftStallNotice();
     followTail = true;
@@ -928,6 +865,23 @@ export const fetcherRunner = (() => {
     updateJumpButton,
   } = logPanelApi;
 
+  const liveProgress = createLiveProgressController({
+    logPanel,
+    setStatus,
+    getLiveRunId: () => liveRunId,
+    resolveChipKey: (key) => key || sourcesByRunId.get(liveRunId)?.key,
+  });
+  const {
+    applyProgressSummary,
+    endLiveProgressTracking,
+    clearSoftStallWatch,
+    clearSoftStallNotice,
+    scheduleSoftStallWatch,
+    noteServerStall,
+    clearServerStallFlag,
+    getLastProgressSummary,
+  } = liveProgress;
+
   function flushLines() {
     flushHandle = 0;
     if (!pendingLines.length) return;
@@ -976,9 +930,7 @@ export const fetcherRunner = (() => {
     lastLineKind = kind;
     const stall = parseStallLogLine(text);
     if (stall) {
-      serverStallActive = true;
-      softStallShowing = false;
-      clearSoftStallWatch();
+      noteServerStall();
       updateStallNotice(logPanel(), stall);
     } else {
       const summary = parseProgressSummary(text);
@@ -1331,11 +1283,10 @@ export const fetcherRunner = (() => {
         if (data.status === 'running' || data.status === 'launching') {
           markChipState(key, 'running', runId);
           liveRunId = runId;
-          lastProgressAt = Date.now();
-          serverStallActive = false;
+          clearServerStallFlag();
           scheduleSoftStallWatch();
           if (liveRunId === runId) {
-            syncLogPanelChrome(src, data.status, lastProgressSummary || undefined);
+            syncLogPanelChrome(src, data.status, getLastProgressSummary() || undefined);
           }
           if (reconnect) {
             if (!quiet) {

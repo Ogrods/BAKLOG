@@ -443,6 +443,7 @@
      stacking context and sits above the hero textblock overlay. */
   z-index: var(--z-nav, 6);
   display: none;
+  align-items: stretch;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
@@ -451,10 +452,12 @@
 }
 .dash-mega-hero:has(.dash-spotlight--multi) .dash-spotlight-nav { display: flex; }
 .dash-spotlight-nav-btn {
+  box-sizing: border-box;
   width: 28px;
-  height: 28px;
   min-width: 28px;
   min-height: 28px;
+  height: auto;
+  align-self: stretch;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -463,6 +466,7 @@
   color: #cbd5e1;
   background: transparent;
   border: none;
+  border-radius: 0;
   user-select: none;
 }
 /* Both the chevron and pause glyphs render slightly low in the UI font; extra
@@ -470,11 +474,17 @@
    border-box keeps the 28px button size. */
 .dash-spotlight-nav-toggle { font-size: 11px; padding-bottom: 3px; }
 .dash-spotlight-nav-btn:not(.dash-spotlight-nav-toggle) { padding: 1px 0 3px; }
+.dash-spotlight-nav > .dash-spotlight-nav-btn:first-child {
+  border-radius: 5px 0 0 5px;
+}
+.dash-spotlight-nav > .dash-spotlight-nav-btn:last-child {
+  border-radius: 0 5px 5px 0;
+}
 .dash-spotlight-nav-btn + .dash-spotlight-nav-btn { border-left: 1px solid rgba(51,65,85,0.6); }
 .dash-spotlight-nav-btn:hover { color: #f1f5f9; background: color-mix(in srgb, var(--bg-hover) 90%, transparent); }
 .dash-spotlight-nav-btn:focus-visible {
   outline: 2px solid #38bdf8;
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 .dash-spotlight-body {
   position: absolute;

@@ -16,7 +16,20 @@ under `profiles/<user-id>/` on the machine running `server.py`. Configure
 publishable `sb_publishable_…` key; see `.env.example`). Access tokens verify
 via JWKS. Do not ship `BAKLOG_SUPABASE_JWT_SECRET` in release bundles.
 
-Last updated: 2026-11-06.
+Last updated: 2026-11-25.
+
+## Threat-model summary
+
+- **Local-first posture:** Store credentials and library JSON live under
+  `profiles/` on the machine running `server.py`. baklog.app never holds store
+  secrets; optional Pro mirror uploads are allowlisted catalog/personal JSON only.
+- **CDP / session gray area:** Some stores are reached by replaying **your**
+  headed browser session (your IP, your cookies). That is intentional and
+  documented per store below; it is not a claim of ToS-clean access for every
+  storefront.
+- **Explicit non-claims:** BAKLOG is not a multi-tenant credential vault, not
+  malware-resistant, and not a guarantee that every fetcher is permitted under
+  every storefront's terms. You run gray paths at your own risk.
 
 ## TL;DR
 

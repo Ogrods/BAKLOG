@@ -78,7 +78,10 @@ release/
 
 # Marketing + internal documents (kept local, not in the public repo)
 marketing/
-docs/
+# Deep maintainer docs stay private; public ADRs are tracked.
+docs/**
+!docs/adr/
+!docs/adr/**
 audit/
 admin/
 tracker.html

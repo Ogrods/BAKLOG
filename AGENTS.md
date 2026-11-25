@@ -18,7 +18,7 @@ Deep reference (maintainer clone only): `docs/ARCHITECTURE.md` in the private `b
 ## Hard rules
 
 1. **Python on Windows** — use `.\.venv\Scripts\python.exe`, not Store `python`.
-2. **Never commit to public repo** — `marketing/`, `admin/`, `docs/`, `tracker.html`, personal data (`games_*.json`, `data/`, `profiles/`, `.env`). See `.gitignore`.
+2. **Never commit to public repo** — `marketing/`, `admin/`, private deep `docs/**` (except tracked public `docs/adr/`), `tracker.html`, personal data (`games_*.json`, `data/`, `profiles/`, `.env`). See `.gitignore`.
 3. **Fetcher contract** — each script exposes `main() -> int`. Exit codes: `0` ok, `1` error, `2` refused empty, `3` refused drift, `4` auth failure (`fetchers/_progress.py`).
 4. **Mutating localhost API** — send `X-BAKLOG-Local: 1` from the app/admin console.
 5. **Admin console** — only when `BAKLOG_ADMIN=1`; routes under `/api/internal/*`.
@@ -49,9 +49,43 @@ Two **separate** systems; mixing them up is why banner edits "don't show". Full 
 
 Refresh bundle budget after intentional growth: `npm run build && node scripts/check-bundle-size.mjs --write`.
 
-**Full local CI parity:** `.\scripts\test-all.ps1 -Full` runs ruff → pytest → vitest → **test:perf** → check:module-size → lint → vendor:supabase → build → check:bundle-size → check:dist-integrity → `scripts/audit_free_surface_data.py --fail-on high` → **release_smoke** (Steam store contracts; same gate as `release.yml` before tagging).
+**Full local CI parity:** `.\scripts\test-all.ps1 -Full` runs ruff → pytest → vitest → **test:perf** → check:module-size → lint → vendor:supabase → build → check:bundle-size → check:dist-integrity → `scripts/audit_free_surface_data.py --fail-on high` → **release_smoke** (Steam store contracts; same gate as `release.yml` before tagging). Also runs `npm run check:landing-seo`.
 
 **Runtime perf:** `npm run test:perf` (Vitest micro-benchmarks vs `perf-budget.json`); `.\scripts\start-perf-server.ps1` or `node scripts/perf-audit.mjs` for Playwright boot/tab timing (requires built server + `BAKLOG_PROFILE=perf`). Opt-in marks: `?perf=1` → `window.__baklogBootPerf`, `__baklogPerf`, `__baklogChartPerf`.
+
+## Cursor rules (invariants)
+
+| Rule file | Enforces |
+|-----------|----------|
+| `architecture.mdc` | Repo map, profile layout, core invariants |
+| `backend-fetchers.mdc` | Server, fetchers, auth, profile paths |
+| `frontend.mdc` | Dashboard ESM modules, banners/ads, styling |
+| `landing.mdc` | `web/` Vercel site, FAQ JSON-LD, privacy/terms sync |
+| `testing-build.mdc` | Tests, CI scripts, optional frontend build |
+| `release.mdc` | Clean tree + green CI before tag/publish |
+| `changelog.mdc` | Public CHANGELOG voice (user facts only) |
+| `internal-workflow.mdc` | Git worktrees, backups, tracker handoff |
+| `internal-admin.mdc` | Local admin console (when present) |
+| `internal-marketing.mdc` | Marketing deck / ads (when present) |
+| `seo-operator.mdc` | Attended OpenSEO / GSC / GA playbook |
+| `powershell-workaround.mdc` | PowerShell `;` not `&&`; paging tips |
+
+## Quality as code
+
+- **Sync pairs** - AGENTS rule 6; Vitest/pytest parity (`tests/sync-pairs.test.js`, wishlist/claims/mirror/registry drift tests).
+- **Budgets** - module/bundle/server line caps; `perf-budget.json` micro-benchmarks.
+- **Fetcher contract** - exit codes 0-4 in `fetchers/_progress.py`.
+- **Hooks** - `scripts/hooks/` pre-push leak scan + internal sync; Cursor stop hooks for stray servers / tracker reminder.
+- **Release gates** - `.cursor/rules/release.mdc` + `scripts/release_preflight.ps1`.
+- **Public ADRs** - [`docs/adr/`](docs/adr/README.md).
+
+## Definition of done (PRs)
+
+1. Branch named `feat/` / `fix/` / `chore/` with **one** concern.
+2. Canonical tests green: `python -m pytest` and `npm test` (optional `.\scripts\test-all.ps1 -Full` for release-shaped work).
+3. Sync pairs updated on both sides with tests when touched; no secrets or personal data.
+4. PR template filled; user-facing copy follows hard rule 8.
+5. Meaningful work: update private `tracker.html` (or write `.cursor/tracker-pending-*.md`).
 
 ## Auth gating (layers)
 
@@ -61,9 +95,14 @@ Refresh bundle budget after intentional growth: `npm run build && node scripts/c
 
 ## Tests & dev
 
+Canonical day-to-day (matches PR CI intent; `pyproject.toml` already skips `integration` + `release_smoke`):
+
 ```powershell
-.\.venv\Scripts\python.exe -m pytest          # Python (skips integration by default)
-npm test                                       # Vitest (JS)
+.\.venv\Scripts\python.exe -m pytest   # Python
+npm test                               # Vitest (JS)
+```
+
+```powershell
 $env:BAKLOG_ADMIN="1"; .\.venv\Scripts\python.exe server.py   # dev + admin
 .\.venv\Scripts\python.exe scripts\stop_baklog.py             # stop strays (+ --dry-run / --dedupe)
 ```

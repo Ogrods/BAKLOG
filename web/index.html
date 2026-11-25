@@ -112,8 +112,17 @@
 
     * { box-sizing: border-box; }
 
-    /* overflow-x: clip (not hidden) so sticky scrub in #how still sticks to the viewport */
-    html { scroll-behavior: smooth; overflow-x: clip; }
+    /*
+     * Sole vertical scrollport = html. overflow-x:clip alone computes overflow-y to auto
+     * (CSS overflow pairing), so clip on BOTH html and body created dual scrollbars in Edge.
+     * overflow-x:clip (not hidden) keeps #how sticky scrub pinned to the viewport.
+     */
+    html {
+      scroll-behavior: smooth;
+      overflow-x: clip;
+      overflow-y: auto;
+      background: var(--bg);
+    }
 
     body {
       margin: 0;
@@ -125,6 +134,7 @@
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
       overflow-x: clip;
+      overflow-y: clip; /* body grows with content; never a second scroller */
     }
 
     a { color: var(--accent); text-decoration: none; }
@@ -155,7 +165,9 @@
       min-height: 100svh;
       display: flex;
       flex-direction: column;
-      overflow-x: hidden;
+      /* Do not overflow-x:hidden here - that hard-clips sweeping mesh into a moving seam.
+         Horizontal bleed is contained by html { overflow-x: clip }. */
+      overflow: visible;
       isolation: isolate;
       --hero-mesh-dur: 13s;
       --hero-mesh-ease: cubic-bezier(0.4, 0.0, 0.2, 1);
@@ -173,7 +185,9 @@
       box-sizing: border-box;
     }
 
-    /* Ambient mesh glow behind the hero (sweep + opacity wash, desynced layers) */
+    /* Ambient mesh glow behind the hero (sweep + opacity wash, desynced layers).
+       Wide insets + edge mask keep the soft fringe past the viewport through ±travel/scale
+       so html's overflow-x:clip never shows as a hard vertical cut. */
     .hero::before,
     .hero::after {
       content: "";
@@ -181,9 +195,23 @@
       z-index: -1;
       pointer-events: none;
       will-change: transform, opacity;
+      -webkit-mask-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        #000 14%,
+        #000 86%,
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        #000 14%,
+        #000 86%,
+        transparent 100%
+      );
     }
     .hero::before {
-      inset: -20% -10% auto -10%;
+      inset: -24% -28% auto -28%;
       height: 120%;
       background:
         radial-gradient(50% 45% at 50% 18%, rgba(56, 189, 248, 0.30), transparent 70%),
@@ -191,7 +219,7 @@
         radial-gradient(40% 38% at 20% 22%, rgba(34, 211, 238, 0.18), transparent 70%);
     }
     .hero::after {
-      inset: -28% -16% auto -16%;
+      inset: -30% -32% auto -32%;
       height: 135%;
       background:
         radial-gradient(42% 40% at 22% 28%, rgba(56, 189, 248, 0.32), transparent 68%),
@@ -208,18 +236,18 @@
       }
     }
     @keyframes hero-mesh-a {
-      0%   { transform: translate3d(-14%, 3%, 0) scale(1.03); opacity: 0.72; }
-      18%  { transform: translate3d(-14%, 3%, 0) scale(1.03); opacity: 0.78; }
-      50%  { transform: translate3d(14%, -5%, 0) scale(1.16); opacity: 1; }
-      82%  { transform: translate3d(14%, -5%, 0) scale(1.16); opacity: 0.94; }
-      100% { transform: translate3d(-14%, 3%, 0) scale(1.03); opacity: 0.72; }
+      0%   { transform: translate3d(-12%, 3%, 0) scale(1.03); opacity: 0.72; }
+      18%  { transform: translate3d(-12%, 3%, 0) scale(1.03); opacity: 0.78; }
+      50%  { transform: translate3d(12%, -5%, 0) scale(1.14); opacity: 1; }
+      82%  { transform: translate3d(12%, -5%, 0) scale(1.14); opacity: 0.94; }
+      100% { transform: translate3d(-12%, 3%, 0) scale(1.03); opacity: 0.72; }
     }
     @keyframes hero-mesh-b {
-      0%   { transform: translate3d(14%, -3%, 0) scale(1.12); opacity: 0.95; }
-      18%  { transform: translate3d(14%, -3%, 0) scale(1.12); opacity: 0.88; }
-      50%  { transform: translate3d(-15%, 5%, 0) scale(1.03); opacity: 0.55; }
-      82%  { transform: translate3d(-15%, 5%, 0) scale(1.03); opacity: 0.62; }
-      100% { transform: translate3d(14%, -3%, 0) scale(1.12); opacity: 0.95; }
+      0%   { transform: translate3d(12%, -3%, 0) scale(1.12); opacity: 0.95; }
+      18%  { transform: translate3d(12%, -3%, 0) scale(1.12); opacity: 0.88; }
+      50%  { transform: translate3d(-13%, 5%, 0) scale(1.03); opacity: 0.55; }
+      82%  { transform: translate3d(-13%, 5%, 0) scale(1.03); opacity: 0.62; }
+      100% { transform: translate3d(12%, -3%, 0) scale(1.12); opacity: 0.95; }
     }
 
     .hero-mark-wrap {

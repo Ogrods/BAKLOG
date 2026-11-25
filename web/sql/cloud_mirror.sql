@@ -1,3 +1,4 @@
+﻿-- baklog-sql-revision: 2026-11-24
 -- BAKLOG Pro cloud mirror — run once in the Supabase SQL editor.
 -- Stores derived catalog JSON per auth user (read-only mirror for signed-in Pro).
 -- Credentials, cache/, and secrets never belong in this bucket.

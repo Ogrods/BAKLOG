@@ -1,3 +1,4 @@
+﻿-- baklog-sql-revision: 2026-11-24
 -- BAKLOG Pro purchases that matched no account yet (run once in the Supabase SQL editor).
 -- web/api/polar-webhook.js upserts a row here when a Polar buyer has no BAKLOG
 -- account with the checkout email (or external id). web/api/auth-signup-notify.js

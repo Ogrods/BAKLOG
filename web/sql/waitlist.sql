@@ -1,3 +1,4 @@
+﻿-- baklog-sql-revision: 2026-11-24
 -- BAKLOG landing waitlist (run once in Supabase SQL editor).
 -- Inserts use the service_role key from the Vercel subscribe function.
 

@@ -1,0 +1,35 @@
+{
+  "updated": "2026-11-24",
+  "scripts": [
+    {
+      "file": "waitlist.sql",
+      "revision": "2026-11-24",
+      "notes": "Landing waitlist + invited_at bookkeeping"
+    },
+    {
+      "file": "bug_reports.sql",
+      "revision": "2026-11-24",
+      "notes": "Opt-in bug report durable log"
+    },
+    {
+      "file": "aggregate_metrics.sql",
+      "revision": "2026-11-24",
+      "notes": "Opt-in anonymous aggregate metrics"
+    },
+    {
+      "file": "polar_entitlement.sql",
+      "revision": "2026-11-24",
+      "notes": "get_user_id_by_email RPC for Polar webhooks"
+    },
+    {
+      "file": "polar_pending_entitlements.sql",
+      "revision": "2026-11-24",
+      "notes": "Pending Polar entitlements until account exists"
+    },
+    {
+      "file": "cloud_mirror.sql",
+      "revision": "2026-11-24",
+      "notes": "baklog-mirror bucket + cloud_mirror_snapshots RLS"
+    }
+  ]
+}

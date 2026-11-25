@@ -92,3 +92,37 @@ def test_zero_priced_rows_refuse_before_write(monkeypatch: pytest.MonkeyPatch, t
 
     assert fetch_itad.main() == 2
     assert json.loads(existing.read_text(encoding="utf-8")) == prior
+
+
+def test_http_error_exits_one_without_auth_mark(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    import requests
+
+    catalogs = tmp_path / "catalogs"
+    catalogs.mkdir()
+    wishlist = catalogs / "games_wishlist.json"
+    wishlist.write_text(
+        json.dumps({"games": [{"appid": 1, "name": "One"}]}),
+        encoding="utf-8",
+    )
+    marks: list[tuple] = []
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        def lookup_title(self, title, appid=None):
+            raise requests.HTTPError("500 Server Error")
+
+        def prices_for_plains(self, plains):
+            return {}
+
+    monkeypatch.setattr(fetch_itad, "catalog_path", lambda name: catalogs / str(name))
+    monkeypatch.setattr(fetch_itad, "itad_path", lambda: catalogs / "itad_prices.json")
+    monkeypatch.setattr(fetch_itad, "resolve_env", lambda *a, **k: "test-key")
+    monkeypatch.setattr(fetch_itad, "ensure_fx_rates", lambda **k: None)
+    monkeypatch.setattr(fetch_itad, "ItadClient", _Client)
+    monkeypatch.setattr(fetch_itad, "mark_invalid", lambda *a, **k: marks.append((a, k)))
+    monkeypatch.setattr("sys.argv", ["fetchers.fetch_itad.py"])
+
+    assert fetch_itad.main() == 1
+    assert marks == []

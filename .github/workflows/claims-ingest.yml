@@ -49,7 +49,7 @@ jobs:
     permissions:
       actions: read
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Report feed PR CI approval target
         env:
@@ -73,7 +73,7 @@ jobs:
       INTERNAL_DIR: .internal-claims
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Private token present
         id: has_token
@@ -84,7 +84,7 @@ jobs:
 
       - name: Check out private decisions
         if: steps.has_token.outputs.present == 'true'
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.INTERNAL_REPO }}
           token: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}

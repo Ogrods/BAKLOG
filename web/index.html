@@ -44,9 +44,7 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/space-grotesk-latin.woff2" />
   <link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/dm-sans-latin.woff2" />
   <link rel="stylesheet" href="demo.css" />
-  <!-- Self-hosted Chart.js (pinned 4.4.1): no third-party CDN dependency or
-       supply-chain exposure. Update by re-downloading the same version. -->
-  <script src="vendor/chart.umd.min.js" defer></script>
+  <!-- Chart.js is lazy-loaded by demo.js when #demo nears the viewport (TBT). -->
   <script src="marquee-speed.js" defer></script>
   <script src="demo.js" defer></script>
   <script src="pro-checkout-gate.js" defer></script>
@@ -169,6 +167,7 @@
       max-width: 100%;
       padding: 3rem 1.5rem;
       flex-shrink: 0;
+      box-sizing: border-box;
     }
 
     /* blue mesh glow behind the hero */
@@ -246,6 +245,54 @@
        two-word fragment like "your machine"; breaks only fall between phrases. */
     .hero-subhead .nb { white-space: nowrap; }
 
+    .hero-moment {
+      font-size: clamp(0.92rem, 2.1vw, 1.08rem);
+      color: var(--accent-muted);
+      margin: 0.65rem auto 0;
+      max-width: min(36ch, 100%);
+      line-height: 1.45;
+      font-weight: 600;
+      text-wrap: pretty;
+      padding: 0 0.25rem;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
+    }
+
+    .hero-peek {
+      margin: 1.75rem auto 0;
+      width: 100%;
+      max-width: min(100%, 52rem);
+      padding: 0;
+      animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+    }
+    .hero-peek a {
+      display: block;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 18px 48px rgba(2, 6, 23, 0.55);
+      background: var(--bg-panel);
+      aspect-ratio: 823 / 415;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .hero-peek a:hover {
+      transform: translateY(-3px);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 22px 56px rgba(2, 6, 23, 0.65);
+    }
+    .hero-peek img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+    }
+    .hero-peek-caption {
+      margin: 0.55rem 0 0;
+      font-size: 0.78rem;
+      color: var(--text-mute);
+      text-wrap: pretty;
+    }
+
     /* Compact store trust strip - same SVG mask system as the app (assets/store-logos) */
     .hero-store-strip {
       display: flex;
@@ -285,7 +332,7 @@
       letter-spacing: 0.03em;
       color: var(--text-mute);
       opacity: 0.88;
-      max-width: none;
+      max-width: min(36rem, 100%);
       white-space: nowrap;
       animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.19s both;
     }
@@ -381,10 +428,50 @@
 
     /* ---------- Generic sections ---------- */
     section.band { padding: 5.5rem 0; border-top: 1px solid var(--border-subtle); }
+    /* Stripe-style rhythm: alternate density so post-demo bands do not feel identical */
+    section.band.band--tint {
+      background:
+        linear-gradient(180deg, rgba(30, 41, 59, 0.55), rgba(15, 23, 42, 0.2) 40%, transparent);
+    }
+    section.band.band--ink {
+      background: linear-gradient(180deg, rgba(2, 6, 23, 0.55), transparent 70%);
+    }
+    section.band.band--dense { padding-top: 4.25rem; padding-bottom: 4.25rem; }
 
     .section-head { max-width: 60ch; margin-bottom: 2.5rem; }
     .section-head h2 { font-size: clamp(1.7rem, 4vw, 2.6rem); margin-top: 0.6rem; }
     .section-head p { color: var(--text-mute); font-size: 1.05rem; margin: 0.9rem 0 0; text-wrap: pretty; }
+
+    /* High-economy section enters (CSS scroll-driven; resting state stays visible) */
+    @supports (animation-timeline: view()) {
+      .reveal-rise {
+        animation: rise-view linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 28%;
+      }
+      .features-grid > .card:nth-child(1),
+      .steps > .step:nth-child(1),
+      .proof-strip > a:nth-child(1) { animation-delay: 0ms; }
+      .features-grid > .card:nth-child(2),
+      .steps > .step:nth-child(2),
+      .proof-strip > a:nth-child(2) { animation-delay: 40ms; }
+      .features-grid > .card:nth-child(3),
+      .steps > .step:nth-child(3),
+      .proof-strip > a:nth-child(3) { animation-delay: 80ms; }
+      .features-grid > .card:nth-child(4),
+      .proof-strip > a:nth-child(4) { animation-delay: 120ms; }
+      .features-grid > .card,
+      .steps > .step,
+      .proof-strip > a {
+        animation: rise-view linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 35%;
+      }
+    }
+    @keyframes rise-view {
+      from { opacity: 0.35; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
     /* Problem */
     .problem h2 { font-size: clamp(2rem, 6vw, 3.6rem); max-width: 16ch; }
@@ -552,6 +639,202 @@
     .trust h2 { font-size: clamp(1.8rem, 5vw, 3rem); max-width: 18ch; margin: 0 auto; }
     .trust p { color: var(--text-mute); max-width: 50ch; margin: 1.2rem auto 0; font-size: 1.05rem; text-wrap: pretty; }
 
+    /* Sticky magic-moment scrub (#how) */
+    .magic-scrub {
+      position: relative;
+      margin: 0 0 2.25rem;
+      border-radius: 18px;
+      border: 1px solid var(--border-subtle);
+      background: linear-gradient(160deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.6));
+      overflow: clip;
+    }
+    .magic-scrub-track {
+      height: min(160vh, 1100px);
+    }
+    .magic-scrub-pin {
+      position: sticky;
+      top: max(1rem, env(safe-area-inset-top, 0px));
+      min-height: min(72vh, 420px);
+      display: grid;
+      place-items: center;
+      padding: 1.75rem 1.25rem 2rem;
+      text-align: center;
+    }
+    .magic-scrub-pin > .magic-stage {
+      grid-area: 1 / 1;
+    }
+    .magic-stage {
+      width: min(100%, 34rem);
+      max-width: 100%;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      pointer-events: none;
+      visibility: hidden;
+    }
+    .magic-stage.is-active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      visibility: visible;
+      z-index: 1;
+    }
+    .magic-stage .stage-kicker {
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-mute);
+      margin-bottom: 0.55rem;
+    }
+    .magic-stage h3 {
+      font-family: var(--font-display);
+      font-size: clamp(1.35rem, 3.5vw, 1.9rem);
+      margin: 0 0 0.55rem;
+      color: #fff;
+    }
+    .magic-stage p {
+      margin: 0;
+      color: var(--text-mute);
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
+    .magic-stage .magic-count {
+      color: #fff;
+      margin: 0.35rem 0 0.55rem;
+    }
+    .magic-chips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.45rem;
+      margin-top: 1.1rem;
+    }
+    .magic-chip {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-mute);
+      background: rgba(15, 23, 42, 0.55);
+      opacity: 0.45;
+      transform: scale(0.96);
+      transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+    }
+    .magic-chip.is-on {
+      opacity: 1;
+      transform: scale(1);
+      color: #04121f;
+      border-color: transparent;
+      background: linear-gradient(180deg, #7dd3fc, var(--accent));
+    }
+    .magic-count {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(2.6rem, 8vw, 4.2rem);
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-top: 0.35rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .magic-scrub-progress {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      background: rgba(148, 163, 184, 0.15);
+    }
+    .magic-scrub-progress > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #a855f7);
+      transform-origin: left center;
+    }
+    @media (max-width: 768px) {
+      .magic-scrub { overflow: visible; }
+      .magic-scrub-track { height: auto; min-height: 0; }
+      .magic-scrub-pin {
+        position: relative;
+        top: auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        padding: 1rem;
+        place-items: stretch;
+      }
+      .magic-scrub-pin > .magic-stage {
+        grid-area: auto;
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        pointer-events: auto;
+        z-index: auto;
+        text-align: left;
+        padding: 1rem 1.05rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(15, 23, 42, 0.55);
+      }
+      .magic-chip { opacity: 1; transform: none; }
+      .magic-chips { justify-content: flex-start; }
+      .magic-scrub-progress { display: none; }
+      .magic-stage .magic-count { font-size: clamp(2rem, 10vw, 2.8rem); }
+    }
+
+    /* Real product proof strip */
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    @media (min-width: 900px) {
+      .proof-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 420px) {
+      .proof-strip { grid-template-columns: 1fr; gap: 0.7rem; }
+    }
+    .proof-strip a {
+      display: block;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-panel);
+      aspect-ratio: 16 / 10;
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+    .proof-strip a:hover {
+      transform: scale(1.03);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    @media (hover: none) {
+      .proof-strip a:hover,
+      .hero-peek a:hover { transform: none; }
+    }
+    .proof-strip img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+    }
+    .proof-strip figcaption,
+    .proof-caption {
+      margin: 0.85rem 0 0;
+      font-size: 0.85rem;
+      color: var(--text-mute);
+      text-align: center;
+      text-wrap: pretty;
+      padding: 0 0.25rem;
+    }
+
     /* Footer */
     footer { padding: 3.5rem 0 4rem; border-top: 1px solid var(--border-subtle); }
     .foot-grid { display: flex; flex-wrap: wrap; gap: 2.5rem 3rem; align-items: flex-start; justify-content: space-between; }
@@ -579,10 +862,12 @@
     @media (max-height: 720px) {
       .hero-inner { padding: 2rem 1.25rem; }
       .hero-tagline { margin-top: 0.85rem; }
+      .hero-moment { margin-top: 0.45rem; font-size: 0.9rem; }
       .hero-store-strip { margin-top: 0.55rem; }
       .hero-store-caption { margin-top: 0.3rem; }
       .waitlist { margin-top: 1.1rem; }
       .form-reassure { margin-top: 0.65rem; gap: 0.35rem; }
+      .hero-peek { margin-top: 1.15rem; max-width: min(100%, 36rem); }
     }
     @media (max-height: 560px) {
       .hero-inner { padding: 1.25rem 1rem; }
@@ -592,16 +877,43 @@
         margin-top: clamp(-2rem, -3.5vw, -0.75rem);
       }
       .hero-tagline { font-size: clamp(1.15rem, 2.8vw, 1.5rem); margin-top: 0.55rem; }
+      .hero-moment { display: none; }
       .hero-store { width: 18px; height: 18px; }
       .hero-store-caption { font-size: 0.68rem; }
       .waitlist { margin-top: 0.85rem; }
       .form-secure, .form-invite { font-size: 0.75rem; }
+      .hero-peek { display: none; }
     }
 
     @media (max-width: 768px) {
+      .hero {
+        min-height: 0;
+      }
+      .hero-inner {
+        margin: 0 auto;
+        padding: 2.25rem 1.25rem 2.5rem;
+      }
+      .hero-peek {
+        margin-top: 1.35rem;
+      }
+      .hero-store-caption {
+        white-space: normal;
+        text-wrap: pretty;
+        line-height: 1.4;
+        padding: 0 0.35rem;
+      }
+      .form-secure {
+        display: flex;
+        max-width: min(42ch, 100%);
+        text-align: left;
+        align-items: flex-start;
+        line-height: 1.45;
+        font-size: 0.8rem;
+      }
+      .form-secure .secure-ico { margin-top: 0.15rem; }
       section.band { padding: 4rem 0; }
       .section-head { margin-bottom: 2rem; }
-      .wrap { padding: 0 1.25rem; }
+      .wrap { padding: 0 1.25rem; box-sizing: border-box; }
       .features-grid { grid-template-columns: 1fr; }
       .steps { grid-template-columns: 1fr; }
       #start .steps { grid-template-columns: 1fr; }
@@ -617,13 +929,49 @@
       .hero-store-strip { gap: 5px 6px; max-width: 100%; }
       .hero-store { width: 20px; height: 20px; }
       .hero-store-caption { font-size: 0.68rem; max-width: 100%; }
+      .hero-moment { font-size: 0.88rem; }
       .wordmark { letter-spacing: 0.12em; }
+      .magic-scrub-pin { padding: 0.75rem; }
+      .magic-scrub-pin > .magic-stage { padding: 0.9rem 0.95rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-      .hero-mark, .wordmark, .hero-tagline, .hero-subhead, .hero-store-strip, .hero-store-caption, .waitlist { animation: none; }
-      .card, .btn { transition: none; }
+      .hero-mark, .wordmark, .hero-tagline, .hero-subhead, .hero-moment, .hero-store-strip, .hero-store-caption, .waitlist, .hero-peek { animation: none; }
+      .card, .btn, .hero-peek a, .proof-strip a, .magic-stage, .magic-chip { transition: none; }
+      .reveal-rise,
+      .features-grid > .card,
+      .steps > .step,
+      .proof-strip > a {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+      .magic-scrub-track { height: auto; }
+      .magic-scrub-pin {
+        position: relative;
+        top: auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        place-items: stretch;
+      }
+      .magic-scrub-pin > .magic-stage {
+        grid-area: auto;
+        width: 100%;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        pointer-events: auto;
+        text-align: left;
+        padding: 1rem 1.05rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(15, 23, 42, 0.55);
+      }
+      .magic-chip { opacity: 1; transform: none; }
+      .magic-scrub-progress { display: none; }
     }
 
     @media (max-width: 560px) {
@@ -682,6 +1030,7 @@
     <h1 class="wordmark">BAKLOG<sup class="tm" aria-hidden="true">&trade;</sup></h1>
     <p class="hero-tagline">One honest backlog across every store.</p>
     <p class="hero-subhead"><span class="nb">Free forever to import&nbsp;&middot;</span> <span class="nb">12 libraries and 8 wishlists&nbsp;&middot;</span> <span class="nb">runs on your machine</span></p>
+    <p class="hero-moment">Connect once. Watch 0&nbsp;&rarr;&nbsp;2,000+ games climb in about 90&nbsp;seconds.</p>
 
     <!-- order: STORE_DISPLAY_ORDER / bizcard BIZCARD_STORES -->
     <div class="hero-store-strip" aria-hidden="true">
@@ -710,30 +1059,34 @@
       <div class="form-reassure">
         <p class="form-secure">
           <svg class="secure-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <strong>Runs on your PC.</strong> No telemetry by default &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> (server, fetchers, auth) &middot; Open beta - email gets the download link.
+          <strong>Credentials stay on your PC.</strong> No BAKLOG server holds your logins &middot; no telemetry by default &middot; <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a> &middot; Open beta - email gets the download link.
         </p>
       </div>
       <p class="form-msg" id="formMsg" role="status" aria-live="polite"></p>
     </form>
+
+    <figure class="hero-peek">
+      <a href="#demo" aria-label="Jump to the interactive dashboard sample">
+        <img
+          src="assets/product/dashboard.webp"
+          width="823"
+          height="415"
+          alt="BAKLOG dashboard showing a cross-store library count and store chips"
+          decoding="async"
+          fetchpriority="high"
+        />
+      </a>
+      <figcaption class="hero-peek-caption">Same UI on your PC - scroll for the live sample.</figcaption>
+    </figure>
     </div>
   </header>
 
   <main id="main">
 
-  <!-- ============ PROBLEM ============ -->
-  <section class="band problem" id="what">
-    <div class="wrap">
-      <span class="eyebrow">The accidental library</span>
-      <h2>You didn't buy 600 games. They piled up.</h2>
-      <p>Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG pulls what you already own from each store into one table on your machine. Catalogs stay local by default; Pro cloud sync is opt-in and account-scoped.</p>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
-    </div>
-  </section>
-
-  <!-- ============ INTERACTIVE DEMO ============ -->
+  <!-- ============ INTERACTIVE DEMO (staged early: product proof before long copy) ============ -->
   <section class="band demo-section" id="demo">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal-rise">
         <span class="eyebrow">The demo is the product</span>
         <h2>This is your dashboard on day one.</h2>
         <p>Connect your stores and watch your library count climb. This live sample uses dummy data; the shipped app is the same UI on your PC. Clone <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">the MIT repo</a> and run it today, or grab a packaged beta build.</p>
@@ -743,14 +1096,56 @@
     </div>
   </section>
 
-  <!-- ============ HOW IT WORKS ============ -->
-  <section class="band" id="how">
+  <!-- ============ PROBLEM ============ -->
+  <section class="band problem band--tint" id="what">
     <div class="wrap">
-      <div class="section-head">
+      <span class="eyebrow reveal-rise">The accidental library</span>
+      <h2 class="reveal-rise">You didn't buy 600 games. They piled up.</h2>
+      <p class="reveal-rise">Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG pulls what you already own from each store into one table on your machine. Catalogs stay local by default; Pro cloud sync is opt-in and account-scoped.</p>
+      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS + sticky magic scrub ============ -->
+  <section class="band band--ink" id="how">
+    <div class="wrap">
+      <div class="section-head reveal-rise">
         <span class="eyebrow">Watch your library appear</span>
         <h2>From empty to 2,000+ games in 90 seconds.</h2>
         <p>Connect once. Each fetch runs on your PC from your IP. No shared credential pool. Catalogs stay local by default; Pro cloud sync is opt-in and account-scoped.</p>
       </div>
+
+      <div class="magic-scrub" id="magicScrub" data-magic-scrub>
+        <div class="magic-scrub-track">
+          <div class="magic-scrub-pin" role="group" aria-label="Library import story">
+            <div class="magic-stage is-active" data-stage="0">
+              <span class="stage-kicker">Step 1</span>
+              <h3>Connect a store</h3>
+              <p>Sign-in opens Chrome or Edge on this PC. Credentials encrypt to disk with your OS keychain.</p>
+            </div>
+            <div class="magic-stage" data-stage="1">
+              <span class="stage-kicker">Step 2</span>
+              <h3>Fetcher chips light up</h3>
+              <p>Each connected store fetches from your IP. Chips flip on as libraries land.</p>
+              <div class="magic-chips" aria-hidden="true">
+                <span class="magic-chip" data-chip="0">Steam</span>
+                <span class="magic-chip" data-chip="1">Epic</span>
+                <span class="magic-chip" data-chip="2">GOG</span>
+                <span class="magic-chip" data-chip="3">Xbox</span>
+                <span class="magic-chip" data-chip="4">PSN</span>
+              </div>
+            </div>
+            <div class="magic-stage" data-stage="2">
+              <span class="stage-kicker">Step 3</span>
+              <h3>Your count climbs</h3>
+              <p class="magic-count" data-magic-count>2,000+</p>
+              <p>One clean table on your machine. Decide what to play next.</p>
+            </div>
+            <div class="magic-scrub-progress" aria-hidden="true"><span data-magic-bar></span></div>
+          </div>
+        </div>
+      </div>
+
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
@@ -768,12 +1163,33 @@
           <p>Know what to play next, and whether that "deal" is actually worth opening.</p>
         </div>
       </div>
+
+      <div class="section-head reveal-rise" style="margin-top:2.75rem;margin-bottom:1.25rem">
+        <span class="eyebrow">Shipped UI</span>
+        <h2>Real screenshots from the desktop app.</h2>
+      </div>
+      <div class="proof-strip">
+        <a href="#demo" aria-label="Fetchers view screenshot">
+          <img src="assets/product/fetchers.webp" width="823" height="414" alt="Fetcher health chips lighting up during a library sync" loading="lazy" decoding="async" />
+        </a>
+        <a href="#demo" aria-label="Library table screenshot">
+          <img src="assets/product/library.webp" width="960" height="481" alt="Library table with cross-store games in one view" loading="lazy" decoding="async" />
+        </a>
+        <a href="#demo" aria-label="Wishlist deals screenshot">
+          <img src="assets/product/wishlist.webp" width="823" height="470" alt="Wishlist deal radar fused with owned games" loading="lazy" decoding="async" />
+        </a>
+        <a href="#demo" aria-label="Connections screenshot">
+          <img src="assets/product/connections.webp" width="823" height="472" alt="Connections screen for linking game stores" loading="lazy" decoding="async" />
+        </a>
+      </div>
+      <p class="proof-caption">Fetchers, library, wishlist radar, and Connections - the same surfaces as the interactive sample above.</p>
+
       <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
   <!-- ============ STORE WALL ============ -->
-  <section class="band logo-wall-section" id="stores">
+  <section class="band logo-wall-section band--dense" id="stores">
     <div class="wrap">
       <span class="eyebrow">Works with what you own, or start from scratch</span>
       <h2>12 libraries and 8 wishlists. One clean table.</h2>
@@ -798,9 +1214,9 @@
   </section>
 
   <!-- ============ FEATURES ============ -->
-  <section class="band">
+  <section class="band band--tint">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal-rise">
         <span class="eyebrow">What you get</span>
         <h2>Your whole library, in one table.</h2>
         <p><a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">MIT source on GitHub</a>: server, fetchers, auth, and dashboard in one public tree you can clone and audit. BAKLOG fetches your library from every store on your machine, then dedupes it into something you can sort, filter, and act on.</p>
@@ -949,7 +1365,7 @@
   </section>
 
   <!-- ============ START FROM ZERO ============ -->
-  <section class="band" id="start">
+  <section class="band band--dense" id="start">
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Starting from zero?</span>
@@ -978,9 +1394,9 @@
   </section>
 
   <!-- ============ COMPARISON ============ -->
-  <section class="band">
+  <section class="band band--tint">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal-rise">
         <span class="eyebrow">Not another launcher</span>
         <h2>Not another launcher.</h2>
         <p>Launchers open games. BAKLOG helps you pick what to play and spot deals worth opening.</p>
@@ -1004,9 +1420,9 @@
   </section>
 
   <!-- ============ BOX SCORE ============ -->
-  <section class="band">
+  <section class="band band--ink band--dense">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal-rise">
         <span class="eyebrow">Sabermetrics for your backlog</span>
         <h2>Your backlog, by the numbers.</h2>
         <p>300+ stats and baseball-style sabermetrics: completion AVG, backlog OPS, value-per-hour, even a WAR for your next pick. Built to screenshot for the group chat.</p>

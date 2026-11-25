@@ -3,6 +3,7 @@
 
 import { state } from "./state.js";
 import { escapeAttr, escapeHtml } from "./dom-util.js";
+import { renderMetaParts } from "./spotlight-meta.js";
 import {
   gameKey,
   hltbMain,
@@ -1472,7 +1473,7 @@ export function spotlightInnerHtml(g) {
     <div class="dash-spotlight-body">
       <span class="dash-spotlight-eyebrow"${eyebrowTitleAttr}>${escapeHtml(displayEyebrow)}</span>
       <span class="dash-spotlight-title">${escapeHtml(g.name)}</span>
-      <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${metaParts.join(" · ")}</span>
+      <span class="dash-spotlight-meta" title="Review % · HLTB main · status (or sale info)">${renderMetaParts(metaParts)}</span>
     </div>
     <div class="dash-spotlight-veil" aria-hidden="true"></div>`;
 }

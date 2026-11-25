@@ -310,8 +310,9 @@ describe('spotlight sponsored slides', () => {
       enabled: true,
     });
     expect(slide._spotlightReason.tagline).toBe('<img src=x onerror=alert(1)>evil');
-    expect(slide._spotlightReason.metaParts[0]).toContain('&lt;img');
-    expect(slide._spotlightReason.metaParts[0]).not.toContain('<img');
+    expect(slide._spotlightReason.metaParts[0]).toEqual({
+      text: '<img src=x onerror=alert(1)>evil',
+    });
     const html = renderSpotlightHtml(slide);
     expect(html).not.toMatch(/<img\s+src=x/i);
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;evil');

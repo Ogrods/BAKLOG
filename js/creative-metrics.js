@@ -427,7 +427,7 @@ const SABER_SPOTLIGHT_SCORE = 92;
  * Single-game creative superlatives for the dashboard spotlight (one game each).
  * @param {object[]} games — typically art-eligible library subset
  * @param {object} snap
- * @returns {{ key: string, eyebrow: string, score: number, metaParts: string[] }[]}
+ * @returns {{ key: string, eyebrow: string, score: number, metaParts: Array<string|{text?:string,html?:string}> }[]}
  */
 export function computeSpotlightSuperlatives(games, _snap) {
   const list = games || [];

@@ -69,14 +69,20 @@ describe("spotlight low-res art", () => {
   it("prefers portrait treatment over low-res for tall art", () => {
     const spot = mountSpotlight();
     const img = stubArtDimensions(spot, 300, 450);
+    const sheen = spot.querySelector(".dash-spotlight-sheen");
 
     expect(spot.classList.contains("has-portrait-art")).toBe(true);
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
+    // Poster geometry is CSS; JS must not leave an inline sheen width.
+    expect(sheen.style.width).toBe("");
+    // Clear hero left-fade so capsule titles are not clipped (CSS also sets
+    // -webkit-mask-image; happy-dom only reliably keeps the standard property).
+    expect(img.style.getPropertyValue("mask-image")).toBe("none");
   });
 
-  it("parks portrait and low-res covers at ~2/3 when spotlight is stacked", () => {
+  it("parks low-res at ~2/3 when stacked; portrait stays center (CSS right-tuck)", () => {
     window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: String(query).includes("1023.98px"),
       media: query,
@@ -89,11 +95,40 @@ describe("spotlight low-res art", () => {
     const portraitSpot = mountSpotlight();
     const portraitImg = stubArtDimensions(portraitSpot, 300, 450);
     expect(portraitSpot.classList.contains("has-portrait-art")).toBe(true);
-    expect(portraitImg.style.objectPosition).toBe("66% 40%");
+    expect(portraitImg.style.objectPosition).toBe("center");
 
     const lowresSpot = mountSpotlight();
     const lowresImg = stubArtDimensions(lowresSpot, 460, 215);
     expect(lowresSpot.classList.contains("is-lowres-art")).toBe(true);
     expect(lowresImg.style.objectPosition).toBe("66% 40%");
+  });
+});
+
+describe("spotlight portrait CSS contract", () => {
+  it("clears hero mask and sizes a 2:3 poster for has-portrait-art", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const css = await fs.readFile(
+      path.join(process.cwd(), "app.css"),
+      "utf8",
+    );
+    const portraitArt = css.match(
+      /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(portraitArt).toBeTruthy();
+    expect(portraitArt).toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
+    expect(portraitArt).toMatch(/object-fit:\s*contain/);
+    expect(portraitArt).toMatch(/mask-image:\s*none/);
+    expect(portraitArt).toMatch(/overflow:\s*hidden/);
+
+    const portraitBg = css.match(
+      /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art-bg \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(portraitBg).toMatch(/mask-image:\s*none/);
+
+    const sheen = css.match(
+      /\.dash-spotlight\.has-portrait-art \.dash-spotlight-sheen \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(sheen).toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
   });
 });

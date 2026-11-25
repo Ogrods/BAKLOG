@@ -1693,11 +1693,12 @@ function wireSpotlightHover(el) {
   // spotlightFloatN). On release we ease to this pose so that when `is-tilting`
   // is removed and the keyframe animation resumes at 0%, the handoff is seamless
   // instead of snapping from a flat (0deg) rest pose.
+  // Match milder spotlightFloatN resting poses (keeps capsule titles inside clip).
   const FLOAT_ANCHORS = {
-    "portrait-anim-1": { ry: -3, rx: 1 },
-    "portrait-anim-2": { ry: 3, rx: -1 },
-    "portrait-anim-3": { ry: -4, rx: 1.2 },
-    "portrait-anim-4": { ry: 2.5, rx: -0.8 },
+    "portrait-anim-1": { ry: -2, rx: 0.8 },
+    "portrait-anim-2": { ry: 2, rx: -0.8 },
+    "portrait-anim-3": { ry: -2.5, rx: 1 },
+    "portrait-anim-4": { ry: 1.8, rx: -0.6 },
   };
   const floatAnchor = () => {
     for (const cls in FLOAT_ANCHORS) {

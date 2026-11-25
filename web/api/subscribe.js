@@ -151,9 +151,10 @@ export default {
     }
 
     const origin = request.headers.get("Origin") || "";
-    // Browser posts must come from the landing origin (bots can still forge Origin;
-    // this blocks casual CSRF from other sites).
-    if (origin && !isAllowedSubscribeOrigin(origin)) {
+    // Require a recognized Origin (baklog.app or localhost). Missing Origin is
+    // rejected so scripted callers cannot skip the allowlist (bots can still
+    // forge Origin; this blocks casual CSRF and Origin-less abuse).
+    if (!isAllowedSubscribeOrigin(origin)) {
       return Response.json({ error: "Origin not allowed" }, { status: 403 });
     }
 

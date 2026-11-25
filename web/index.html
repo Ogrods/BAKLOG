@@ -373,8 +373,13 @@
       font-family: var(--font-body);
       font-size: 1rem;
       padding: 0.55rem 0.75rem;
+      border-radius: 10px;
     }
     .waitlist input::placeholder { color: var(--text-mute); }
+    .waitlist input[type="email"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
 
     .btn {
       font-family: var(--font-display);
@@ -392,6 +397,11 @@
     }
     .btn:hover { transform: translateY(-1px); color: #04121f; box-shadow: 0 10px 26px rgba(56, 189, 248, 0.42); filter: brightness(1.04); }
     .btn:active { transform: translateY(0); }
+    .btn:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+      box-shadow: 0 0 0 5px rgba(56, 189, 248, 0.45);
+    }
     .btn[disabled] { opacity: 0.6; cursor: default; transform: none; box-shadow: none; }
 
     .honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
@@ -450,17 +460,6 @@
         animation-timeline: view();
         animation-range: entry 0% entry 28%;
       }
-      .features-grid > .card:nth-child(1),
-      .steps > .step:nth-child(1),
-      .proof-strip > a:nth-child(1) { animation-delay: 0ms; }
-      .features-grid > .card:nth-child(2),
-      .steps > .step:nth-child(2),
-      .proof-strip > a:nth-child(2) { animation-delay: 40ms; }
-      .features-grid > .card:nth-child(3),
-      .steps > .step:nth-child(3),
-      .proof-strip > a:nth-child(3) { animation-delay: 80ms; }
-      .features-grid > .card:nth-child(4),
-      .proof-strip > a:nth-child(4) { animation-delay: 120ms; }
       .features-grid > .card,
       .steps > .step,
       .proof-strip > a {
@@ -649,7 +648,7 @@
       border: none;
     }
     .magic-scrub-track {
-      height: min(240vh, 1600px);
+      height: min(180vh, 1200px);
     }
     .magic-scrub-pin {
       position: sticky;
@@ -770,7 +769,6 @@
       background: rgba(15, 23, 42, 0.65);
       box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
       transform: translateY(calc(var(--magic-drift) * 1%));
-      will-change: transform;
     }
     .magic-visual-frame img {
       position: absolute;
@@ -854,18 +852,29 @@
       .magic-stage .magic-count { font-size: clamp(2rem, 10vw, 2.8rem); }
     }
 
-    /* Real product proof strip */
+    /* Post-scrub beat: one Decide line, then unique proof shots only */
+    .how-decide {
+      max-width: 42rem;
+      margin: 0 auto 2.5rem;
+      text-align: center;
+      font-size: 1.08rem;
+      color: var(--text-mute);
+      text-wrap: pretty;
+    }
+    .how-decide strong { color: var(--text-bright); font-weight: 600; }
+
+    /* Real product proof strip (non-scrub surfaces only) */
     .proof-strip {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       gap: 0.85rem;
       margin-top: 0.5rem;
+      max-width: 36rem;
+      margin-left: auto;
+      margin-right: auto;
     }
-    @media (min-width: 900px) {
-      .proof-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    }
-    @media (max-width: 420px) {
-      .proof-strip { grid-template-columns: 1fr; gap: 0.7rem; }
+    @media (min-width: 700px) {
+      .proof-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 48rem; }
     }
     .proof-strip a {
       display: block;
@@ -1169,7 +1178,7 @@
         <p>Connect your stores and watch your library count climb. This live sample uses dummy data; the shipped app is the same UI on your PC. Clone <a href="https://github.com/Ogrods/BAKLOG" target="_blank" rel="noopener noreferrer">the MIT repo</a> and run it today, or grab a packaged beta build.</p>
       </div>
       <div class="demo-mount" id="demoMount" role="region" aria-label="BAKLOG dashboard sample"></div>
-      <p class="demo-cta"><a class="btn" href="#waitlist">Get the beta</a></p>
+      <p class="demo-cta"><a href="#waitlist">Join the open beta</a></p>
     </div>
   </section>
 
@@ -1179,7 +1188,6 @@
       <span class="eyebrow reveal-rise">The accidental library</span>
       <h2 class="reveal-rise">You didn't buy 600 games. They piled up.</h2>
       <p class="reveal-rise">Free Epic and Prime Gaming Thursdays, a GOG giveaway you grabbed mid-sale, Humble Bundle dumps, the itch.io Palestinian Relief Bundle, the Steam Summer Sale. A modern library is an accident, scattered across launchers you forgot you had. You should not have to visit five storefronts to see what is yours. BAKLOG pulls what you already own from each store into one table on your machine. Catalogs stay local by default; Pro cloud sync is opt-in and account-scoped.</p>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
@@ -1257,43 +1265,18 @@
         </div>
       </div>
 
-      <div class="steps">
-        <div class="step">
-          <div class="num">1</div>
-          <h3>Connect</h3>
-          <p>Link each store. Sign-in opens Chrome or Edge on this PC; if neither is installed, BAKLOG downloads a one-time browser. Credentials encrypt to disk with your OS keychain.</p>
-        </div>
-        <div class="step">
-          <div class="num">2</div>
-          <h3>Auto-fetch on connect</h3>
-          <p>BAKLOG fetches each connected store and brings everything you own back to one clean table. Fetcher chips light up as each library lands. Auto-refresh keeps stale stores current while the app is open.</p>
-        </div>
-        <div class="step">
-          <div class="num">3</div>
-          <h3>Decide</h3>
-          <p>Know what to play next, and whether that "deal" is actually worth opening.</p>
-        </div>
-      </div>
+      <p class="how-decide reveal-rise"><strong>Decide</strong> what to play next, and whether that deal is actually worth opening. One clean table on your machine.</p>
 
-      <div class="section-head reveal-rise" style="margin-top:2.75rem;margin-bottom:1.25rem">
+      <div class="section-head reveal-rise" style="margin-top:0.5rem;margin-bottom:1.25rem">
         <span class="eyebrow">Shipped UI</span>
-        <h2>Real screenshots from the desktop app.</h2>
+        <h2>More surfaces from the desktop app.</h2>
       </div>
       <div class="proof-strip">
-        <a href="#demo" aria-label="Fetchers view screenshot">
-          <img src="assets/product/fetchers.webp" width="1600" height="1000" alt="Fetcher health chips lighting up during a library sync" loading="lazy" decoding="async" />
-        </a>
-        <a href="#demo" aria-label="Library table screenshot">
-          <img src="assets/product/library.webp" width="1600" height="1000" alt="Library table with cross-store games in one view" loading="lazy" decoding="async" />
-        </a>
         <a href="#demo" aria-label="Wishlist deals screenshot">
           <img src="assets/product/wishlist.webp" width="1600" height="1000" alt="Wishlist deal radar fused with owned games" loading="lazy" decoding="async" />
         </a>
-        <a href="#demo" aria-label="Connections screenshot">
-          <img src="assets/product/connections.webp" width="1600" height="1000" alt="Connections screen for linking game stores" loading="lazy" decoding="async" />
-        </a>
       </div>
-      <p class="proof-caption">Fetchers, library, wishlist radar, and Connections - the same surfaces as the interactive sample above.</p>
+      <p class="proof-caption">Wishlist deal radar - ownership-aware sales against the library you already connected.</p>
 
       <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
@@ -1320,7 +1303,6 @@
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M16.635 6.162l-5.928 9.377H4.24l1.508-2.3h4.024l1.474-2.335H2.264L.79 13.239h2.156L0 17.84h12.072l4.563-7.259 1.652 2.66h-1.401l-1.473 2.299h4.347l1.473 2.3H24zm-11.461.107L3.7 8.604l9.52-.035 1.474-2.3z"/></svg>
       </div>
       <p class="logo-wall-caption">Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, and EA App. Plus 8 wishlist sources for deal radar (Humble wishlist paused while their site upgrade finishes; Humble library still works).</p>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
@@ -1477,7 +1459,6 @@
           </tbody>
         </table>
       </div>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
@@ -1506,7 +1487,7 @@
           <p>Connect once and your new collection counts itself from day one.</p>
         </div>
       </div>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
+      <p class="section-invite"><a href="#waitlist">Join the open beta</a></p>
     </div>
   </section>
 
@@ -1532,7 +1513,6 @@
           <p>Backloggd is manual logging. BAKLOG auto-imports 12 libraries and 8 wishlist sources when you connect each store.</p>
         </article>
       </div>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
@@ -1552,7 +1532,6 @@
         <div class="score-tile"><div class="num">$0</div><div class="lbl">free forever to import your library</div></div>
         <div class="score-tile"><div class="num">1-click</div><div class="lbl">queue every stale store (Pro)</div></div>
       </div>
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
@@ -1634,7 +1613,7 @@
           <p>No. BAKLOG has no business model built on your library. We do not sell catalog data. Packaged beta builds require account sign-in (email only). Catalogs stay local unless you turn on Pro cloud sync, which hosts catalogs and personal statuses for your account only - still not for sale.</p>
         </details>
       </div>
-      <p class="section-invite"><a href="https://github.com/Ogrods/BAKLOG/tree/main/guide" target="_blank" rel="noopener noreferrer">Full user guide on GitHub</a> · <a class="btn" href="#waitlist">Get the beta</a></p>
+      <p class="section-invite"><a href="https://github.com/Ogrods/BAKLOG/tree/main/guide" target="_blank" rel="noopener noreferrer">Full user guide on GitHub</a> · <a href="#waitlist">Join the open beta</a></p>
     </div>
   </section>
 

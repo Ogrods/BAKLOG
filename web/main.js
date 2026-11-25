@@ -59,12 +59,13 @@
     if (!root) return;
 
     const track = root.querySelector(".magic-scrub-track");
+    const pin = root.querySelector(".magic-scrub-pin");
     const stages = Array.from(root.querySelectorAll(".magic-stage"));
     const shots = Array.from(root.querySelectorAll("[data-magic-shot]"));
     const visual = root.querySelector(".magic-visual");
     const chips = Array.from(root.querySelectorAll(".magic-chip"));
     const bar = root.querySelector("[data-magic-bar]");
-    if (!track || stages.length < 3) return;
+    if (!track || !pin || stages.length < 3) return;
 
     const reduceMq = window.matchMedia
       ? window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -76,6 +77,28 @@
     let raf = 0;
     let lastStage = -1;
     let scrubbing = false;
+    let stickyTopPx = 0;
+
+    function syncStickyTop() {
+      if (!scrubbing) {
+        pin.style.top = "";
+        stickyTopPx = 0;
+        return;
+      }
+      const view = Math.max(1, window.innerHeight);
+      const maxPin = 760;
+      const expected = Math.min(view, maxPin);
+      const actual = pin.offsetHeight || expected;
+      // When content grows past the CSS min-height cap, measure-center so the card stays mid-viewport.
+      if (Math.abs(actual - expected) > 2) {
+        const top = Math.max(12, Math.round((view - actual) / 2));
+        pin.style.top = `${top}px`;
+        stickyTopPx = top;
+      } else {
+        pin.style.top = "";
+        stickyTopPx = parseFloat(getComputedStyle(pin).top) || 0;
+      }
+    }
 
     function setShot(stage) {
       shots.forEach((el, i) => {
@@ -122,12 +145,23 @@
         raf = 0;
         const rect = track.getBoundingClientRect();
         const view = Math.max(1, window.innerHeight);
-        // Start scrubbing once the track top reaches ~35% down the viewport (not only at top=0).
-        const startOffset = view * 0.35;
+        // Progress 0 when the pin reaches its sticky rest (centered top), not an arbitrary mid-view hack.
+        const startOffset = stickyTopPx;
         const total = Math.max(1, rect.height - view + startOffset);
         const scrolled = Math.min(total, Math.max(0, -rect.top + startOffset));
         applyProgress(scrolled / total);
       });
+    }
+
+    function onResize() {
+      const wantStatic = reduceMq.matches || mobileMq.matches;
+      // matchMedia "change" can miss some viewport flips (DevTools / embed); resync mode if drifted.
+      if (wantStatic === scrubbing) {
+        syncMode();
+        return;
+      }
+      syncStickyTop();
+      onScroll();
     }
 
     function syncMode() {
@@ -135,14 +169,16 @@
       scrubbing = !staticMode;
       lastStage = -1;
       if (staticMode) {
+        syncStickyTop();
         showAllStatic();
       } else {
+        syncStickyTop();
         onScroll();
       }
     }
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
     if (reduceMq.addEventListener) {
       reduceMq.addEventListener("change", syncMode);
       mobileMq.addEventListener("change", syncMode);

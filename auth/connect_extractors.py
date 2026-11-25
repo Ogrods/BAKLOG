@@ -463,12 +463,13 @@ def extract_humble_session(context: Any, page: Any) -> dict[str, str] | None:
 
 
 def humble_connect_hint(page: Any) -> str:
-    url = (getattr(page, "url", None) or "").lower()
-    if "login" in url or "sign" in url and "library" not in url:
-        return "Sign in to Humble Bundle in the browser window (email or Google)."
-    if "auth.humblebundle.com" in url:
+    url = getattr(page, "url", None) or ""
+    path = (urlparse(url).path or "").lower()
+    if host_matches(url, "auth.humblebundle.com"):
         return "Finish sign-in - wait until your library opens (do not close early)."
-    if "humblebundle.com" not in url:
+    if "login" in path or "sign" in path and "library" not in path:
+        return "Sign in to Humble Bundle in the browser window (email or Google)."
+    if not host_matches(url, "humblebundle.com"):
         return "Open humblebundle.com and sign in if prompted."
     return (
         "Wait until your Humble library finishes loading - do not close early. "

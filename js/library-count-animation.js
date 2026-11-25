@@ -28,8 +28,10 @@ const STRICT_POPUP_SYNC_MAX = 15;
 const JITTER_PX = 4;
 
 const SURFACE_KEY = '__baklogLibCountAnim';
-/** Every surface with an in-flight episode (survives DOM detachment on tab switch). */
+/** Every surface with an in-flight digit roll (survives DOM detachment on tab switch). */
 const _activeSurfaces = new Set();
+/** Episodes whose roll finished but timed +1 spawns may still be pending. */
+const _lingeringEpisodes = new Set();
 
 function fmtPlain(n) { return String(Math.round(n)); }
 function fmtCommas(n) {
@@ -53,6 +55,7 @@ function cancelEpisode(node, opts = {}) {
   if (prev.spawnTimers) {
     for (const id of prev.spawnTimers) clearTimeout(id);
   }
+  prev.spawnTimers = [];
   // Chained demo/fetcher bursts: if a replacement episode cut the roll short,
   // still show one +1 so rapid landings do not look silent.
   if (
@@ -73,6 +76,31 @@ function cancelEpisode(node, opts = {}) {
   if (opts.keepPopups === false && prev.node?.id) {
     document.querySelectorAll(`.library-count-popup[data-libcount-surface="${prev.node.id}"]`)
       .forEach(el => el.remove());
+  }
+  _lingeringEpisodes.delete(prev);
+  node[SURFACE_KEY] = null;
+  _activeSurfaces.delete(node);
+}
+
+/**
+ * Natural end of a roll: drop the animating flag so handoff / charts / a
+ * second burst can proceed, but leave CSS popups climbing until animationend.
+ * Timed spawn callbacks stay on a lingering episode so cancelAll can still
+ * clearTimeout them (do not clear spawnTimers here).
+ */
+function finishEpisode(node) {
+  if (!node) return;
+  const prev = node[SURFACE_KEY];
+  if (!prev) return;
+  if (prev.rafId) {
+    cancelAnimationFrame(prev.rafId);
+    prev.rafId = 0;
+  }
+  try {
+    if (prev.format && prev.to != null) node.textContent = prev.format(prev.to);
+  } catch (_) { /* ignore */ }
+  if (prev.spawnTimers && prev.spawnTimers.length) {
+    _lingeringEpisodes.add(prev);
   }
   node[SURFACE_KEY] = null;
   _activeSurfaces.delete(node);
@@ -255,6 +283,9 @@ function spawnPopups(host, popupCount, opts) {
     const id = setTimeout(() => {
       if (!host.isConnected && !anchorNode.isConnected) return;
       mountOnePopup(host, anchorNode, i);
+      if (i === popupCount - 1 && opts?.episode) {
+        _lingeringEpisodes.delete(opts.episode);
+      }
     }, delay);
     timers.push(id);
   }
@@ -339,6 +370,7 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
       anchorNode: node,
       delta,
       durationMs,
+      episode,
     });
   }
 
@@ -367,6 +399,8 @@ export function flashCountUp(node, from, to, format = fmtCommas, opts = {}) {
       node.textContent = format(safeTo);
       if (episode.tickPopups) syncPopupsOnTick(episode, safeTo);
       episode.rafId = 0;
+      // Clear sticky animating flag; CSS popups finish on their own.
+      finishEpisode(node);
     }
   }
   episode.rafId = requestAnimationFrame(tick);
@@ -462,7 +496,7 @@ function collectSurfaces(kind, prev, next, rowOpts = {}) {
   return out;
 }
 
-/** True when this surface has an in-flight roll or pending popup spawns. */
+/** True when this surface has an in-flight digit roll (not climbing CSS popups). */
 export function isSurfaceAnimating(node) {
   return !!(node && node[SURFACE_KEY]);
 }
@@ -470,12 +504,19 @@ export function isSurfaceAnimating(node) {
 /**
  * Abort any in-flight count animations on every surface we know about and
  * remove any popups still climbing. Called from view switches and visibility
- * change. Use this when we're tearing down for real — for fresh episodes on
+ * change. Use this when we're tearing down for real - for fresh episodes on
  * the same surface, flashCountUp does a soft cancel that preserves climbing
  * popups for a smoother chained-fetcher experience.
  */
 export function cancelAllLibraryCountAnimations() {
   for (const node of [..._activeSurfaces]) cancelEpisode(node, { keepPopups: false });
+  for (const ep of [..._lingeringEpisodes]) {
+    if (ep.spawnTimers) {
+      for (const id of ep.spawnTimers) clearTimeout(id);
+    }
+    ep.spawnTimers = [];
+    _lingeringEpisodes.delete(ep);
+  }
   document.querySelectorAll('[data-count-target]').forEach(n => cancelEpisode(n, { keepPopups: false }));
   const hero = document.getElementById('dashHeroCount');
   if (hero) cancelEpisode(hero, { keepPopups: false });

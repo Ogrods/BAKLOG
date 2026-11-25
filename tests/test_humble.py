@@ -11,6 +11,7 @@ from auth.connect_extractors import (
     HUMBLE_SUCCESS_URL_PATTERN,
     dump_humble_session_cookies,
     extract_humble_session,
+    humble_connect_hint,
     humble_has_durable_session_cookies,
     humble_is_durable_session_cookie_name,
     humble_page_is_confirmed_library_or_store,
@@ -270,6 +271,19 @@ def test_humble_durable_session_cookie_helpers() -> None:
                 }
             ],
         )
+    )
+
+
+def test_humble_connect_hint_uses_parsed_host() -> None:
+    assert "Sign in" in humble_connect_hint(_FakePage("https://www.humblebundle.com/login"))
+    assert "Finish sign-in" in humble_connect_hint(
+        _FakePage("https://auth.humblebundle.com/self-service/login/browser")
+    )
+    assert "Open humblebundle.com" in humble_connect_hint(
+        _FakePage("https://evil.example/?q=auth.humblebundle.com")
+    )
+    assert "library finishes loading" in humble_connect_hint(
+        _FakePage("https://www.humblebundle.com/home/library")
     )
 
 

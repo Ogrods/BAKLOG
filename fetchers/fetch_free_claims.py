@@ -18,7 +18,7 @@ from fetchers._base import (
     refuse_drift_result,
     refuse_empty_result,
 )
-from fetchers._progress import RunStats, started
+from fetchers._progress import RunStats, phase, run_with_heartbeat, started
 from shared.free_claims_sources import has_valid_claim_links
 from shared.profile_paths import free_claims_path
 from shared.safe_write import safe_write_text
@@ -124,12 +124,17 @@ def main() -> int:
     t0 = started("fetch_free_claims.py")
 
     try:
-        data = _fetch_url(args.url)
+        data = run_with_heartbeat(
+            lambda: _fetch_url(args.url),
+            "Free claims feed download",
+            interval=25.0,
+        )
     except (URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
         stats.error(f"could not load feed: {exc}")
         return stats.finish("fetch_free_claims", t0, exit_code=1)
 
     raw_items = data.get("items") or []
+    phase(f"Free claims validate ({len(raw_items)} raw rows)")
     valid_items: list[dict] = []
     invalid = 0
     dropped_ids: list[str] = []
@@ -187,6 +192,7 @@ def main() -> int:
     if isinstance(attribution, list) and attribution:
         payload["attribution"] = attribution
 
+    phase(f"Free claims write ({valid} claim(s))")
     if args.dry_run:
         print(f"dry-run: would write {valid} claim(s) to {out}", flush=True)
     else:

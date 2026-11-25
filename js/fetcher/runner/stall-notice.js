@@ -1,6 +1,7 @@
 /**
  * Cheap stuck-fetcher diagnosis: detect stall watchdog log lines and offer
- * a force-reset CTA (close browser / clear queue). No CDP lastUrl plumbing.
+ * a force-reset CTA (close browser / clear queue). Client soft notice when
+ * no progress-shaped output for ~30s (before the 60s server stall line).
  */
 
 const STALL_RE = /\[server\]\s+no output for\s+(\d+)s\s+[—\-].*still running/i;
@@ -8,20 +9,20 @@ const FORCE_KILL_RE = /\[server\]\s+no output for\s+(\d+)s\s+[—\-].*force-kill
 
 /**
  * @param {string} text
- * @returns {{ seconds: number, fatal: boolean } | null}
+ * @returns {{ seconds: number, fatal: boolean, soft?: boolean } | null}
  */
 export function parseStallLogLine(text) {
   const raw = String(text || '');
   let m = raw.match(FORCE_KILL_RE);
-  if (m) return { seconds: Number(m[1]), fatal: true };
+  if (m) return { seconds: Number(m[1]), fatal: true, soft: false };
   m = raw.match(STALL_RE);
-  if (m) return { seconds: Number(m[1]), fatal: false };
+  if (m) return { seconds: Number(m[1]), fatal: false, soft: false };
   return null;
 }
 
 /**
  * @param {HTMLElement | null | undefined} panel
- * @param {{ seconds: number, fatal: boolean } | null} stall
+ * @param {{ seconds: number, fatal: boolean, soft?: boolean } | null} stall
  */
 export function updateStallNotice(panel, stall) {
   if (!panel) return;
@@ -44,20 +45,28 @@ export function updateStallNotice(panel, stall) {
   }
   el.classList.remove('hidden');
   const sec = stall.seconds;
-  const msg = stall.fatal
-    ? `No output for ${sec}s - browser/process force-killed.`
-    : `No output for ${sec}s - fetcher may be stuck.`;
+  let msg;
+  if (stall.soft) {
+    msg = `No progress update for ${sec}s - check the log below.`;
+  } else if (stall.fatal) {
+    msg = `No output for ${sec}s - browser/process force-killed.`;
+  } else {
+    msg = `No output for ${sec}s - fetcher may be stuck.`;
+  }
   el.replaceChildren();
   const span = document.createElement('span');
   span.className = 'fh-log-stall-msg';
   span.textContent = msg;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'fh-log-btn fh-log-stall-retry';
-  btn.setAttribute('data-role', 'stall-retry');
-  btn.textContent = 'Close browser and retry';
-  btn.title = 'Force-reset the fetcher queue and close a stuck browser session';
-  el.append(span, btn);
+  el.append(span);
+  if (!stall.soft) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fh-log-btn fh-log-stall-retry';
+    btn.setAttribute('data-role', 'stall-retry');
+    btn.textContent = 'Close browser and retry';
+    btn.title = 'Force-reset the fetcher queue and close a stuck browser session';
+    el.append(btn);
+  }
 }
 
 /**

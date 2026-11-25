@@ -56,6 +56,10 @@ import {
   parseStallLogLine,
   updateStallNotice,
 } from './stall-notice.js';
+import {
+  parseProgressSummary,
+  SOFT_STALL_NO_PROGRESS_MS,
+} from '../progress-summary.js';
 
 export const fetcherRunner = (() => {
   let apiAvailable = null;
@@ -381,6 +385,11 @@ export const fetcherRunner = (() => {
   let liveRunId = null;
   let lastLineText = '';
   let lastLineKind = 'stdout';
+  let lastProgressSummary = '';
+  let lastProgressAt = 0;
+  let softStallTimer = null;
+  let softStallShowing = false;
+  let serverStallActive = false;
   let lastBarSummary = 'Fetcher health';
   let pollTimer = null;
   let _dashboardPollWanted = false;
@@ -388,6 +397,62 @@ export const fetcherRunner = (() => {
   /** Avoid re-running refreshAfterFetch on every dashboard tab return when syncFromServer
    *  keeps seeing the same recent "done" run in the 5-minute window. */
   let _lastAppliedDoneRunId = null;
+
+  function clearSoftStallWatch() {
+    if (softStallTimer) {
+      clearTimeout(softStallTimer);
+      softStallTimer = null;
+    }
+  }
+
+  function clearSoftStallNotice() {
+    softStallShowing = false;
+    if (!serverStallActive) updateStallNotice(logPanel(), null);
+  }
+
+  function scheduleSoftStallWatch() {
+    clearSoftStallWatch();
+    if (!liveRunId) return;
+    softStallTimer = setTimeout(() => {
+      softStallTimer = null;
+      if (!liveRunId || serverStallActive) return;
+      const ageMs = Date.now() - (lastProgressAt || 0);
+      if (ageMs < SOFT_STALL_NO_PROGRESS_MS) {
+        scheduleSoftStallWatch();
+        return;
+      }
+      softStallShowing = true;
+      updateStallNotice(logPanel(), {
+        seconds: Math.round(ageMs / 1000),
+        fatal: false,
+        soft: true,
+      });
+    }, SOFT_STALL_NO_PROGRESS_MS);
+  }
+
+  function applyProgressSummary(summary, key = null) {
+    if (!summary) return;
+    lastProgressSummary = summary;
+    lastProgressAt = Date.now();
+    softStallShowing = false;
+    if (!serverStallActive) updateStallNotice(logPanel(), null);
+    if (liveRunId) setStatus('running', summary);
+    const chipKey = key || sourcesByRunId.get(liveRunId)?.key;
+    if (chipKey && /^[A-Za-z0-9_-]+$/.test(chipKey)) {
+      const chip = document.querySelector(`.fh-chip[data-fetcher-key="${chipKey}"]`);
+      if (chip) chip.title = summary;
+    }
+    scheduleSoftStallWatch();
+  }
+
+  function endLiveProgressTracking() {
+    clearSoftStallWatch();
+    serverStallActive = false;
+    softStallShowing = false;
+    lastProgressSummary = '';
+    lastProgressAt = 0;
+    updateStallNotice(logPanel(), null);
+  }
 
   function isFetcherInFlight() {
     return runStateByKey.size > 0 || lastServerInFlight || cancelInFlight;
@@ -796,7 +861,9 @@ export const fetcherRunner = (() => {
     }
     const body = logPanelApi.logBody();
     if (body) body.innerHTML = '';
-    updateStallNotice(logPanel(), null);
+    serverStallActive = false;
+    clearSoftStallWatch();
+    clearSoftStallNotice();
     followTail = true;
     clearFollowTailIdleTimer();
     logPanelApi.updateJumpButton();
@@ -908,7 +975,15 @@ export const fetcherRunner = (() => {
     lastLineText = text;
     lastLineKind = kind;
     const stall = parseStallLogLine(text);
-    if (stall) updateStallNotice(logPanel(), stall);
+    if (stall) {
+      serverStallActive = true;
+      softStallShowing = false;
+      clearSoftStallWatch();
+      updateStallNotice(logPanel(), stall);
+    } else {
+      const summary = parseProgressSummary(text);
+      if (summary) applyProgressSummary(summary);
+    }
     if (!isFetcherRowExpanded()) updateFetcherBar();
     setGlobalFetcherTail(text, kind);
     pendingLines.push({ text, kind });
@@ -1256,7 +1331,12 @@ export const fetcherRunner = (() => {
         if (data.status === 'running' || data.status === 'launching') {
           markChipState(key, 'running', runId);
           liveRunId = runId;
-          if (liveRunId === runId) syncLogPanelChrome(src, data.status);
+          lastProgressAt = Date.now();
+          serverStallActive = false;
+          scheduleSoftStallWatch();
+          if (liveRunId === runId) {
+            syncLogPanelChrome(src, data.status, lastProgressSummary || undefined);
+          }
           if (reconnect) {
             if (!quiet) {
               const stateWord = data.status === 'launching' ? 'launching' : 'running';
@@ -1341,6 +1421,7 @@ export const fetcherRunner = (() => {
         sourcesByRunId.delete(runId);
         if (liveRunId === runId) {
           liveRunId = null;
+          endLiveProgressTracking();
           updateCancelButton();
         }
         revertFetcherLayoutIfIdle();

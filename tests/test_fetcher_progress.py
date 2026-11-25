@@ -7,6 +7,7 @@ from fetchers._base import refuse_drift_result, refuse_empty_result
 from fetchers._progress import (
     HeartbeatTimer,
     RunStats,
+    elapsed_progress_line,
     pct,
     phase,
     progress_line,
@@ -151,10 +152,42 @@ def test_heartbeat_timer_emits_after_interval(capsys):
     # Simulate elapsed silence deterministically; real sleep margins are flaky
     # on loaded CI runners where monotonic()/sleep() resolution varies.
     timer._last -= timer.interval + 0.01
-    timer.tick("still working")
-    assert "still working" in capsys.readouterr().out
+    timer.tick("still running")
+    assert "still running" in capsys.readouterr().out
     timer.tick("no repeat")
     assert capsys.readouterr().out == ""
+
+
+def test_elapsed_progress_line_prefers_counters():
+    assert elapsed_progress_line("Steam library", 90) == "Steam library - still running (90s)"
+    assert "42/100" in elapsed_progress_line("Steam library", 90, done=42, total=100)
+    assert "still running (90s)" in elapsed_progress_line(
+        "Steam library", 90, done=42, total=100
+    )
+
+
+def test_tick_elapsed_has_no_em_dash(capsys, monkeypatch):
+    times = [0.0, 30.0]
+
+    def fake_monotonic():
+        return times.pop(0) if times else 60.0
+
+    monkeypatch.setattr("fetchers._progress.time.monotonic", fake_monotonic)
+    timer = HeartbeatTimer(interval=25.0)
+    timer.tick_elapsed("probe")
+    out = capsys.readouterr().out
+    assert "still running" in out
+    assert "\u2014" not in out
+
+
+def test_done_footer_has_no_em_dash(capsys):
+    t0 = started("demo")
+    from fetchers._progress import done
+
+    done("demo", t0, ok=1, extra="ok")
+    out = capsys.readouterr().out
+    assert "\u2014" not in out
+    assert "demo done" in out
 
 
 def test_run_stats_finish_returns_exit_code(capsys):

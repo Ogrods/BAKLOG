@@ -27,9 +27,19 @@ $patterns = @(
 $tracked = git -C $repoRoot ls-files 2>$null
 if (-not $tracked) { exit 0 }
 
+# Public architecture decision records are intentionally tracked.
+$allowPrefixes = @(
+    "docs/adr/"
+)
+
 $hits = @()
 foreach ($line in $tracked) {
     $norm = $line -replace '\\', '/'
+    $allowed = $false
+    foreach ($prefix in $allowPrefixes) {
+        if ($norm -like "$prefix*") { $allowed = $true; break }
+    }
+    if ($allowed) { continue }
     foreach ($pat in $patterns) {
         if ($pat.EndsWith('/')) {
             if ($norm -like "$pat*") { $hits += $line; break }

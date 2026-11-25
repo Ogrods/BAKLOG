@@ -34,8 +34,8 @@ npm run perf:audit              # Playwright timing (server must be running)
 ## Full suite
 
 ```powershell
-.\scripts\test-all.ps1           # ruff + pytest + vitest
-.\scripts\test-all.ps1 -Full     # + module-size, lint, build, bundle-size, dist-integrity, audit_free_surface_data
+.\scripts\test-all.ps1           # ruff + pytest (fast) + vitest + test:perf
+.\scripts\test-all.ps1 -Full     # + module-size, landing-seo, lint, vendor/build, bundle-size, dist-integrity, free-surface + security audits, release_smoke (see scripts/test-all.ps1)
 ```
 
 **Line budgets** (`pytest tests/test_repo_size_budgets.py`): `server.py` **3000**; `scripts/git_tree.py` **720**. Module-size: `js/*.js` **3800** (`table-query.worker.js` exempt).

@@ -18,7 +18,7 @@
 |-------|-------|
 | Server | `server.py` on `127.0.0.1:8765` |
 | Auth | `auth/` (AES-GCM + CDP) |
-| Fetchers | `fetch_*.py` + `fetchers/manifest.json` |
+| Fetchers | `fetchers/fetch_*.py` + `enrichers/` + `fetchers/manifest.json` |
 | Frontend | `index.html`, `js/` |
 | Landing / Pro mirror | `web/` (Vercel) |
 | Profiles | `profiles/<id>/` (local, gitignored at runtime) |

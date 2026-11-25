@@ -15,9 +15,9 @@ GitHub About (Settings → General):
 
 ![BAKLOG dashboard: KPI cards, store and status charts, and a deduped cross-store library](dashboard.png)
 
-**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once - Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App - then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
+**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once - Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App - then decide what to play next and whether that "deal" is actually worth opening. Under the hood the fetcher manifest also covers **2 price/claim jobs** (`itad`, `claims`) and **5 enrichers** (HLTB, Steam reviews/covers/tags, ProtonDB) - 27 jobs total. Your credentials and library JSON stay on your machine by default (see [PRIVACY.md](PRIVACY.md) for optional network calls and opt-in Pro Cloud sync).
 
-**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Open beta.** Download at **[baklog.app](https://baklog.app)** or [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
+**Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Open beta.** Clone and run from source anytime; packaged beta builds come via the waitlist email or public [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Download at **[baklog.app](https://baklog.app)**. Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
 
 **Reviewing the repo?** Start with [FOR_REVIEWERS.md](FOR_REVIEWERS.md), then [ARCHITECTURE.md](ARCHITECTURE.md) (local vs network, monolith shape, Pro licensing, store ToS).
 
@@ -37,15 +37,15 @@ python -m pytest
 npm test
 ```
 
-**No games yet?** You don't need an existing library on any store. Start free with Epic, GOG, or Prime Gaming — see [baklog.app/#start](https://baklog.app/#start) for free entry paths and **Claimable Now** (Epic, GamerPower, IsThereAnyDeal) so you never miss a free game again.
+**No games yet?** You don't need an existing library on any store. Start free with Epic, GOG, or Prime Gaming - see [baklog.app/#start](https://baklog.app/#start) for free entry paths and **Claimable Now** (Epic, GamerPower, IsThereAnyDeal) so you never miss a free game again.
 
 ## Watch your library appear
 
-From empty to 2,000+ games in about 90 seconds — three steps. That timing comes from real tests on an above-average Steam library; extremely large libraries take longer.
+From empty to 2,000+ games in about 90 seconds - three steps. That timing comes from real tests on an above-average Steam library; extremely large libraries take longer.
 
-1. **Connect** — link your stores once from the **Connections** tab. Credentials stay encrypted on your machine (OS keyring + AES-GCM fallback).
-2. **Auto-fetch on connect** — BAKLOG opens a channel to each store and brings everything you own back to one table. Fetcher chips light up as each library lands, and auto-refresh quietly updates stores older than 24h while the app is open.
-3. **Decide** — know what to play next, and whether that "deal" is actually worth opening.
+1. **Connect** - link your stores once from the **Connections** tab. Credentials stay encrypted on your machine (OS keyring + AES-GCM fallback).
+2. **Auto-fetch on connect** - BAKLOG opens a channel to each store and brings everything you own back to one table. Fetcher chips light up as each library lands, and auto-refresh quietly updates stores older than 24h while the app is open.
+3. **Decide** - know what to play next, and whether that "deal" is actually worth opening.
 
 → Ready to install? Jump to [**Setup**](#setup). Want the full tour first? Skim the [feature list](#features).
 
@@ -78,7 +78,7 @@ Every shot below is the app itself, running on a sample library. The titles and 
 
 Want to click something before installing? The **[live sample at baklog.app/#demo](https://baklog.app/#demo)** runs the dashboard on dummy data, no install and no sign-in. It is a taste of the UI, not the whole app: the tabs above only fill in once you connect your own stores.
 
-> Formerly “Steam Backlog Dashboard” — same repo, sharper name for a multi-store product.
+> Formerly “Steam Backlog Dashboard” - same repo, sharper name for a multi-store product.
 
 See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: library and credentials stay local; optional network calls are listed explicitly) and [SECURITY.md](SECURITY.md) for the threat model. See [ARCHITECTURE.md](ARCHITECTURE.md) for repo layout and what actually hits the network.
 
@@ -87,18 +87,18 @@ See [PRIVACY.md](PRIVACY.md) for the data-handling story (TL;DR: library and cre
 | OS | Status |
 |----|--------|
 | **Windows 10/11** | Fully supported (primary development target) |
-| **macOS** | Supported with limits — **Amazon Games (launcher)** and **GOG Galaxy (local)** are Windows/macOS-only local sources |
+| **macOS** | Supported with limits - **Amazon Games (launcher)** and **GOG Galaxy (local)** are Windows/macOS-only local sources |
 | **Linux** | Supported with limits - Amazon Games (launcher) and GOG Galaxy (local) unavailable (use web Connect). Packaged zip (`BAKLOG-linux64.zip`) on GitHub Releases (experimental; no tray yet) |
 
-The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local source:** **Amazon Games (launcher)** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent) — on macOS/Linux use **Amazon (Prime Gaming, web)** Connect instead; the Amazon fetcher still runs and auto-picks the web session. **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) — there is no supported Linux path, so Linux users use **GOG (web)** instead. Platform-restricted local providers show as **Unavailable** on unsupported OSes; their fetcher chips stay enabled when a web fallback exists.
+The app itself (dashboard, `server.py`, secret storage, browser sign-in) is OS-agnostic. **Windows-only local source:** **Amazon Games (launcher)** reads the desktop launcher's DPAPI-encrypted SQLite (no portable equivalent) - on macOS/Linux use **Amazon (Prime Gaming, web)** Connect instead; the Amazon fetcher still runs and auto-picks the web session. **GOG Galaxy (local)** reads `galaxy-2.0.db` from the Galaxy install (Windows ProgramData or macOS Shared) - there is no supported Linux path, so Linux users use **GOG (web)** instead. Platform-restricted local providers show as **Unavailable** on unsupported OSes; their fetcher chips stay enabled when a web fallback exists.
 
-Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback — not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
+Credentials are stored via your OS **keyring** (Windows Credential Manager, macOS Keychain, Linux Secret Service) with an AES-GCM file fallback - not DPAPI. See [`auth/secrets.py`](auth/secrets.py).
 
 **Requirements (all platforms):** Python 3.11+, Google Chrome or Chromium preferred for Connect (override with `BAKLOG_CHROME_PATH`; if missing, first Connect downloads a one-time browser ~150 MB), then `pip install -r requirements.txt` and `python server.py`. Developers/CI: `pip install -e ".[dev]"` (or `requirements-dev.txt`).
 
 ### System tray (optional)
 
-Keep BAKLOG running in the background with a tray icon — starts the same local server, opens your browser, and offers **Open**, **Restart**, and **Quit** from the menu:
+Keep BAKLOG running in the background with a tray icon - starts the same local server, opens your browser, and offers **Open**, **Restart**, and **Quit** from the menu:
 
 ```powershell
 pip install pystray Pillow   # tray UI (included in requirements optional deps)
@@ -156,7 +156,7 @@ powershell -ExecutionPolicy Bypass -File scripts/build_installer.ps1
 - **Wishlist deal radar:** filter by On Sale / Historical Low / Min Discount % / Max Price, hide already-owned cross-store
 - **Connections tab:** one-click store auth (browser sign-in or API keys), encrypted credential storage, portable secrets bundle
 - **Auto-fetch on connect** (default on): when you connect or reconnect a store, BAKLOG auto-fetches its library and opens the fetcher log
-- **Auto-refresh stale stores** (default on): Connections toggle — quietly refreshes one store older than 24h every ~30 min while the app is open
+- **Auto-refresh stale stores** (default on): Connections toggle - quietly refreshes one store older than 24h every ~30 min while the app is open
 - **Auto-enrich** (default off): after a library fetch adds games, optionally queues HLTB, reviews, covers, and co-op tags (Fetcher health toggle)
 - **ITAD auto-refresh** (default on): deal prices refresh on a 15–60 min schedule while the dashboard is open
 
@@ -217,7 +217,7 @@ Hashed assets under `dist/` get `immutable` long-term cache; `index.html` stays 
    copy .env.example .env
    ```
 
-   Prefer the **Connections** page instead — it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the plaintext `.env` file is deleted.
+   Prefer the **Connections** page instead - it stores credentials in encrypted per-profile storage. On first `python server.py` start, any `.env` credentials are imported once into the **default** profile's encrypted store and the plaintext `.env` file is deleted.
 
 5. Set **Game details** to **Public** in Steam → Profile → Edit Profile → Privacy Settings.
 
@@ -231,13 +231,14 @@ Use the **profile menu** in the header for separate datasets (e.g. work vs play)
 
 Per-store Connect steps, CLI fallbacks, wishlist scripts, platform matrix, fetcher flags, and exit codes: **[guide/connecting-stores.md](guide/connecting-stores.md)** and **[guide/refresh-and-enrichment.md](guide/refresh-and-enrichment.md)**.
 
-Quick start after Steam Connect:
+Quick start after Steam Connect (set `PYTHONPATH` to the repo root so imports resolve; Connections and `refresh.ps1` / `refresh.sh` set it for you):
 
-```bash
-python fetch_games.py
+```powershell
+$env:PYTHONPATH = (Get-Location).Path
+python fetchers/fetch_games.py
 ```
 
-**Data attribution:** BAKLOG surfaces third-party data from [ProtonDB](https://www.protondb.com) (Steam Deck / Linux tiers, ODbL), [IsThereAnyDeal](https://isthereanydeal.com/) (deal prices), [GamerPower](https://www.gamerpower.com/) (giveaway feed), and [HowLongToBeat](https://howlongtobeat.com/) (completion hours). Store logos and trademarks belong to their respective owners; BAKLOG is not affiliated with Valve, Epic, GOG, or other storefronts.
+**Data attribution:** BAKLOG surfaces third-party data from [ProtonDB](https://www.protondb.com) (Steam Deck / Linux tiers, ODbL), [IsThereAnyDeal](https://isthereanydeal.com/) (deal prices), [GamerPower](https://www.gamerpower.com/) (giveaway feed), [HowLongToBeat](https://howlongtobeat.com/) (completion hours), and Steam store metadata used by enrichers (reviews, covers, tags). **Claimable Now** aggregates Epic free promotions plus GamerPower and IsThereAnyDeal giveaway feeds. Store logos and trademarks belong to their respective owners; BAKLOG is not affiliated with Valve, Epic, GOG, or other storefronts.
 
 ## Open the dashboard
 
@@ -277,28 +278,29 @@ While BAKLOG is open, **auto-refresh stores older than 24h** is on by default on
 
 | File | Purpose |
 |------|---------|
-| `fetch_games.py` | Steam library → `games_steam.json` |
-| `fetch_gog.py` | GOG library → `games_gog.json` |
-| `fetch_psn.py` | PSN library → `games_psn.json` |
-| `fetch_epic.py` | Epic library → `games_epic.json` |
-| `fetch_amazon.py` | Amazon library (launcher DB or Prime Gaming web) → `games_amazon.json` |
-| `fetch_xbox.py` | Xbox / Game Pass / MS Store → `games_xbox.json` |
-| `fetch_battlenet.py` | Battle.net → `games_battlenet.json` |
-| `fetch_ubisoft.py` | Ubisoft Connect → `games_ubisoft.json` |
-| `fetch_nintendo.py` | Nintendo eShop (~2yr) → `games_nintendo.json` |
-| `fetch_humble.py` | Humble Bundle library (games only) → `games_humble.json` |
-| `fetch_itch.py` | itch.io owned keys → `games_itch.json` |
-| `fetch_wishlist.py` | Steam wishlist → `games_wishlist.json` |
-| `fetch_gog_wishlist.py` | GOG wishlist → `games_wishlist_gog.json` |
-| `fetch_epic_wishlist.py` | Epic Games Store wishlist → `games_wishlist_epic.json` |
-| `fetch_humble_wishlist.py` | Humble Store wishlist → `games_wishlist_humble.json` |
-| `fetch_itad.py` | IsThereAnyDeal prices → `itad_prices.json` |
-| `enrich_steam_reviews.py` | Backfill Steam review fields on non-Steam rows |
-| `enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |
-| `enrich_hltb.py` | Backfill HLTB hours on any store JSON |
-| `python -m enrichers <cmd>` | Wrapper: `hltb`, `steam-reviews`, `cross-store-images` |
+| `fetchers/fetch_games.py` | Steam library → `games_steam.json` |
+| `fetchers/fetch_gog.py` | GOG library → `games_gog.json` |
+| `fetchers/fetch_psn.py` | PSN library → `games_psn.json` |
+| `fetchers/fetch_epic.py` | Epic library → `games_epic.json` |
+| `fetchers/fetch_amazon.py` | Amazon library (launcher DB or Prime Gaming web) → `games_amazon.json` |
+| `fetchers/fetch_xbox.py` | Xbox / Game Pass / MS Store → `games_xbox.json` |
+| `fetchers/fetch_battlenet.py` | Battle.net → `games_battlenet.json` |
+| `fetchers/fetch_ubisoft.py` | Ubisoft Connect → `games_ubisoft.json` |
+| `fetchers/fetch_nintendo.py` | Nintendo eShop (~2yr) → `games_nintendo.json` |
+| `fetchers/fetch_humble.py` | Humble Bundle library (games only) → `games_humble.json` |
+| `fetchers/fetch_itch.py` | itch.io owned keys → `games_itch.json` |
+| `fetchers/fetch_ea.py` | EA App library → `games_ea.json` |
+| `fetchers/fetch_wishlist.py` | Steam wishlist → `games_wishlist.json` |
+| `fetchers/fetch_gog_wishlist.py` | GOG wishlist → `games_wishlist_gog.json` |
+| `fetchers/fetch_epic_wishlist.py` | Epic Games Store wishlist → `games_wishlist_epic.json` |
+| `fetchers/fetch_humble_wishlist.py` | Humble Store wishlist → `games_wishlist_humble.json` |
+| `fetchers/fetch_itad.py` | IsThereAnyDeal prices → `itad_prices.json` |
+| `enrichers/enrich_steam_reviews.py` | Backfill Steam review fields on non-Steam rows |
+| `enrichers/enrich_cross_store_images.py` | Backfill GOG/PSN/Epic/Amazon covers from Steam CDN |
+| `enrichers/enrich_hltb.py` | Backfill HLTB hours on any store JSON |
+| `python -m enrichers <cmd>` | Wrapper: `hltb`, `steam-reviews`, `cross-store-images`, … |
 | `tray_app.py` | Optional system tray launcher (starts `server.py`, opens browser) |
-| `shared/`, `fetchers/` | Shared JSON slim + fetcher base helpers |
+| `shared/`, `fetchers/`, `enrichers/` | Shared helpers, store fetchers, enrichers |
 | `js/state.js`, `js/app.js` | Dashboard app (ES modules) |
 | `steam_client.py` | Steam Web API + Store API client |
 | `gog_client.py` | GOG embed API client |
@@ -319,19 +321,19 @@ While BAKLOG is open, **auto-refresh stores older than 24h** is on by default on
 
 ## Project layout
 
-The repo keeps most scripts in the project root on purpose — each fetcher is a standalone entry point you run directly.
+Store fetchers live under `fetchers/`; enrichers under `enrichers/`. Prefer **Connections** in the UI; CLI is for advanced / scripted use.
 
 | Pattern | What it is |
 |---------|------------|
-| `fetch_*.py` | One script per store; writes `games_<store>.json` |
+| `fetchers/fetch_*.py` | One script per store job; writes profile-scoped `games_<store>.json` |
 | `*_client.py` | HTTP/auth helpers used by fetchers |
-| `enrich_*.py` | Backfill or maintenance scripts |
+| `enrichers/enrich_*.py` | Backfill or maintenance scripts |
 | `games_*.json`, `itad_prices.json` | Generated library data (gitignored where applicable) |
 | `index.html`, `js/`, `tailwind.css` | Static dashboard (serve over HTTP for ES modules) |
 | `cache/` | Cached API responses between fetch runs |
 | `refresh.ps1` / `refresh.sh` | Runs the fetch sequence in order (Windows / POSIX) |
 
-No nested `src/` folder — run fetchers from the repo root so paths stay simple.
+Run CLI fetchers from the repo root as `python fetchers/fetch_<store>.py` with `PYTHONPATH` set to the repo root (see Fetch your libraries).
 
 ### Dev checks
 

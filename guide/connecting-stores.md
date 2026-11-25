@@ -4,6 +4,14 @@ Connect each store from the **Connections** tab in the dashboard, then run fetch
 
 **Recommended flow:** run `python server.py`, open **Connections**, click **Connect** for each store. A headed Chrome/Edge window opens for cookie or OAuth sign-in (if neither is installed, BAKLOG downloads a one-time browser on first Connect). Credentials stay local in encrypted per-profile storage (`cache/auth/`). After connecting, click the matching chip in **Fetcher health** or run the script below.
 
+**CLI note:** store scripts live under `fetchers/`. From the repo root, set `PYTHONPATH` to the repo root before running them (Connections and `refresh.ps1` / `refresh.sh` do this for you):
+
+```powershell
+$env:PYTHONPATH = (Get-Location).Path   # Windows PowerShell
+# export PYTHONPATH="$(pwd)"            # macOS / Linux
+python fetchers/fetch_games.py --help
+```
+
 BAKLOG supports **19 store connections** across **12 libraries** and **8 wishlists** (27 fetcher jobs). Wishlist JSON files are optional per store - the **Fetcher health** row marks any file not yet fetched as *missing*; that is normal until you run the matching script.
 
 ## Fetcher options (all scripts)
@@ -33,7 +41,7 @@ First Steam run may take several minutes for a large library (Store API is rate-
 **CLI fallback:** set `STEAM_API_KEY` + `STEAM_ID` in `.env`.
 
 ```bash
-python fetch_games.py
+python fetchers/fetch_games.py
 ```
 
 Writes `games_steam.json`.
@@ -52,13 +60,13 @@ Two sources, one `games_gog.json`:
 `fetch_gog.py` picks **auto**: Galaxy DB when present, else the saved web session. Override with `--source local|web` or `GOG_SOURCE=`.
 
 ```bash
-python fetch_gog.py
-python fetch_gog_wishlist.py    # optional - needs GOG session; until run, WL GOG chip shows "missing"
+python fetchers/fetch_gog.py
+python fetchers/fetch_gog_wishlist.py    # optional - needs GOG session; until run, WL GOG chip shows "missing"
 ```
 
 **CLI fallback:** copy the `gog-al` cookie from DevTools → Application → Cookies into `GOG_AL=` in `.env`.
 
-If the web fetch fails with **403 Forbidden**, reconnect GOG on Connections (refreshes the cookie). On Windows/macOS with GOG Galaxy installed, prefer `python fetch_gog.py --source local`.
+If the web fetch fails with **403 Forbidden**, reconnect GOG on Connections (refreshes the cookie). On Windows/macOS with GOG Galaxy installed, prefer `python fetchers/fetch_gog.py --source local`.
 
 ---
 
@@ -69,7 +77,7 @@ If the web fetch fails with **403 Forbidden**, reconnect GOG on Connections (ref
 **Privacy:** set trophy/game privacy to **Anyone** so the library and wishlist can load.
 
 ```bash
-python fetch_psn.py
+python fetchers/fetch_psn.py
 ```
 
 **CLI fallback:** open https://ca.account.sony.com/api/v1/ssocookie while logged in and paste the `npsso` token into `PSN_NPSSO=` in `.env`.
@@ -81,10 +89,10 @@ python fetch_psn.py
 **Connections:** Epic (library) → **Connect** - BAKLOG captures and exchanges the authorization code automatically.
 
 ```bash
-python fetch_epic.py
+python fetchers/fetch_epic.py
 ```
 
-**CLI fallback:** run `python fetch_epic.py --auth-help` and paste the code into `EPIC_AUTH_CODE=` in `.env`.
+**CLI fallback:** run `python fetchers/fetch_epic.py --auth-help` and paste the code into `EPIC_AUTH_CODE=` in `.env`.
 
 ---
 
@@ -93,7 +101,7 @@ python fetch_epic.py
 Separate session from library OAuth. **Connections:** Epic (wishlist) → **Connect** at [store.epicgames.com/wishlist](https://store.epicgames.com/en-US/wishlist) (clear Cloudflare if shown). `fetch_epic_wishlist.py` reuses the saved browser profile headlessly.
 
 ```bash
-python fetch_epic_wishlist.py
+python fetchers/fetch_epic_wishlist.py
 ```
 
 ---
@@ -110,8 +118,8 @@ Two sources, one `games_amazon.json`:
 `fetch_amazon.py` picks **auto**: launcher DB on Windows when present, else the saved web session. Override with `--source launcher|web` or `AMAZON_SOURCE=`.
 
 ```bash
-python fetch_amazon.py
-python fetch_amazon.py --source web --dump-raw   # debug: writes cache/amazon_web_raw.json
+python fetchers/fetch_amazon.py
+python fetchers/fetch_amazon.py --source web --dump-raw   # debug: writes cache/amazon_web_raw.json
 ```
 
 On macOS/Linux, use the Prime Gaming web card + `--source web` (launcher DB is Windows-only).
@@ -123,7 +131,7 @@ On macOS/Linux, use the Prime Gaming web card + `--source web` (launcher DB is W
 **Connections:** Xbox → **Connect** at [xbl.io](https://xbl.io/login), or paste an OpenXBL API key into the card.
 
 ```bash
-python fetch_xbox.py --skip-hltb
+python fetchers/fetch_xbox.py --skip-hltb
 ```
 
 ---
@@ -133,7 +141,7 @@ python fetch_xbox.py --skip-hltb
 Separate from play history. **Connections:** Xbox Store wishlist → **Connect** on xbox.com.
 
 ```bash
-python fetch_xbox_wishlist.py
+python fetchers/fetch_xbox_wishlist.py
 ```
 
 ---
@@ -143,10 +151,10 @@ python fetch_xbox_wishlist.py
 **Connections:** Battle.net → **Connect** and sign in at [account.battle.net](https://account.battle.net/). The managed browser saves your session cookie locally.
 
 ```bash
-python fetch_battlenet.py --skip-hltb
+python fetchers/fetch_battlenet.py --skip-hltb
 ```
 
-**CLI fallback:** DevTools → Network → `games-and-subs` → copy the full `Cookie:` header into `BATTLENET_COOKIE=` in `.env`, then `python fetch_battlenet.py --browser env --skip-hltb`. On Windows, Edge/Chrome v127+ app-bound encryption can block the legacy fetch-time browser-jar read; Connect + stored cookie avoids that. Firefox (`--browser firefox`) or the `.env` cookie path still work without admin.
+**CLI fallback:** DevTools → Network → `games-and-subs` → copy the full `Cookie:` header into `BATTLENET_COOKIE=` in `.env`, then `python fetchers/fetch_battlenet.py --browser env --skip-hltb`. On Windows, Edge/Chrome v127+ app-bound encryption can block the legacy fetch-time browser-jar read; Connect + stored cookie avoids that. Firefox (`--browser firefox`) or the `.env` cookie path still work without admin.
 
 ---
 
@@ -155,8 +163,8 @@ python fetch_battlenet.py --skip-hltb
 **Connections:** Ubisoft Connect → **Connect** (one sign-in for library + Ubisoft Store wishlist).
 
 ```bash
-python fetch_ubisoft.py --skip-hltb
-python fetch_ubisoft_wishlist.py
+python fetchers/fetch_ubisoft.py --skip-hltb
+python fetchers/fetch_ubisoft_wishlist.py
 ```
 
 **CLI fallback:** DevTools → Network → `public-ubi` → copy `Authorization` and `Ubi-SessionId` into `.env`.
@@ -168,7 +176,7 @@ python fetch_ubisoft_wishlist.py
 **Connections:** Nintendo → **Connect**. Only ~2 years of digital eShop history; cartridge games and older purchases must be added manually.
 
 ```bash
-python fetch_nintendo.py --skip-hltb
+python fetchers/fetch_nintendo.py --skip-hltb
 ```
 
 **CLI fallback:** copy the `Cookie` header from a `ec.nintendo.com/my/transactions` request into `NINTENDO_COOKIE=` in `.env`.
@@ -180,7 +188,7 @@ python fetch_nintendo.py --skip-hltb
 **Connections:** Nintendo Store wishlist → **Connect** on nintendo.com (separate from eShop library login).
 
 ```bash
-python fetch_nintendo_wishlist.py
+python fetchers/fetch_nintendo_wishlist.py
 ```
 
 ---
@@ -190,7 +198,7 @@ python fetch_nintendo_wishlist.py
 **Connections:** EA App → **Connect** at ea.com.
 
 ```bash
-python fetch_ea.py
+python fetchers/fetch_ea.py
 ```
 
 ---
@@ -200,8 +208,8 @@ python fetch_ea.py
 **Connections:** Humble Bundle → **Connect** at humblebundle.com (library page). One profile unlocks library + store wishlist fetchers.
 
 ```bash
-python fetch_humble.py --skip-hltb
-python fetch_humble_wishlist.py
+python fetchers/fetch_humble.py --skip-hltb
+python fetchers/fetch_humble_wishlist.py
 ```
 
 ---
@@ -218,7 +226,7 @@ Two sources, one `games_itch.json`:
 `fetch_itch.py` picks **auto**: butler.db when present, else the API key. Override with `--source local|api` or `ITCH_SOURCE=`.
 
 ```bash
-python fetch_itch.py --skip-hltb
+python fetchers/fetch_itch.py --skip-hltb
 python enrich_steam_reviews.py --stores itch
 ```
 
@@ -229,12 +237,12 @@ Writes all owned keys (games + tools/TTRPG PDFs). The dashboard itch.io tab hide
 ## Wishlist and deal prices
 
 ```bash
-python fetch_wishlist.py --skip-hltb          # Steam wishlist
-python fetch_gog_wishlist.py                # GOG (needs GOG session)
-python fetch_epic_wishlist.py
-python fetch_nintendo_wishlist.py
-python fetch_humble_wishlist.py
-python fetch_itad.py                        # IsThereAnyDeal prices → itad_prices.json
+python fetchers/fetch_wishlist.py --skip-hltb          # Steam wishlist
+python fetchers/fetch_gog_wishlist.py                # GOG (needs GOG session)
+python fetchers/fetch_epic_wishlist.py
+python fetchers/fetch_nintendo_wishlist.py
+python fetchers/fetch_humble_wishlist.py
+python fetchers/fetch_itad.py                        # IsThereAnyDeal prices → itad_prices.json
 ```
 
 **Display currency / FX:** set `ITAD_COUNTRY` (e.g. `GB`) before `fetch_itad.py`. ITAD and wishlist rows use that region's currency. The script caches daily exchange rates from [Frankfurter](https://www.frankfurter.app/) and writes comparable `price_amount` fields on wishlist JSON while keeping `price_native` / `currency_native` for the store's real price. Re-run ITAD after wishlist fetches to refresh conversions.

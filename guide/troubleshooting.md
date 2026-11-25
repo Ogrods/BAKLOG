@@ -52,7 +52,7 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 **Fix:**
 
 1. Reconnect GOG on the Connections page (refreshes the `gog-al` cookie).
-2. On Windows/macOS with GOG Galaxy installed, run `python fetch_gog.py --source local` to read `galaxy-2.0.db` instead of the embed API.
+2. On Windows/macOS with GOG Galaxy installed, run `python fetchers/fetch_gog.py --source local` to read `galaxy-2.0.db` instead of the embed API.
 
 ## Windows: fetcher hangs or run queue wedges
 
@@ -100,7 +100,7 @@ Sessions expire on different schedules per store. Epic wishlist, Nintendo, and c
 
 **Symptom:** Amazon launcher card shows **Unavailable**.
 
-**Expected:** Launcher DB is Windows-only. Use **Amazon (Prime Gaming, web)** Connect + `python fetch_amazon.py --source web`.
+**Expected:** Launcher DB is Windows-only. Use **Amazon (Prime Gaming, web)** Connect + `python fetchers/fetch_amazon.py --source web`.
 
 ## GOG Galaxy on Linux
 

@@ -883,6 +883,18 @@ def test_cancel_all_and_wait_finishes_queued(runs_env) -> None:
     assert run._finished.is_set()
 
 
+def test_cancel_all_and_wait_drains_lane_queues(runs_env) -> None:
+    mgr, runs_dir = runs_env
+    queued = server.Run("demo", runs_dir=runs_dir)
+    mgr._queue.put(queued)
+    mgr._enrich_queue.put(server.Run("hltb", runs_dir=runs_dir))
+    result = mgr.cancel_all_and_wait(timeout=1.0)
+    assert result["stragglers"] == []
+    assert mgr._queue.empty()
+    assert mgr._enrich_queue.empty()
+    assert mgr._internal_queue.empty()
+
+
 def test_cancel_all_and_wait_reports_stragglers(runs_env) -> None:
     mgr, runs_dir = runs_env
     run = server.Run("demo", runs_dir=runs_dir)

@@ -29,6 +29,12 @@ __pycache__/
 .ruff_cache/
 steam_backlog.egg-info/
 
+# Build / packaging / audit output (large; not source of truth)
+dist/
+release/
+build/
+.audit/
+
 # Logs and server noise
 refresh.log
 enrich_hltb_run.log

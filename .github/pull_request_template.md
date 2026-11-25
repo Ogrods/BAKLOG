@@ -12,14 +12,16 @@
 
 ## Testing
 
-<!-- How did you verify this? -->
+<!-- Canonical day-to-day commands (same intent as PR CI). -->
 
 - [ ] `python -m pytest`
 - [ ] `npm test`
-- [ ] `.\scripts\test-all.ps1 -Full` (for larger changes)
+- [ ] `.\scripts\test-all.ps1 -Full` (optional; release-shaped or large changes)
+- [ ] `npm run check:landing-seo` (if `web/` changed)
 
 ## Checklist
 
-- [ ] One concern per branch; commits are focused
+- [ ] One concern per branch (`feat/` / `fix/` / `chore/`); commits are focused
 - [ ] No personal data, credentials, or gitignored internal paths committed
-- [ ] Docs / sync-pair lists updated if behavior or copy changed
+- [ ] Sync pairs / docs updated when behavior or copy changed (see `AGENTS.md`)
+- [ ] Definition of done in `AGENTS.md` satisfied

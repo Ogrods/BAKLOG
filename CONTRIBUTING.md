@@ -30,19 +30,21 @@ the Microsoft Store `python` shim.
 
 ## Tests
 
-Run the suites before opening a PR:
+Canonical day-to-day suites before opening a PR (same intent as PR CI):
 
 ```bash
-python -m pytest            # Python (skips integration by default)
+python -m pytest            # Python (skips integration + release_smoke by default)
 npm test                    # JavaScript (Vitest)
 ```
 
-Full local CI parity (ruff, pytest, vitest, size budgets, lint, build, bundle
-checks):
+Full local CI parity (ruff, pytest, vitest, size budgets, lint, build, bundle,
+landing SEO, release_smoke):
 
 ```powershell
 .\scripts\test-all.ps1 -Full
 ```
+
+Reviewer entrypoint: [FOR_REVIEWERS.md](FOR_REVIEWERS.md). Agent brief: [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md).
 
 ## Branches
 

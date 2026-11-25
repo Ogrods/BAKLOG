@@ -2,13 +2,40 @@
 
 > **One honest backlog across every store.**
 
+[![CI](https://github.com/Ogrods/BAKLOG/actions/workflows/ci.yml/badge.svg)](https://github.com/Ogrods/BAKLOG/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/Ogrods/BAKLOG)](https://github.com/Ogrods/BAKLOG/releases/latest)
+
+<!--
+GitHub About (Settings → General):
+  Description: Local-first cross-store game backlog. Twelve libraries and eight wishlists on your machine.
+  Website: https://baklog.app
+  Topics: local-first, python, javascript, game-library, backlog, steam, mit, cross-platform, privacy, desktop
+-->
+
 ![BAKLOG dashboard: KPI cards, store and status charts, and a deduped cross-store library](dashboard.png)
 
-**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once — Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App — then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
+**BAKLOG pulls every game you own into one local, honest table.** Free forever to import · **twelve libraries and eight wishlists** · runs on your machine, no telemetry by default. Connect your stores once - Steam, GOG, PlayStation, Epic, Amazon, Xbox, Battle.net, Ubisoft Connect, Nintendo Switch, itch.io, Humble Bundle, and EA App - then decide what to play next and whether that "deal" is actually worth opening. Your credentials and library JSON stay on your machine (see [PRIVACY.md](PRIVACY.md) for the few optional network calls).
 
 **Open source (MIT)** - [read the code on GitHub](https://github.com/Ogrods/BAKLOG) and verify the privacy story yourself. **Free forever to import · Open beta.** Download at **[baklog.app](https://baklog.app)** or [GitHub Releases](https://github.com/Ogrods/BAKLOG/releases/latest). Community chat: **[Discord](https://discord.gg/VFvxN5nCCB)** (canonical invite in [`shared/community.json`](shared/community.json)).
 
-**Reviewing the repo?** See [ARCHITECTURE.md](ARCHITECTURE.md) for an honest map (local vs network, monolith shape, Pro licensing, store ToS).
+**Reviewing the repo?** Start with [FOR_REVIEWERS.md](FOR_REVIEWERS.md), then [ARCHITECTURE.md](ARCHITECTURE.md) (local vs network, monolith shape, Pro licensing, store ToS).
+
+## 15-Minute Agent & Reviewer Tour
+
+1. [FOR_REVIEWERS.md](FOR_REVIEWERS.md) - evaluation prompt and inspect list
+2. [AGENTS.md](AGENTS.md) - hard rules, sync pairs, definition of done
+3. [ARCHITECTURE.md](ARCHITECTURE.md) - system map and out of scope
+4. [fetchers/manifest.json](fetchers/manifest.json) - store/fetcher registry
+5. [tests/](tests/) - pytest + Vitest (including sync-pair parity)
+6. [.github/workflows/ci.yml](.github/workflows/ci.yml) - CI gates
+7. [.cursor/rules/](.cursor/rules/) - project invariants
+8. [web/](web/) + [baklog.app](https://baklog.app) + [llms.txt](llms.txt) / [baklog.app/llms.txt](https://baklog.app/llms.txt) - crawler summaries
+
+```bash
+python -m pytest
+npm test
+```
 
 **No games yet?** You don't need an existing library on any store. Start free with Epic, GOG, or Prime Gaming — see [baklog.app/#start](https://baklog.app/#start) for free entry paths and **Claimable Now** (Epic, GamerPower, IsThereAnyDeal) so you never miss a free game again.
 
@@ -308,17 +335,16 @@ No nested `src/` folder — run fetchers from the repo root so paths stay simple
 
 ### Dev checks
 
-Run everything (pytest + vitest): `.\scripts\test-all.ps1` or `npm run test:all`.
-
-**Internal docs** (marketing, licensing leads, audits) live in local gitignored folders such as `marketing/` — not in the public repo or on Vercel. Sync them to a private GitHub repo with `.\scripts\sync-internal-repo.ps1` (see script header for one-time setup).
-
-Original per-suite commands:
+Canonical day-to-day tests (same as PR CI intent):
 
 ```bash
-pip install -e ".[dev]"
 python -m pytest
-ruff check shared fetchers enrichers tests
+npm test
 ```
+
+Full local CI parity (ruff, perf, size budgets, build, landing SEO, release_smoke): `.\scripts\test-all.ps1 -Full`.
+
+**Internal docs** (marketing, licensing leads, audits) live in local gitignored folders such as `marketing/` - not in the public repo or on Vercel. Sync them to a private GitHub repo with `.\scripts\sync-internal-repo.ps1` (see script header for one-time setup).
 
 **Connections CDP smoke test** (requires Chrome or Edge; not run in default CI):
 

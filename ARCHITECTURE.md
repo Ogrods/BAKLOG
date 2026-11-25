@@ -27,19 +27,36 @@ runs without them.
 | `web/` | Static marketing site (Vercel); separate from the local app |
 | `guide/` | End-user documentation |
 
-## Runtime (one machine)
+## Runtime
 
-```
-Browser tab  →  server.py (localhost)
-                    ├─ static: index.html, js/, css/
-                    ├─ /api/* JSON + SSE run streams
-                    └─ subprocess: fetch_*.py / enrich_*.py
-                           └─ auth profiles, games_*.json on disk
-Tray (optional) → starts server, autostart, update notify
+```mermaid
+flowchart LR
+  subgraph local [Local-first path]
+    browser[Browser tab]
+    server["server.py on 127.0.0.1:8765"]
+    fetchers["Fetchers / enrichers"]
+    profiles["profiles on disk"]
+    tray[Optional tray]
+    browser <--> server
+    server --> fetchers
+    fetchers --> profiles
+    tray --> server
+  end
+  subgraph cloud [baklog.app web path]
+    landing["web/ static marketing"]
+    api["web/api serverless"]
+    feeds["sponsors + free-claims feeds"]
+    mirror["Optional Pro /mirror"]
+    landing --> api
+    landing --> feeds
+    api --> mirror
+  end
+  server -.->|"optional public feeds only"| feeds
 ```
 
 Frozen builds bundle Python + assets via PyInstaller; data defaults to
-`%LOCALAPPDATA%\BAKLOG-Data` (or co-located with `portable.txt`).
+`%LOCALAPPDATA%\BAKLOG-Data` (or co-located with `portable.txt`). Public
+architecture decisions: [`docs/adr/`](docs/adr/README.md).
 
 ## Network calls (honest)
 
@@ -58,10 +75,10 @@ See [PRIVACY.md](PRIVACY.md) for the full host list.
 
 ## Why `server.py` is large
 
-Historically one stdlib server file (~4k lines, CI line budget). New work moves
-into `shared/` (`update_api.py`, `server_internal_routes.py`, auth helpers).
-The monolith remains the integration point; splitting further is incremental, not
-a rewrite.
+`server.py` remains the integration point (CI line budget **3000**; currently
+well under that after extraction). New work moves into `shared/`
+(`update_api.py`, `server_internal_routes.py`, `run_manager.py`, auth helpers).
+Further splits are incremental, not a rewrite.
 
 ## Store access and ToS
 
@@ -100,6 +117,19 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for running locally.
 | "Not real OSS" | MIT app tree is here; invite gate is distribution, not license. |
 | "Pro is DRM" | Local license file + optional Supabase plan; documented in `shared/entitlement.py`. |
 | "Electron would be simpler" | Deliberate choice: stdlib server + browser tab + PyInstaller (smaller, auditable). |
+
+## Out of scope
+
+| Topic | Stance |
+|-------|--------|
+| Electron / Chromium shell | Not used. Browser tab + PyInstaller tray. |
+| Multi-tenant cloud catalog | Libraries stay on the user machine. |
+| In-app AI picks / recommendations | Not a product feature. Do not claim otherwise. |
+| Credential or auth-profile sync | Never uploaded; mirror allowlist excludes secrets. |
+| CAPTCHA solving / pooled scraping | Not done. Sign-in is the user's own headed browser session. |
+| Silent background app updates | Check-then-click only. |
+| Defending against local malware | Out of scope; OS user is the trust boundary. |
+| Binding the server on LAN (`0.0.0.0`) | User responsibility; default is localhost. |
 
 ## Rough edges (honest status)
 

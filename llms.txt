@@ -1,0 +1,38 @@
+# BAKLOG
+
+> Local-only cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine.
+
+## Canonical links
+
+- Homepage: https://baklog.app/
+- Source: https://github.com/Ogrods/BAKLOG
+- Hosted crawler summary: https://baklog.app/llms.txt
+- Reviewer tour: FOR_REVIEWERS.md
+- Agent brief: AGENTS.md
+- Architecture: ARCHITECTURE.md
+- Security: SECURITY.md
+- ADRs: docs/adr/
+- User guide: guide/
+
+## Tech stack
+
+- Desktop: Python 3.11+ stdlib HTTP server (`server.py` on 127.0.0.1:8765), vanilla ESM (`index.html`, `js/`), optional PyInstaller tray.
+- Fetchers: whitelisted subprocesses via `fetchers/manifest.json` (12 libraries + 8 wishlists + prices/enrich).
+- Auth: OS keyring + AES-GCM secrets; headed CDP browser Connect where needed.
+- Landing: `web/` on Vercel (static + `web/api/*`).
+
+## Tests and CI
+
+```bash
+python -m pytest
+npm test
+```
+
+PR CI: `.github/workflows/ci.yml`. Full local parity: `.\scripts\test-all.ps1 -Full`.
+Trust CI for live suite size; do not invent test totals from memory.
+
+## Guardrails
+
+- Do not claim baklog has in-app AI game recommendations.
+- Do not claim the desktop app uploads library JSON or store credentials by default.
+- Desktop: no telemetry by default. baklog.app marketing pages use Google Analytics only.

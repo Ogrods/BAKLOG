@@ -78,7 +78,10 @@ release/
 
 # Marketing + internal documents (kept local, not in the public repo)
 marketing/
-docs/
+# Deep maintainer docs stay private; public ADRs are tracked.
+docs/**
+!docs/adr/
+!docs/adr/**
 audit/
 admin/
 tracker.html
@@ -109,6 +112,10 @@ review-feed-rows.csv
 review-findings.yaml
 review-handoff.md
 review-report.json
+review-*.json
+review-*.md
+review-*.yaml
+review-*.csv
 .audit/
 scripts/_diag_personal.py
 scripts/perf-last-run.json

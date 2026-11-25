@@ -97,3 +97,15 @@ def test_loop_does_not_call_patched_time_sleep(start) -> None:
         # Let the 1s-floored loop complete at least one cycle under the patch.
         threading.Event().wait(1.3)
     sleep.assert_not_called()
+
+
+def test_on_idle_exception_is_logged(start, capsys) -> None:
+    def _boom() -> None:
+        raise RuntimeError("shutdown boom")
+
+    thread = start(0.1, lambda: True, _boom, check_interval_s=0.01)
+    assert thread is not None
+    thread.join(timeout=4.0)
+    err = capsys.readouterr().out + capsys.readouterr().err
+    assert "on_idle failed" in err
+    assert "shutdown boom" in err

@@ -519,6 +519,19 @@ def _csrf_allowed_strict(handler: SimpleHTTPRequestHandler) -> bool:
     return handler.headers.get(_BAKLOG_LOCAL_HEADER) == "1"
 
 
+def _redact_ticket_log_args(args: tuple[Any, ...]) -> tuple[Any, ...]:
+    """Replace ticket= query values in access-log format args."""
+    scrubbed: list[Any] = []
+    for arg in args:
+        if isinstance(arg, str) and "ticket=" in arg:
+            scrubbed.append(
+                re.sub(r"(?i)([?&]ticket=)[^&\s]+", r"\1<redacted>", arg)
+            )
+        else:
+            scrubbed.append(arg)
+    return tuple(scrubbed)
+
+
 def _send_json(handler: SimpleHTTPRequestHandler, status: int, payload: Any) -> None:
     body = json.dumps(payload).encode("utf-8")
     handler.send_response(status)
@@ -1112,8 +1125,8 @@ class Handler(SimpleHTTPRequestHandler):
                 from shared.entitlement import clear_background_auth_caches
 
                 clear_background_auth_caches()
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - still return ok to the client
+                print(f"[auth] sign-out cache clear failed: {exc!r}", file=sys.stderr, flush=True)
             _send_json(self, HTTPStatus.OK, {"ok": True})
             return
         if path in (
@@ -2302,7 +2315,7 @@ class Handler(SimpleHTTPRequestHandler):
         # Quieter logs; skip favicon and api keepalive noise.
         if "/api/stream/" in self.path:
             return
-        super().log_message(format, *args)
+        super().log_message(format, *_redact_ticket_log_args(args))
 
 
 def _start_background_scheduler() -> None:

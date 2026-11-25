@@ -49,7 +49,6 @@ def consume_epic_oauth_state(state: str | None) -> str | None:
 
 def handle_epic_oauth_callback(handler) -> None:
     """GET /oauth/epic/callback — exchange code and mark Epic connected."""
-    import html
     from http import HTTPStatus
     from urllib.parse import parse_qs, urlparse
 
@@ -104,8 +103,11 @@ def handle_epic_oauth_callback(handler) -> None:
         handler.end_headers()
         handler.wfile.write(body)
     except Exception as exc:  # noqa: BLE001
-        safe = html.escape(str(exc), quote=True)
-        body = f"<html><body><p>Epic sign-in failed: {safe}</p></body></html>".encode()
+        print(f"[epic-oauth] sign-in failed: {exc!r}", flush=True)
+        body = (
+            b"<html><body><p>Epic sign-in failed. Close this tab and try Connect again.</p>"
+            b"</body></html>"
+        )
         handler.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
         handler.send_header("Content-Type", "text/html; charset=utf-8")
         handler.send_header("Content-Length", str(len(body)))

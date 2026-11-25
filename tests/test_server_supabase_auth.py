@@ -709,6 +709,30 @@ def test_build_epic_oauth_login_url_shape() -> None:
     assert "st8" in url
 
 
+def test_epic_callback_error_page_hides_exception_text(
+    local_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base, _tmp = local_server
+    state = "epic-err-state-01"
+    server._register_epic_oauth_state(state, profile_id="default")
+
+    class _BoomClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def login(self):
+            raise RuntimeError("secret epic token leaked")
+
+    monkeypatch.setattr("clients.epic_client.EpicClient", _BoomClient)
+    status, raw = _request(
+        base, f"/oauth/epic/callback?state={state}&code=abc123def456"
+    )
+    assert status == 500
+    body = raw.decode("utf-8", errors="replace")
+    assert "secret epic token leaked" not in body
+    assert "Close this tab and try Connect again" in body
+
+
 def test_epic_callback_requires_state_even_when_auth_off(local_server) -> None:
     """CSRF defense: a server-minted state is mandatory regardless of auth mode."""
     base, _tmp = local_server

@@ -4,6 +4,7 @@
 param(
     [int]$Port = 8766,
     [string]$Views = 'dashboard,library,wishlist,connections',
+    [int]$Dpr = 1,
     [string]$DataDir = (Join-Path $env:TEMP 'baklog-demo-data')
 )
 
@@ -25,7 +26,8 @@ $env:BAKLOG_DATA_DIR = $DataDir
 $env:PORT = "$Port"
 $env:BAKLOG_AUTH_DISABLED = '1'
 $env:BAKLOG_ADMIN = '0'
-$env:BAKLOG_IDLE_SHUTDOWN_MINUTES = '5'
+# Keep the capture server alive for the full multi-view run (dpr 2 is slower).
+$env:BAKLOG_IDLE_SHUTDOWN_MINUTES = '0'
 $env:BAKLOG_NO_BROWSER = '1'
 
 Write-Host "==> starting capture server on $baseUrl"
@@ -43,15 +45,18 @@ try {
     }
     if (-not $ready) { Write-Error "Capture server did not become ready at $baseUrl" }
 
-    Write-Host "==> capturing views: $Views"
-    node scripts/capture-screenshots.mjs $baseUrl --views $Views
+    Write-Host "==> capturing views: $Views (dpr=$Dpr)"
+    node scripts/capture-screenshots.mjs $baseUrl --views $Views --dpr $Dpr
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     # Keep the repo-root hero (README top, social embeds) on the same sample set.
-    $gallery = Join-Path $root 'assets\screenshots\dashboard.png'
-    if (Test-Path $gallery) {
-        Copy-Item -Force $gallery (Join-Path $root 'dashboard.png')
-        Write-Host '==> refreshed dashboard.png hero'
+    # Only refresh when capturing at 1x so README weight stays stable.
+    if ($Dpr -eq 1) {
+        $gallery = Join-Path $root 'assets\screenshots\dashboard.png'
+        if (Test-Path $gallery) {
+            Copy-Item -Force $gallery (Join-Path $root 'dashboard.png')
+            Write-Host '==> refreshed dashboard.png hero'
+        }
     }
     exit 0
 } finally {

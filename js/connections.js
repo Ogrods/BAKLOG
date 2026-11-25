@@ -405,6 +405,26 @@ function renderConnections() {
   restoreConnNoteFocus(noteFocus, pane);
 }
 
+async function pasteFromClipboard(card) {
+  const log = card?.querySelector(".conn-log");
+  const input = card?.querySelector(".conn-paste-panel [data-field]");
+  if (!input) return;
+  try {
+    const text = await navigator.clipboard.readText();
+    input.value = (text || "").trim();
+    if (log) {
+      log.classList.remove("hidden");
+      log.textContent = "Pasted from clipboard.";
+    }
+  } catch {
+    if (log) {
+      log.classList.remove("hidden");
+      log.textContent =
+        "Could not read clipboard - paste into the field manually (Ctrl+V).";
+    }
+  }
+}
+
 function handleLayoutClick(ev) {
   const target = ev.target;
 

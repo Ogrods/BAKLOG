@@ -6697,6 +6697,27 @@ html[data-theme="ember"] .brand-logo-pills {
   align-self: center;
   flex-shrink: 0;
 }
+.fh-log-stall-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  background: color-mix(in srgb, #f59e0b 18%, var(--bg-panel));
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fh-log-stall-notice.hidden {
+  display: none;
+}
+.fh-log-stall-msg {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.fh-log-stall-retry {
+  flex-shrink: 0;
+}
 .fh-log-title {
   font-size: 0.75rem;
   font-weight: 600;

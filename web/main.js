@@ -60,6 +60,8 @@
 
     const track = root.querySelector(".magic-scrub-track");
     const stages = Array.from(root.querySelectorAll(".magic-stage"));
+    const shots = Array.from(root.querySelectorAll("[data-magic-shot]"));
+    const visual = root.querySelector(".magic-visual");
     const chips = Array.from(root.querySelectorAll(".magic-chip"));
     const bar = root.querySelector("[data-magic-bar]");
     if (!track || stages.length < 3) return;
@@ -75,15 +77,27 @@
     let lastStage = -1;
     let scrubbing = false;
 
+    function setShot(stage) {
+      shots.forEach((el, i) => {
+        el.classList.toggle("is-active", i === stage);
+      });
+    }
+
     function showAllStatic() {
       stages.forEach((el) => el.classList.add("is-active"));
       chips.forEach((chip) => chip.classList.add("is-on"));
       if (bar) bar.style.width = "100%";
+      setShot(Math.max(0, shots.length - 1));
+      if (visual) visual.style.setProperty("--magic-drift", "0");
     }
 
     function applyProgress(p) {
       const clamped = Math.max(0, Math.min(1, p));
       if (bar) bar.style.width = `${(clamped * 100).toFixed(1)}%`;
+      if (visual) {
+        // Drift about ±4% across the scrub so the frame feels tied to scroll.
+        visual.style.setProperty("--magic-drift", ((clamped - 0.5) * 8).toFixed(2));
+      }
 
       const stage = clamped < 0.22 ? 0 : clamped < 0.55 ? 1 : 2;
       if (stage !== lastStage) {
@@ -91,6 +105,7 @@
         stages.forEach((el, i) => {
           el.classList.toggle("is-active", i === stage);
         });
+        setShot(stage);
       }
 
       const chipProgress = Math.max(0, (clamped - 0.12) / 0.35);

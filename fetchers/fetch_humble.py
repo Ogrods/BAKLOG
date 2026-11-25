@@ -425,17 +425,17 @@ def _page_on_cloudflare(page) -> bool:
 def _page_looks_signed_out(page) -> bool:
     """True when the session is gone — not during an in-progress CF challenge."""
     from auth.connect_extractors import humble_page_title_looks_login
+    from auth.url_hosts import host_matches
 
     raw = getattr(page, "url", None) or ""
     try:
         parsed = urlparse(raw)
     except Exception:  # noqa: BLE001
         return False
-    host = (parsed.hostname or "").lower()
     path = (parsed.path or "").lower()
     if _page_on_cloudflare(page):
         return False
-    if host == "auth.humblebundle.com":
+    if host_matches(raw, "auth.humblebundle.com"):
         return True
     if path.rstrip("/").endswith("/login") or "/login" in path.split("/"):
         return True
@@ -501,16 +501,18 @@ def _pick_humble_library_page(ctx):
 
 
 def _humble_main_auth_failure(msg: str) -> bool:
+    from auth.url_hosts import host_matches
+
     low = msg.lower()
     if "expired" in low or "401" in msg or "403" in msg:
         return True
     if msg.startswith("Humble session expired"):
         return True
-    if "auth.humblebundle.com" in low:
-        return True
-    from auth.url_hosts import host_matches
-
     for token in re.findall(r"https?://[^\s'\"]+", msg):
+        if host_matches(token, "auth.humblebundle.com"):
+            return True
+    # Bare host token in messages like "url='auth.humblebundle.com/login'"
+    for token in re.findall(r"(?:^|[\s'\"(=])([a-z0-9.-]*humblebundle\.com)(?:[/\s'\")]|$)", low):
         if host_matches(token, "auth.humblebundle.com"):
             return True
     return False

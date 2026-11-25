@@ -44,7 +44,8 @@ export function shouldConfirmHltbRun(pending, { refresh = false } = {}) {
   return false;
 }
 
-function formatEta(seconds) {
+/** @param {number} seconds */
+export function formatHltbEta(seconds) {
   const s = Math.max(0, Math.round(seconds));
   if (s < 60) return `about ${s}s`;
   const m = Math.round(s / 60);
@@ -73,7 +74,7 @@ function ensureModal() {
  */
 export function confirmHltbEstimate(pending, { refresh = false } = {}) {
   const lookups = hltbPendingLookupCount(pending, { refresh });
-  const eta = formatEta(estimateHltbSeconds(lookups));
+  const eta = formatHltbEta(estimateHltbSeconds(lookups));
   const unchecked = pending?.unchecked || 0;
   const noMatch = pending?.noMatch || 0;
   const retryLine = refresh && noMatch > 0

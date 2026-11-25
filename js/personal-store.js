@@ -103,6 +103,8 @@ export const personalStore = (() => {
     // Local-only seed flag: a stale server copy must not re-arm the one-shot
     // first-seen seed, which would flood "Recently added" on the next boot.
     'librarySeenSeeded',
+    // One-shot Steam enrich offer: stale server false must not re-open the dialog.
+    'steamEnrichOfferSeen',
   ];
 
   // Merge first-seen maps. The server doc is normally authoritative, but a

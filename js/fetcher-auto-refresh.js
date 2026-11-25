@@ -18,6 +18,7 @@ import {
   LS_ITAD_LAST_AUTO_RUN,
   profileScopedStorageKey,
 } from './profiles.js';
+import { ENRICH_ORDER } from './fetcher/enrich-order.js';
 import { state } from './state.js';
 
 /** Defaults wired from fetcher-health.js after module init (avoids import cycles). */
@@ -173,10 +174,79 @@ export function autoStaleLastRunKey() {
   return profileScopedStorageKey(LS_AUTO_STALE_LAST_RUN);
 }
 
-const ENRICH_ORDER = ['steamReviews', 'steamTags', 'steamCovers', 'protondb', 'hltb'];
-
 let autoEnrichCooldownUntil = 0;
 const AUTO_ENRICH_COOLDOWN_MS = 3000;
+
+/**
+ * Queue enrichers in ENRICH_ORDER (reviews → tags → covers → ProtonDB → HLTB).
+ * @param {{ logLabel: string, deps?: Record<string, unknown> }} opts
+ * @returns {Promise<boolean>}
+ */
+async function queueEnrichersInOrder({ logLabel, deps = {} }) {
+  const now = deps.now ?? Date.now();
+  if (now < autoEnrichCooldownUntil) return false;
+  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner?.isApiAvailable());
+  if (!isApiAvailableFn()) return false;
+
+  autoEnrichCooldownUntil = now + AUTO_ENRICH_COOLDOWN_MS;
+
+  const loadSourcesFn = deps.loadFetcherSources ?? (async () => {
+    const m = await import('./fetcher-health.js');
+    return m.loadFetcherSources(true);
+  });
+  await loadSourcesFn();
+
+  const sources = deps.sources ?? fetcherSources;
+  const stateForFn = deps.stateFor ?? (k => fetcherRunner?.stateFor(k));
+  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
+  const cancelEpochFn = deps.getCancelEpoch ?? (() => fetcherRunner?.getCancelEpoch());
+  const batchEpoch = cancelEpochFn();
+  const waitSlotFn =
+    deps.waitForQueueSlot ?? (() => fetcherRunner?.waitForQueueSlot({ batchEpoch }));
+  const credsOkFn = deps.fetcherCredentialsSatisfied ?? wired.fetcherCredentialsSatisfied;
+  const cooldownFn = deps.authCooldownRemainingMs ?? wired.authCooldownRemainingMs;
+  const disconnectedFn = deps.isFetcherDisconnected ?? wired.isFetcherDisconnected;
+
+  const keysToRun = ENRICH_ORDER.filter(key => {
+    const src = sources.find(s => s.key === key);
+    if (!src) return false;
+    if (src.missingRequirements?.length && !credsOkFn(key)) return false;
+    if (stateForFn(key)) return false;
+    if (cooldownFn(key) > 0) return false;
+    if (disconnectedFn(key)) return false;
+    return true;
+  });
+
+  if (!keysToRun.length) return false;
+
+  const appendLineFn = deps.appendLine;
+  if (appendLineFn) {
+    appendLineFn(logLabel.replace('{n}', String(keysToRun.length)), 'meta');
+  }
+
+  for (const key of keysToRun) {
+    if (cancelEpochFn() !== batchEpoch) {
+      if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
+      break;
+    }
+    try {
+      await waitSlotFn();
+      if (cancelEpochFn() !== batchEpoch) {
+        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
+        break;
+      }
+      await runFn(key, { auto: true });
+    } catch (err) {
+      if (err?.message === 'cancelled') {
+        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
+      } else if (appendLineFn) {
+        appendLineFn(`[auto-enrich aborted: ${err}]`, 'stderr');
+      }
+      break;
+    }
+  }
+  return true;
+}
 
 export async function maybeAutoRefreshItad(deps = {}) {
   if (state.prefs.itadAutoRefreshDisabled) return false;
@@ -327,68 +397,21 @@ export function maybeAutoFetchStale24h(deps = {}) {
 export async function maybeAutoEnrichNewAdditions(newCount, deps = {}) {
   if (!state.prefs.autoEnrichOnAdd) return false;
   if (!newCount || newCount <= 0) return false;
-  const now = deps.now ?? Date.now();
-  if (now < autoEnrichCooldownUntil) return false;
-  const isApiAvailableFn = deps.isApiAvailable ?? (() => fetcherRunner?.isApiAvailable());
-  if (!isApiAvailableFn()) return false;
-
-  autoEnrichCooldownUntil = now + AUTO_ENRICH_COOLDOWN_MS;
-
-  const loadSourcesFn = deps.loadFetcherSources ?? (async () => {
-    const m = await import('./fetcher-health.js');
-    return m.loadFetcherSources(true);
+  return queueEnrichersInOrder({
+    logLabel: `[auto-enrich: ${newCount} new game(s) - queuing {n} enricher(s)]`,
+    deps,
   });
-  await loadSourcesFn();
+}
 
-  const sources = deps.sources ?? fetcherSources;
-  const stateForFn = deps.stateFor ?? (k => fetcherRunner?.stateFor(k));
-  const runFn = deps.runFn ?? ((k, opts) => fetcherRunner?.run(k, opts));
-  const waitSlotFn =
-    deps.waitForQueueSlot ?? (() => fetcherRunner?.waitForQueueSlot({ batchEpoch }));
-  const credsOkFn = deps.fetcherCredentialsSatisfied ?? wired.fetcherCredentialsSatisfied;
-  const cooldownFn = deps.authCooldownRemainingMs ?? wired.authCooldownRemainingMs;
-  const disconnectedFn = deps.isFetcherDisconnected ?? wired.isFetcherDisconnected;
-
-  const keysToRun = ENRICH_ORDER.filter(key => {
-    const src = sources.find(s => s.key === key);
-    if (!src) return false;
-    if (src.missingRequirements?.length && !credsOkFn(key)) return false;
-    if (stateForFn(key)) return false;
-    if (cooldownFn(key) > 0) return false;
-    if (disconnectedFn(key)) return false;
-    return true;
+/**
+ * Bootstrap enrich after an explicit user offer (first Steam success).
+ * Does not require newCount > 0 or autoEnrichOnAdd (caller already consented).
+ * @param {Record<string, unknown>} [deps]
+ */
+export async function runEnrichBootstrap(deps = {}) {
+  const reason = deps.reason || 'bootstrap';
+  return queueEnrichersInOrder({
+    logLabel: `[enrich-bootstrap: ${reason} - queuing {n} enricher(s)]`,
+    deps,
   });
-
-  if (!keysToRun.length) return false;
-
-  const appendLineFn = deps.appendLine;
-  if (appendLineFn) {
-    appendLineFn(`[auto-enrich: ${newCount} new game(s) - queuing ${keysToRun.length} enricher(s)]`, 'meta');
-  }
-
-  const cancelEpochFn = deps.getCancelEpoch ?? (() => fetcherRunner?.getCancelEpoch());
-  const batchEpoch = cancelEpochFn();
-
-  for (const key of keysToRun) {
-    if (cancelEpochFn() !== batchEpoch) {
-      if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
-      break;
-    }
-    try {
-      await waitSlotFn();
-      if (cancelEpochFn() !== batchEpoch) {
-        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
-        break;
-      }
-      await runFn(key, { auto: true });
-    } catch (err) {
-      if (err?.message === 'cancelled') {
-        if (appendLineFn) appendLineFn('[auto-enrich aborted: cancelled]', 'meta');
-      } else if (appendLineFn) {
-        appendLineFn(`[auto-enrich aborted: ${err}]`, 'stderr');
-      }
-      break;
-    }
-  }
-  return true;
 }

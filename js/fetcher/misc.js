@@ -25,6 +25,7 @@ export {
   maybeAutoFetchOnConnect,
   maybeAutoFetchStale24h,
   maybeAutoEnrichNewAdditions,
+  runEnrichBootstrap,
 } from '../fetcher-auto-refresh.js';
 
 export { consumeItadAutoRunFlag };

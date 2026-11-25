@@ -837,6 +837,10 @@ export async function reloadAfterFetcher(key) {
   }
   if (key === "steam") {
     void import("./library-watch.js").then((m) => m.onSteamCatalogReloaded());
+    // First Steam success: one-time enrich offer (newCount is 0 on seed).
+    void import("./steam-enrich-offer.js")
+      .then((m) => m.maybeShowSteamEnrichOffer())
+      .catch(() => {});
   }
 }
 

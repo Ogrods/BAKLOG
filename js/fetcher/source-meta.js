@@ -29,7 +29,7 @@ export const COUNT_PILL_TITLES = {
 // Fixed order within the Enrichment group: keep the three Steam-derived
 // enrichers (orange edge) adjacent, then HLTB. Overrides the status/label
 // sort so they always render next to each other.
-export const ENRICH_ORDER = ['steamReviews', 'steamTags', 'steamCovers', 'protondb', 'hltb'];
+export { ENRICH_ORDER } from './enrich-order.js';
 
 export const COUNT_FNS = {
   itad: m => Object.keys(m?.by_key || {}).length,

@@ -37,16 +37,30 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.23] - 2026-11-25
+
 ### Added
 
 - Pro bonus palettes in the profile menu: Storybook, Sapphire, and Emerald (six free themes stay free)
+- After the first Steam library pull succeeds, a one-time prompt can start enrichment (reviews, tags, covers, ProtonDB, HowLongToBeat)
+- Fetcher health shows countable progress on long syncs and a soft stall notice when output goes quiet
 
 ### Fixed
+
 - Humble library sync works with Humble's redesigned site and is much faster on large libraries
 - After you accept the first Steam enrich offer, a refused start shows a notice and retries once instead of failing silently
+- Profile switch waits out in-flight refresh more reliably and can retry once if runs are still stopping
+- When a fetcher stalls, Fetcher health offers close-browser retry
+- Spotlight: nav buttons fill the pill on hover, portrait covers no longer clip titles, unsafe sponsor HTML is blocked
+- Windows Settings → Apps version stays in sync after an in-app update
+- GOG pagination, ITAD HTTP errors, and PSN wishlist timeouts are more resilient
+- Starting a new Connect closes the previous Connect stream instead of stacking them
+- Claim dialogs trap focus for keyboard/screen-reader use
 
 ### Changed
+
 - Landing and FAQ: packaged beta requires account sign-in; privacy copy notes opt-in Pro cloud sync; Humble wishlist pause called out on the store wall
+- baklog.app splash and magic-scrub sections use sharper product shots and a shorter how-it-works retell
 
 ## [0.9.22] - 2026-11-18
 

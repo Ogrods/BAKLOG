@@ -1401,7 +1401,8 @@ function spotlightLogoBodyCopy(slogan, tagline) {
 function spotlightLogoInnerHtml(g) {
   const eyebrow = g._spotlightReason?.eyebrow || "BAKLOG Pro";
   const displayEyebrow = eyebrowVariant(eyebrow, gameKey(g));
-  const tagline = g._spotlightReason?.metaParts?.[0] || "";
+  const tagline =
+    g._spotlightReason?.tagline || g._spotlightReason?.metaParts?.[0] || "";
   const slogan = g._spotlightAd?.slogan || g._spotlightReason?.slogan || "";
   const cta = g._spotlightAd?.cta || "";
   const { headline, sub } = spotlightLogoBodyCopy(slogan, tagline);

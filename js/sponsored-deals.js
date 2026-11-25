@@ -1638,7 +1638,10 @@ export function sponsorToSpotlightGame(item) {
     _spotlightReason: {
       eyebrow: isHouse ? 'BAKLOG Pro' : disclosure,
       score: 100 - (item.priority ?? 50),
-      metaParts: tagline ? [tagline] : [],
+      // metaParts is joined into innerHTML by cover-art spotlight slides;
+      // escape feed text here. Logo slides read the raw `tagline` field.
+      metaParts: tagline ? [escapeHtml(tagline)] : [],
+      tagline,
       slogan,
       isSponsored: true,
     },

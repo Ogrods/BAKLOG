@@ -297,4 +297,43 @@ describe('spotlight sponsored slides', () => {
     expect(html).not.toContain('sponsored-dismiss');
     expect(html).not.toContain('data-action="sponsored-dismiss"');
   });
+
+  it('escapes a malicious cover-art sponsor tagline (no raw markup in meta)', async () => {
+    const { sponsorToSpotlightGame } = await import('../js/sponsored-deals.js');
+    const slide = sponsorToSpotlightGame({
+      id: 'ad-xss',
+      kind: 'sponsor',
+      title: 'Emberfall',
+      tagline: '<img src=x onerror=alert(1)>evil',
+      url: 'https://example.com/ad',
+      cover: '/assets/ads-sample/hero-emberfall.webp',
+      enabled: true,
+    });
+    expect(slide._spotlightReason.tagline).toBe('<img src=x onerror=alert(1)>evil');
+    expect(slide._spotlightReason.metaParts[0]).toContain('&lt;img');
+    expect(slide._spotlightReason.metaParts[0]).not.toContain('<img');
+    const html = renderSpotlightHtml(slide);
+    expect(html).not.toMatch(/<img\s+src=x/i);
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;evil');
+  });
+
+  it('shows a plain logo-slide tagline once without double-escaping', async () => {
+    const { sponsorToSpotlightGame } = await import('../js/sponsored-deals.js');
+    const slide = sponsorToSpotlightGame({
+      id: 'house-logo-xss',
+      kind: 'house',
+      title: 'BAKLOG Pro',
+      tagline: 'Local-first & free',
+      slogan: 'One honest backlog across every store.',
+      url: 'https://baklog.app/',
+      art_mode: 'logo',
+      scheme: 'ember',
+      cta: 'Support BAKLOG',
+      enabled: true,
+    });
+    const html = renderSpotlightHtml(slide);
+    expect(html).toContain('Local-first &amp; free');
+    expect(html).not.toContain('&amp;amp;');
+    expect(html.match(/Local-first &amp; free/g)?.length).toBe(1);
+  });
 });

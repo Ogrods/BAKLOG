@@ -75,8 +75,8 @@ def start_idle_watchdog(
                 continue
             try:
                 on_idle()
-            except Exception:  # noqa: BLE001 - best-effort graceful shutdown
-                pass
+            except Exception as exc:  # noqa: BLE001 - best-effort graceful shutdown
+                print(f"[idle-watchdog] on_idle failed: {exc!r}", flush=True)
             return
 
     thread = threading.Thread(

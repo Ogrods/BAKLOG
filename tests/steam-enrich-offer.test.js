@@ -206,6 +206,36 @@ describe('maybeShowSteamEnrichOffer', () => {
     expect(runEnrichBootstrap.mock.calls[0][0].reason).toBe('steam-first-offer');
   });
 
+  it('refused bootstrap notifies and schedules one deferred retry', async () => {
+    vi.useFakeTimers();
+    const runEnrichBootstrap = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    const notifyFn = vi.fn();
+    const result = await maybeShowSteamEnrichOffer({
+      prefs: state.prefs,
+      confirmFn: async () => true,
+      runEnrichBootstrap,
+      savePrefs: () => {},
+      notifyFn,
+      hltbPending: { unchecked: 0, noMatch: 0 },
+      stateFor: () => null,
+      retryDelayMs: 4000,
+    });
+    expect(result).toBe('enrich-deferred');
+    expect(state.prefs.steamEnrichOfferSeen).toBe(true);
+    expect(state.prefs.autoEnrichOnAdd).toBe(true);
+    expect(notifyFn).toHaveBeenCalledTimes(1);
+    expect(String(notifyFn.mock.calls[0][0])).toMatch(/could not start/i);
+    expect(runEnrichBootstrap).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(runEnrichBootstrap).toHaveBeenCalledTimes(2);
+    expect(runEnrichBootstrap.mock.calls[1][0].reason).toBe('steam-first-offer-retry');
+    vi.useRealTimers();
+  });
+
   it('skips when enrich lane busy', async () => {
     const result = await maybeShowSteamEnrichOffer({
       prefs: state.prefs,

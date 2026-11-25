@@ -37,6 +37,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Library count +1 animation no longer sticks after the roll finishes and blocks later counter or chart updates
+
 ## [0.9.23] - 2026-11-25
 
 ### Added

@@ -193,6 +193,23 @@ describe('flashCountUp', () => {
     expect(node.textContent).toBe('6');
   });
 
+  it('clears isSurfaceAnimating when the roll finishes so a second burst can fire', () => {
+    const node = mountCountSurface();
+    flashCountUp(node, 10, 11, n => String(Math.round(n)), { popups: true });
+    expect(isSurfaceAnimating(node)).toBe(true);
+    const dur = strictSyncRollMs(1, 1);
+    flushRaf(dur + 50);
+    expect(node.textContent).toBe('11');
+    expect(isSurfaceAnimating(node)).toBe(false);
+    // Second acquisition must roll + popup again (sticky-flag regression).
+    flashCountUp(node, 11, 12, n => String(Math.round(n)), { popups: true });
+    expect(isSurfaceAnimating(node)).toBe(true);
+    flushRaf(dur + 50);
+    expect(node.textContent).toBe('12');
+    expect(isSurfaceAnimating(node)).toBe(false);
+    expect(document.querySelectorAll('.library-count-popup').length).toBeGreaterThan(0);
+  });
+
   it('cancelAllLibraryCountAnimations rips down active episodes AND stray popups', () => {
     const node = mountCountSurface();
     flashCountUp(node, 0, 5, n => String(Math.round(n)), { popups: true });

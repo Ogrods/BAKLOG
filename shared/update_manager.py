@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -32,6 +33,7 @@ from shared.update_ready_state import (
 from shared.update_release import (
     ReleaseArtifacts,
     UpdateSecurityError,
+    extract_apply_script_from_zip,
     fetch_release_artifacts,
     fetch_url_to_file,
     verify_file_sha256,
@@ -76,6 +78,18 @@ class UpdateManager:
         self._artifacts: ReleaseArtifacts | None = None
         self._zip_path: Path | None = None
         self._rehydrate_from_disk()
+        self._repair_windows_arp()
+
+    def _repair_windows_arp(self) -> None:
+        """Sync Settings → Apps DisplayVersion after zip apply (best-effort)."""
+        if not is_frozen() or sys.platform != "win32":
+            return
+        try:
+            from shared.install_visibility import repair_arp_display_version
+
+            repair_arp_display_version(self._current_version())
+        except Exception:  # noqa: BLE001 - never block boot on ARP heal
+            pass
 
     def status_dict(self) -> dict[str, Any]:
         with self._lock:
@@ -285,9 +299,20 @@ class UpdateManager:
             return {"ok": False, "error": "Update package path is outside the trusted update workspace"}
 
         install_dir = frozen_bundle_dir()
-        script = install_dir / apply_script_name()
+        script_name = apply_script_name()
+        install_script = install_dir / script_name
+        # Prefer the apply helper from the verified zip so this release's fixes
+        # (e.g. ARP DisplayVersion sync) run on the same Install & restart.
+        script = install_script
+        zip_script_dest = zip_path.parent / script_name
+        try:
+            extracted = extract_apply_script_from_zip(zip_path, zip_script_dest)
+            if extracted is not None and extracted.is_file():
+                script = extracted
+        except Exception:  # noqa: BLE001 - fall back to install-dir helper
+            script = install_script
         if not script.is_file():
-            return {"ok": False, "error": f"{apply_script_name()} missing from install"}
+            return {"ok": False, "error": f"{script_name} missing from install"}
 
         server_bin = install_dir / server_binary_name()
         if not server_bin.is_file():

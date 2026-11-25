@@ -86,15 +86,17 @@ export function _resetInstallHintsForTests() {
 }
 
 /**
- * Footnote for Setup installs where zip apply does not refresh Add/Remove Programs.
+ * Footnote when Settings → Apps still lags the running build after a Setup install.
+ * Shown only while diagnostics report arp_version_mismatch (heal usually clears it).
  * @param {{ installSource?: string | null, arpVersionMismatch?: boolean }} [hints]
  */
 export function renderSetupArpFootnote(hints = _installHints) {
-  if (hints?.installSource !== "setup" && !hints?.arpVersionMismatch) return "";
+  if (!hints?.arpVersionMismatch) return "";
   return (
     '<p class="text-xs text-slate-500 mt-2">' +
-    "Installed with BAKLOG-Setup.exe? Add/Remove Programs may still show an older version after in-app updates. " +
-    "Re-run the installer from the release page when you want Settings to match, or ignore it if the app version looks correct." +
+    "Settings → Apps still shows an older BAKLOG version. The in-app version is current; " +
+    "Add/Remove Programs usually catches up after Install & restart. " +
+    "Re-run BAKLOG-Setup.exe only if it stays wrong." +
     "</p>"
   );
 }

@@ -93,14 +93,14 @@ describe('parseUpdateCheckResponse', () => {
 });
 
 describe('renderSetupArpFootnote', () => {
-  it('shows footnote for setup installs', () => {
-    const html = renderSetupArpFootnote({ installSource: 'setup', arpVersionMismatch: false });
-    expect(html).toContain('Add/Remove Programs');
+  it('hides footnote for setup installs once ARP matches', () => {
+    expect(renderSetupArpFootnote({ installSource: 'setup', arpVersionMismatch: false })).toBe('');
   });
 
-  it('shows footnote when ARP version already mismatches', () => {
+  it('shows footnote when ARP version still mismatches', () => {
     const html = renderSetupArpFootnote({ installSource: 'zip', arpVersionMismatch: true });
     expect(html).toContain('Add/Remove Programs');
+    expect(html).toContain('Settings → Apps');
   });
 
   it('returns empty for zip installs without mismatch', () => {

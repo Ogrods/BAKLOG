@@ -9,7 +9,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from shared.install_paths import data_root, frozen_bundle_dir, is_frozen, is_portable_frozen
+from shared.install_paths import (
+    bundle_root,
+    data_root,
+    frozen_bundle_dir,
+    is_frozen,
+    is_portable_frozen,
+)
 
 _COMMUNITY_JSON = Path(__file__).resolve().parent / "community.json"
 _DEFAULT_RELEASES_API = "https://api.github.com/repos/Ogrods/BAKLOG/releases/latest"
@@ -40,8 +46,18 @@ def is_running_from_temp_dir(path: Path) -> bool:
         return False
 
 
+def _read_bundle_version() -> str:
+    try:
+        import tomllib
+
+        raw = (bundle_root() / "pyproject.toml").read_text(encoding="utf-8")
+        return str(tomllib.loads(raw).get("project", {}).get("version", "") or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def run_boot_checks(data_root: Path) -> None:
-    """Non-fatal boot warnings and Windows autostart self-heal."""
+    """Non-fatal boot warnings, Windows autostart self-heal, and ARP version heal."""
     check_data_location()
     if not is_frozen() or sys.platform != "win32":
         return
@@ -55,6 +71,14 @@ def run_boot_checks(data_root: Path) -> None:
             )
     except Exception as exc:  # noqa: BLE001 - must not block server boot
         print(f"[startup] reconcile skipped: {exc!r}", file=sys.stderr, flush=True)
+    try:
+        from shared.install_visibility import repair_arp_display_version
+
+        version = _read_bundle_version()
+        if version and repair_arp_display_version(version):
+            print(f"NOTE: Synced Add/Remove Programs version to {version}.", flush=True)
+    except Exception as exc:  # noqa: BLE001 - must not block server boot
+        print(f"[startup] ARP version heal skipped: {exc!r}", file=sys.stderr, flush=True)
 
 
 def check_data_location() -> None:

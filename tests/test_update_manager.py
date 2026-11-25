@@ -184,6 +184,87 @@ def test_apply_ready_update_launches_helper(
     assert launched
 
 
+def test_apply_ready_update_prefers_script_from_zip(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import io
+    import zipfile
+
+    monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("shared.update_manager.is_running_from_temp_dir", lambda _p: False)
+    monkeypatch.setattr("shared.update_manager.frozen_bundle_dir", lambda: tmp_path)
+    (tmp_path / "BAKLOG.exe").write_text("x", encoding="utf-8")
+    (tmp_path / "apply_update.ps1").write_text("# old install helper", encoding="utf-8")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("BAKLOG/BAKLOG.exe", b"new")
+        archive.writestr("BAKLOG/BAKLOG Tray.exe", b"tray")
+        archive.writestr("BAKLOG/apply_update.ps1", b"# new zip helper\n")
+    payload_bytes = buf.getvalue()
+    digest = hashlib.sha256(payload_bytes).hexdigest()
+    zip_path = tmp_path / "0.8.26" / "package.zip"
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    zip_path.write_bytes(payload_bytes)
+
+    mgr = UpdateManager(
+        current_version=lambda: "0.8.25",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    with mgr._lock:
+        mgr._status.phase = "ready"
+        mgr._status.ready = True
+        mgr._zip_path = zip_path
+        mgr._artifacts = ReleaseArtifacts(
+            tag="v0.8.26",
+            version="0.8.26",
+            html_url="https://example.com",
+            zip_url="https://github.com/Ogrods/BAKLOG/releases/download/v0.8.26/BAKLOG-win64.zip",
+            sha256=digest,
+        )
+
+    launched_scripts: list[Path] = []
+
+    def fake_launch(*, script, **kwargs):
+        launched_scripts.append(Path(script))
+        return type("P", (), {})()
+
+    monkeypatch.setattr("shared.update_manager.launch_apply_subprocess", fake_launch)
+    monkeypatch.setattr("shared.update_manager.wait_for_apply_started", lambda *_a, **_k: True)
+    result = mgr.apply_ready_update()
+    assert result["ok"] is True
+    assert launched_scripts
+    assert launched_scripts[0] == zip_path.parent / "apply_update.ps1"
+    assert launched_scripts[0].read_text(encoding="utf-8") == "# new zip helper\n"
+
+
+def test_update_manager_repairs_arp_on_init(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("shared.update_manager.is_frozen", lambda: True)
+    monkeypatch.setattr(sys, "platform", "win32")
+    calls: list[str] = []
+
+    def fake_repair(version: str) -> bool:
+        calls.append(version)
+        return True
+
+    monkeypatch.setattr(
+        "shared.install_visibility.repair_arp_display_version",
+        fake_repair,
+    )
+    UpdateManager(
+        current_version=lambda: "0.9.22",
+        has_in_flight_runs=lambda: False,
+        work_root=tmp_path,
+    )
+    assert calls == ["0.9.22"]
+
+
 def test_apply_aborts_when_helper_never_starts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -262,6 +262,31 @@ describe('post-checkout return', () => {
   });
 });
 
+describe('Pro refresh error handling', () => {
+  beforeEach(async () => {
+    document.body.innerHTML = '<div id="proContainer"><div id="proViewRoot"></div></div>';
+    const authGate = await import('../js/auth-gate.js');
+    authGate.isAccountAuthMode.mockReturnValue(true);
+    authGate.isPro.mockReturnValue(false);
+    authGate.refreshAccountPlan.mockRejectedValue(new Error('network down'));
+  });
+
+  it('re-enables the refresh button and shows an error status on rejection', async () => {
+    const { renderProView, wireProView } = await import('../js/pro-view.js');
+    renderProView();
+    wireProView();
+    const btn = document.querySelector('[data-pro-refresh]');
+    expect(btn).toBeTruthy();
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(btn.disabled).toBe(false);
+    });
+    expect(document.getElementById('proViewStatus').textContent).toContain(
+      'Could not check your account',
+    );
+  });
+});
+
 describe('Pro activation UX', () => {
   beforeEach(() => {
     vi.resetModules();

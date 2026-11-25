@@ -9,6 +9,7 @@ import {
   isLocalProfilesEnabled,
   getAccountEmail,
   getAccountProfileId,
+  proFeaturesUnlocked,
   signOutAccount,
 } from './auth-gate.js';
 import {
@@ -24,9 +25,11 @@ import { escapeAttr } from './dom-util.js';
 import {
   getColorTheme,
   setColorTheme,
-  THEMES,
+  FREE_THEMES,
+  PRO_THEMES,
   THEME_LABELS,
   THEME_SWATCHES,
+  isProTheme,
   applyColorThemeFromStorage,
 } from './theme.js';
 
@@ -329,12 +332,18 @@ function setThemeNameLabel(text) {
 
 let _themeSwatchHoverWired = false;
 
+function themeDisplayName(id) {
+  const name = THEME_LABELS[id] || id;
+  if (isProTheme(id) && !proFeaturesUnlocked()) return `${name} (Pro)`;
+  return name;
+}
+
 function wireThemeSwatchHover(list) {
   if (!list || _themeSwatchHoverWired) return;
   _themeSwatchHoverWired = true;
   list.addEventListener('pointerover', (e) => {
     const b = e.target.closest('[data-theme-set]');
-    if (b) setThemeNameLabel(THEME_LABELS[b.dataset.themeSet] || b.dataset.themeSet);
+    if (b) setThemeNameLabel(themeDisplayName(b.dataset.themeSet));
   });
   list.addEventListener('pointerleave', () => {
     const active = getColorTheme();
@@ -342,17 +351,32 @@ function wireThemeSwatchHover(list) {
   });
 }
 
+/** Re-paint swatches after free ↔ Pro (locks / unlocks bonus palettes). */
+export function renderThemeListForPlanChange() {
+  renderThemeList();
+}
+
+function themeSwatchButtonHtml(id, active) {
+  const sw = THEME_SWATCHES[id] || {};
+  const name = THEME_LABELS[id] || id;
+  const locked = isProTheme(id) && !proFeaturesUnlocked();
+  const label = locked ? `${name} (Pro)` : name;
+  const grad = `linear-gradient(135deg, ${sw.bg} 0%, ${sw.bg} 55%, ${sw.accent} 90%, ${sw.accent2} 100%)`;
+  const selected = id === active;
+  const cls = `theme-swatch${selected ? ' is-active' : ''}${locked ? ' is-locked' : ''}`;
+  return `<button type="button" role="menuitemradio" aria-checked="${selected}" class="${cls}" data-theme-set="${escapeAttr(id)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}" style="--swatch-grad:${grad}; --swatch-accent:${sw.accent || '#fff'}"></button>`;
+}
+
 function renderThemeList() {
   const list = el('profileThemeList');
   if (!list) return;
   const active = getColorTheme();
-  list.innerHTML = THEMES.map((id) => {
-    const sw = THEME_SWATCHES[id] || {};
-    const name = THEME_LABELS[id] || id;
-    const grad = `linear-gradient(135deg, ${sw.bg} 0%, ${sw.bg} 55%, ${sw.accent} 90%, ${sw.accent2} 100%)`;
-    const selected = id === active;
-    return `<button type="button" role="menuitemradio" aria-checked="${selected}" class="theme-swatch${selected ? ' is-active' : ''}" data-theme-set="${escapeAttr(id)}" title="${escapeAttr(name)}" aria-label="${escapeAttr(name)}" style="--swatch-grad:${grad}; --swatch-accent:${sw.accent || '#fff'}"></button>`;
-  }).join('');
+  const freeHtml = FREE_THEMES.map((id) => themeSwatchButtonHtml(id, active)).join('');
+  const bonusHtml = PRO_THEMES.map((id) => themeSwatchButtonHtml(id, active)).join('');
+  list.innerHTML =
+    freeHtml +
+    `<span class="profile-menu-theme-group" role="presentation">Bonus palettes</span>` +
+    bonusHtml;
   setThemeNameLabel(THEME_LABELS[active] || active);
   wireThemeSwatchHover(list);
 }
@@ -366,10 +390,13 @@ function handleMenuThemeClick(e) {
   // Stop propagation so theme previews keep the menu open.
   e.stopPropagation();
   const id = btn.getAttribute('data-theme-set');
-  if (id) {
-    setColorTheme(id);
-    renderThemeList();
+  if (!id) return true;
+  if (isProTheme(id) && !proFeaturesUnlocked()) {
+    void import('./pro-view.js').then((m) => m.goToProView());
+    return true;
   }
+  setColorTheme(id);
+  renderThemeList();
   return true;
 }
 

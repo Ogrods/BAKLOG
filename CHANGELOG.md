@@ -37,6 +37,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Added
+
+- Pro bonus palettes in the profile menu: Storybook, Sapphire, and Emerald (six free themes stay free)
+
 ### Fixed
 - Humble library sync works with Humble's redesigned site and is much faster on large libraries
 

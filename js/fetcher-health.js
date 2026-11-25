@@ -109,6 +109,7 @@ export {
   maybeAutoFetchOnConnect,
   maybeAutoFetchStale24h,
   maybeAutoEnrichNewAdditions,
+  runEnrichBootstrap,
   formatRefreshIntervalLabel,
   thresholdsForMetaKey,
   diffItadDeals,

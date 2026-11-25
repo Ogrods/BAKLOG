@@ -467,6 +467,7 @@ const IMPORT_KEEP_LOCAL_PREF_KEYS = new Set([
   'rowHeroBackdrop',
   'rowHeroBackdropDefaulted',
   'librarySeenSeeded',
+  'steamEnrichOfferSeen',
 ]);
 
 function mergeDismissalMaps(baseMap, incomingMap) {

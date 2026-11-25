@@ -79,7 +79,7 @@ describe('modal JS spacing hygiene', () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const root = path.resolve(import.meta.dirname, '..');
-    for (const rel of ['js/hltb-estimate-modal.js', 'js/update-check.js']) {
+    for (const rel of ['js/hltb-estimate-modal.js', 'js/update-check.js', 'js/steam-enrich-offer.js']) {
       const src = fs.readFileSync(path.join(root, rel), 'utf8');
       expect(src, rel).not.toMatch(/\bmt-5\b/);
     }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.error
 import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
@@ -83,3 +84,52 @@ def test_profile_switch_cancels_runs_before_rebind(switch_server) -> None:
     # cancel_all_and_wait must run before paths rebind so a still-running fetcher can't
     # write into the newly-activated profile's run files.
     assert fake.calls == ["cancel_all_and_wait", "rebind"]
+
+
+class _StragglerManager(_FakeManager):
+    def cancel_all_and_wait(self, timeout: float = 10.0) -> dict:
+        self.calls.append("cancel_all_and_wait")
+        return {
+            "cancelled": [],
+            "stragglers": [{"id": "stuck", "key": "demo", "status": "cancelling"}],
+        }
+
+
+def test_profile_switch_rejects_when_runs_still_stopping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = tmp_path / "profiles"
+    monkeypatch.setattr(profile_paths, "ROOT", tmp_path)
+    monkeypatch.setattr(profile_paths, "PROFILES_DIR", prof)
+    monkeypatch.setattr(profile_paths, "INDEX_FILE", prof / "index.json")
+    monkeypatch.setattr(server, "ROOT", tmp_path)
+    fake = _StragglerManager()
+    monkeypatch.setattr(server, "MANAGER", fake)
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), partial(server.Handler, directory=str(tmp_path)))
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        create_profile("Work")
+        data = json.dumps({"id": "work"}).encode("utf-8")
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/api/profiles/active",
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                server._BAKLOG_LOCAL_HEADER: "1",
+            },
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=10)
+        err = exc_info.value
+        assert err.code == 409
+        body = json.loads(err.read().decode("utf-8"))
+        assert body.get("code") == "runs_stopping"
+        assert fake.calls == ["cancel_all_and_wait"]
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)

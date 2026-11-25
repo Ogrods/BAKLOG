@@ -1674,7 +1674,18 @@ class Handler(SimpleHTTPRequestHandler):
                     {"error": "Finish or cancel the sign-in window before switching profiles."},
                 )
                 return
-            MANAGER.cancel_all_and_wait()
+            cancel_result = MANAGER.cancel_all_and_wait()
+            stragglers = cancel_result.get("stragglers") or []
+            if stragglers:
+                _send_json(
+                    self,
+                    HTTPStatus.CONFLICT,
+                    {
+                        "error": "A refresh is still stopping. Try again in a few seconds.",
+                        "code": "runs_stopping",
+                    },
+                )
+                return
             result = set_active_profile(profile_id)
             try:
                 from shared.mirror_session import clear_mirror_session

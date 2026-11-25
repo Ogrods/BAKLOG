@@ -1250,19 +1250,7 @@ class RunManager:
                     run.ended_at = time.time()
             all_pids.extend(self._collect_pids_for_run(run, []))
         target_ids = {run.id for run in targets}
-        drains: list[queue.Queue] = []
-        if lane in (None, "fetcher"):
-            drains.append(self._queue)
-        if lane in (None, "enrich"):
-            drains.append(self._enrich_queue)
-        if lane in (None, "internal"):
-            drains.append(self._internal_queue)
-        for drain in drains:
-            while True:
-                try:
-                    drain.get_nowait()
-                except queue.Empty:
-                    break
+        self._drain_lane_queues(lane)
         with self._lock:
             if lane is None:
                 self._pending.clear()
@@ -1325,6 +1313,22 @@ class RunManager:
         """True if any queued or running job in either lane is bound to this profile."""
         return bool(self._in_flight_targets(profile_id))
 
+    def _drain_lane_queues(self, lane: str | None = None) -> None:
+        """Drop queued Run objects for the given lane (or all lanes)."""
+        drains: list[queue.Queue] = []
+        if lane in (None, "fetcher"):
+            drains.append(self._queue)
+        if lane in (None, "enrich"):
+            drains.append(self._enrich_queue)
+        if lane in (None, "internal"):
+            drains.append(self._internal_queue)
+        for drain in drains:
+            while True:
+                try:
+                    drain.get_nowait()
+                except queue.Empty:
+                    break
+
     def cancel_all_and_wait(
         self,
         timeout: float = SWITCH_CANCEL_WAIT_SEC,
@@ -1344,6 +1348,9 @@ class RunManager:
                 run._finished.wait(remaining)
             if not run._finished.is_set():
                 stragglers.append(run.to_summary())
+        # Match force_reset: drop cancelled queue entries so a worker cannot
+        # dequeue a stale Run after profile switch.
+        self._drain_lane_queues()
         if stragglers:
             ids = ", ".join(s.get("id", "?") for s in stragglers)
             print(

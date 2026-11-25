@@ -406,14 +406,17 @@ export function spotlightArtUrl(g) {
   return c[0] || "";
 }
 
-/** object-fit / object-position for dashboard spotlight from loaded aspect ratio. */
+/** object-fit / object-position for dashboard spotlight from loaded aspect ratio.
+ *  Near-square (0.9–1.25) stays on the portrait capsule path but flags `square`
+ *  so CSS can use a 1:1 poster instead of the tall 2:3 card. */
 export function spotlightCropForAspect(ratio) {
   if (!Number.isFinite(ratio) || ratio <= 0) {
-    return { fit: "cover", pos: "35% center", portrait: false };
+    return { fit: "cover", pos: "35% center", portrait: false, square: false };
   }
-  if (ratio >= 2) return { fit: "cover", pos: "58% 40%", portrait: false };
-  if (ratio >= 1.4) return { fit: "cover", pos: "35% center", portrait: false };
-  return { fit: "contain", pos: "center", portrait: true };
+  if (ratio >= 2) return { fit: "cover", pos: "58% 40%", portrait: false, square: false };
+  if (ratio >= 1.25) return { fit: "cover", pos: "35% center", portrait: false, square: false };
+  if (ratio >= 0.9) return { fit: "contain", pos: "center", portrait: true, square: true };
+  return { fit: "contain", pos: "center", portrait: true, square: false };
 }
 
 const EPIC_PUBLIC_SLUG = /^[a-z0-9][a-z0-9-]*$/;

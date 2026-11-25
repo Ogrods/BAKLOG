@@ -53,7 +53,7 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("is-lowres-art")).toBe(true);
     expect(spot.classList.contains("has-portrait-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
-    expect(img.style.objectPosition).toBe("100% 40%");
+    expect(img.style.objectPosition).toBe("center");
     expect(spot.querySelector(".dash-spotlight-art-bg").classList.contains("is-loaded")).toBe(true);
   });
 
@@ -72,6 +72,7 @@ describe("spotlight low-res art", () => {
     const sheen = spot.querySelector(".dash-spotlight-sheen");
 
     expect(spot.classList.contains("has-portrait-art")).toBe(true);
+    expect(spot.classList.contains("has-square-art")).toBe(false);
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
@@ -82,7 +83,19 @@ describe("spotlight low-res art", () => {
     expect(img.style.getPropertyValue("mask-image")).toBe("none");
   });
 
-  it("parks low-res at ~2/3 when stacked; portrait stays center (CSS right-tuck)", () => {
+  it("flags near-square art as square capsule (still portrait path)", () => {
+    const spot = mountSpotlight();
+    const img = stubArtDimensions(spot, 400, 400);
+
+    expect(spot.classList.contains("has-portrait-art")).toBe(true);
+    expect(spot.classList.contains("has-square-art")).toBe(true);
+    expect(spot.classList.contains("is-lowres-art")).toBe(false);
+    expect(img.style.objectFit).toBe("contain");
+    expect(img.style.objectPosition).toBe("center");
+    expect(img.style.getPropertyValue("mask-image")).toBe("none");
+  });
+
+  it("keeps low-res and portrait focal center when stacked (CSS parks the card)", () => {
     window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: String(query).includes("1023.98px"),
       media: query,
@@ -100,7 +113,7 @@ describe("spotlight low-res art", () => {
     const lowresSpot = mountSpotlight();
     const lowresImg = stubArtDimensions(lowresSpot, 460, 215);
     expect(lowresSpot.classList.contains("is-lowres-art")).toBe(true);
-    expect(lowresImg.style.objectPosition).toBe("66% 40%");
+    expect(lowresImg.style.objectPosition).toBe("center");
   });
 });
 
@@ -119,7 +132,8 @@ describe("spotlight portrait CSS contract", () => {
     expect(portraitArt).toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
     expect(portraitArt).toMatch(/object-fit:\s*contain/);
     expect(portraitArt).toMatch(/mask-image:\s*none/);
-    expect(portraitArt).toMatch(/overflow:\s*hidden/);
+    // Float lives on this node; overflow:hidden would self-clip edge titles.
+    expect(portraitArt).not.toMatch(/overflow:\s*hidden/);
 
     const portraitBg = css.match(
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art-bg \{[\s\S]*?\n\}/,
@@ -130,5 +144,32 @@ describe("spotlight portrait CSS contract", () => {
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-sheen \{[\s\S]*?\n\}/,
     )?.[0];
     expect(sheen).toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
+
+    const squareArt = css.match(
+      /\.dash-spotlight\.has-portrait-art\.has-square-art \.dash-spotlight-art \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(squareArt).toMatch(/aspect-ratio:\s*1\s*\/\s*1/);
+
+    const squareSheen = css.match(
+      /\.dash-spotlight\.has-portrait-art\.has-square-art \.dash-spotlight-sheen \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(squareSheen).toMatch(/aspect-ratio:\s*1\s*\/\s*1/);
+  });
+
+  it("insets low-res art as a wide cover card with vertical margins", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const css = await fs.readFile(
+      path.join(process.cwd(), "app.css"),
+      "utf8",
+    );
+    const lowresArt = css.match(
+      /\.dash-spotlight\.is-lowres-art \.dash-spotlight-art \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(lowresArt).toBeTruthy();
+    expect(lowresArt).toMatch(/top:\s*16%/);
+    expect(lowresArt).toMatch(/height:\s*68%/);
+    expect(lowresArt).toMatch(/mask-image:\s*none/);
+    expect(lowresArt).toMatch(/object-fit:\s*contain/);
   });
 });

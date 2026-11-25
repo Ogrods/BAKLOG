@@ -61,6 +61,7 @@ _extra_fetchers = [
     root / "fetchers" / "fetch_free_claims.py",
     root / "fetchers" / "fetch_claim_sources.py",
     root / "fetchers" / "build_free_claims.py",
+    root / "fetchers" / "humble_library_api.py",
 ]
 _client_scripts = [p for p in (root / "clients").glob("*.py") if p.name != "__init__.py"]
 

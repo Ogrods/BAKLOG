@@ -37,6 +37,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+- Humble library sync works with Humble's redesigned site and is much faster on large libraries
+
 ## [0.9.22] - 2026-11-18
 
 ### Fixed

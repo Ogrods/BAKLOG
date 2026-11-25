@@ -80,6 +80,22 @@ def write_arp_display_version(version: str) -> bool:
     return False
 
 
+def repair_arp_display_version(current_version: str) -> bool:
+    """Best-effort: write *current_version* to ARP when Settings → Apps has drifted.
+
+    Covers Setup installs that applied an older ``apply_update.ps1`` (no ARP sync)
+    and any apply where the registry write was skipped. No-op when there is no
+    Inno uninstall key or versions already match.
+    """
+    text = str(current_version or "").strip()
+    if sys.platform != "win32" or not text:
+        return False
+    arp = read_arp_display_version()
+    if not arp_version_mismatch(text, arp):
+        return False
+    return write_arp_display_version(text)
+
+
 def arp_version_mismatch(current_version: str, arp_version: str | None) -> bool:
     """True when ARP lists a different version than the running build."""
     from shared.server_support import normalize_version_tag

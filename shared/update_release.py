@@ -271,6 +271,43 @@ def _zip_member_is_safe(member_name: str) -> bool:
     return True
 
 
+def extract_apply_script_from_zip(
+    zip_path: Path,
+    dest: Path,
+    *,
+    platform: str | None = None,
+) -> Path | None:
+    """Extract the platform apply helper from a verified release zip.
+
+    Returns *dest* on success, or ``None`` when the member is missing / unsafe.
+    Prefer the shortest matching member path (bundle root over nested copies).
+    """
+    from shared.update_platform import apply_script_name
+
+    name = apply_script_name(platform)
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            candidates: list[zipfile.ZipInfo] = []
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                if not _zip_member_is_safe(info.filename):
+                    continue
+                member_name = PurePosixPath(info.filename.replace("\\", "/")).name
+                if member_name != name:
+                    continue
+                candidates.append(info)
+            if not candidates:
+                return None
+            info = min(candidates, key=lambda item: len(item.filename.replace("\\", "/")))
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(info) as src, dest.open("wb") as out:
+                out.write(src.read())
+    except (OSError, zipfile.BadZipFile, KeyError):
+        return None
+    return dest if dest.is_file() else None
+
+
 def safe_extract_zip(zip_path: Path, dest_dir: Path) -> Path:
     """Extract *zip_path* into *dest_dir* with path-traversal guards. Returns bundle root."""
     dest_resolved = dest_dir.resolve()

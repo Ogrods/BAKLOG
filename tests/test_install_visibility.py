@@ -13,6 +13,7 @@ from shared.install_visibility import (
     detect_install_source,
     install_visibility_fields,
     read_arp_display_version,
+    repair_arp_display_version,
     write_arp_display_version,
 )
 
@@ -81,6 +82,46 @@ def test_write_arp_display_version_updates_registry() -> None:
                 winreg.DeleteKey(winreg.HKEY_CURRENT_USER, subkey)
             except OSError:
                 pass
+
+
+def test_repair_arp_display_version_noop_when_matched() -> None:
+    with patch("shared.install_visibility.sys.platform", "win32"):
+        with patch("shared.install_visibility.read_arp_display_version", return_value="0.9.22"):
+            with patch("shared.install_visibility.write_arp_display_version") as write:
+                assert repair_arp_display_version("0.9.22") is False
+                write.assert_not_called()
+
+
+def test_repair_arp_display_version_writes_on_mismatch() -> None:
+    with patch("shared.install_visibility.sys.platform", "win32"):
+        with patch("shared.install_visibility.read_arp_display_version", return_value="0.9.20"):
+            with patch("shared.install_visibility.write_arp_display_version", return_value=True) as write:
+                assert repair_arp_display_version("0.9.22") is True
+                write.assert_called_once_with("0.9.22")
+
+
+def test_repair_arp_display_version_noop_without_arp_entry() -> None:
+    with patch("shared.install_visibility.sys.platform", "win32"):
+        with patch("shared.install_visibility.read_arp_display_version", return_value=None):
+            with patch("shared.install_visibility.write_arp_display_version") as write:
+                assert repair_arp_display_version("0.9.22") is False
+                write.assert_not_called()
+
+
+def test_run_boot_checks_repairs_arp_version() -> None:
+    from shared.server_support import run_boot_checks
+
+    with patch("shared.server_support.is_frozen", return_value=True):
+        with patch("shared.server_support.sys.platform", "win32"):
+            with patch("shared.server_support.check_data_location"):
+                with patch("shared.startup.reconcile_startup", return_value=False):
+                    with patch("shared.server_support._read_bundle_version", return_value="0.9.22"):
+                        with patch(
+                            "shared.install_visibility.repair_arp_display_version",
+                            return_value=True,
+                        ) as repair:
+                            run_boot_checks(Path("/tmp/data"))
+                            repair.assert_called_once_with("0.9.22")
 
 
 def test_install_visibility_fields_includes_keys() -> None:

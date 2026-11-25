@@ -201,7 +201,7 @@ def test_apply_update_ps1_syncs_arp_display_version(tmp_path: Path, monkeypatch:
         install.mkdir(parents=True)
         (install / "BAKLOG.exe").write_bytes(b"old-server")
         (install / "BAKLOG Tray.exe").write_bytes(b"old-tray")
-        (install / "unins000.exe").write_bytes(b"inno-uninstall-stub")
+        # No unins*.exe: ARP sync must still update when the Inno key exists.
 
         zip_path, sha256 = _make_bundle_zip(tmp_path)
         proc = _run_apply(tmp_path, install=install, zip_path=zip_path, sha256=sha256, version="0.9.01")
@@ -210,7 +210,9 @@ def test_apply_update_ps1_syncs_arp_display_version(tmp_path: Path, monkeypatch:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as key:
             display_version, _ = winreg.QueryValueEx(key, "DisplayVersion")
         assert display_version == "0.9.01"
-        assert "updated ARP DisplayVersion" in (tmp_path / "BAKLOG-update" / "apply.log").read_text(encoding="utf-8")
+        log = (tmp_path / "BAKLOG-update" / "apply.log").read_text(encoding="utf-8")
+        assert "updated ARP DisplayVersion" in log
+        assert "no Inno uninstaller" not in log
     finally:
         try:
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, subkey)
@@ -232,6 +234,8 @@ def test_apply_update_ps1_avoids_module_cmdlets() -> None:
     assert "ExtractToFile" in text
     assert "ExtractToDirectory" not in text
     assert "Sync-ArpDisplayVersion" in text
+    assert "no Inno uninstaller" not in text
+    assert "not found or not writable" in text
 
 
 def test_apply_update_ps1_kill_helper_excludes_self() -> None:

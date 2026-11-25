@@ -217,23 +217,28 @@ function Sync-ArpDisplayVersion {
         [string]$InstallDir,
         [string]$Version
     )
-    if (-not $Version) { return }
-    $unins = Get-ChildItem -LiteralPath $InstallDir -Filter "unins*.exe" -File -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if (-not $unins) {
-        Write-ApplyLog "skip ARP sync (no Inno uninstaller in install dir)"
+    # InstallDir kept for call-site compatibility; ARP key is AppId-based.
+    if (-not $Version) {
+        Write-ApplyLog "skip ARP sync (empty version)"
         return
     }
     $subkey = "Software\Microsoft\Windows\CurrentVersion\Uninstall\{A7B3C9D1-E4F2-4A8B-9C0D-1E2F3A4B5C6D}_is1"
+    $updated = $false
     foreach ($root in @("HKCU:\", "HKLM:\")) {
         $path = "$root$subkey"
-        if (Test-Path -LiteralPath $path) {
+        try {
+            if (-not (Test-Path -LiteralPath $path)) { continue }
             Set-ItemProperty -LiteralPath $path -Name DisplayVersion -Value $Version -ErrorAction Stop
             Write-ApplyLog "updated ARP DisplayVersion to $Version ($path)"
-            return
+            $updated = $true
+            break
+        } catch {
+            Write-ApplyLog ("ARP sync failed for {0}: {1}" -f $path, $_.Exception.Message)
         }
     }
-    Write-ApplyLog "skip ARP sync (Inno uninstall registry key not found)"
+    if (-not $updated) {
+        Write-ApplyLog "skip ARP sync (Inno uninstall registry key not found or not writable)"
+    }
 }
 
 function Start-TrayIfPresent {

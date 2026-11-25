@@ -15,6 +15,7 @@ from shared.update_release import (
     STABLE_ZIP_NAME,
     UpdateSecurityError,
     build_release_artifacts,
+    extract_apply_script_from_zip,
     fetch_url_to_file,
     is_allowed_download_url,
     locate_bundle_root,
@@ -103,6 +104,32 @@ def test_safe_extract_zip_and_locate_bundle_root(tmp_path: Path) -> None:
     root = safe_extract_zip(zip_path, tmp_path / "extract")
     assert (root / "BAKLOG.exe").is_file()
     assert locate_bundle_root(tmp_path / "extract") == root
+
+
+def test_extract_apply_script_from_zip(tmp_path: Path) -> None:
+    zip_path = tmp_path / "pkg.zip"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("BAKLOG/BAKLOG.exe", b"exe")
+        archive.writestr("BAKLOG/BAKLOG Tray.exe", b"tray")
+        archive.writestr("BAKLOG/apply_update.ps1", b"# from zip\n")
+    zip_path.write_bytes(buf.getvalue())
+    dest = tmp_path / "apply_update.ps1"
+    out = extract_apply_script_from_zip(zip_path, dest, platform="win32")
+    assert out == dest
+    assert dest.read_text(encoding="utf-8") == "# from zip\n"
+
+
+def test_extract_apply_script_from_zip_missing_returns_none(tmp_path: Path) -> None:
+    zip_path = tmp_path / "pkg.zip"
+    _write_test_bundle_zip(zip_path)
+    assert extract_apply_script_from_zip(zip_path, tmp_path / "apply_update.ps1", platform="win32") is None
+
+
+def test_extract_apply_script_from_zip_bad_zip_returns_none(tmp_path: Path) -> None:
+    zip_path = tmp_path / "pkg.zip"
+    zip_path.write_bytes(b"not-a-zip")
+    assert extract_apply_script_from_zip(zip_path, tmp_path / "apply_update.ps1", platform="win32") is None
 
 
 def test_fetch_url_to_file_rejects_disallowed_url(tmp_path: Path) -> None:

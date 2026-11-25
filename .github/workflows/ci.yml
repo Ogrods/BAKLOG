@@ -13,6 +13,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.sha }}
   cancel-in-progress: false
 
+# Least privilege for GITHUB_TOKEN (CodeQL actions/missing-workflow-permissions).
+permissions:
+  contents: read
+
 jobs:
   # Ubuntu carries comprehensive coverage, split into two parallel lanes so the
   # slow subprocess/timing suite never blocks the critical path:

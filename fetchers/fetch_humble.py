@@ -257,12 +257,16 @@ def _page_on_cloudflare(page) -> bool:
 
 
 def _page_looks_signed_out(page) -> bool:
-    from auth.connect_extractors import humble_page_title_looks_login
+    from urllib.parse import urlparse
 
-    url = (_page_url_hint(page) or "").lower()
-    if "auth.humblebundle.com" in url:
+    from auth.connect_extractors import humble_page_title_looks_login
+    from auth.url_hosts import host_matches
+
+    url = _page_url_hint(page) or ""
+    if host_matches(url, "auth.humblebundle.com"):
         return True
-    if "/login" in url and "humblebundle.com" in url:
+    path = (urlparse(url).path or "").lower()
+    if host_matches(url, "humblebundle.com") and "/login" in path:
         return True
     try:
         title = page.title() if hasattr(page, "title") else ""
@@ -300,12 +304,16 @@ def _tab_is_chrome_internal(url: str) -> bool:
 
 
 def _page_is_humble_library(page) -> bool:
+    from urllib.parse import urlparse
+
     from auth.connect_extractors import humble_page_is_confirmed_library_or_store
+    from auth.url_hosts import host_matches
 
     url = _page_url_hint(page)
     if humble_page_is_confirmed_library_or_store(url):
         return True
-    return "humblebundle.com/home/library" in (url or "").lower()
+    path = (urlparse(url or "").path or "").lower()
+    return host_matches(url or "", "humblebundle.com") and path.startswith("/home/library")
 
 
 def _pick_humble_library_page(ctx):
@@ -323,15 +331,13 @@ def _pick_humble_library_page(ctx):
 
 
 def _humble_main_auth_failure(msg: str) -> bool:
+    from auth.url_hosts import host_matches
+
     low = msg.lower()
     if "expired" in low or "401" in msg or "403" in msg:
         return True
     if msg.startswith("Humble session expired"):
         return True
-    if "auth.humblebundle.com" in low:
-        return True
-    from auth.url_hosts import host_matches
-
     for token in re.findall(r"https?://[^\s'\"]+", msg):
         if host_matches(token, "auth.humblebundle.com"):
             return True

@@ -9,8 +9,6 @@ from unittest.mock import patch
 
 import pytest
 
-from fetchers._progress import EXIT_CODE_AUTH
-
 from auth.connect_extractors import (
     HUMBLE_LIBRARY_URL,
     HUMBLE_SUCCESS_URL_PATTERN,
@@ -24,11 +22,12 @@ from auth.connect_extractors import (
     humble_session_status_authenticated,
     restore_humble_session_cookies,
 )
+from fetchers._progress import EXIT_CODE_AUTH
 from fetchers.fetch_humble import (
+    _CHROME_STUCK_MSG,
     FILTER_USER_LIBRARY_ACTION,
     LIBRARY_URL,
     LibraryItem,
-    _CHROME_STUCK_MSG,
     _build_row,
     _discover_filter_user_library_action,
     _extract_filter_user_library_payload,

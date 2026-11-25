@@ -7708,8 +7708,13 @@ html[data-theme="dark"]
     transparent 100%
   );
 }
+/* Square sheen: height-driven 1:1 width (left+right stretch would ignore aspect-ratio). */
 .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-sheen {
   aspect-ratio: 1 / 1;
+  left: 50%;
+  right: auto;
+  margin-inline: 0;
+  transform: translateX(-50%);
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
   content: "";
@@ -8293,6 +8298,11 @@ html.ui-resizing
     left: auto;
     right: 14px;
     margin-inline: 0;
+  }
+  .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-sheen {
+    left: auto;
+    right: 14px;
+    transform: none;
   }
   .dash-spotlight-body {
     left: 16px;

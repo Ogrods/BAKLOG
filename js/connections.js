@@ -141,6 +141,22 @@ const _activeConnectStreams = new Map();
 const _connectFlowIds = new Map();
 let _connectFlowSeq = 0;
 
+/** Close any prior Connect stream for this provider, then register `es`. */
+export function replaceActiveConnectStream(provider, es) {
+  const prev = _activeConnectStreams.get(provider);
+  if (prev && prev !== es) {
+    try {
+      prev.onerror = null;
+      prev.close();
+    } catch {
+      /* noop */
+    }
+    _activeConnectStreams.delete(provider);
+  }
+  if (es) _activeConnectStreams.set(provider, es);
+  return prev || null;
+}
+
 let gridWired = false;
 let noteSaveTimer = null;
 
@@ -2343,7 +2359,7 @@ async function startBrowserConnect(provider) {
     return;
   }
   es = new EventSource(streamUrl);
-  _activeConnectStreams.set(provider, es);
+  replaceActiveConnectStream(provider, es);
   let connectUiFinished = false;
   let transportErrorStreak = 0;
 
@@ -2390,8 +2406,12 @@ async function startBrowserConnect(provider) {
   };
 
   es.addEventListener("waiting_for_user", (ev) => {
-    const msg = JSON.parse(ev.data);
-    setLog(msg.message || "Complete sign-in in the browser window…");
+    try {
+      const msg = JSON.parse(ev.data);
+      setLog(msg.message || "Complete sign-in in the browser window…");
+    } catch {
+      setLog("Complete sign-in in the browser window…");
+    }
   });
 
   es.addEventListener("status", (ev) => {

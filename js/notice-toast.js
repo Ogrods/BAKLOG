@@ -39,6 +39,7 @@ export function adoptNoticeToast(el, { variant = "info", role, live } = {}) {
 
 /**
  * @param {{ id: string, html: string, variant?: string, role?: string, live?: string }} opts
+ * `html` must already be escaped (or built from trusted markup only).
  * @returns {HTMLElement | null}
  */
 export function showNoticeToast({

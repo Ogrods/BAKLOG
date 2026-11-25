@@ -20,6 +20,30 @@ import {
   claimHiddenRowHtml,
   claimDetailPanelHtml,
 } from './claim-card.js';
+import { trapFocus } from './focus-trap.js';
+
+/** @type {(() => void) | null} */
+let _claimDetailRelease = null;
+/** @type {(() => void) | null} */
+let _hiddenClaimsRelease = null;
+/** @type {(() => void) | null} */
+let _claimPurgeRelease = null;
+
+function _armClaimDialogTrap(dlg, getRelease, setRelease) {
+  getRelease()?.();
+  const releaseTrap = trapFocus(dlg);
+  const onClose = () => {
+    releaseTrap();
+    setRelease(null);
+    dlg.removeEventListener('close', onClose);
+  };
+  dlg.addEventListener('close', onClose);
+  setRelease(() => {
+    dlg.removeEventListener('close', onClose);
+    releaseTrap();
+    setRelease(null);
+  });
+}
 
 // Re-export the shared pure helpers consumed elsewhere (tests, admin) so the
 // public surface of this module is unchanged after the claim-card.js split.
@@ -621,7 +645,11 @@ export function openHiddenClaimsModal() {
     </form>`;
   if (typeof dlg.showModal === 'function') {
     dlg.showModal();
-    dlg.focus();
+    _armClaimDialogTrap(
+      dlg,
+      () => _hiddenClaimsRelease,
+      (fn) => { _hiddenClaimsRelease = fn; },
+    );
   }
   syncCoverFits(dlg);
 }
@@ -648,7 +676,11 @@ export function openClaimPurgeConfirm() {
     </form>`;
   if (typeof dlg.showModal === 'function') {
     dlg.showModal();
-    dlg.focus();
+    _armClaimDialogTrap(
+      dlg,
+      () => _claimPurgeRelease,
+      (fn) => { _claimPurgeRelease = fn; },
+    );
   }
 }
 
@@ -740,8 +772,11 @@ export function openClaimDetail(id) {
   });
   if (typeof dlg.showModal === 'function') {
     dlg.showModal();
-    // showModal() autofocuses the first focusable child (the × close button).
-    dlg.focus();
+    _armClaimDialogTrap(
+      dlg,
+      () => _claimDetailRelease,
+      (fn) => { _claimDetailRelease = fn; },
+    );
   }
 }
 

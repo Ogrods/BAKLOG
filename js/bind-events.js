@@ -897,19 +897,23 @@ export function bindEvents() {
   }
   document.getElementById("checkUpdates")?.addEventListener("click", async () => {
     kebabMenu.classList.remove("open");
-    const { checkForUpdates, showUpdateToast } = await import('./update-check.js');
-    let frozen;
     try {
-      const cfg = await (await fetch('/api/config')).json();
-      frozen = cfg?.frozen === true;
-    } catch {
-      /* optional */
+      const { checkForUpdates, showUpdateToast } = await import('./update-check.js');
+      let frozen;
+      try {
+        const cfg = await (await fetch('/api/config')).json();
+        frozen = cfg?.frozen === true;
+      } catch {
+        /* optional */
+      }
+      await checkForUpdates({
+        source: 'manual',
+        frozen,
+        onNotice: (msg, opts) => showUpdateToast(msg, opts),
+      });
+    } catch (err) {
+      showKebabBanner(`Update check failed: ${err?.message || err}`, { error: true });
     }
-    await checkForUpdates({
-      source: 'manual',
-      frozen,
-      onNotice: (msg, opts) => showUpdateToast(msg, opts),
-    });
   });
   const bootUpdateRow = document.getElementById('checkUpdatesOnBootRow');
   const bootUpdateToggle = document.getElementById('checkUpdatesOnBoot');

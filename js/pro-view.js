@@ -520,12 +520,17 @@ export function wireProView() {
     if (!btn) return;
     btn.disabled = true;
     setProStatus('Checking your account…', true);
-    const plan = await refreshAccountPlan();
-    if (plan === 'pro') {
-      completeProActivation({ reloadMs: 400 });
-      return;
+    try {
+      const plan = await refreshAccountPlan();
+      if (plan === 'pro') {
+        completeProActivation({ reloadMs: 400 });
+        return;
+      }
+      setProStatus('Not Pro yet. Finish checkout with your account email, then try again.', false);
+    } catch {
+      setProStatus('Could not check your account. Try again.', false);
+    } finally {
+      if (btn.isConnected) btn.disabled = false;
     }
-    setProStatus('Not Pro yet. Finish checkout with your account email, then try again.', false);
-    btn.disabled = false;
   });
 }

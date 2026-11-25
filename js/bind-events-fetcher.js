@@ -139,10 +139,21 @@ export function bindFetcherHealthEvents() {
   });
 
   // Pro-only deep achievement/trophy sync: re-pull the store's achievement data.
-  document.addEventListener("baklog:deep-sync", async (e) => {
+  document.addEventListener("baklog:deep-sync", (e) => {
     const store = e.detail?.store;
     if (store !== "psn" && store !== "xbox") return;
-    await fetcherRunner.run(store, { refresh: true });
+    void fetcherRunner.run(store, { refresh: true }).catch((err) => {
+      console.error(`[deep-sync ${store}]`, err);
+      void import("./notice-toast.js").then(async ({ showNoticeToast }) => {
+        const { escapeHtml } = await import("./dom-util.js");
+        const detail = escapeHtml(String(err?.message || err).slice(0, 120));
+        showNoticeToast({
+          id: "deepSyncError",
+          html: `<strong>Deep sync failed</strong><span>${detail}</span>`,
+          variant: "error",
+        });
+      });
+    });
   });
 
   document.getElementById("fetcherPopoverBackdrop")?.addEventListener("click", () => {

@@ -68,7 +68,7 @@ import {
   HIDDEN_TITLE_NORMS_LIBRARY_KEY,
   HIDDEN_TITLE_NORMS_WISHLIST_KEY,
 } from './personal-storage.js';
-import { refreshAfterManualChange } from './library-load.js';
+import { libraryLoadApi } from './library-load-api.js';
 import { getCoopFilterMode } from './prefs.js';
 import { renderSummary, switchView, hideViewLoading } from './filters-ui.js';
 import { buildTableEmptyStateHtml } from './table-empty-state.js';
@@ -78,9 +78,11 @@ import { formatPrice } from './table-price-format.js';
 export { formatPrice };
 import { renderPicks, effectivePicksTab } from './picks-ui.js';
 import { scheduleDashboardRender } from './dashboard.js';
-// dashboard-drilldown imports from table-ui already; the cycle is safe because
-// both sides only invoke each other's functions inside click-time bodies.
 import { dashResetLibraryFiltersExceptDedup } from './dashboard-drilldown.js';
+
+function refreshAfterManualChange() {
+  libraryLoadApi.refreshAfterManualChange();
+}
 import {
   isTablePerfEnabled,
   perfBeginRun,

@@ -42,6 +42,7 @@ import {
   invalidateTableCache,
   visibleRowCountForActiveView,
 } from "./table-ui.js";
+import { registerLibraryLoadApi } from "./library-load-api.js";
 import {
   refreshFilterUI,
   renderGenreChips,
@@ -989,6 +990,8 @@ export function refreshAfterManualChange() {
   ];
   void applyMergedLibrary();
 }
+
+registerLibraryLoadApi({ refreshAfterManualChange });
 
 /** @internal test helper — wait for queued merges to settle. */
 export function whenLibraryMergesIdle() {

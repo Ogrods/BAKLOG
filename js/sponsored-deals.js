@@ -823,6 +823,11 @@ export const PRO_PROMO = {
       desc: 'Optional tray alerts when a wishlist game drops in price or a new free game appears. Turn it on in Connections.',
       icon: '🔔',
     },
+    {
+      title: 'Bonus palettes',
+      desc: 'Three extra color themes in the profile menu: Storybook, Sapphire, and Emerald.',
+      icon: '🎨',
+    },
   ],
   tierCompare: [
     { feature: 'Import & browse all stores', free: '✓', pro: '✓' },
@@ -834,6 +839,7 @@ export const PRO_PROMO = {
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
     { feature: 'Cloud sync', free: '-', pro: '✓ (opt-in)' },
     { feature: 'Deal/watchlist alerts', free: '-', pro: '✓ (opt-in)' },
+    { feature: 'Bonus palettes', free: 'Six free themes', pro: 'Storybook, Sapphire, Emerald' },
   ],
   trustPoints: [
     'Local-first - your library stays on your machine',

@@ -5,12 +5,19 @@
 
 import { COLOR_THEME_KEY } from './state.js';
 import { BAKLOG_THEME_CHANGE } from './custom-events.js';
+import { proFeaturesUnlocked } from './auth-gate.js';
 
 export { COLOR_THEME_KEY };
 
 export const THEME_CHANGE_EVENT = BAKLOG_THEME_CHANGE;
 
-export const THEMES = ['default', 'dark', 'log-jammin', 'ember', 'synthwave', 'terminal'];
+/** Free profile-menu themes (always selectable). */
+export const FREE_THEMES = ['default', 'dark', 'log-jammin', 'ember', 'synthwave', 'terminal'];
+
+/** Pro-gated bonus palettes. */
+export const PRO_THEMES = ['storybook', 'sapphire', 'emerald'];
+
+export const THEMES = [...FREE_THEMES, ...PRO_THEMES];
 
 /** @deprecated renamed to log-jammin */
 const LEGACY_THEME_ALIASES = { timber: 'log-jammin' };
@@ -22,6 +29,9 @@ export const THEME_LABELS = {
   ember: 'Ember',
   synthwave: 'Synthwave',
   terminal: 'Terminal',
+  storybook: 'Storybook',
+  sapphire: 'Sapphire',
+  emerald: 'Emerald',
 };
 
 /** Swatch preview colors — mirror html[data-theme] tokens in app.css; update both if themes change.
@@ -33,7 +43,14 @@ export const THEME_SWATCHES = {
   ember: { bg: '#0f0d0b', accent: '#f97316', accent2: '#fbbf24' },
   synthwave: { bg: '#14101f', accent: '#ff2e88', accent2: '#a855f7' },
   terminal: { bg: '#0c1413', accent: '#34e6b0', accent2: '#22d3ee' },
+  storybook: { bg: '#3d2613', accent: '#7ec96a', accent2: '#e0ba8c' },
+  sapphire: { bg: '#0a1030', accent: '#5b8cff', accent2: '#818cf8' },
+  emerald: { bg: '#04160f', accent: '#34d399', accent2: '#d9b44a' },
 };
+
+export function isProTheme(id) {
+  return PRO_THEMES.includes(id);
+}
 
 function resolveThemeId(stored) {
   if (THEMES.includes(stored)) return stored;
@@ -51,7 +68,8 @@ function themeStorageKey() {
   }
 }
 
-export function getColorTheme() {
+/** Raw stored id (after alias resolve). Does not apply Pro entitlement clamp. */
+export function getStoredColorTheme() {
   try {
     const v = localStorage.getItem(themeStorageKey());
     return resolveThemeId(v);
@@ -60,8 +78,22 @@ export function getColorTheme() {
   }
 }
 
+function effectiveTheme(stored) {
+  if (isProTheme(stored) && !proFeaturesUnlocked()) return 'default';
+  return stored;
+}
+
+export function getColorTheme() {
+  return effectiveTheme(getStoredColorTheme());
+}
+
+/**
+ * Persist and apply a theme. Pro themes require entitlement; returns false if blocked.
+ * @returns {boolean}
+ */
 export function setColorTheme(theme) {
   const t = resolveThemeId(theme);
+  if (isProTheme(t) && !proFeaturesUnlocked()) return false;
   const prev = document.documentElement.getAttribute('data-theme');
   try {
     localStorage.setItem(themeStorageKey(), t);
@@ -72,9 +104,16 @@ export function setColorTheme(theme) {
   if (t !== prev && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: t } }));
   }
+  return true;
 }
 
-/** Sync <html> from storage (module load after head IIFE). */
+/** Sync <html> from storage (module load after head IIFE). Clamps Pro themes when locked without wiping storage. */
 export function applyColorThemeFromStorage() {
-  setColorTheme(getColorTheme());
+  const stored = getStoredColorTheme();
+  const next = effectiveTheme(stored);
+  const prev = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', next);
+  if (next !== prev && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { theme: next } }));
+  }
 }

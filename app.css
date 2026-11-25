@@ -611,6 +611,69 @@ html[data-theme="terminal"] {
   --overlay-scrim-soft: rgba(12, 20, 19, 0.78);
 }
 
+/* Pro bonus palettes — Storybook / Sapphire / Emerald (gated in theme picker). */
+html[data-theme="storybook"] {
+  --bg: #3d2613;
+  --bg-panel: #4c3019;
+  --bg-elev: #5d3c20;
+  --bg-hover: #6e4a28;
+  --border: #6e4a28;
+  --border-subtle: #5d3c20;
+  --text: #f8efe0;
+  --text-bright: #fff8ee;
+  --text-dim: #e0ba8c;
+  --text-mute: #d2bb9b;
+  --accent: #7ec96a;
+  --accent-bright: #38bdf8;
+  --accent-dim: #5a9a4a;
+  --accent-subtle: rgba(126, 201, 106, 0.14);
+  --accent-border: rgba(126, 201, 106, 0.45);
+  --accent-muted: #a3e089;
+  --overlay-scrim-soft: rgba(61, 38, 19, 0.82);
+}
+
+html[data-theme="sapphire"] {
+  --bg: #0a1030;
+  --bg-panel: #121a44;
+  --bg-elev: #1b2560;
+  --bg-hover: #243070;
+  --border: #2a356f;
+  --border-subtle: #1b2560;
+  --text: #e6ebff;
+  --text-bright: #f5f7ff;
+  --text-dim: #c7d0f5;
+  --text-mute: #97a3d6;
+  --accent: #5b8cff;
+  --accent-bright: #818cf8;
+  --accent-dim: #3b6ae0;
+  --accent-subtle: rgba(91, 140, 255, 0.14);
+  --accent-border: rgba(91, 140, 255, 0.45);
+  --accent-muted: #a5b4fc;
+  --overlay-scrim-soft: rgba(10, 16, 48, 0.82);
+  --brand-grad: linear-gradient(135deg, #38bdf8 0%, #6366f1 55%, #4338ca 100%);
+}
+
+html[data-theme="emerald"] {
+  --bg: #04160f;
+  --bg-panel: #0a2218;
+  --bg-elev: #103022;
+  --bg-hover: #163c2c;
+  --border: #1c4534;
+  --border-subtle: #103022;
+  --text: #d9f5e6;
+  --text-bright: #ecfdf5;
+  --text-dim: #a7f3d0;
+  --text-mute: #7fae97;
+  --accent: #34d399;
+  --accent-bright: #d9b44a;
+  --accent-dim: #059669;
+  --accent-subtle: rgba(52, 211, 153, 0.14);
+  --accent-border: rgba(52, 211, 153, 0.45);
+  --accent-muted: #6ee7b7;
+  --overlay-scrim-soft: rgba(4, 22, 15, 0.82);
+  --brand-grad: linear-gradient(135deg, #6ee7b7 0%, #34d399 55%, #059669 100%);
+}
+
 html[data-theme] body {
   background: var(--bg);
   color: var(--text);
@@ -4527,12 +4590,17 @@ html[data-theme="default"] .app-header-brand h1 {
 html[data-theme="dark"] .app-header-brand h1 {
   color: #fff;
 }
-html[data-theme="ember"] .app-header-brand h1 {
+html[data-theme="ember"] .app-header-brand h1,
+html[data-theme="sapphire"] .app-header-brand h1,
+html[data-theme="emerald"] .app-header-brand h1 {
   background: var(--brand-grad);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+}
+html[data-theme="storybook"] .brand-logo-mark {
+  color: #38bdf8;
 }
 /* Header logo mark — inline SVG with transparent knob cutouts (same mask
    technique as web/index.html hero mark). CSS mask-image on the old white
@@ -12292,6 +12360,17 @@ html[data-init-view="wishlist"] .steal-list-footer-passive {
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.theme-swatch.is-locked {
+  opacity: 0.55;
+}
+.profile-menu-theme-group {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mute);
 }
 .profile-menu-option-active {
   color: var(--accent-muted);

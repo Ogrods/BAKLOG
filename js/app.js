@@ -261,6 +261,13 @@ async function bootstrap() {
   onPlanChange(() => {
     applyProTabVisibility();
     void refreshAdsForPlanChange();
+    void import("./theme.js").then((m) => m.applyColorThemeFromStorage());
+    void import("./profiles.js").then((m) => {
+      // Re-render locked/unlocked swatches when plan flips.
+      if (typeof m.renderThemeListForPlanChange === "function") {
+        m.renderThemeListForPlanChange();
+      }
+    });
   });
   applyProTabVisibility();
   showProWelcomeBanner();

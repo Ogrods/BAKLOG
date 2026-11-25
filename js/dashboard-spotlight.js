@@ -1600,6 +1600,7 @@ function wireSpotlightControls(wrap) {
 function applySpotlightSlide(el, next) {
   el.classList.remove(
     "has-portrait-art",
+    "has-square-art",
     "has-art-placeholder",
     "is-lowres-art",
     "has-logo-art",

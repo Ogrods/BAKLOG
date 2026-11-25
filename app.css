@@ -7306,10 +7306,21 @@ html[data-theme="dark"]
   display: block;
   transition: opacity var(--spotlight-fade) ease;
 }
+/* Low-res: wide cover card with vertical breathing room (not a failed full hero).
+   Use explicit height (not top+bottom) so the img height attr cannot stretch the box. */
 .dash-spotlight.is-lowres-art .dash-spotlight-art {
+  inset: auto;
+  top: 16%;
+  bottom: auto;
+  left: auto;
+  right: 14px;
+  width: auto;
+  height: 68%;
+  max-width: min(92%, 720px);
   object-fit: contain;
-  object-position: 100% 40%;
-  transform-origin: 0% 40%;
+  object-position: center;
+  transform-origin: center center;
+  border-radius: 4px;
   /* Hard edges: low-res contained art keeps crisp boundaries (no edge fade). */
   -webkit-mask-image: none;
   mask-image: none;
@@ -7510,7 +7521,8 @@ html[data-theme="dark"]
 }
 /* Portrait capsule: real 2:3 poster card (not full-bleed hero). Center with
    left/right + margin so float keyframes can own `transform`. Show the whole
-   cover (contain); clear the landscape left-fade so titles are not clipped. */
+   cover (contain); clear the landscape left-fade so titles are not clipped.
+   No overflow:hidden on the art - that self-clips edge titles under rotateY. */
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   inset: auto;
   top: 10px;
@@ -7527,8 +7539,6 @@ html[data-theme="dark"]
   box-sizing: border-box;
   padding: 0;
   border-radius: 4px;
-  /* Clip float wobble inside the poster so edge titles stay visible. */
-  overflow: hidden;
   filter: brightness(1.32);
   -webkit-mask-image: none;
   mask-image: none;
@@ -7536,6 +7546,11 @@ html[data-theme="dark"]
     opacity var(--spotlight-fade) ease,
     transform 0.35s ease,
     filter 0.35s ease;
+}
+/* Near-square covers share the capsule path but use a 1:1 poster so they fill
+   nearly the full spotlight height. */
+.dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-art {
+  aspect-ratio: 1 / 1;
 }
 @keyframes spotlightSheen1 {
   0%,
@@ -7609,7 +7624,7 @@ html[data-theme="dark"]
     opacity: 0;
   }
 }
-/* Milder rotateY so edge-to-edge capsule titles stay inside the poster clip. */
+/* Mild rotateY; art has no overflow:hidden so edge titles are not self-clipped. */
 @keyframes spotlightFloat1 {
   0%,
   100% {
@@ -7692,6 +7707,9 @@ html[data-theme="dark"]
     #000 86%,
     transparent 100%
   );
+}
+.dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-sheen {
+  aspect-ratio: 1 / 1;
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
   content: "";
@@ -8256,7 +8274,12 @@ html.ui-resizing
     object-position: 66% 40%;
   }
   .dash-spotlight.is-lowres-art .dash-spotlight-art {
-    object-position: 66% 40%;
+    top: 12%;
+    bottom: auto;
+    right: 14px;
+    height: 76%;
+    max-width: min(88%, 560px);
+    object-position: center;
   }
   /* Portrait poster: tuck to the right (same visual park as before) without
      translateX so float keyframes keep sole ownership of transform. */

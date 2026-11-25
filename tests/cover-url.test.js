@@ -85,9 +85,21 @@ describe("spotlight art (A+B)", () => {
     })).toBe("413150");
   });
 
-  it("spotlightCropForAspect picks cover vs portrait contain", () => {
-    expect(spotlightCropForAspect(2.5)).toEqual({ fit: "cover", pos: "58% 40%", portrait: false });
-    expect(spotlightCropForAspect(1.6)).toEqual({ fit: "cover", pos: "35% center", portrait: false });
-    expect(spotlightCropForAspect(0.67)).toEqual({ fit: "contain", pos: "center", portrait: true });
+  it("spotlightCropForAspect picks cover vs portrait/square contain", () => {
+    expect(spotlightCropForAspect(2.5)).toEqual({
+      fit: "cover", pos: "58% 40%", portrait: false, square: false,
+    });
+    expect(spotlightCropForAspect(1.6)).toEqual({
+      fit: "cover", pos: "35% center", portrait: false, square: false,
+    });
+    expect(spotlightCropForAspect(1.3)).toEqual({
+      fit: "cover", pos: "35% center", portrait: false, square: false,
+    });
+    expect(spotlightCropForAspect(1.0)).toEqual({
+      fit: "contain", pos: "center", portrait: true, square: true,
+    });
+    expect(spotlightCropForAspect(0.67)).toEqual({
+      fit: "contain", pos: "center", portrait: true, square: false,
+    });
   });
 });

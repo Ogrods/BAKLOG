@@ -124,10 +124,9 @@ function assignPortraitAnimClass(spot) {
 const LOWRES_FACTOR = 0.7;
 /* Match app.css stacked-spotlight ladder (max-width: 1023.98px). Inline
    object-position from this helper beats stylesheet rules, so stacked cover
-   offset must be stamped here (portrait defaults to center; low-res to 100%). */
+   offset must be stamped here (portrait/low-res stay center; CSS parks the card). */
 const SPOTLIGHT_STACK_MQ = "(max-width: 1023.98px)";
 const SPOTLIGHT_STACK_ART_POS = "66% 40%";
-const SPOTLIGHT_LOWRES_DESKTOP_POS = "100% 40%";
 
 function spotlightStackedArtPos() {
   try {
@@ -175,20 +174,21 @@ window.applySpotlightArtFit = function (img) {
 
   if (crop.portrait && bg) {
     img.style.objectFit = crop.fit;
-    // Poster card is sized in CSS (aspect-ratio 2/3); keep focal center. Stacked
-    // park is also CSS (right tuck) - do not stamp landscape 66% object-position.
+    // Poster card is sized in CSS (2:3 or 1:1 for square); keep focal center.
+    // Stacked park is also CSS (right tuck) - do not stamp landscape 66%.
     img.style.objectPosition = "center";
     img.style.setProperty("mask-image", "none");
     img.style.setProperty("-webkit-mask-image", "none");
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
+    spot.classList.toggle("has-square-art", !!crop.square);
     spot.classList.remove("is-lowres-art");
     assignPortraitAnimClass(spot);
     bg.classList.add("is-loaded");
-    // Sheen shares the CSS 2:3 poster box; clear any prior inline width.
+    // Sheen shares the CSS poster box; clear any prior inline width.
     if (sheen) sheen.style.width = "";
   } else {
-    spot.classList.remove("has-portrait-art");
+    spot.classList.remove("has-portrait-art", "has-square-art");
     clearPortraitAnimClasses(spot);
     if (sheen) sheen.style.width = "";
     img.style.removeProperty("mask-image");
@@ -200,9 +200,8 @@ window.applySpotlightArtFit = function (img) {
 
     if (lowRes && bg) {
       img.style.objectFit = "contain";
-      // Contained low-res art is pillarboxed; desktop pins right edge, stacked
-      // parks ~2/3 across (inline wins over the stylesheet rule).
-      img.style.objectPosition = stackPos || SPOTLIGHT_LOWRES_DESKTOP_POS;
+      // Wide cover card is parked in CSS (right tuck / stacked inset); keep focal center.
+      img.style.objectPosition = "center";
       if (src && bg.src !== src) bg.src = src;
       spot.classList.add("is-lowres-art");
       bg.classList.add("is-loaded");
@@ -218,7 +217,7 @@ window.spotlightArtFallback = function (img) {
   const list = (img.dataset.spotlightCandidates || "").split("|").filter(Boolean);
   let idx = parseInt(img.dataset.spotlightIdx || "0", 10) + 1;
   const spot = img.closest(".dash-spotlight");
-  spot?.classList.remove("has-portrait-art", "is-lowres-art");
+  spot?.classList.remove("has-portrait-art", "has-square-art", "is-lowres-art");
   clearPortraitAnimClasses(spot);
   while (idx < list.length) {
     if (img.src !== list[idx]) {

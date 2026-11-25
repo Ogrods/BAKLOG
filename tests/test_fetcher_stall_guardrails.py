@@ -19,9 +19,19 @@ FETCHER_ENTRIES = [
     if e.get("key") not in _STALL_GUARD_EXEMPT and e["script"].startswith("fetchers/fetch_")
 ]
 
+ENRICHER_ENTRIES = [
+    e for e in MANIFEST["fetchers"] if e["script"].startswith("enrichers/")
+]
+
 
 @pytest.mark.parametrize("entry", FETCHER_ENTRIES, ids=[e["key"] for e in FETCHER_ENTRIES])
 def test_fetcher_configures_line_buffered_stdout(entry: dict) -> None:
+    text = (ROOT / entry["script"]).read_text(encoding="utf-8")
+    assert "configure_stdout()" in text, f"{entry['script']} must call configure_stdout() in main"
+
+
+@pytest.mark.parametrize("entry", ENRICHER_ENTRIES, ids=[e["key"] for e in ENRICHER_ENTRIES])
+def test_enricher_configures_line_buffered_stdout(entry: dict) -> None:
     text = (ROOT / entry["script"]).read_text(encoding="utf-8")
     assert "configure_stdout()" in text, f"{entry['script']} must call configure_stdout() in main"
 

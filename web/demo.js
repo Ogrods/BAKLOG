@@ -820,10 +820,9 @@
   }
 
   function initCharts() {
-    if (typeof Chart !== "undefined") {
-      Chart.defaults.color = "#94a3b8";
-      Chart.defaults.borderColor = "#334155";
-    }
+    if (typeof Chart === "undefined") return;
+    Chart.defaults.color = "#94a3b8";
+    Chart.defaults.borderColor = "#334155";
     for (const chart of donutCharts) {
       try { chart.destroy(); } catch (_) { /* already disposed */ }
     }
@@ -832,6 +831,39 @@
     makeDonut("chartStatusDonut", STATUS_DONUT);
     makeDonut("chartReviewDonut", REVIEW_DONUT);
     syncDonutChartSizes(false);
+  }
+
+  /** Load self-hosted Chart.js only when the demo is near the viewport (TBT). */
+  let chartLoadPromise = null;
+  function loadChartJs() {
+    if (typeof Chart !== "undefined") return Promise.resolve();
+    if (chartLoadPromise) return chartLoadPromise;
+    chartLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-baklog-chart]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", () => reject(new Error("chart load failed")));
+        return;
+      }
+      const s = document.createElement("script");
+      s.src = "vendor/chart.umd.min.js";
+      s.async = true;
+      s.dataset.baklogChart = "1";
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("chart load failed"));
+      document.head.appendChild(s);
+    });
+    return chartLoadPromise;
+  }
+
+  function ensureCharts() {
+    return loadChartJs()
+      .then(() => {
+        initCharts();
+      })
+      .catch(() => {
+        /* Donuts stay empty; demo still works without charts. */
+      });
   }
 
   // --- Init ---
@@ -894,7 +926,6 @@
     wireSpotlightNav();
     resetSpotlightTimer();
     startInsightRotation();
-    requestAnimationFrame(() => initCharts());
 
     const heroCount = document.getElementById("dashHeroCount");
     if (heroCount) {
@@ -913,12 +944,29 @@
     }
 
     const demoSection = document.getElementById("demo");
+    const bootDemo = () => {
+      ensureCharts();
+      runCountDemo();
+      wireMarqueeSpeed(mount);
+    };
+
     if (demoSection && "IntersectionObserver" in window) {
+      /* Prefetch Chart.js ~1 viewport early so donuts paint with the count-up. */
+      const prefetchObs = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            loadChartJs().catch(() => {});
+            prefetchObs.disconnect();
+          }
+        },
+        { rootMargin: "100% 0px", threshold: 0 }
+      );
+      prefetchObs.observe(demoSection);
+
       const obs = new IntersectionObserver(
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) {
-            runCountDemo();
-            wireMarqueeSpeed(mount);
+            bootDemo();
             obs.disconnect();
           }
         },
@@ -926,7 +974,7 @@
       );
       obs.observe(demoSection);
     } else {
-      runCountDemo();
+      bootDemo();
     }
   }
 

@@ -251,9 +251,39 @@ async function api(method, path, body) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.error || res.statusText || 'Request failed';
-    throw new Error(msg);
+    const err = new Error(msg);
+    if (data?.code) err.code = data.code;
+    if (res.status) err.status = res.status;
+    throw err;
   }
   return data;
+}
+
+/** True when profile switch failed because a refresh lane is still draining. */
+export function isRunsStoppingError(err) {
+  if (!err) return false;
+  if (err.code === 'runs_stopping') return true;
+  return /still stopping/i.test(String(err.message || ''));
+}
+
+const SWITCH_STOPPING_RETRY_MS = 1500;
+
+/**
+ * POST /api/profiles/active with one delayed retry on runs_stopping (409).
+ * @param {(body: object) => Promise<unknown>} postActive
+ * @param {object} body
+ * @param {{ delayMs?: number, sleep?: (ms: number) => Promise<void> }} [opts]
+ */
+export async function postActiveProfileWithStoppingRetry(postActive, body, opts = {}) {
+  const delayMs = opts.delayMs ?? SWITCH_STOPPING_RETRY_MS;
+  const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  try {
+    return await postActive(body);
+  } catch (err) {
+    if (!isRunsStoppingError(err)) throw err;
+    await sleep(delayMs);
+    return await postActive(body);
+  }
 }
 
 export async function fetchProfilesStatus() {
@@ -421,7 +451,10 @@ async function switchProfile(id, pin) {
   try {
     const body = { id };
     if (pin) body.pin = pin;
-    await api('POST', '/api/profiles/active', body);
+    await postActiveProfileWithStoppingRetry(
+      (payload) => api('POST', '/api/profiles/active', payload),
+      body,
+    );
   } catch (err) {
     personalStore.abortProfileSwitchSaveBlock();
     throw err;

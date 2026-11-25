@@ -56,6 +56,8 @@ import {
   parseStallLogLine,
   updateStallNotice,
 } from './stall-notice.js';
+import { parseProgressSummary } from '../progress-summary.js';
+import { createLiveProgressController } from './live-progress.js';
 
 export const fetcherRunner = (() => {
   let apiAvailable = null;
@@ -796,7 +798,9 @@ export const fetcherRunner = (() => {
     }
     const body = logPanelApi.logBody();
     if (body) body.innerHTML = '';
-    updateStallNotice(logPanel(), null);
+    clearServerStallFlag();
+    clearSoftStallWatch();
+    clearSoftStallNotice();
     followTail = true;
     clearFollowTailIdleTimer();
     logPanelApi.updateJumpButton();
@@ -861,6 +865,23 @@ export const fetcherRunner = (() => {
     updateJumpButton,
   } = logPanelApi;
 
+  const liveProgress = createLiveProgressController({
+    logPanel,
+    setStatus,
+    getLiveRunId: () => liveRunId,
+    resolveChipKey: (key) => key || sourcesByRunId.get(liveRunId)?.key,
+  });
+  const {
+    applyProgressSummary,
+    endLiveProgressTracking,
+    clearSoftStallWatch,
+    clearSoftStallNotice,
+    scheduleSoftStallWatch,
+    noteServerStall,
+    clearServerStallFlag,
+    getLastProgressSummary,
+  } = liveProgress;
+
   function flushLines() {
     flushHandle = 0;
     if (!pendingLines.length) return;
@@ -908,7 +929,13 @@ export const fetcherRunner = (() => {
     lastLineText = text;
     lastLineKind = kind;
     const stall = parseStallLogLine(text);
-    if (stall) updateStallNotice(logPanel(), stall);
+    if (stall) {
+      noteServerStall();
+      updateStallNotice(logPanel(), stall);
+    } else {
+      const summary = parseProgressSummary(text);
+      if (summary) applyProgressSummary(summary);
+    }
     if (!isFetcherRowExpanded()) updateFetcherBar();
     setGlobalFetcherTail(text, kind);
     pendingLines.push({ text, kind });
@@ -1256,7 +1283,11 @@ export const fetcherRunner = (() => {
         if (data.status === 'running' || data.status === 'launching') {
           markChipState(key, 'running', runId);
           liveRunId = runId;
-          if (liveRunId === runId) syncLogPanelChrome(src, data.status);
+          clearServerStallFlag();
+          scheduleSoftStallWatch();
+          if (liveRunId === runId) {
+            syncLogPanelChrome(src, data.status, getLastProgressSummary() || undefined);
+          }
           if (reconnect) {
             if (!quiet) {
               const stateWord = data.status === 'launching' ? 'launching' : 'running';
@@ -1341,6 +1372,7 @@ export const fetcherRunner = (() => {
         sourcesByRunId.delete(runId);
         if (liveRunId === runId) {
           liveRunId = null;
+          endLiveProgressTracking();
           updateCancelButton();
         }
         revertFetcherLayoutIfIdle();

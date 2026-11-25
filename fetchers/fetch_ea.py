@@ -48,7 +48,14 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from fetchers._progress import (
+    EXIT_CODE_AUTH,
+    HeartbeatTimer,
+    RunStats,
+    phase,
+    run_with_heartbeat,
+    started,
+)
 from shared.raw_dumps import profile_raw_dump_path
 
 GAMES_EA_JSON = Path("games_ea.json")
@@ -502,9 +509,11 @@ def main() -> int:
     def _sort_key(row: dict) -> str:
         return _clean_name(str((row.get("product") or {}).get("name") or ""))
 
+    phase(f"EA library ({len(deduped)} titles)")
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(sorted(deduped, key=_sort_key), 1):
         name = _clean_name(str((item.get("product") or {}).get("name") or ""))
-        print(f"[{i}/{len(deduped)}] {name}", flush=True)
+        loop_hb.tick_progress(i, len(deduped), "EA library", name[:40])
         cached = existing.get(_row_id(item))
         if args.only_new and cached:
             games_out.append(cached)

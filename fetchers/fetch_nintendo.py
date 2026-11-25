@@ -43,7 +43,14 @@ from fetchers._base import (
     row_key_by_id,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from fetchers._progress import (
+    EXIT_CODE_AUTH,
+    HeartbeatTimer,
+    RunStats,
+    phase,
+    run_with_heartbeat,
+    started,
+)
 from fetchers.nintendo_hybrid import (
     finalize_nintendo_library_rows,
     find_existing_row,
@@ -653,7 +660,7 @@ def main() -> int:
             stats.error(str(e))
             return stats.finish("fetch_nintendo", t0, exit_code=EXIT_CODE_AUTH)
         except NintendoVgcCaptureError as e:
-            print(f"  VGC warning: {e} — continuing with transactions only.", flush=True)
+            print(f"  VGC warning: {e} - continuing with transactions only.", flush=True)
 
     merged = (
         merge_vgc_with_transactions(vgc_rows, merged_tx)
@@ -696,6 +703,8 @@ def main() -> int:
         existing
     )
     games_out: list[dict] = []
+    phase(f"Nintendo library ({len(merged)} titles)")
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, item in enumerate(merged, 1):
         cached = find_existing_row(
             item,
@@ -707,7 +716,7 @@ def main() -> int:
         if args.only_new and cached:
             games_out.append(cached)
             continue
-        print(f"[{i}/{len(merged)}] {item['name']}")
+        loop_hb.tick_progress(i, len(merged), "Nintendo library", str(item["name"])[:40])
         hltb = None
         hltb_updated = False
         if not args.skip_hltb:

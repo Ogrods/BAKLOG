@@ -32,7 +32,14 @@ from fetchers._base import (
     refuse_empty_result,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from fetchers._progress import (
+    EXIT_CODE_AUTH,
+    HeartbeatTimer,
+    RunStats,
+    phase,
+    run_with_heartbeat,
+    started,
+)
 from shared.money import format_price
 
 GAMES_WISHLIST_GOG_JSON = Path("games_wishlist_gog.json")
@@ -274,12 +281,14 @@ def main() -> int:
     existing = load_existing_games(GAMES_WISHLIST_GOG_JSON)
 
     rows: list[dict] = []
+    phase(f"GOG wishlist ({len(ids)} products)")
+    loop_hb = HeartbeatTimer(interval=25.0)
     for i, gog_id in enumerate(ids, 1):
         cached = existing.get(str(gog_id))
         if args.only_new and cached:
             rows.append(cached)
             continue
-        print(f"[{i}/{len(ids)}] product {gog_id}", flush=True)
+        loop_hb.tick_progress(i, len(ids), "GOG wishlist", f"product {gog_id}")
         product = _fetch_product(session, gog_id, args.country)
         time.sleep(GOG_PRODUCT_DELAY_SEC)
         price_doc = _fetch_price(session, gog_id, args.country)

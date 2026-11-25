@@ -32,7 +32,13 @@ from fetchers._base import (
     refuse_empty_result,
     write_catalog_text,
 )
-from fetchers._progress import EXIT_CODE_AUTH, RunStats, run_with_heartbeat, started
+from fetchers._progress import (
+    EXIT_CODE_AUTH,
+    HeartbeatTimer,
+    RunStats,
+    run_with_heartbeat,
+    started,
+)
 from shared.library_noise import catalog_game_count, maybe_tag_library_noise_row
 
 GAMES_GOG_JSON = Path("games_gog.json")
@@ -679,14 +685,25 @@ def main() -> int:
                     except Exception:  # noqa: BLE001
                         return pid, None
 
+                detail_hb = HeartbeatTimer(interval=25.0)
+                detail_total = len(detail_ids)
                 with concurrent.futures.ThreadPoolExecutor(
                     max_workers=GOG_WEB_DETAIL_WORKERS
                 ) as ex:
                     futures = [ex.submit(_fetch_detail, pid) for pid in detail_ids]
+                    done_n = 0
                     for fut in concurrent.futures.as_completed(futures):
                         pid, det = fut.result()
                         details_by_id[pid] = det
+                        done_n += 1
+                        detail_hb.tick_progress(
+                            done_n,
+                            detail_total,
+                            "GOG details",
+                            f"{done_n} of {detail_total}",
+                        )
 
+        loop_hb = HeartbeatTimer(interval=25.0)
         for i, product in enumerate(products, 1):
             gog_id = int(product.get("id") or product.get("productId") or 0)
             name = product.get("title") or product.get("name") or str(gog_id)
@@ -697,7 +714,7 @@ def main() -> int:
                     current_rows.append(row)
                 continue
 
-            print(f"[{i}/{len(products)}] {name} ({gog_id})", flush=True)
+            loop_hb.tick_progress(i, len(products), "GOG library", f"{name[:40]} ({gog_id})")
 
             cached_row = existing.get(gog_id)
 

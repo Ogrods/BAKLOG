@@ -1,11 +1,21 @@
 """Shared progress / timing helpers for fetch and enrich scripts.
 
 Exit code contract (used across fetchers and enrichers):
-  0 — success
-  1 — runtime/config error
-  2 — refused to write (empty library result)
-  3 — refused to write (suspicious drift vs prior file)
-  4 — auth failure (expired/invalid credential)
+  0 - success
+  1 - runtime/config error
+  2 - refused to write (empty library result)
+  3 - refused to write (suspicious drift vs prior file)
+  4 - auth failure (expired/invalid credential)
+
+Base communication contract (user-facing stdout via SSE):
+  Pattern A - Countable loop: ``tick_progress(i, total, phase, detail)`` before
+    each slow unit of work (default interval 25s).
+  Pattern B - Concurrent batch: tick after each completed future with done/total.
+  Pattern C - Blocking phase (no total): ``run_with_heartbeat(fn, phase, interval=25)``.
+  Pattern D - Fast path (<~10s): ``phase`` start/end only; no timer required.
+
+Shared line format: ``[i/total] (NN%) phase: detail`` via ``progress_line``.
+No em dashes (U+2014) in progress strings - use spaced hyphens.
 """
 
 from __future__ import annotations
@@ -60,12 +70,26 @@ def progress_line(done: int, total: int, phase: str, detail: str = "") -> str:
     return " ".join(bits)
 
 
+def elapsed_progress_line(
+    phase: str,
+    elapsed_sec: int,
+    *,
+    done: int = 0,
+    total: int = 0,
+) -> str:
+    """Elapsed heartbeat with optional last-known counters (never bare 'working')."""
+    tail = f"{phase} - still running ({elapsed_sec}s)"
+    if total > 0 and done >= 0:
+        return f"{progress_line(done, total, phase)} - still running ({elapsed_sec}s)"
+    return tail
+
+
 class HeartbeatTimer:
     """Emit a heartbeat only after `interval` seconds of wall-clock silence.
 
-    The dev server force-kills a fetcher after 180s with no stdout (stall
+    The server force-kills a fetcher after 180s with no stdout (stall
     watchdog). Count-based heartbeats (every N items) are unsafe when each item
-    is a slow network call — N slow lookups can exceed 180s before the count
+    is a slow network call - N slow lookups can exceed 180s before the count
     threshold prints anything. Call `tick(msg)` every loop iteration (ideally
     *before* each slow call); it prints at most once per `interval`, guaranteeing
     silence never approaches the watchdog as long as the loop keeps turning.
@@ -108,8 +132,29 @@ class HeartbeatTimer:
         now = time.monotonic()
         if now - self._last >= self.interval:
             elapsed = int(now - self._started)
-            heartbeat(f"{phase} — still working ({elapsed}s)")
+            heartbeat(
+                elapsed_progress_line(
+                    phase,
+                    elapsed,
+                    done=self._done,
+                    total=self._total,
+                )
+            )
             self._last = now
+
+    def tick_progress_or_elapsed(
+        self,
+        done: int,
+        total: int,
+        phase: str,
+        detail: str = "",
+    ) -> None:
+        """Prefer countable progress; fall back to elapsed when total is unknown."""
+        if total and total > 0:
+            self.tick_progress(done, total, phase, detail)
+            return
+        self.set_progress(done, 0, phase)
+        self.tick_elapsed(phase)
 
 
 def run_with_heartbeat(
@@ -153,9 +198,9 @@ def done(
 ) -> int:
     """Print a run footer and return *exit_code* for ``return done(...)``."""
     elapsed = time.monotonic() - t0
-    tail = f" — {extra}" if extra else ""
+    tail = f" - {extra}" if extra else ""
     print(
-        f"=== {label} done in {elapsed:.1f}s — "
+        f"=== {label} done in {elapsed:.1f}s - "
         f"{ok} ok, {warnings} warnings, {errors} errors (exit {exit_code}){tail} ===",
         flush=True,
     )

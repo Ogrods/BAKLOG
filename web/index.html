@@ -462,7 +462,7 @@
       }
       .features-grid > .card,
       .steps > .step,
-      .proof-strip > a {
+      .how-proof a {
         animation: rise-view linear both;
         animation-timeline: view();
         animation-range: entry 0% entry 35%;
@@ -852,31 +852,32 @@
       .magic-stage .magic-count { font-size: clamp(2rem, 10vw, 2.8rem); }
     }
 
-    /* Post-scrub beat: one Decide line, then unique proof shots only */
-    .how-decide {
-      max-width: 42rem;
-      margin: 0 auto 2.5rem;
+    /* Post-scrub beat: one centered wishlist proof + CTA */
+    .how-after {
       text-align: center;
-      font-size: 1.08rem;
+      margin: 2.75rem auto 0;
+      max-width: min(100%, 56rem);
+    }
+    .how-after .eyebrow { display: block; }
+    .how-after h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.7rem, 4vw, 2.4rem);
+      margin: 0.55rem auto 0;
+      max-width: 18ch;
+      color: #fff;
+    }
+    .how-after > p {
+      margin: 0.85rem auto 0;
+      max-width: 46ch;
       color: var(--text-mute);
+      font-size: 1.05rem;
       text-wrap: pretty;
     }
-    .how-decide strong { color: var(--text-bright); font-weight: 600; }
-
-    /* Real product proof strip (non-scrub surfaces only) */
-    .proof-strip {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0.85rem;
-      margin-top: 0.5rem;
-      max-width: 36rem;
-      margin-left: auto;
-      margin-right: auto;
+    .how-proof {
+      margin: 1.75rem auto 0;
+      max-width: min(100%, 56rem);
     }
-    @media (min-width: 700px) {
-      .proof-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 48rem; }
-    }
-    .proof-strip a {
+    .how-proof a {
       display: block;
       border-radius: 12px;
       overflow: hidden;
@@ -884,31 +885,87 @@
       background: var(--bg-panel);
       aspect-ratio: 16 / 10;
       transition: transform 0.18s ease, border-color 0.18s ease;
+      cursor: zoom-in;
     }
-    .proof-strip a:hover {
-      transform: scale(1.03);
+    .how-proof a:hover {
+      transform: scale(1.015);
       border-color: rgba(56, 189, 248, 0.4);
     }
     @media (hover: none) {
-      .proof-strip a:hover,
+      .how-proof a:hover,
       .hero-peek a:hover { transform: none; }
     }
-    .proof-strip img {
+    .how-proof img {
       display: block;
       width: 100%;
       height: 100%;
       object-fit: cover;
       object-position: top center;
     }
-    .proof-strip figcaption,
-    .proof-caption {
+    .how-proof figcaption {
       margin: 0.85rem 0 0;
       font-size: 0.85rem;
       color: var(--text-mute);
-      text-align: center;
       text-wrap: pretty;
       padding: 0 0.25rem;
     }
+    .how-after .section-invite {
+      margin-top: 1.75rem;
+      text-align: center;
+    }
+
+    /* Product thumbnail lightbox */
+    .product-lightbox {
+      padding: 0;
+      border: none;
+      background: transparent;
+      max-width: min(96vw, 1100px);
+      width: 100%;
+      color: var(--text);
+    }
+    .product-lightbox::backdrop {
+      background: rgba(2, 6, 23, 0.82);
+    }
+    .product-lightbox-inner {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+    }
+    .product-lightbox img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: min(88vh, 900px);
+      object-fit: contain;
+      background: #020617;
+    }
+    .product-lightbox-close {
+      position: absolute;
+      top: 0.65rem;
+      right: 0.65rem;
+      z-index: 2;
+      min-width: 44px;
+      min-height: 44px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.88);
+      color: #fff;
+      font-size: 1.35rem;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .product-lightbox-close:hover { border-color: rgba(56, 189, 248, 0.55); }
+    .product-lightbox-close:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .hero-peek a { cursor: zoom-in; }
 
     /* Footer */
     footer { padding: 3.5rem 0 4rem; border-top: 1px solid var(--border-subtle); }
@@ -1013,11 +1070,11 @@
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
       .hero-mark, .wordmark, .hero-tagline, .hero-subhead, .hero-moment, .hero-store-strip, .hero-store-caption, .waitlist, .hero-peek { animation: none; }
-      .card, .btn, .hero-peek a, .proof-strip a, .magic-stage, .magic-chip, .magic-visual-frame img { transition: none; }
+      .card, .btn, .hero-peek a, .how-proof a, .magic-stage, .magic-chip, .magic-visual-frame img { transition: none; }
       .reveal-rise,
       .features-grid > .card,
       .steps > .step,
-      .proof-strip > a {
+      .how-proof a {
         animation: none !important;
         opacity: 1 !important;
         transform: none !important;
@@ -1152,7 +1209,11 @@
     </form>
 
     <figure class="hero-peek">
-      <a href="#demo" aria-label="Jump to the interactive dashboard sample">
+      <a
+        href="assets/product/dashboard.webp"
+        data-lightbox
+        aria-label="Expand dashboard screenshot"
+      >
         <img
           src="assets/product/dashboard.webp"
           width="1600"
@@ -1162,7 +1223,7 @@
           fetchpriority="high"
         />
       </a>
-      <figcaption class="hero-peek-caption">Same UI on your PC - scroll for the live sample.</figcaption>
+      <figcaption class="hero-peek-caption">Same UI on your PC - click to enlarge, or scroll for the live sample.</figcaption>
     </figure>
     </div>
   </header>
@@ -1265,20 +1326,29 @@
         </div>
       </div>
 
-      <p class="how-decide reveal-rise"><strong>Decide</strong> what to play next, and whether that deal is actually worth opening. One clean table on your machine.</p>
-
-      <div class="section-head reveal-rise" style="margin-top:0.5rem;margin-bottom:1.25rem">
-        <span class="eyebrow">Shipped UI</span>
-        <h2>More surfaces from the desktop app.</h2>
+      <div class="how-after reveal-rise">
+        <span class="eyebrow">Wishlist radar</span>
+        <h2>Decide with ownership-aware deals.</h2>
+        <p>Know what to play next, and whether that deal is worth opening - against the library you already connected.</p>
+        <figure class="how-proof">
+          <a
+            href="assets/product/wishlist.webp"
+            data-lightbox
+            aria-label="Expand wishlist deal radar screenshot"
+          >
+            <img
+              src="assets/product/wishlist.webp"
+              width="1600"
+              height="1000"
+              alt="Wishlist deal radar fused with owned games"
+              loading="lazy"
+              decoding="async"
+            />
+          </a>
+          <figcaption>Wishlist deal radar on the desktop app.</figcaption>
+        </figure>
+        <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
       </div>
-      <div class="proof-strip">
-        <a href="#demo" aria-label="Wishlist deals screenshot">
-          <img src="assets/product/wishlist.webp" width="1600" height="1000" alt="Wishlist deal radar fused with owned games" loading="lazy" decoding="async" />
-        </a>
-      </div>
-      <p class="proof-caption">Wishlist deal radar - ownership-aware sales against the library you already connected.</p>
-
-      <p class="section-invite"><a class="btn" href="#waitlist">Get the beta</a></p>
     </div>
   </section>
 
@@ -1701,6 +1771,15 @@
       </div>
     </div>
   </footer>
+
+  <dialog id="productLightbox" class="product-lightbox" aria-label="Product screenshot">
+    <div class="product-lightbox-inner">
+      <button type="button" class="product-lightbox-close" data-lightbox-close aria-label="Close screenshot">
+        &times;
+      </button>
+      <img id="productLightboxImg" src="" alt="" width="1600" height="1000" decoding="async" />
+    </div>
+  </dialog>
 
 </body>
 </html>

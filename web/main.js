@@ -1,5 +1,5 @@
 /**
- * Landing page utilities: footer year, waitlist form, magic-moment scrub.
+ * Landing page utilities: footer year, waitlist form, magic-moment scrub, product lightbox.
  */
 (function () {
   "use strict";
@@ -153,9 +153,62 @@
     syncMode();
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initMagicScrub);
-  } else {
+  /** Shared product-thumbnail lightbox (hero peek + how-after proof). */
+  function initProductLightbox() {
+    const dialog = document.getElementById("productLightbox");
+    const img = document.getElementById("productLightboxImg");
+    if (!dialog || !img || typeof dialog.showModal !== "function") return;
+
+    let lastTrigger = null;
+
+    function openFrom(trigger) {
+      const href = trigger.getAttribute("href");
+      if (!href) return;
+      const thumb = trigger.querySelector("img");
+      img.src = href;
+      img.alt = (thumb && thumb.getAttribute("alt")) || "Product screenshot";
+      lastTrigger = trigger;
+      dialog.showModal();
+      const closeBtn = dialog.querySelector("[data-lightbox-close]");
+      if (closeBtn) closeBtn.focus();
+    }
+
+    function closeLightbox() {
+      if (!dialog.open) return;
+      dialog.close();
+    }
+
+    document.addEventListener("click", (e) => {
+      const trigger = e.target.closest("a[data-lightbox]");
+      if (!trigger) return;
+      e.preventDefault();
+      openFrom(trigger);
+    });
+
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog || e.target.closest("[data-lightbox-close]")) {
+        closeLightbox();
+      }
+    });
+
+    dialog.addEventListener("close", () => {
+      img.removeAttribute("src");
+      img.alt = "";
+      if (lastTrigger && typeof lastTrigger.focus === "function") {
+        lastTrigger.focus();
+      }
+      lastTrigger = null;
+    });
+  }
+
+  function boot() {
     initMagicScrub();
+    initProductLightbox();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
   }
 })();

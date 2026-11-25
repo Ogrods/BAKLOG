@@ -112,7 +112,8 @@
 
     * { box-sizing: border-box; }
 
-    html { scroll-behavior: smooth; overflow-x: hidden; }
+    /* overflow-x: clip (not hidden) so sticky scrub in #how still sticks to the viewport */
+    html { scroll-behavior: smooth; overflow-x: clip; }
 
     body {
       margin: 0;
@@ -123,7 +124,7 @@
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
-      overflow-x: hidden;
+      overflow-x: clip;
     }
 
     a { color: var(--accent); text-decoration: none; }
@@ -639,26 +640,31 @@
     .trust h2 { font-size: clamp(1.8rem, 5vw, 3rem); max-width: 18ch; margin: 0 auto; }
     .trust p { color: var(--text-mute); max-width: 50ch; margin: 1.2rem auto 0; font-size: 1.05rem; text-wrap: pretty; }
 
-    /* Sticky magic-moment scrub (#how) */
+    /* Sticky magic-moment scrub (#how) — paint + radius on pin so overflow stays visible (sticky works). */
     .magic-scrub {
       position: relative;
       margin: 0 0 2.25rem;
-      border-radius: 18px;
-      border: 1px solid var(--border-subtle);
-      background: linear-gradient(160deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.6));
-      overflow: clip;
+      overflow: visible;
+      background: transparent;
+      border: none;
     }
     .magic-scrub-track {
-      height: min(160vh, 1100px);
+      height: min(240vh, 1600px);
     }
     .magic-scrub-pin {
       position: sticky;
-      top: max(1rem, env(safe-area-inset-top, 0px));
-      min-height: min(72vh, 420px);
+      top: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
       place-items: center;
       padding: 1.75rem 1.25rem 2rem;
       text-align: center;
+      box-sizing: border-box;
+      border-radius: 18px;
+      border: 1px solid var(--border-subtle);
+      background: linear-gradient(160deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.6));
+      overflow: hidden; /* clip progress bar to pin radius; sticky lives on this node so this is safe */
     }
     .magic-scrub-pin > .magic-stage {
       grid-area: 1 / 1;
@@ -765,6 +771,9 @@
         gap: 0.85rem;
         padding: 1rem;
         place-items: stretch;
+        border: none;
+        background: transparent;
+        border-radius: 0;
       }
       .magic-scrub-pin > .magic-stage {
         grid-area: auto;
@@ -956,6 +965,9 @@
         flex-direction: column;
         gap: 0.85rem;
         place-items: stretch;
+        border: none;
+        background: transparent;
+        border-radius: 0;
       }
       .magic-scrub-pin > .magic-stage {
         grid-area: auto;

@@ -85,7 +85,7 @@
       const clamped = Math.max(0, Math.min(1, p));
       if (bar) bar.style.width = `${(clamped * 100).toFixed(1)}%`;
 
-      const stage = clamped < 0.33 ? 0 : clamped < 0.66 ? 1 : 2;
+      const stage = clamped < 0.22 ? 0 : clamped < 0.55 ? 1 : 2;
       if (stage !== lastStage) {
         lastStage = stage;
         stages.forEach((el, i) => {
@@ -93,7 +93,7 @@
         });
       }
 
-      const chipProgress = Math.max(0, (clamped - 0.28) / 0.4);
+      const chipProgress = Math.max(0, (clamped - 0.12) / 0.35);
       chips.forEach((chip, i) => {
         const on = chipProgress > (i + 0.15) / chips.length;
         chip.classList.toggle("is-on", on);
@@ -107,8 +107,10 @@
         raf = 0;
         const rect = track.getBoundingClientRect();
         const view = Math.max(1, window.innerHeight);
-        const total = Math.max(1, rect.height - view);
-        const scrolled = Math.min(total, Math.max(0, -rect.top));
+        // Start scrubbing once the track top reaches ~35% down the viewport (not only at top=0).
+        const startOffset = view * 0.35;
+        const total = Math.max(1, rect.height - view + startOffset);
+        const scrolled = Math.min(total, Math.max(0, -rect.top + startOffset));
         applyProgress(scrolled / total);
       });
     }

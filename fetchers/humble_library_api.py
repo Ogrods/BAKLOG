@@ -450,6 +450,8 @@ def library_action_form_fields(
 
 
 def library_action_headers(action_id: str) -> dict[str, str]:
+    # Prefer building encodeURIComponent(tree) in-page (see fetch_humble).
+    # This helper remains for tests / callers that already URI-encode once.
     return {
         "Accept": "text/x-component",
         "Next-Action": action_id,

@@ -179,6 +179,37 @@ class TestNetworkExtraInfo:
         )
         assert seen == [False, True]
 
+    def test_set_cookies_omits_non_positive_expires(self) -> None:
+        """Session cookies dumped with expires=-1 must still set successfully."""
+        ctx = _bare_context()
+        ctx._ws_dead = False
+        ctx.pages = [_FakePage("SESSION-1")]
+        sent: list[dict] = []
+
+        def fake_send(method, params=None, *, session_id=None, timeout=60):
+            if method == "Network.setCookie":
+                sent.append(dict(params or {}))
+                return {"success": True}
+            return {}
+
+        ctx._send = fake_send  # type: ignore[method-assign]
+        n = ctx.set_cookies(
+            [
+                {
+                    "name": "ory_session_test",
+                    "value": "abc",
+                    "domain": ".humblebundle.com",
+                    "path": "/",
+                    "secure": True,
+                    "httpOnly": True,
+                    "expires": -1,
+                }
+            ]
+        )
+        assert n == 1
+        assert "expires" not in sent[0]
+        assert sent[0]["name"] == "ory_session_test"
+
     def test_response_handler_text_does_not_deadlock_reader(self) -> None:
         """Handlers that call resp.text() must not run on the CDP reader thread.
 

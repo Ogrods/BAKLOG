@@ -56,7 +56,6 @@ from fetchers.humble_library_api import (
     extract_library_page,
     item_from_result,
     library_action_form_fields,
-    library_action_headers,
     library_result_is_game,
     match_cached_row,
     norm_title_key,
@@ -488,17 +487,73 @@ def _in_page_library_action(
         request_id=f"bk{page_num}",
         prev_state=EMPTY_LIBRARY_ACTION_STATE,
     )
-    headers = library_action_headers(action_id)
-    # CdpPage.evaluate has no arg channel - embed JSON like the wishlist fetcher.
-    args_json = json.dumps({"fields": fields, "headers": headers})
+    # Build the router tree in-page with encodeURIComponent (matches the live
+    # site / Cursor-tab probe that honors limit=100). Pre-quoted Python headers
+    # were ignored by Humble and always returned page 1 / limit 5.
+    tree_json = json.dumps(
+        [
+            "",
+            {
+                "children": [
+                    "(default)",
+                    {
+                        "children": [
+                            "(account)",
+                            {
+                                "children": [
+                                    "home",
+                                    {
+                                        "children": [
+                                            "library",
+                                            {
+                                                "children": [
+                                                    "__PAGE__",
+                                                    {},
+                                                    None,
+                                                    None,
+                                                    0,
+                                                ]
+                                            },
+                                            None,
+                                            None,
+                                            4,
+                                        ]
+                                    },
+                                    None,
+                                    None,
+                                    8,
+                                ]
+                            },
+                            None,
+                            None,
+                            8,
+                        ]
+                    },
+                    None,
+                    None,
+                    24,
+                ]
+            },
+            None,
+            None,
+            True,
+        ]
+    )
+    args_json = json.dumps(
+        {"fields": fields, "actionId": action_id, "treeJson": tree_json}
+    )
     result = page.evaluate(
         f"""async () => {{
           const args = {args_json};
           const fd = new FormData();
-          for (const [k, v] of Object.entries(args.fields)) fd.append(k, v);
+          for (const [k, v] of Object.entries(args.fields)) fd.append(k, String(v));
           const r = await fetch('/home/library', {{
             method: 'POST',
-            headers: args.headers,
+            headers: {{
+              'Accept': 'text/x-component',
+              'Next-Action': args.actionId,
+              'Next-Router-State-Tree': encodeURIComponent(args.treeJson),
+            }},
             body: fd,
             credentials: 'include',
           }});
@@ -553,6 +608,7 @@ def _fetch_via_action(
     page_num = 1
     total_pages = 1
     cursor = 0
+    stall_count = 0
     while page_num <= max(total_pages, 1) and page_num <= 500:
         print(
             f"[library action page {page_num}] limit={_ACTION_PAGE_LIMIT} cursor={cursor}",
@@ -585,24 +641,48 @@ def _fetch_via_action(
                 }
             )
         pag = payload.get("pagination") if isinstance(payload.get("pagination"), dict) else {}
+        payload_page = int(pag.get("page") or 0) or page_num
         total_pages = max(total_pages, int(pag.get("totalPages") or 1) or 1)
         total_docs = int(pag.get("totalDocs") or 0)
+        results = [r for r in (payload.get("results") or []) if isinstance(r, dict)]
         page_items = 0
-        for row in payload.get("results") or []:
+        new_items = 0
+        for row in results:
             item = item_from_result(row, include_nongames=include_nongames)
             if not item:
                 continue
             page_items += 1
             if item.machine_name not in found:
                 found[item.machine_name] = item
+                new_items += 1
         print(
-            f"  page {page_num}: {page_items} rows, "
-            f"totalPages={total_pages} totalDocs~{total_docs} collected={len(found)}",
+            f"  page {page_num}: {page_items} rows ({new_items} new), "
+            f"payloadPage={payload_page} totalPages={total_pages} "
+            f"totalDocs~{total_docs} collected={len(found)}",
             flush=True,
         )
+        # Humble sometimes ignores our limit/cursor and keeps returning page 1.
+        if payload_page != page_num or (page_num > 1 and new_items == 0):
+            stall_count += 1
+        else:
+            stall_count = 0
+        if stall_count >= 1 and page_num == 1 and total_pages > 1 and len(results) < total_docs:
+            print(
+                "[humble] filterUserLibrary ignored page/limit; falling back to RSC orders",
+                flush=True,
+            )
+            return []
+        if stall_count >= 2:
+            print(
+                "[humble] filterUserLibrary pagination stalled; falling back to RSC orders",
+                flush=True,
+            )
+            return []
         if page_num >= total_pages:
             break
-        cursor = page_num * _ACTION_PAGE_LIMIT
+        # Advance cursor by the effective page size Humble actually returned.
+        effective_limit = len(results) or _ACTION_PAGE_LIMIT
+        cursor = page_num * effective_limit
         page_num += 1
         time.sleep(_ACTION_PAGE_DELAY_SEC)
     return list(found.values())
@@ -722,6 +802,22 @@ def fetch_library_items(
         page = _goto_humble_library(page, ctx)
         try:
             page.wait_for_timeout(2000)
+        except Exception:  # noqa: BLE001
+            pass
+        # OneTrust / consent overlays block library hydration in a fresh profile.
+        try:
+            page.evaluate(
+                """() => {
+                  for (const label of ['I Consent', 'Accept All', 'Accept', 'Got it']) {
+                    const btn = Array.from(document.querySelectorAll('button'))
+                      .find(b => (b.textContent || '').trim() === label);
+                    if (btn) { btn.click(); return label; }
+                  }
+                  return null;
+                }""",
+                timeout=5,
+            )
+            page.wait_for_timeout(1000)
         except Exception:  # noqa: BLE001
             pass
         page = _rebind_live_library_page(ctx, page)

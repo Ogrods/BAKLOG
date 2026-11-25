@@ -1430,6 +1430,12 @@ class CdpContext:
             ):
                 if key in c and c[key] is not None:
                     params[key] = c[key]
+            # Session cookies from CDP dumps often have expires=-1. Passing that
+            # to Network.setCookie fails silently (success=false); omit it so
+            # Chrome treats the cookie as session-scoped.
+            exp = params.get("expires")
+            if isinstance(exp, (int, float)) and float(exp) <= 0:
+                params.pop("expires", None)
             # __Host- cookies require secure + path=/ and no domain attribute.
             if str(name).startswith("__Host-"):
                 params["secure"] = True
@@ -1437,35 +1443,40 @@ class CdpContext:
                 params.pop("domain", None)
                 if "url" not in params:
                     params["url"] = "https://www.humblebundle.com/"
-            try:
-                if sid:
-                    self._send("Network.setCookie", params, session_id=sid)
-                else:
-                    self._send("Network.setCookie", params)
-                ok += 1
-            except Exception:  # noqa: BLE001
-                # Retry with url-only for __Host- failures.
+
+            def _apply(cookie_params: dict[str, Any]) -> bool:
                 try:
-                    retry = {
-                        "name": str(name),
-                        "value": str(value),
-                        "url": params.get("url") or "https://www.humblebundle.com/",
-                        "secure": True,
-                        "path": params.get("path") or "/",
-                    }
-                    if c.get("httpOnly") is not None:
-                        retry["httpOnly"] = c["httpOnly"]
-                    if c.get("sameSite") is not None:
-                        retry["sameSite"] = c["sameSite"]
-                    if c.get("expires") is not None:
-                        retry["expires"] = c["expires"]
-                    if sid:
-                        self._send("Network.setCookie", retry, session_id=sid)
-                    else:
-                        self._send("Network.setCookie", retry)
-                    ok += 1
+                    result = (
+                        self._send("Network.setCookie", cookie_params, session_id=sid)
+                        if sid
+                        else self._send("Network.setCookie", cookie_params)
+                    )
                 except Exception:  # noqa: BLE001
-                    pass
+                    return False
+                if isinstance(result, dict) and result.get("success") is False:
+                    return False
+                return True
+
+            if _apply(params):
+                ok += 1
+                continue
+            # Retry with url-only for __Host- / domain attribute failures.
+            retry = {
+                "name": str(name),
+                "value": str(value),
+                "url": params.get("url") or "https://www.humblebundle.com/",
+                "secure": True,
+                "path": params.get("path") or "/",
+            }
+            if c.get("httpOnly") is not None:
+                retry["httpOnly"] = c["httpOnly"]
+            if c.get("sameSite") is not None:
+                retry["sameSite"] = c["sameSite"]
+            exp = c.get("expires")
+            if isinstance(exp, (int, float)) and float(exp) > 0:
+                retry["expires"] = exp
+            if _apply(retry):
+                ok += 1
         return ok
 
     def cookies_for_urls(

@@ -8,6 +8,7 @@ import {
   fireLibraryCountFlash,
   cancelAllLibraryCountAnimations,
   isSurfaceAnimating,
+  lingeringLibraryCountEpisodeCount,
   runLibraryCountSmallDemo,
   armLibraryCountAnimations,
   disarmLibraryCountAnimations,
@@ -112,6 +113,18 @@ describe('flashCountUp', () => {
     for (const el of document.querySelectorAll('.library-count-popup')) {
       expect(el.textContent).toBe('+1');
     }
+  });
+
+  it('does not linger episodes after spawn timers finish', () => {
+    const node = mountCountSurface();
+    flashCountUp(node, 0, 50, n => String(Math.round(n)), { popups: true });
+    expect(node.__baklogLibCountAnim.spawnTimers.length).toBe(10);
+    // Popups finish (~2700ms) before the roll ends (~3100ms); completed
+    // timer IDs must leave spawnTimers so finishEpisode does not retain DOM.
+    vi.advanceTimersByTime(3200);
+    flushRaf(4000);
+    expect(isSurfaceAnimating(node)).toBe(false);
+    expect(lingeringLibraryCountEpisodeCount()).toBe(0);
   });
 
   it('does not burst large-delta popups when the first rAF is late', () => {

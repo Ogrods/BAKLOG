@@ -30,7 +30,7 @@ GitHub About (Settings → General):
 5. [tests/](tests/) - pytest + Vitest (including sync-pair parity)
 6. [.github/workflows/ci.yml](.github/workflows/ci.yml) - CI gates
 7. [.cursor/rules/](.cursor/rules/) - project invariants
-8. [web/](web/) + [baklog.app](https://baklog.app) + [llms.txt](https://baklog.app/llms.txt) - landing and crawler summary
+8. [web/](web/) + [baklog.app](https://baklog.app) + [llms.txt](llms.txt) / [baklog.app/llms.txt](https://baklog.app/llms.txt) - crawler summaries
 
 ```bash
 python -m pytest

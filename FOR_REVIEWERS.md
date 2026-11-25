@@ -15,9 +15,9 @@ This product does **not** offer in-app AI game recommendations. Do not claim tha
 5. [`tests/`](tests/) - pytest + Vitest, including sync-pair parity
 6. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) - ruff, pytest lanes, vitest, build gates
 7. [`.cursor/rules/`](.cursor/rules/) - invariants agents must keep
-8. [`web/`](web/) + [baklog.app](https://baklog.app) + [`/llms.txt`](https://baklog.app/llms.txt)
+8. [`web/`](web/) + [baklog.app](https://baklog.app) + [`/llms.txt`](https://baklog.app/llms.txt) (repo root [`llms.txt`](llms.txt) too)
 
-Also useful: [`SECURITY.md`](SECURITY.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), [`docs/adr/`](docs/adr/README.md).
+Also useful: [`SECURITY.md`](SECURITY.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), [`docs/adr/`](docs/adr/README.md), [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
 ## Tests (canonical)
 
@@ -27,6 +27,12 @@ npm test
 ```
 
 Full local CI parity (optional): `.\scripts\test-all.ps1 -Full`
+
+**Suite size (verified 2026-11-25 on this branch):** `pytest --collect-only` → **2424** selected / 5 deselected; `npm test` → **2009** Vitest tests. Counts drift as the tree grows. **Trust CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) as the live source of truth; do not invent or memorize totals. No sync-pair test guards doc-stated counts.
+
+## How agents work in this repo
+
+Coding agents follow [`AGENTS.md`](AGENTS.md) and [`.cursor/rules/`](.cursor/rules/): one concern per `feat|fix|chore` branch, canonical tests before claiming done, sync-pair and size-budget failures as merge blockers. `scripts/hooks/` (pre-push leak check, stray-server cleanup) and PR CI encode the same gates. This is engineering discipline, not product branding.
 
 ## What to look for
 

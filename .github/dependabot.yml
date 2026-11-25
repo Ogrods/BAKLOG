@@ -1,14 +1,14 @@
 version: 2
 updates:
+  # Minor/patch bumps are grouped into one PR per ecosystem; majors stay solo.
+  # Cap open PRs so Dependabot does not crowd the review queue.
   - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore
-    # One PR per week for minor/patch bumps so lockfile edits never conflict;
-    # majors still arrive as their own PRs for review.
     groups:
       minor-patch:
         update-types: ["minor", "patch"]
@@ -22,7 +22,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore
     groups:
@@ -33,7 +33,7 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore
     groups:

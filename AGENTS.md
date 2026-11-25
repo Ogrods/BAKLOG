@@ -87,6 +87,10 @@ Refresh bundle budget after intentional growth: `npm run build && node scripts/c
 4. PR template filled; user-facing copy follows hard rule 8.
 5. Meaningful work: update private `tracker.html` (or write `.cursor/tracker-pending-*.md`).
 
+## Agent operating notes
+
+Automated coding agents in this repo are expected to: read this file and `.cursor/rules/` before editing; keep worktrees/branches single-purpose; run the canonical tests above before claiming done; treat sync-pair, size-budget, and pre-push leak failures as hard stops; never commit `profiles/`, `games_*.json`, `.env`, or private deep `docs/**` (public `docs/adr/` is the exception). Reviewer-facing tour: `FOR_REVIEWERS.md`.
+
 ## Auth gating (layers)
 
 - **CSRF** — mutating requests require `X-BAKLOG-Local: 1` (the app and admin console send it). When Supabase auth is on, a valid bearer may also authorize mutations; Origin/Referer alone is not enough.

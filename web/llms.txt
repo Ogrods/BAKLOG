@@ -11,7 +11,8 @@
 - Agent brief: https://github.com/Ogrods/BAKLOG/blob/main/AGENTS.md
 - Security model: https://github.com/Ogrods/BAKLOG/blob/main/SECURITY.md
 - User guide: https://github.com/Ogrods/BAKLOG/tree/main/guide
-- Plain-text summary: https://baklog.app/llms.txt
+- Plain-text summary (hosted): https://baklog.app/llms.txt
+- Plain-text summary (repo root): https://github.com/Ogrods/BAKLOG/blob/main/llms.txt
 
 ## What baklog.app is
 

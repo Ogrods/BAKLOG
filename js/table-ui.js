@@ -72,6 +72,8 @@ import {
   bulkSetStatus,
   bulkRemove,
   flashGameRow,
+  hasPendingFlash,
+  applyPendingFlash,
 } from './table-bulk.js';
 
 export {
@@ -580,7 +582,7 @@ export function consumePendingScrollTarget(list = state._visibleList) {
       markFocusedRow(key);
       refreshMeasuredRowHeight(row.parentElement);
       scrollRowToCenter(row, { smooth: !!t.smooth });
-      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
+      if (hasPendingFlash(key)) applyPendingFlash(key);
     } else if (usesVirtualScroll(list)) {
       // Virtual lists: position by deterministic index math (top-spacer height +
       // measured row height) instead of the freshly-painted row's rect. The giant
@@ -592,11 +594,11 @@ export function consumePendingScrollTarget(list = state._visibleList) {
       if (row) refreshMeasuredRowHeight(row.parentElement);
       scrollToVirtualRowIndex(idx, { behavior: t.smooth ? "smooth" : "auto" });
       if (row) markFocusedRow(key);
-      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
+      if (hasPendingFlash(key)) applyPendingFlash(key);
     } else if (row) {
       markFocusedRow(key);
       scrollRowToCenter(row, { smooth: !!t.smooth });
-      if (_pendingFlashKeys.has(key)) applyRowFlash(key);
+      if (hasPendingFlash(key)) applyPendingFlash(key);
     }
 
     _lastConsumeWasSmooth = !!t.smooth && !!row && (phone || !usesVirtualScroll(list));

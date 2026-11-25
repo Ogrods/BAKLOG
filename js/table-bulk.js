@@ -250,6 +250,11 @@ export function bulkRemove() {
 
 const _pendingFlashKeys = new Set();
 
+/** Used by table-ui scroll landing to re-apply flash after the row paints. */
+export function hasPendingFlash(key) {
+  return _pendingFlashKeys.has(key);
+}
+
 function applyRowFlash(key) {
   const row = document.querySelector(`tr[data-row-key="${CSS.escape(key)}"]`);
   if (!row) return false;
@@ -257,6 +262,12 @@ function applyRowFlash(key) {
   setTimeout(() => row.classList.remove("row-flash"), 2000);
   _pendingFlashKeys.delete(key);
   return true;
+}
+
+/** Apply a queued row flash if still pending (no focus/scroll side effects). */
+export function applyPendingFlash(key) {
+  if (!_pendingFlashKeys.has(key)) return false;
+  return applyRowFlash(key);
 }
 
 export function flashGameRow(key) {

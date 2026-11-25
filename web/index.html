@@ -688,10 +688,12 @@
       height: min(220vh, 1480px);
     }
     .magic-scrub-pin {
+      --magic-pin-max: 760px;
       position: sticky;
-      top: 0;
-      min-height: min(100vh, 760px);
-      min-height: min(100dvh, 760px);
+      /* Full-bleed when pin fills the viewport; otherwise center the capped card */
+      top: max(0.75rem, calc((100dvh - min(100dvh, var(--magic-pin-max))) / 2));
+      min-height: min(100vh, var(--magic-pin-max));
+      min-height: min(100dvh, var(--magic-pin-max));
       display: grid;
       grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
       align-items: center;

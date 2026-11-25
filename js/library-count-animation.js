@@ -281,11 +281,20 @@ function spawnPopups(host, popupCount, opts) {
   for (let i = 0; i < popupCount; i++) {
     const delay = delays[i];
     const id = setTimeout(() => {
-      if (!host.isConnected && !anchorNode.isConnected) return;
-      mountOnePopup(host, anchorNode, i);
-      if (i === popupCount - 1 && opts?.episode) {
-        _lingeringEpisodes.delete(opts.episode);
+      const episode = opts?.episode;
+      // Drop completed one-shot timers so finishEpisode / cancelAll only
+      // retain episodes that still have pending spawns.
+      if (episode?.spawnTimers) {
+        const idx = episode.spawnTimers.indexOf(id);
+        if (idx >= 0) episode.spawnTimers.splice(idx, 1);
       }
+      const stillPending = !!(episode?.spawnTimers && episode.spawnTimers.length);
+      if (!host.isConnected && !anchorNode.isConnected) {
+        if (episode && !stillPending) _lingeringEpisodes.delete(episode);
+        return;
+      }
+      mountOnePopup(host, anchorNode, i);
+      if (episode && !stillPending) _lingeringEpisodes.delete(episode);
     }, delay);
     timers.push(id);
   }
@@ -499,6 +508,11 @@ function collectSurfaces(kind, prev, next, rowOpts = {}) {
 /** True when this surface has an in-flight digit roll (not climbing CSS popups). */
 export function isSurfaceAnimating(node) {
   return !!(node && node[SURFACE_KEY]);
+}
+
+/** Test/diagnostic helper — episodes retained only while spawn timers remain. */
+export function lingeringLibraryCountEpisodeCount() {
+  return _lingeringEpisodes.size;
 }
 
 /**

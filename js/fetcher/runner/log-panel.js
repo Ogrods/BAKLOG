@@ -9,6 +9,7 @@ import {
 } from '../../fetcher-health-log.js';
 import { renderDashboardFetcherHealth } from '../render/dashboard.js';
 import { updateGlobalFetcherIndicator } from '../global-indicator.js';
+import { wireStallRetryOnce } from './stall-notice.js';
 
 const LOG_DESKTOP_MQ = '(min-width: 1024px)';
 const FETCHER_SHEET_MQ =
@@ -414,6 +415,7 @@ export function createLogPanelHelpers(deps) {
     panel.innerHTML = LOG_PANEL_CHROME_HTML;
     panel.dataset.built = '1';
     syncLogCollapseButton();
+    wireStallRetryOnce(panel, () => deps.cancelInFlightRuns({ force: true }));
     panel.addEventListener('click', e => {
       const btn = e.target.closest('[data-role]');
       if (!btn) return;

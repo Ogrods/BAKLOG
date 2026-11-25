@@ -44,7 +44,7 @@ The app is [open source (MIT)](https://github.com/Ogrods/BAKLOG). Read [PRIVACY.
 
 No. BAKLOG has no business model built on your library. We do not sell catalog or personal data.
 
-Library data stays on your machine by default. Optional account login stores email; Pro cloud sync (opt-in) can host catalogs and personal statuses for your account only - still not for sale. See [PRIVACY.md](../PRIVACY.md#hosted-surfaces) for baklog.app marketing surfaces (waitlist, bug reports).
+Library data stays on your machine by default. Packaged beta builds require account sign-in (email only). Pro cloud sync (opt-in) can host catalogs and personal statuses for your account only - still not for sale. See [PRIVACY.md](../PRIVACY.md#hosted-surfaces) for baklog.app marketing surfaces (waitlist, bug reports).
 
 ## Does BAKLOG have telemetry?
 

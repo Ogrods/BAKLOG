@@ -44,6 +44,9 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 ### Fixed
 - Humble library sync works with Humble's redesigned site and is much faster on large libraries
 
+### Changed
+- Landing and FAQ: packaged beta requires account sign-in; privacy copy notes opt-in Pro cloud sync; Humble wishlist pause called out on the store wall
+
 ## [0.9.22] - 2026-11-18
 
 ### Fixed

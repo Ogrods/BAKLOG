@@ -764,7 +764,7 @@ export function spotlightLogoMarkHtml() {
 const HOUSE_BANNER_FEATURES = [
   {
     title: 'Local-first',
-    desc: 'Your library never leaves your machine. No BAKLOG server holds your data.',
+    desc: 'Catalogs stay on your PC by default. Credentials never leave. Opt-in Pro cloud sync is account-scoped.',
   },
   {
     title: 'Every store, one list',
@@ -782,11 +782,11 @@ export const PRO_PROMO = {
   label: 'BAKLOG Pro',
   title: 'Back BAKLOG',
   price: '',
-  tagline: 'BAKLOG stays free and local-first. Pro is optional support that funds the next stores, sync work, and a quieter deal radar - nothing free today moves behind it.',
+  tagline: "BAKLOG stays free and local-first. Pro is optional support that funds the next stores, sync work, and a quieter deal radar. None of today's free features ever move behind it.",
   cta: 'Support BAKLOG',
-  ctaYearly: 'Support BAKLOG',
+  ctaYearly: 'Support BAKLOG (yearly)',
   url: PRO_CHECKOUT_MONTHLY,
-  founderNote: 'Early support pays for store connectors, packaging, and the sync work still on the roadmap.',
+  founderNote: 'Early support pays for store connectors, packaging, and the next features on the roadmap.',
   features: [
     {
       title: 'Queued bulk refresh',
@@ -833,16 +833,16 @@ export const PRO_PROMO = {
     { feature: 'Import & browse all stores', free: '✓', pro: '✓' },
     { feature: 'Manual store refresh', free: 'One at a time', pro: 'Queue all stale stores' },
     { feature: 'Auto-refresh while app is open', free: '✓ (one store / ~30 min)', pro: '✓' },
-    { feature: 'Refresh while app is closed', free: '-', pro: '✓' },
+    { feature: 'Refresh while app is closed', free: '✕', pro: '✓' },
     { feature: 'Claimable Now (full games)', free: '✓', pro: '✓ + bonus DLC/bonus feed' },
     { feature: 'Sponsored deal cards', free: 'Shown', pro: 'Removed' },
     { feature: 'Deep achievement/trophy sync', free: 'Cached % only', pro: 'Full re-pull' },
-    { feature: 'Cloud sync', free: '-', pro: '✓ (opt-in)' },
-    { feature: 'Deal/watchlist alerts', free: '-', pro: '✓ (opt-in)' },
+    { feature: 'Cloud sync', free: '✕', pro: 'Opt-in' },
+    { feature: 'Deal/watchlist alerts', free: '✕', pro: 'Opt-in' },
     { feature: 'Bonus palettes', free: 'Six free themes', pro: 'Storybook, Sapphire, Emerald' },
   ],
   trustPoints: [
-    'Local-first - your library stays on your machine',
+    'Local-first - catalogs stay on your machine by default',
     'Open source (MIT) - audit every fetcher path',
     'Polar.sh Merchant of Record (open source, like us) - cancel anytime',
     'No telemetry by default',

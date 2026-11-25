@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
 import shutil
 import socket
@@ -631,6 +632,11 @@ class CdpResponse:
 
     def text(self) -> str:
         if self._body is None:
+            # Wait for Network.loadingFinished before getResponseBody. Calling
+            # getResponseBody from a response handler that still ran on the CDP
+            # reader thread used to deadlock; handlers now run on a dispatcher
+            # thread, and this wait also avoids empty/partial bodies.
+            self._page._wait_body_ready(self._request_id)
             self._body = self._page._get_response_body(self._request_id)
         return self._body
 
@@ -747,6 +753,9 @@ class CdpPage:
         self._request_handlers: list[Callable[[_RequestProxy], None]] = []
         self._response_handlers: list[Callable[[CdpResponse], None]] = []
         self._pending_requests: dict[str, CdpRequest] = {}
+        # requestId -> Event set when Network.loadingFinished / loadingFailed
+        self._body_ready: dict[str, threading.Event] = {}
+        self._body_failed: set[str] = set()
         self._pending_popup_url: str | None = None
 
     @property
@@ -775,28 +784,62 @@ class CdpPage:
 
     def _dispatch_request(self, req: CdpRequest) -> None:
         proxy = _RequestProxy(req.url, req.headers)
-        for h in self._request_handlers:
-            try:
-                h(proxy)
-            except Exception:
-                pass
-        for h in self._context._request_handlers:
-            try:
-                h(proxy)
-            except Exception:
-                pass
+
+        def run() -> None:
+            for h in self._request_handlers:
+                try:
+                    h(proxy)
+                except Exception:
+                    pass
+            for h in self._context._request_handlers:
+                try:
+                    h(proxy)
+                except Exception:
+                    pass
+
+        enqueue = getattr(self._context, "_enqueue_network_handler", None)
+        if callable(enqueue):
+            enqueue(run)
+        else:
+            run()
 
     def _dispatch_response(self, resp: CdpResponse) -> None:
-        for h in self._response_handlers:
-            try:
-                h(resp)
-            except Exception:
-                pass
-        for h in self._context._response_handlers:
-            try:
-                h(resp)
-            except Exception:
-                pass
+        def run() -> None:
+            for h in self._response_handlers:
+                try:
+                    h(resp)
+                except Exception:
+                    pass
+            for h in self._context._response_handlers:
+                try:
+                    h(resp)
+                except Exception:
+                    pass
+
+        enqueue = getattr(self._context, "_enqueue_network_handler", None)
+        if callable(enqueue):
+            enqueue(run)
+        else:
+            run()
+
+    def _body_event(self, request_id: str) -> threading.Event:
+        ev = self._body_ready.get(request_id)
+        if ev is None:
+            ev = threading.Event()
+            self._body_ready[request_id] = ev
+        return ev
+
+    def _mark_body_ready(self, request_id: str, *, failed: bool = False) -> None:
+        if not request_id:
+            return
+        if failed:
+            self._body_failed.add(request_id)
+        self._body_event(request_id).set()
+
+    def _wait_body_ready(self, request_id: str, timeout: float = 30.0) -> None:
+        if not request_id:
+            return
+        self._body_event(request_id).wait(timeout=timeout)
 
     def _handle_network_event(self, method: str, params: dict) -> None:
         if method == "Network.requestWillBeSent":
@@ -807,6 +850,9 @@ class CdpPage:
             url = req_data.get("url") or ""
             cdp_req = CdpRequest(url=url, headers=headers, post_data=post)
             self._pending_requests[req_id] = cdp_req
+            # Reset body-ready state for reused request ids.
+            self._body_failed.discard(req_id)
+            self._body_ready[req_id] = threading.Event()
             self._dispatch_request(cdp_req)
         elif method == "Network.requestWillBeSentExtraInfo":
             req_id = params.get("requestId", "")
@@ -825,6 +871,8 @@ class CdpPage:
             )
             status = int(resp_data.get("status") or 0)
             resp_headers = resp_data.get("headers") or {}
+            # Ensure waiters have an Event before handlers run.
+            self._body_event(req_id)
             cdp_resp = CdpResponse(
                 url=cdp_req.url,
                 status=status,
@@ -834,8 +882,14 @@ class CdpPage:
                 _request_id=req_id,
             )
             self._dispatch_response(cdp_resp)
+        elif method == "Network.loadingFinished":
+            self._mark_body_ready(params.get("requestId", ""), failed=False)
+        elif method == "Network.loadingFailed":
+            self._mark_body_ready(params.get("requestId", ""), failed=True)
 
     def _get_response_body(self, request_id: str) -> str:
+        if request_id in self._body_failed:
+            return ""
         try:
             result = self._context._send(
                 "Network.getResponseBody",
@@ -1208,6 +1262,57 @@ class CdpContext:
         self._background_targets: set[str] = set()
         self._ws_dead = False
         self.request = CdpHttpClient(self)
+        # Network request/response handlers must not run on the CDP websocket
+        # reader thread: handlers that call CdpResponse.text() issue
+        # Network.getResponseBody and wait for a reply the reader alone can
+        # deliver (classic self-deadlock). Dispatch them on a dedicated thread.
+        self._handler_queue: queue.Queue[Callable[[], None] | None] = queue.Queue()
+        self._handler_stop = threading.Event()
+        self._handler_thread = threading.Thread(
+            target=self._network_handler_loop,
+            daemon=True,
+            name="cdp-network-handlers",
+        )
+        self._handler_thread.start()
+
+    def _enqueue_network_handler(self, fn: Callable[[], None]) -> None:
+        """Run ``fn`` off the CDP reader thread (sync fallback for bare tests)."""
+        q = getattr(self, "_handler_queue", None)
+        stop = getattr(self, "_handler_stop", None)
+        if q is None or (stop is not None and stop.is_set()):
+            try:
+                fn()
+            except Exception:
+                pass
+            return
+        q.put(fn)
+
+    def _network_handler_loop(self) -> None:
+        while True:
+            try:
+                item = self._handler_queue.get()
+            except Exception:
+                break
+            if item is None:
+                break
+            try:
+                item()
+            except Exception:
+                pass
+
+    def _stop_network_handlers(self) -> None:
+        stop = getattr(self, "_handler_stop", None)
+        q = getattr(self, "_handler_queue", None)
+        if stop is not None:
+            stop.set()
+        if q is not None:
+            try:
+                q.put_nowait(None)
+            except Exception:
+                pass
+        t = getattr(self, "_handler_thread", None)
+        if t is not None and t.is_alive():
+            t.join(timeout=2.0)
 
     def on(self, event: str, handler: Callable) -> None:
         if event == "page":
@@ -1700,6 +1805,7 @@ class CdpContext:
                     self._proc.kill()
                 except Exception:
                     pass
+        self._stop_network_handlers()
         port_pids = _pids_listening_on_local_port(port)
         if port_pids:
             _kill_pids(port_pids)

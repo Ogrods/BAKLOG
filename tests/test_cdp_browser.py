@@ -17,6 +17,7 @@ import io
 import os
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 from pathlib import Path
@@ -177,6 +178,93 @@ class TestNetworkExtraInfo:
             },
         )
         assert seen == [False, True]
+
+    def test_response_handler_text_does_not_deadlock_reader(self) -> None:
+        """Handlers that call resp.text() must not run on the CDP reader thread.
+
+        Regression for Humble library hangs: inline resp.text() issued
+        Network.getResponseBody and waited on a reply only the reader could
+        deliver while still stuck inside the handler.
+        """
+        import queue
+
+        ctx = _bare_context()
+        ctx._request_handlers = []
+        ctx._response_handlers = []
+        ctx._ws_dead = False
+        ctx._pending = {}
+        ctx._send_lock = threading.Lock()
+        ctx._handler_queue = queue.Queue()
+        ctx._handler_stop = threading.Event()
+
+        def enqueue(fn) -> None:
+            ctx._handler_queue.put(fn)
+
+        ctx._enqueue_network_handler = enqueue  # type: ignore[method-assign]
+
+        def handler_loop() -> None:
+            while True:
+                item = ctx._handler_queue.get()
+                if item is None:
+                    break
+                item()
+
+        disp = threading.Thread(target=handler_loop, daemon=True)
+        disp.start()
+
+        page = CdpPage(ctx, "TARGET-1", "SESSION-1")
+        bodies: list[str] = []
+        next_id = {"n": 0}
+
+        def fake_send(method, params=None, *, session_id=None, timeout=5):
+            next_id["n"] += 1
+            mid = next_id["n"]
+            done = threading.Event()
+            entry: dict = {"done": done, "result": None, "error": None, "method": method}
+            ctx._pending[mid] = entry
+            if method == "Network.getResponseBody":
+                if not done.wait(timeout=timeout):
+                    raise TimeoutError("deadlocked waiting for getResponseBody")
+                out = entry.get("result") or {}
+                ctx._pending.pop(mid, None)
+                return out
+            ctx._pending.pop(mid, None)
+            return {}
+
+        ctx._send = fake_send  # type: ignore[method-assign]
+
+        def on_resp(resp) -> None:
+            bodies.append(resp.text())
+
+        page.on("response", on_resp)
+
+        # Act as the CDP reader: deliver responseReceived, then continue to
+        # loadingFinished (impossible if the handler ran inline and blocked).
+        page._handle_network_event(
+            "Network.responseReceived",
+            {
+                "requestId": "req-1",
+                "response": {
+                    "url": "https://www.humblebundle.com/home/library",
+                    "status": 200,
+                    "headers": {},
+                },
+            },
+        )
+        page._handle_network_event("Network.loadingFinished", {"requestId": "req-1"})
+
+        deadline = time.time() + 3
+        while time.time() < deadline and not bodies:
+            for mid, entry in list(ctx._pending.items()):
+                if entry.get("method") == "Network.getResponseBody" and not entry["done"].is_set():
+                    entry["result"] = {"body": '{"ok":true}', "base64Encoded": False}
+                    entry["done"].set()
+            time.sleep(0.01)
+
+        ctx._handler_queue.put(None)
+        disp.join(timeout=2)
+        assert bodies == ['{"ok":true}']
+
     def test_websocket_403_message(self) -> None:
         err = _cdp_websocket_error(
             Exception("Handshake status 403 Forbidden - remote-allow-origins")

@@ -27,6 +27,7 @@ from fetchers.fetch_humble import (
     _discover_filter_user_library_action,
     _extract_filter_user_library_payload,
     _goto_humble_library,
+    _humble_main_auth_failure,
     _item_from_library_result,
     _looks_like_filter_user_library_payload,
     _page_looks_signed_out,
@@ -47,6 +48,13 @@ from fetchers.fetch_humble_wishlist import (
 from fetchers.fetch_humble_wishlist import (
     _build_row as _build_wishlist_row,
 )
+from fetchers.humble_library_api import (
+    extract_bundle_items,
+    item_from_result,
+    match_cached_row,
+    order_entitlements,
+    parse_flight_rows,
+)
 
 ORDER_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_order_detail.json"
 LOOKUP_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "humble_wishlist_lookup.json"
@@ -58,6 +66,9 @@ WISHLIST_INTERSTITIAL_FIXTURE = (
 )
 LIBRARY_FILTER_FIXTURE = (
     Path(__file__).resolve().parent / "fixtures" / "humble_library_filter_page.json"
+)
+LIBRARY_ORDER_RSC_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "humble_library_order_rsc.txt"
 )
 
 
@@ -473,8 +484,9 @@ def test_extract_filter_user_library_payload_plain_json() -> None:
     data = json.loads(LIBRARY_FILTER_FIXTURE.read_text(encoding="utf-8"))
     extracted = _extract_filter_user_library_payload(json.dumps(data))
     assert extracted is not None
-    assert len(extracted["results"]) == 3
-    assert extracted["pagination"]["totalPages"] == 2
+    assert len(extracted["results"]) == 5
+    assert extracted["pagination"]["totalPages"] == 1
+    assert extracted["pagination"]["totalDocs"] == 5
     assert _looks_like_filter_user_library_payload(extracted)
 
 
@@ -484,15 +496,18 @@ def test_extract_filter_user_library_payload_flight_embedded() -> None:
     extracted = _extract_filter_user_library_payload(flight)
     assert extracted is not None
     assert extracted["results"][0]["title"] == "Celeste"
+    rows = parse_flight_rows(flight)
+    assert "1" in rows
 
 
 def test_discover_filter_user_library_action_from_bundle_snippet() -> None:
-    action = "60199147c9d010842d98602b018a506278c5317f8e"
+    action = "607286a6c5956a391ffaab6aaf6d0d1e526e8034dd"
     snippet = (
-        f'e.s("next-flight-loader","{action}",rn.callServer,void 0,'
-        'rn.findSourceMapURL,"filterUserLibrary");'
+        f'(0,a0.createServerReference)("{action}",a0.callServer,void 0,'
+        'a0.findSourceMapURL,"filterUserLibrary");'
     )
     assert _discover_filter_user_library_action(snippet) == action
+    assert FILTER_USER_LIBRARY_ACTION == action
     assert _discover_filter_user_library_action("nope") is None
     assert not _looks_like_filter_user_library_payload({"results": "bad"})
     assert _looks_like_filter_user_library_payload({"results": [{"title": "X"}]})
@@ -511,12 +526,81 @@ def test_item_from_library_result_games_only() -> None:
     names = {it.name for it in items}
     assert "Celeste" in names
     assert "Hollow Knight" in names
+    assert "Mountain 2.0" in names
     assert "Sample Ebook Only" not in names
-    from urllib.parse import urlparse
-
+    # Shared productEntitlementId must not collapse the bundle into one row.
+    assert len({it.machine_name for it in items}) == len(items)
     celeste = next(it for it in items if it.name == "Celeste")
-    assert celeste.steam_app_id == "504230"
-    assert urlparse(celeste.store_url).hostname == "store.steampowered.com"
+    assert celeste.machine_name == "celeste_steam"
+    assert celeste.gamekey == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert celeste.redeemed is True
+    assert "/home/library/content/celeste_steam" in celeste.store_url
+    hollow = next(it for it in items if it.name == "Hollow Knight")
+    assert hollow.redeemed is False
+    assert "unredeemed key" in _build_row(hollow, None)["tags"]
+    assert "Steam key" in _build_row(celeste, None)["tags"]
+
+
+def test_order_rsc_entitlements_keep_per_game_identity() -> None:
+    text = LIBRARY_ORDER_RSC_FIXTURE.read_text(encoding="utf-8")
+    ents = order_entitlements(text)
+    assert len(ents) >= 12
+    items = [
+        it
+        for it in (item_from_result(row, include_nongames=False) for row in ents)
+        if it
+    ]
+    assert len(items) >= 12
+    assert len({it.machine_name for it in items}) == len(items)
+    assert any(it.machine_name == "celeste_steam" for it in items)
+    assert any(it.machine_name == "mountain" for it in items)
+
+
+def test_rsc_bundle_items_extract() -> None:
+    flight = (
+        '0:{"a":"$@1"}\n'
+        '1:{"bundleItems":[{"id":"ord-1","title":"Sample Bundle","type":"bundle"}],'
+        '"showRedeemed":true}'
+    )
+    orders = extract_bundle_items(flight)
+    assert len(orders) == 1
+    assert orders[0]["id"] == "ord-1"
+
+
+def test_match_cached_row_id_migration() -> None:
+    item = LibraryItem(
+        machine_name="celeste_steam",
+        name="Celeste",
+        image_url=None,
+        store_url="https://www.humblebundle.com/home/library/content/celeste_steam",
+        gamekey="ord-1",
+        redeemed=True,
+        steam_app_id=None,
+    )
+    by_id = {
+        "celeste": {
+            "id": "humble-celeste",
+            "humble_id": "celeste",
+            "name": "Celeste",
+            "hltb_main_hours": 8.0,
+        }
+    }
+    by_title = {"celeste": by_id["celeste"]}
+    hit = match_cached_row(item, by_id, by_title)
+    assert hit is not None
+    assert hit["hltb_main_hours"] == 8.0
+
+
+def test_humble_main_auth_failure_mapping() -> None:
+    assert _humble_main_auth_failure("Humble session expired (url='https://x')")
+    assert _humble_main_auth_failure("HTTP 401 from library")
+    assert _humble_main_auth_failure(
+        "redirected to https://auth.humblebundle.com/login?flow=1"
+    )
+    assert not _humble_main_auth_failure(_CHROME_STUCK := (
+        "Humble page did not load; close other BAKLOG browser windows and retry"
+    ))
+    assert not _humble_main_auth_failure("Humble library blocked by Cloudflare")
 
 
 def test_build_wishlist_row_schema() -> None:

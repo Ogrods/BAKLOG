@@ -43,6 +43,7 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ### Fixed
 - Humble library sync works with Humble's redesigned site and is much faster on large libraries
+- After you accept the first Steam enrich offer, a refused start shows a notice and retries once instead of failing silently
 
 ### Changed
 - Landing and FAQ: packaged beta requires account sign-in; privacy copy notes opt-in Pro cloud sync; Humble wishlist pause called out on the store wall

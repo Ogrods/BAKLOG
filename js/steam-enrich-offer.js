@@ -135,10 +135,42 @@ function enrichLaneBusy(stateForFn) {
   return ENRICH_ORDER.some((key) => !!stateForFn(key));
 }
 
+const ENRICH_OFFER_TOAST_ID = 'steamEnrichOfferNotice';
+/** Past AUTO_ENRICH_COOLDOWN_MS (3s) so a deferred retry can clear the gate. */
+export const STEAM_ENRICH_OFFER_RETRY_MS = 4000;
+
+async function notifyEnrichDidNotStart(deps = {}) {
+  const html =
+    'Enrichment could not start right now. Retrying shortly - or open <strong>Fetcher health</strong> and run enrichers there.';
+  if (typeof deps.notifyFn === 'function') {
+    deps.notifyFn(html);
+    return;
+  }
+  try {
+    const { showNoticeToast } = await import('./notice-toast.js');
+    showNoticeToast({
+      id: ENRICH_OFFER_TOAST_ID,
+      html,
+      variant: 'info',
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
+
+async function refreshFetcherHealthPanel() {
+  try {
+    const { renderDashboardFetcherHealth } = await import('./fetcher/render/dashboard.js');
+    renderDashboardFetcherHealth();
+  } catch {
+    /* non-fatal */
+  }
+}
+
 /**
  * After a successful Steam catalog reload: one-time offer to enrich.
  * @param {Record<string, unknown>} [deps]
- * @returns {Promise<'skipped'|'seen-quiet'|'dismissed'|'enriched'|false>}
+ * @returns {Promise<'skipped'|'seen-quiet'|'dismissed'|'enriched'|'enrich-deferred'|false>}
  */
 export async function maybeShowSteamEnrichOffer(deps = {}) {
   const prefs = deps.prefs ?? state.prefs;
@@ -171,15 +203,18 @@ export async function maybeShowSteamEnrichOffer(deps = {}) {
 
   const confirmFn = deps.confirmFn ?? confirmSteamEnrichOffer;
   const accepted = await confirmFn(hltbPending);
-
-  prefs.steamEnrichOfferSeen = true;
-  if (accepted) {
-    prefs.autoEnrichOnAdd = true;
-  }
   const savePrefsFn = deps.savePrefs ?? savePrefs;
-  savePrefsFn();
 
-  if (!accepted) return 'dismissed';
+  if (!accepted) {
+    prefs.steamEnrichOfferSeen = true;
+    savePrefsFn();
+    return 'dismissed';
+  }
+
+  // Consent stands even if the first bootstrap queue is refused.
+  prefs.autoEnrichOnAdd = true;
+  prefs.steamEnrichOfferSeen = true;
+  savePrefsFn();
 
   const runBootstrap =
     deps.runEnrichBootstrap ??
@@ -188,18 +223,37 @@ export async function maybeShowSteamEnrichOffer(deps = {}) {
       return runEnrichBootstrap(bootstrapDeps);
     });
 
-  await runBootstrap({
+  const bootstrapDeps = {
     ...deps,
     stateFor: stateForFn,
     reason: 'steam-first-offer',
-  });
+  };
+  const started = await runBootstrap(bootstrapDeps);
 
-  try {
-    const { renderDashboardFetcherHealth } = await import('./fetcher/render/dashboard.js');
-    renderDashboardFetcherHealth();
-  } catch {
-    /* non-fatal */
+  if (started) {
+    await refreshFetcherHealthPanel();
+    return 'enriched';
   }
 
-  return 'enriched';
+  await notifyEnrichDidNotStart(deps);
+
+  const delayMs = deps.retryDelayMs ?? STEAM_ENRICH_OFFER_RETRY_MS;
+  const schedule = deps.setTimeoutFn ?? setTimeout;
+  schedule(() => {
+    void (async () => {
+      try {
+        const ok = await runBootstrap({
+          ...bootstrapDeps,
+          reason: 'steam-first-offer-retry',
+          // Fresh clock so cooldown checks use wall time, not the failed call's stub.
+          now: undefined,
+        });
+        if (ok) await refreshFetcherHealthPanel();
+      } catch {
+        /* non-fatal */
+      }
+    })();
+  }, delayMs);
+
+  return 'enrich-deferred';
 }

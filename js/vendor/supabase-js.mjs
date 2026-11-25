@@ -4400,7 +4400,7 @@ Suggested solution: ${env.workaround}`;
 var websocket_factory_default = WebSocketFactory;
 
 // node_modules/@supabase/realtime-js/dist/module/lib/version.js
-var version = "2.119.0";
+var version = "2.119.2";
 
 // node_modules/@supabase/realtime-js/dist/module/lib/constants.js
 var DEFAULT_VERSION = `realtime-js/${version}`;
@@ -9368,6 +9368,12 @@ var BlobDownloadBuilder = class {
     }
   }
 };
+function validateStorageUrl(input, expected) {
+  const url = new URL(input);
+  const prefix = expected.pathname.endsWith("/") ? expected.pathname : `${expected.pathname}/`;
+  if (url.origin !== expected.origin || !url.pathname.startsWith(prefix)) throw new StorageError("Object path escapes the intended bucket endpoint");
+  return url.href;
+}
 var DEFAULT_SEARCH_OPTIONS = {
   limit: 100,
   offset: 0,
@@ -9415,8 +9421,7 @@ var StorageFileApi = class extends BaseApiClient {
       }
       if (fileOptions === null || fileOptions === void 0 ? void 0 : fileOptions.headers) for (const [key, value] of Object.entries(fileOptions.headers)) headers = setHeader(headers, key, value);
       const cleanPath = _this._removeEmptyFolders(path);
-      const _path = _this._getFinalPath(cleanPath);
-      const data = await (method == "PUT" ? put : post)(_this.fetch, `${_this.url}/object/${_path}`, body, _objectSpread22({ headers }, (options === null || options === void 0 ? void 0 : options.duplex) ? { duplex: options.duplex } : {}));
+      const data = await (method == "PUT" ? put : post)(_this.fetch, _this._getRequestUrl("object", cleanPath), body, _objectSpread22({ headers }, (options === null || options === void 0 ? void 0 : options.duplex) ? { duplex: options.duplex } : {}));
       return {
         path: cleanPath,
         id: data.Id,
@@ -9535,10 +9540,9 @@ var StorageFileApi = class extends BaseApiClient {
   async uploadToSignedUrl(path, token, fileBody, fileOptions) {
     var _this3 = this;
     const cleanPath = _this3._removeEmptyFolders(path);
-    const _path = _this3._getFinalPath(cleanPath);
-    const url = new URL(_this3.url + `/object/upload/sign/${_path}`);
-    url.searchParams.set("token", token);
     return _this3.handleOperation(async () => {
+      const url = new URL(_this3._getRequestUrl("object/upload/sign", cleanPath));
+      url.searchParams.set("token", token);
       let body;
       const options = mergeFileOptions(fileOptions);
       let headers = _objectSpread22(_objectSpread22({}, _this3.headers), { "x-upsert": String(options.upsert) });
@@ -9599,10 +9603,9 @@ var StorageFileApi = class extends BaseApiClient {
   async createSignedUploadUrl(path, options) {
     var _this4 = this;
     return _this4.handleOperation(async () => {
-      let _path = _this4._getFinalPath(path);
       const headers = _objectSpread22({}, _this4.headers);
       if (options === null || options === void 0 ? void 0 : options.upsert) headers["x-upsert"] = "true";
-      const data = await post(_this4.fetch, `${_this4.url}/object/upload/sign/${_path}`, {}, { headers });
+      const data = await post(_this4.fetch, _this4._getRequestUrl("object/upload/sign", path), {}, { headers });
       const url = new URL(_this4.url + data.url);
       const token = url.searchParams.get("token");
       if (!token) throw new StorageError("No token returned by API");
@@ -9845,9 +9848,8 @@ var StorageFileApi = class extends BaseApiClient {
   async createSignedUrl(path, expiresIn, options) {
     var _this8 = this;
     return _this8.handleOperation(async () => {
-      let _path = _this8._getFinalPath(path);
       const hasTransform = typeof (options === null || options === void 0 ? void 0 : options.transform) === "object" && options.transform !== null && Object.keys(options.transform).length > 0;
-      let data = await post(_this8.fetch, `${_this8.url}/object/sign/${_path}`, _objectSpread22(_objectSpread22({ expiresIn }, hasTransform ? { transform: options.transform } : {}), (options === null || options === void 0 ? void 0 : options.versionId) != null ? { versionId: options.versionId } : {}), { headers: _this8.headers });
+      let data = await post(_this8.fetch, _this8._getRequestUrl("object/sign", path), _objectSpread22(_objectSpread22({ expiresIn }, hasTransform ? { transform: options.transform } : {}), (options === null || options === void 0 ? void 0 : options.versionId) != null ? { versionId: options.versionId } : {}), { headers: _this8.headers });
       const query = new URLSearchParams();
       if (options === null || options === void 0 ? void 0 : options.download) query.set("download", options.download === true ? "" : options.download);
       if ((options === null || options === void 0 ? void 0 : options.cacheNonce) != null) query.set("cacheNonce", String(options.cacheNonce));
@@ -9987,8 +9989,7 @@ var StorageFileApi = class extends BaseApiClient {
     if ((options === null || options === void 0 ? void 0 : options.cacheNonce) != null) query.set("cacheNonce", String(options.cacheNonce));
     if ((options === null || options === void 0 ? void 0 : options.versionId) != null) query.set("versionId", String(options.versionId));
     const queryString = query.toString();
-    const _path = this._getFinalPath(path);
-    const downloadFn = () => get(this.fetch, `${this.url}/${renderPath}/${_path}${queryString ? `?${queryString}` : ""}`, {
+    const downloadFn = () => get(this.fetch, this._getRequestUrl(renderPath, path, { queryString }), {
       headers: this.headers,
       noResolveJson: true
     }, parameters);
@@ -10021,12 +10022,11 @@ var StorageFileApi = class extends BaseApiClient {
   */
   async info(path, options) {
     var _this10 = this;
-    const _path = _this10._getFinalPath(path);
     const query = new URLSearchParams();
     if ((options === null || options === void 0 ? void 0 : options.versionId) != null) query.set("versionId", String(options.versionId));
     const queryString = query.toString();
     return _this10.handleOperation(async () => {
-      return recursiveToCamel(await get(_this10.fetch, `${_this10.url}/object/info/${_path}${queryString ? `?${queryString}` : ""}`, { headers: _this10.headers }));
+      return recursiveToCamel(await get(_this10.fetch, _this10._getRequestUrl("object/info", path, { queryString }), { headers: _this10.headers }));
     });
   }
   /**
@@ -10229,11 +10229,13 @@ var StorageFileApi = class extends BaseApiClient {
   async purgeCache(path, options, parameters) {
     var _this13 = this;
     return _this13.handleOperation(async () => {
-      const _path = encodeStoragePath(_this13._getFinalPath(path));
       const query = new URLSearchParams();
       if (options === null || options === void 0 ? void 0 : options.transformations) query.set("transformations", "true");
       const queryString = query.toString();
-      return await remove(_this13.fetch, `${_this13.url}/cdn/${_path}${queryString ? `?${queryString}` : ""}`, {}, { headers: _this13.headers }, parameters);
+      return await remove(_this13.fetch, _this13._getRequestUrl("cdn", path, {
+        encodePath: true,
+        queryString
+      }), {}, { headers: _this13.headers }, parameters);
     });
   }
   /**
@@ -10413,6 +10415,20 @@ var StorageFileApi = class extends BaseApiClient {
     if (typeof Buffer !== "undefined") return Buffer.from(data).toString("base64");
     return btoa(data);
   }
+  /** Builds a request URL and checks that it stays within the intended Storage route and bucket. */
+  _getRequestUrl(route, path, { encodePath = false, queryString = "" } = {}) {
+    const finalPath = this._getFinalPath(path);
+    const bucket = encodePath ? encodeStoragePath(String(this.bucketId)) : this.bucketId;
+    const url = `${this.url}/${route}/${encodePath ? encodeStoragePath(finalPath) : finalPath}${queryString ? `?${queryString}` : ""}`;
+    const routeUrl = new URL(`${this.url}/${route}/`);
+    const requestUrl = validateStorageUrl(url, routeUrl);
+    const bucketUrl = new URL(`${this.url}/${route}/${bucket}/`);
+    if (bucketUrl.pathname.startsWith(routeUrl.pathname)) {
+      const bucketSegment = bucketUrl.pathname.slice(routeUrl.pathname.length).split("/")[0];
+      if (bucketSegment) bucketUrl.pathname = `${routeUrl.pathname}${bucketSegment}/`;
+    }
+    return validateStorageUrl(requestUrl, bucketUrl);
+  }
   _getFinalPath(path) {
     return `${this.bucketId}/${path.replace(/^\/+/, "")}`;
   }
@@ -10429,7 +10445,7 @@ var StorageFileApi = class extends BaseApiClient {
     return query;
   }
 };
-var version2 = "2.119.0";
+var version2 = "2.119.2";
 var DEFAULT_HEADERS = { "X-Client-Info": `storage-js/${version2}` };
 var StorageBucketApi = class extends BaseApiClient {
   constructor(url, headers = {}, fetch$1, opts) {
@@ -11987,7 +12003,7 @@ var StorageClient = class extends StorageBucketApi {
 };
 
 // node_modules/@supabase/auth-js/dist/module/lib/version.js
-var version3 = "2.119.0";
+var version3 = "2.119.2";
 
 // node_modules/@supabase/auth-js/dist/module/lib/constants.js
 var AUTO_REFRESH_TICK_DURATION_MS = 30 * 1e3;
@@ -20317,24 +20333,116 @@ var AuthClient = GoTrueClient_default;
 var AuthClient_default = AuthClient;
 
 // node_modules/@supabase/supabase-js/dist/index.mjs
-var version4 = "2.119.0";
-var JS_ENV = "";
-var JS_RUNTIME_VERSION;
-if (typeof Deno !== "undefined") {
-  JS_ENV = "deno";
-  JS_RUNTIME_VERSION = (_Deno$version = Deno.version) === null || _Deno$version === void 0 ? void 0 : _Deno$version.deno;
-} else if (typeof document !== "undefined") JS_ENV = "web";
-else if (typeof navigator !== "undefined" && navigator.product === "ReactNative") JS_ENV = "react-native";
-else {
-  JS_ENV = "node";
-  const _process = globalThis["process"];
-  JS_RUNTIME_VERSION = _process === null || _process === void 0 || (_process$version = _process["version"]) === null || _process$version === void 0 ? void 0 : _process$version.replace(/^v/, "");
+var version4 = "2.119.2";
+function _typeof3(o) {
+  "@babel/helpers - typeof";
+  return _typeof3 = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o$1) {
+    return typeof o$1;
+  } : function(o$1) {
+    return o$1 && "function" == typeof Symbol && o$1.constructor === Symbol && o$1 !== Symbol.prototype ? "symbol" : typeof o$1;
+  }, _typeof3(o);
 }
-var _Deno$version;
-var _process$version;
-var _runtimeMeta = [`runtime=${JS_ENV}`];
-if (JS_RUNTIME_VERSION) _runtimeMeta.push(`runtime-version=${JS_RUNTIME_VERSION}`);
-var DEFAULT_HEADERS3 = { "X-Client-Info": `supabase-js/${version4}; ${_runtimeMeta.join("; ")}` };
+function toPrimitive3(t, r) {
+  if ("object" != _typeof3(t) || !t) return t;
+  var e = t[Symbol.toPrimitive];
+  if (void 0 !== e) {
+    var i = e.call(t, r || "default");
+    if ("object" != _typeof3(i)) return i;
+    throw new TypeError("@@toPrimitive must return a primitive value.");
+  }
+  return ("string" === r ? String : Number)(t);
+}
+function toPropertyKey3(t) {
+  var i = toPrimitive3(t, "string");
+  return "symbol" == _typeof3(i) ? i : i + "";
+}
+function _defineProperty3(e, r, t) {
+  return (r = toPropertyKey3(r)) in e ? Object.defineProperty(e, r, {
+    value: t,
+    enumerable: true,
+    configurable: true,
+    writable: true
+  }) : e[r] = t, e;
+}
+function ownKeys3(e, r) {
+  var t = Object.keys(e);
+  if (Object.getOwnPropertySymbols) {
+    var o = Object.getOwnPropertySymbols(e);
+    r && (o = o.filter(function(r$1) {
+      return Object.getOwnPropertyDescriptor(e, r$1).enumerable;
+    })), t.push.apply(t, o);
+  }
+  return t;
+}
+function _objectSpread23(e) {
+  for (var r = 1; r < arguments.length; r++) {
+    var t = null != arguments[r] ? arguments[r] : {};
+    r % 2 ? ownKeys3(Object(t), true).forEach(function(r$1) {
+      _defineProperty3(e, r$1, t[r$1]);
+    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys3(Object(t)).forEach(function(r$1) {
+      Object.defineProperty(e, r$1, Object.getOwnPropertyDescriptor(t, r$1));
+    });
+  }
+  return e;
+}
+function asString(value) {
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function detectDenoPlatform(globals) {
+  if (typeof globals.EdgeRuntime === "object" && globals.EdgeRuntime !== null) return {
+    platform: "edge-runtime",
+    platformVersion: asString(globals.SUPABASE_VERSION)
+  };
+  if (typeof globals.Netlify !== "undefined") return { platform: "netlify-edge" };
+  return {};
+}
+function detectElectronFromUserAgent(userAgent) {
+  var _userAgent$match;
+  const electronVersion = userAgent === null || userAgent === void 0 || (_userAgent$match = userAgent.match(/\bElectron\/([\w.-]+)/)) === null || _userAgent$match === void 0 ? void 0 : _userAgent$match[1];
+  return electronVersion ? {
+    framework: "electron",
+    frameworkVersion: electronVersion
+  } : {};
+}
+function detectClientEnvironment(globals = globalThis) {
+  var _globals$navigator, _globals$navigator2, _globals$process, _asString, _globals$process2;
+  const userAgent = asString((_globals$navigator = globals.navigator) === null || _globals$navigator === void 0 ? void 0 : _globals$navigator.userAgent);
+  if (userAgent === "Cloudflare-Workers") return { platform: "cloudflare-workers" };
+  if (typeof globals.Deno !== "undefined") {
+    var _globals$Deno$version;
+    return _objectSpread23(_objectSpread23({}, detectDenoPlatform(globals)), {}, {
+      runtime: "deno",
+      runtimeVersion: asString((_globals$Deno$version = globals.Deno.version) === null || _globals$Deno$version === void 0 ? void 0 : _globals$Deno$version.deno)
+    });
+  }
+  if (typeof globals.Bun !== "undefined") return {
+    runtime: "bun",
+    runtimeVersion: asString(globals.Bun.version)
+  };
+  if (typeof globals.EdgeRuntime === "string") return { platform: "vercel-edge-runtime" };
+  if (((_globals$navigator2 = globals.navigator) === null || _globals$navigator2 === void 0 ? void 0 : _globals$navigator2.product) === "ReactNative") return { framework: "react-native" };
+  if (typeof globals.document !== "undefined" || typeof globals.WorkerGlobalScope !== "undefined") return _objectSpread23({ platform: "browser" }, detectElectronFromUserAgent(userAgent));
+  const processVersions = (_globals$process = globals.process) === null || _globals$process === void 0 ? void 0 : _globals$process["versions"];
+  const electronVersion = asString(processVersions === null || processVersions === void 0 ? void 0 : processVersions["electron"]);
+  return _objectSpread23({
+    runtime: "node",
+    runtimeVersion: (_asString = asString((_globals$process2 = globals.process) === null || _globals$process2 === void 0 ? void 0 : _globals$process2["version"])) === null || _asString === void 0 ? void 0 : _asString.replace(/^v/, "")
+  }, electronVersion ? {
+    framework: "electron",
+    frameworkVersion: electronVersion
+  } : {});
+}
+function formatClientEnvironment(environment) {
+  return [
+    ["platform", environment.platform],
+    ["platform-version", environment.platformVersion],
+    ["runtime", environment.runtime],
+    ["runtime-version", environment.runtimeVersion],
+    ["framework", environment.framework],
+    ["framework-version", environment.frameworkVersion]
+  ].filter(([, value]) => value).map(([key, value]) => `${key}=${value}`);
+}
+var DEFAULT_HEADERS3 = { "X-Client-Info": [`supabase-js/${version4}`, ...formatClientEnvironment(detectClientEnvironment())].join("; ") };
 var DEFAULT_GLOBAL_OPTIONS = { headers: DEFAULT_HEADERS3 };
 var DEFAULT_DB_OPTIONS = { schema: "public" };
 var DEFAULT_AUTH_OPTIONS = {
@@ -20407,57 +20515,6 @@ function getDefaultPropagationTargets(supabaseUrl) {
   targets.push("*.supabase.co", "*.supabase.in");
   targets.push("localhost", "127.0.0.1", "[::1]");
   return targets;
-}
-function _typeof3(o) {
-  "@babel/helpers - typeof";
-  return _typeof3 = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o$1) {
-    return typeof o$1;
-  } : function(o$1) {
-    return o$1 && "function" == typeof Symbol && o$1.constructor === Symbol && o$1 !== Symbol.prototype ? "symbol" : typeof o$1;
-  }, _typeof3(o);
-}
-function toPrimitive3(t, r) {
-  if ("object" != _typeof3(t) || !t) return t;
-  var e = t[Symbol.toPrimitive];
-  if (void 0 !== e) {
-    var i = e.call(t, r || "default");
-    if ("object" != _typeof3(i)) return i;
-    throw new TypeError("@@toPrimitive must return a primitive value.");
-  }
-  return ("string" === r ? String : Number)(t);
-}
-function toPropertyKey3(t) {
-  var i = toPrimitive3(t, "string");
-  return "symbol" == _typeof3(i) ? i : i + "";
-}
-function _defineProperty3(e, r, t) {
-  return (r = toPropertyKey3(r)) in e ? Object.defineProperty(e, r, {
-    value: t,
-    enumerable: true,
-    configurable: true,
-    writable: true
-  }) : e[r] = t, e;
-}
-function ownKeys3(e, r) {
-  var t = Object.keys(e);
-  if (Object.getOwnPropertySymbols) {
-    var o = Object.getOwnPropertySymbols(e);
-    r && (o = o.filter(function(r$1) {
-      return Object.getOwnPropertyDescriptor(e, r$1).enumerable;
-    })), t.push.apply(t, o);
-  }
-  return t;
-}
-function _objectSpread23(e) {
-  for (var r = 1; r < arguments.length; r++) {
-    var t = null != arguments[r] ? arguments[r] : {};
-    r % 2 ? ownKeys3(Object(t), true).forEach(function(r$1) {
-      _defineProperty3(e, r$1, t[r$1]);
-    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys3(Object(t)).forEach(function(r$1) {
-      Object.defineProperty(e, r$1, Object.getOwnPropertyDescriptor(t, r$1));
-    });
-  }
-  return e;
 }
 var resolveFetch4 = (customFetch) => {
   if (customFetch) return (...args) => customFetch(...args);

@@ -17,18 +17,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 from clients.hltb_client import HltbClient
 from clients.itch_game import itch_is_videogame as _itch_is_videogame
-from fetchers._base import catalog_file, write_catalog_text
+from fetchers._base import catalog_file, configure_stdout, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
-
-sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+from shared.safe_write import safe_write_text
 
 
 def mapping_file() -> Path:
@@ -88,9 +86,7 @@ def save_mapping(mapping: dict) -> None:
     mapping["fetched_at"] = datetime.now(UTC).isoformat()
     path = mapping_file()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    safe_write_text(path, json.dumps(mapping, indent=2, ensure_ascii=False))
 
 
 def _flush_catalog(rel: Path, data: dict, games: list) -> None:
@@ -111,6 +107,7 @@ def main() -> int:
         help="Only enrich one store (default: all).",
     )
     args = parser.parse_args()
+    configure_stdout()
 
     t0 = started("enrich_hltb")
     stats = RunStats()

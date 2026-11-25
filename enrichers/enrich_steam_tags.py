@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,13 +43,12 @@ from clients.steam_metadata import (
     apply_enrichment_to_row,
     enrichment_from_appdetails,
 )
-from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, write_catalog_text
+from fetchers._base import STEAM_CREDENTIALS_HINT, catalog_file, configure_stdout, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
+from shared.safe_write import safe_write_text
 
 HEARTBEAT_EVERY = 25  # Steam API lookups between progress lines (avoids server stall-kill)
-
-sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
 def mapping_file() -> Path:
     return cache_json_path("steam_review_map.json")
@@ -117,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Show counts without writing JSON back to disk.",
     )
     args = parser.parse_args(argv)
+    configure_stdout()
     t0 = started("enrich_steam_tags")
     stats = RunStats()
 
@@ -229,7 +228,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.dry_run:
         meta = meta_file()
         meta.parent.mkdir(parents=True, exist_ok=True)
-        meta.write_text(
+        safe_write_text(
+            meta,
             json.dumps(
                 {
                     "fetched_at": datetime.now(UTC).isoformat(),
@@ -240,7 +240,6 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
                 ensure_ascii=False,
             ),
-            encoding="utf-8",
         )
 
     return stats.finish(

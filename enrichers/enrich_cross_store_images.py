@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import sys
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,12 +14,12 @@ import requests
 from dotenv import load_dotenv
 
 from clients.itch_game import itch_is_videogame as _itch_is_videogame
-from fetchers._base import catalog_file, write_catalog_text
+from fetchers._base import catalog_file, configure_stdout, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
+from shared.safe_write import safe_write_text
 from shared.steam_match import pick_appid
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 load_dotenv()
 
 SEARCH_URL = "https://store.steampowered.com/api/storesearch/"
@@ -189,6 +188,7 @@ def main() -> int:
         help="Re-source native-store art (non-steamstatic URLs) to sharper Steam CDN images.",
     )
     args = parser.parse_args()
+    configure_stdout()
 
     t0 = started("enrich_cross_store_images")
     stats = RunStats()
@@ -331,7 +331,8 @@ def main() -> int:
 
     meta = meta_file()
     meta.parent.mkdir(parents=True, exist_ok=True)
-    meta.write_text(
+    safe_write_text(
+        meta,
         json.dumps(
             {
                 "fetched_at": datetime.now(UTC).isoformat(),
@@ -342,7 +343,6 @@ def main() -> int:
             },
             indent=2,
         ),
-        encoding="utf-8",
     )
     print(
         f"\nUpdated {updated} games with Steam CDN images. "

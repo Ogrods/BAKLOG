@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -25,11 +24,10 @@ from pathlib import Path
 import requests
 
 from clients.itch_game import itch_is_videogame as _itch_is_videogame
-from fetchers._base import catalog_file, write_catalog_text
+from fetchers._base import catalog_file, configure_stdout, write_catalog_text
 from fetchers._progress import HeartbeatTimer, RunStats, started
 from shared.profile_paths import cache_json_path
-
-sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+from shared.safe_write import safe_write_text
 
 SUMMARY_URL = "https://www.protondb.com/api/v1/reports/summaries/{appid}.json"
 HEADERS = {"User-Agent": "Mozilla/5.0 backlog/1.0"}
@@ -93,7 +91,7 @@ def save_mapping(mapping: dict) -> None:
     mapping["fetched_at"] = datetime.now(UTC).isoformat()
     path = mapping_file()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(mapping, indent=2, ensure_ascii=False), encoding="utf-8")
+    safe_write_text(path, json.dumps(mapping, indent=2, ensure_ascii=False))
 
 
 def effective_tier(summary: dict) -> str | None:
@@ -193,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Re-fetch summaries even when rows already have protondb_tier.",
     )
     args = parser.parse_args(argv)
+    configure_stdout()
     t0 = started("enrich_protondb")
     stats = RunStats()
 

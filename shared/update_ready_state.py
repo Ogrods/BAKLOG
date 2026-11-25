@@ -78,10 +78,12 @@ def is_update_apply_in_progress(
     if not path.is_file():
         return False
     try:
-        age = time.time() - path.stat().st_mtime
+        # Clamp negative age (future mtime from FS rounding / mild clock skew on
+        # Windows runners) so a just-written lock is never treated as absent.
+        age = max(0.0, time.time() - path.stat().st_mtime)
     except OSError:
         return False
-    if age < 0 or age > max_age_sec:
+    if age > max_age_sec:
         return False
     return True
 

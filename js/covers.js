@@ -175,20 +175,24 @@ window.applySpotlightArtFit = function (img) {
 
   if (crop.portrait && bg) {
     img.style.objectFit = crop.fit;
-    img.style.objectPosition = stackPos || crop.pos;
+    // Poster card is sized in CSS (aspect-ratio 2/3); keep focal center. Stacked
+    // park is also CSS (right tuck) - do not stamp landscape 66% object-position.
+    img.style.objectPosition = "center";
+    img.style.setProperty("mask-image", "none");
+    img.style.setProperty("-webkit-mask-image", "none");
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
     spot.classList.remove("is-lowres-art");
     assignPortraitAnimClass(spot);
     bg.classList.add("is-loaded");
-    if (sheen) {
-      const w = Math.min(spot.clientWidth, spot.clientHeight * ratio);
-      sheen.style.width = `${w}px`;
-    }
+    // Sheen shares the CSS 2:3 poster box; clear any prior inline width.
+    if (sheen) sheen.style.width = "";
   } else {
     spot.classList.remove("has-portrait-art");
     clearPortraitAnimClasses(spot);
     if (sheen) sheen.style.width = "";
+    img.style.removeProperty("mask-image");
+    img.style.removeProperty("-webkit-mask-image");
 
     const slotW = (spot.clientWidth || 0) * (window.devicePixelRatio || 1);
     const lowRes = img.naturalWidth > 0 && slotW > 0

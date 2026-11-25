@@ -7140,6 +7140,9 @@ html[data-theme="ember"] .brand-logo-pills {
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
   transition: opacity var(--spotlight-fade) ease;
+  /* Blur stays full-bleed; do not inherit the landscape hero left-fade. */
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .dash-spotlight-art-bg.is-loaded {
   opacity: 1;
@@ -7416,14 +7419,34 @@ html[data-theme="dark"]
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg.is-loaded {
   animation: spotlightPortraitBgDrift 14s ease-in-out infinite;
 }
+/* Portrait capsule: real 2:3 poster card (not full-bleed hero). Center with
+   left/right + margin so float keyframes can own `transform`. Show the whole
+   cover (contain); clear the landscape left-fade so titles are not clipped. */
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
+  inset: auto;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: auto;
+  height: calc(100% - 20px);
+  max-width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: contain;
+  object-position: center;
+  box-sizing: border-box;
+  padding: 0;
+  border-radius: 4px;
+  /* Clip float wobble inside the poster so edge titles stay visible. */
+  overflow: hidden;
+  filter: brightness(1.32);
+  -webkit-mask-image: none;
+  mask-image: none;
   transition:
     opacity var(--spotlight-fade) ease,
     transform 0.35s ease,
     filter 0.35s ease;
-  box-sizing: border-box;
-  padding: 10px 0;
-  filter: brightness(1.32);
 }
 @keyframes spotlightSheen1 {
   0%,
@@ -7497,60 +7520,69 @@ html[data-theme="dark"]
     opacity: 0;
   }
 }
+/* Milder rotateY so edge-to-edge capsule titles stay inside the poster clip. */
 @keyframes spotlightFloat1 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(-3deg) rotateX(1deg) translateY(0)
+    transform: perspective(900px) rotateY(-2deg) rotateX(0.8deg) translateY(0)
       translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(3deg) rotateX(-1deg)
+    transform: perspective(900px) rotateY(2deg) rotateX(-0.8deg)
       translateY(-1.5px) translateZ(0);
   }
 }
 @keyframes spotlightFloat2 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(3deg) rotateX(-1deg) translateY(0)
+    transform: perspective(900px) rotateY(2deg) rotateX(-0.8deg) translateY(0)
       translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(-3deg) rotateX(1deg)
+    transform: perspective(900px) rotateY(-2deg) rotateX(0.8deg)
       translateY(-1.5px) translateZ(0);
   }
 }
 @keyframes spotlightFloat3 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(-4deg) rotateX(1.2deg) translateY(0)
+    transform: perspective(900px) rotateY(-2.5deg) rotateX(1deg) translateY(0)
       translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(4deg) rotateX(-1.2deg)
+    transform: perspective(900px) rotateY(2.5deg) rotateX(-1deg)
       translateY(-1.5px) translateZ(0);
   }
 }
 @keyframes spotlightFloat4 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(2.5deg) rotateX(-0.8deg) translateY(0)
+    transform: perspective(900px) rotateY(1.8deg) rotateX(-0.6deg) translateY(0)
       translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(-2.5deg) rotateX(0.8deg)
+    transform: perspective(900px) rotateY(-1.8deg) rotateX(0.6deg)
       translateY(-1px) translateZ(0);
   }
 }
 .dash-spotlight-sheen {
   display: none;
 }
+/* Same 2:3 poster box as the foreground art (margin-centered, no translate). */
 .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
   display: block;
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  inset: auto;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: auto;
+  height: calc(100% - 20px);
+  max-width: 100%;
+  aspect-ratio: 2 / 3;
+  transform: none;
   z-index: 1;
   pointer-events: none;
   overflow: hidden;
@@ -8136,11 +8168,18 @@ html.ui-resizing
   .dash-spotlight.is-lowres-art .dash-spotlight-art {
     object-position: 66% 40%;
   }
+  /* Portrait poster: tuck to the right (same visual park as before) without
+     translateX so float keyframes keep sole ownership of transform. */
   .dash-spotlight.has-portrait-art .dash-spotlight-art {
-    object-position: 66% 40%;
+    left: auto;
+    right: 14px;
+    margin-inline: 0;
+    object-position: center;
   }
   .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
-    left: 66%;
+    left: auto;
+    right: 14px;
+    margin-inline: 0;
   }
   .dash-spotlight-body {
     left: 16px;

@@ -37,9 +37,16 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.24] - 2026-11-25
+
 ### Fixed
 
 - Library count +1 animation no longer sticks after the roll finishes and blocks later counter or chart updates
+- Landing page: dual scrollbars and hard hero-mesh clip edges cleaned up; magic scrub centers on tall viewports
+
+### Changed
+
+- Landing CTAs flattened and accent chrome simplified; hero mesh uses a softer sweep
 
 ## [0.9.23] - 2026-11-25
 

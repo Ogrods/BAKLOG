@@ -157,7 +157,7 @@
       flex-direction: column;
       overflow-x: hidden;
       isolation: isolate;
-      --hero-mesh-dur: 28s;
+      --hero-mesh-dur: 16s;
     }
     .hero-inner {
       margin: auto;
@@ -193,9 +193,9 @@
       inset: -28% -16% auto -16%;
       height: 135%;
       background:
-        radial-gradient(42% 40% at 22% 28%, rgba(56, 189, 248, 0.16), transparent 68%),
-        radial-gradient(48% 42% at 88% 8%, rgba(168, 85, 247, 0.14), transparent 65%),
-        radial-gradient(36% 34% at 62% 42%, rgba(34, 211, 238, 0.10), transparent 70%);
+        radial-gradient(42% 40% at 22% 28%, rgba(56, 189, 248, 0.22), transparent 68%),
+        radial-gradient(48% 42% at 88% 8%, rgba(168, 85, 247, 0.18), transparent 65%),
+        radial-gradient(36% 34% at 62% 42%, rgba(34, 211, 238, 0.12), transparent 70%);
       opacity: 0.7;
     }
     @media (prefers-reduced-motion: no-preference) {
@@ -207,12 +207,12 @@
       }
     }
     @keyframes hero-mesh-a {
-      from { transform: translate3d(-4%, 2%, 0) scale(1.03); opacity: 0.85; }
-      to   { transform: translate3d(5%, -3%, 0) scale(1.08); opacity: 1; }
+      from { transform: translate3d(-9%, 3%, 0) scale(1.05); opacity: 0.7; }
+      to   { transform: translate3d(10%, -4%, 0) scale(1.12); opacity: 1; }
     }
     @keyframes hero-mesh-b {
-      from { transform: translate3d(5%, -2%, 0) scale(1.06); opacity: 0.75; }
-      to   { transform: translate3d(-6%, 3%, 0) scale(1.02); opacity: 0.45; }
+      from { transform: translate3d(10%, -3%, 0) scale(1.10); opacity: 0.9; }
+      to   { transform: translate3d(-11%, 4%, 0) scale(1.04); opacity: 0.35; }
     }
 
     .hero-mark-wrap {

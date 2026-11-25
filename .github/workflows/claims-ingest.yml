@@ -49,7 +49,7 @@ jobs:
     permissions:
       actions: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Report feed PR CI approval target
         env:
@@ -73,7 +73,7 @@ jobs:
       INTERNAL_DIR: .internal-claims
       DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Private token present
         id: has_token
@@ -84,7 +84,7 @@ jobs:
 
       - name: Check out private decisions
         if: steps.has_token.outputs.present == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: ${{ env.INTERNAL_REPO }}
           token: ${{ secrets.BAKLOG_INTERNAL_TOKEN }}
@@ -106,7 +106,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.11"
           cache: pip
@@ -179,7 +179,7 @@ jobs:
 
       - name: Upload audit artifacts on failure
         if: failure() && steps.audit.outcome == 'failure'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: claims-audit-findings
           path: |

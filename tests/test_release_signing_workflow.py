@@ -16,7 +16,9 @@ WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 SIGN_SCRIPT = ROOT / "scripts" / "sign_windows_artifacts.ps1"
 BUILD_SCRIPT = ROOT / "packaging" / "build_windows.ps1"
 
-SIGN_ACTION = "azure/artifact-signing-action@v2"
+# SHA-pinned in release.yml (version tag kept as a trailing comment).
+SIGN_ACTION = "azure/artifact-signing-action@"
+LOGIN_ACTION = "azure/login@"
 
 
 def _windows_job() -> str:
@@ -63,7 +65,7 @@ def test_signing_steps_gated_on_signing_enabled() -> None:
     job = _windows_job()
     assert "SIGNING_ENABLED: ${{ vars.SIGNING_ENABLED }}" in _job_header(job)
     steps = _steps(job)
-    gated_markers = ("azure/login@", SIGN_ACTION, "sign_windows_artifacts.ps1")
+    gated_markers = (LOGIN_ACTION, SIGN_ACTION, "sign_windows_artifacts.ps1")
     gated = [s for s in steps if any(m in s for m in gated_markers)]
     assert len(gated) >= 7
     for step in gated:
@@ -97,7 +99,7 @@ def test_bundle_signed_before_installer_and_installer_signed_before_upload() -> 
     assert bundle < sign_bundle < verify_bundle < package < sign_setup < verify_setup
     assert verify_setup < install_smoke < attest < publish
 
-    logins = _all_indexes(steps, "azure/login@v3")
+    logins = _all_indexes(steps, LOGIN_ACTION)
     assert len(logins) == 2
     assert logins[0] < sign_bundle and package < logins[1] < sign_setup
 

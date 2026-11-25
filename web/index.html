@@ -654,23 +654,33 @@
     .magic-scrub-pin {
       position: sticky;
       top: 0;
-      min-height: 100vh;
-      min-height: 100dvh;
+      min-height: min(100vh, 760px);
+      min-height: min(100dvh, 760px);
       display: grid;
-      place-items: center;
-      padding: 1.75rem 1.25rem 2rem;
-      text-align: center;
+      grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+      align-items: center;
+      gap: 1.75rem 2.5rem;
+      padding: 2rem 2rem 2.35rem;
+      text-align: left;
       box-sizing: border-box;
       border-radius: 18px;
       border: 1px solid var(--border-subtle);
       background: linear-gradient(160deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.6));
       overflow: hidden; /* clip progress bar to pin radius; sticky lives on this node so this is safe */
     }
-    .magic-scrub-pin > .magic-stage {
+    .magic-copy {
+      position: relative;
+      display: grid;
+      align-items: center;
+      min-width: 0;
+      min-height: 11rem;
+      z-index: 1;
+    }
+    .magic-copy > .magic-stage {
       grid-area: 1 / 1;
     }
     .magic-stage {
-      width: min(100%, 34rem);
+      width: 100%;
       max-width: 100%;
       opacity: 0;
       transform: translateY(10px);
@@ -712,7 +722,7 @@
     .magic-chips {
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 0.45rem;
       margin-top: 1.1rem;
     }
@@ -744,6 +754,38 @@
       margin-top: 0.35rem;
       font-variant-numeric: tabular-nums;
     }
+    .magic-visual {
+      --magic-drift: 0;
+      position: relative;
+      min-width: 0;
+      z-index: 0;
+    }
+    .magic-visual-frame {
+      position: relative;
+      aspect-ratio: 16 / 10;
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.65);
+      box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
+      transform: translateY(calc(var(--magic-drift) * 1%));
+      will-change: transform;
+    }
+    .magic-visual-frame img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+    }
+    .magic-visual-frame img.is-active {
+      opacity: 1;
+    }
     .magic-scrub-progress {
       position: absolute;
       left: 0;
@@ -758,6 +800,14 @@
       width: 0%;
       background: linear-gradient(90deg, var(--accent), #a855f7);
       transform-origin: left center;
+    }
+    @media (max-width: 900px) {
+      .magic-scrub-pin {
+        grid-template-columns: 1fr;
+        gap: 1.35rem;
+        padding: 1.5rem 1.35rem 1.85rem;
+      }
+      .magic-copy { min-height: 0; }
     }
     @media (max-width: 768px) {
       .magic-scrub { overflow: visible; }
@@ -775,7 +825,13 @@
         background: transparent;
         border-radius: 0;
       }
-      .magic-scrub-pin > .magic-stage {
+      .magic-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        min-height: 0;
+      }
+      .magic-copy > .magic-stage {
         grid-area: auto;
         width: 100%;
         max-width: none;
@@ -791,6 +847,7 @@
         border: 1px solid var(--border-subtle);
         background: rgba(15, 23, 42, 0.55);
       }
+      .magic-visual { display: none; }
       .magic-chip { opacity: 1; transform: none; }
       .magic-chips { justify-content: flex-start; }
       .magic-scrub-progress { display: none; }
@@ -941,13 +998,13 @@
       .hero-moment { font-size: 0.88rem; }
       .wordmark { letter-spacing: 0.12em; }
       .magic-scrub-pin { padding: 0.75rem; }
-      .magic-scrub-pin > .magic-stage { padding: 0.9rem 0.95rem; }
+      .magic-copy > .magic-stage { padding: 0.9rem 0.95rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
       .hero-mark, .wordmark, .hero-tagline, .hero-subhead, .hero-moment, .hero-store-strip, .hero-store-caption, .waitlist, .hero-peek { animation: none; }
-      .card, .btn, .hero-peek a, .proof-strip a, .magic-stage, .magic-chip { transition: none; }
+      .card, .btn, .hero-peek a, .proof-strip a, .magic-stage, .magic-chip, .magic-visual-frame img { transition: none; }
       .reveal-rise,
       .features-grid > .card,
       .steps > .step,
@@ -969,7 +1026,13 @@
         background: transparent;
         border-radius: 0;
       }
-      .magic-scrub-pin > .magic-stage {
+      .magic-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        min-height: 0;
+      }
+      .magic-copy > .magic-stage {
         grid-area: auto;
         width: 100%;
         opacity: 1;
@@ -982,6 +1045,8 @@
         border: 1px solid var(--border-subtle);
         background: rgba(15, 23, 42, 0.55);
       }
+      .magic-visual { display: none; }
+      .magic-visual-frame { transform: none; }
       .magic-chip { opacity: 1; transform: none; }
       .magic-scrub-progress { display: none; }
     }
@@ -1130,28 +1195,62 @@
       <div class="magic-scrub" id="magicScrub" data-magic-scrub>
         <div class="magic-scrub-track">
           <div class="magic-scrub-pin" role="group" aria-label="Library import story">
-            <div class="magic-stage is-active" data-stage="0">
-              <span class="stage-kicker">Step 1</span>
-              <h3>Connect a store</h3>
-              <p>Sign-in opens Chrome or Edge on this PC. Credentials encrypt to disk with your OS keychain.</p>
-            </div>
-            <div class="magic-stage" data-stage="1">
-              <span class="stage-kicker">Step 2</span>
-              <h3>Fetcher chips light up</h3>
-              <p>Each connected store fetches from your IP. Chips flip on as libraries land.</p>
-              <div class="magic-chips" aria-hidden="true">
-                <span class="magic-chip" data-chip="0">Steam</span>
-                <span class="magic-chip" data-chip="1">Epic</span>
-                <span class="magic-chip" data-chip="2">GOG</span>
-                <span class="magic-chip" data-chip="3">Xbox</span>
-                <span class="magic-chip" data-chip="4">PSN</span>
+            <div class="magic-copy">
+              <div class="magic-stage is-active" data-stage="0">
+                <span class="stage-kicker">Step 1</span>
+                <h3>Connect a store</h3>
+                <p>Sign-in opens Chrome or Edge on this PC. Credentials encrypt to disk with your OS keychain.</p>
+              </div>
+              <div class="magic-stage" data-stage="1">
+                <span class="stage-kicker">Step 2</span>
+                <h3>Fetcher chips light up</h3>
+                <p>Each connected store fetches from your IP. Chips flip on as libraries land.</p>
+                <div class="magic-chips" aria-hidden="true">
+                  <span class="magic-chip" data-chip="0">Steam</span>
+                  <span class="magic-chip" data-chip="1">Epic</span>
+                  <span class="magic-chip" data-chip="2">GOG</span>
+                  <span class="magic-chip" data-chip="3">Xbox</span>
+                  <span class="magic-chip" data-chip="4">PSN</span>
+                </div>
+              </div>
+              <div class="magic-stage" data-stage="2">
+                <span class="stage-kicker">Step 3</span>
+                <h3>Your count climbs</h3>
+                <p class="magic-count" data-magic-count>2,000+</p>
+                <p>One clean table on your machine. Decide what to play next.</p>
               </div>
             </div>
-            <div class="magic-stage" data-stage="2">
-              <span class="stage-kicker">Step 3</span>
-              <h3>Your count climbs</h3>
-              <p class="magic-count" data-magic-count>2,000+</p>
-              <p>One clean table on your machine. Decide what to play next.</p>
+            <div class="magic-visual" aria-hidden="true">
+              <div class="magic-visual-frame">
+                <img
+                  class="is-active"
+                  data-magic-shot="0"
+                  src="assets/product/connections.webp"
+                  width="823"
+                  height="472"
+                  alt=""
+                  decoding="async"
+                  fetchpriority="high"
+                />
+                <img
+                  data-magic-shot="1"
+                  src="assets/product/fetchers.webp"
+                  width="823"
+                  height="414"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                <img
+                  data-magic-shot="2"
+                  src="assets/product/library.webp"
+                  width="960"
+                  height="481"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
             </div>
             <div class="magic-scrub-progress" aria-hidden="true"><span data-magic-bar></span></div>
           </div>

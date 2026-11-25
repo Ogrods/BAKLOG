@@ -450,18 +450,102 @@ def _session_expired_message(page) -> str:
     return f"Humble session expired (url={url!r})"
 
 
+_CHROME_STUCK_MSG = (
+    "Humble page did not load; close other BAKLOG browser windows and retry"
+)
+
+
+def _page_url_hint(page) -> str:
+    url = (getattr(page, "url", None) or "").strip()
+    if url and url not in ("about:blank", "") and not url.startswith("chrome://"):
+        return url
+    evaluate = getattr(page, "evaluate", None)
+    if not callable(evaluate):
+        return url
+    try:
+        href = evaluate("() => location.href", timeout=2)
+        if isinstance(href, str) and href.strip():
+            return href.strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return url
+
+
+def _tab_is_chrome_internal(url: str) -> bool:
+    u = (url or "").strip().lower()
+    return not u or u == "about:blank" or u.startswith("chrome://")
+
+
+def _page_is_humble_library(page) -> bool:
+    """True when the tab is already on www Humble /home/* or /store/*."""
+    from auth.connect_extractors import humble_page_is_confirmed_library_or_store
+
+    url = _page_url_hint(page)
+    if humble_page_is_confirmed_library_or_store(url):
+        return True
+    return "humblebundle.com/home/library" in (url or "").lower()
+
+
+def _pick_humble_library_page(ctx):
+    """Prefer an existing Humble library tab; skip chrome:// NTP when possible."""
+    pages = [p for p in (getattr(ctx, "pages", None) or []) if not getattr(p, "is_closed", False)]
+    for page in pages:
+        if _page_is_humble_library(page):
+            return page
+    for page in pages:
+        if not _tab_is_chrome_internal(_page_url_hint(page)):
+            return page
+    if pages:
+        return pages[0]
+    return ctx.new_page()
+
+
+def _humble_main_auth_failure(msg: str) -> bool:
+    low = msg.lower()
+    if "expired" in low or "401" in msg or "403" in msg:
+        return True
+    if msg.startswith("Humble session expired"):
+        return True
+    if "auth.humblebundle.com" in low:
+        return True
+    from auth.url_hosts import host_matches
+
+    for token in re.findall(r"https?://[^\s'\"]+", msg):
+        if host_matches(token, "auth.humblebundle.com"):
+            return True
+    return False
+
+
 def _goto_humble_library(page, ctx, *, on_response=None):
     """Navigate to /home/library; retry once on a fresh tab if CDP navigate fails."""
     last_exc: Exception | None = None
     current = page
+    chrome_stuck = False
     for attempt in range(2):
+        if _page_is_humble_library(current):
+            return current
+        if _tab_is_chrome_internal(_page_url_hint(current)):
+            if attempt == 0:
+                try:
+                    current = ctx.new_page()
+                    if on_response is not None:
+                        current.on("response", on_response)
+                except Exception as exc:  # noqa: BLE001
+                    last_exc = exc
+                    break
         try:
-            current.goto(LIBRARY_URL, wait_until="commit", timeout=60_000)
-            url = (getattr(current, "url", None) or "").lower()
-            if not url.startswith("chrome://"):
+            current.goto(LIBRARY_URL, wait_until="domcontentloaded", timeout=30_000)
+            if _page_is_humble_library(current):
                 return current
-            last_exc = RuntimeError(f"stuck on {getattr(current, 'url', None) or url}")
+            url = _page_url_hint(current).lower()
+            if _tab_is_chrome_internal(url):
+                chrome_stuck = True
+                last_exc = RuntimeError(_CHROME_STUCK_MSG)
+            else:
+                return current
         except Exception as exc:  # noqa: BLE001
+            if _page_is_humble_library(current):
+                return current
             last_exc = exc
             if attempt == 0:
                 print(
@@ -476,9 +560,11 @@ def _goto_humble_library(page, ctx, *, on_response=None):
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 break
+    if chrome_stuck:
+        raise RuntimeError(_CHROME_STUCK_MSG)
     if last_exc:
         raise last_exc
-    return current
+    raise RuntimeError(_CHROME_STUCK_MSG)
 
 
 def fetch_library_items(
@@ -519,7 +605,7 @@ def fetch_library_items(
                 print(f"[humble] restored {restored} cookie(s) from Connect sidecar", flush=True)
         except Exception:  # noqa: BLE001
             pass
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        page = _pick_humble_library_page(ctx)
 
         def on_response(resp) -> None:
             try:
@@ -763,7 +849,7 @@ def fetch_library_items(
 
         return sorted(found.values(), key=lambda x: x.name.lower())
     finally:
-        close_browser_bounded(ctx)
+        close_browser_bounded(ctx, profile=profile)
 
 
 def _build_row(item: LibraryItem, hltb: dict | None) -> dict:
@@ -853,7 +939,7 @@ def main() -> int:
         )
     except Exception as exc:  # noqa: BLE001
         msg = str(exc)
-        if "expired" in msg.lower() or "401" in msg or "403" in msg:
+        if _humble_main_auth_failure(msg):
             mark_invalid("humble", error=msg)
             stats.error(msg)
             return stats.finish("fetch_humble", t0, exit_code=EXIT_CODE_AUTH)

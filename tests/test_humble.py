@@ -3,8 +3,13 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
+
+from fetchers._progress import EXIT_CODE_AUTH
 
 from auth.connect_extractors import (
     HUMBLE_LIBRARY_URL,
@@ -23,6 +28,7 @@ from fetchers.fetch_humble import (
     FILTER_USER_LIBRARY_ACTION,
     LIBRARY_URL,
     LibraryItem,
+    _CHROME_STUCK_MSG,
     _build_row,
     _discover_filter_user_library_action,
     _extract_filter_user_library_payload,
@@ -31,6 +37,7 @@ from fetchers.fetch_humble import (
     _looks_like_filter_user_library_payload,
     _page_looks_signed_out,
     _parse_order_detail,
+    _pick_humble_library_page,
     _subproduct_is_game,
 )
 from fetchers.fetch_humble_wishlist import (
@@ -451,6 +458,53 @@ def test_probe_humble_session_routes_and_missing_profile(tmp_path, monkeypatch) 
         mock.assert_called_once()
 
 
+def test_pick_humble_library_page_skips_chrome_ntp() -> None:
+    ntp = _FakePage("chrome://new-tab-page/")
+    library = _FakePage("https://www.humblebundle.com/home/library")
+
+    class Ctx:
+        pages = [ntp, library]
+
+        def new_page(self):
+            raise AssertionError("should reuse existing library tab")
+
+    assert _pick_humble_library_page(Ctx()) is library
+
+
+def test_goto_humble_library_skips_when_already_on_library() -> None:
+    class Ctx:
+        def new_page(self):
+            raise AssertionError("should not open a new tab")
+
+    page = _FakePage("https://www.humblebundle.com/home/library")
+    out = _goto_humble_library(page, Ctx())
+    assert out is page
+    assert page.goto_calls == 0
+
+
+def test_goto_humble_library_does_not_treat_chrome_ntp_as_success() -> None:
+    class StuckChrome(_FakePage):
+        def goto(self, url: str, wait_until: str = "", timeout: int = 0) -> None:  # noqa: ARG002
+            self.goto_calls += 1
+            self.url = "chrome://new-tab-page/"
+
+    class Ctx:
+        def __init__(self) -> None:
+            self.pages: list = []
+
+        def new_page(self):
+            p = StuckChrome("chrome://new-tab-page/")
+            self.pages.append(p)
+            return p
+
+    first = StuckChrome("chrome://new-tab-page/")
+    ctx = Ctx()
+    with pytest.raises(RuntimeError, match=_CHROME_STUCK_MSG):
+        _goto_humble_library(first, ctx)
+    assert first.goto_calls == 0
+    assert any(p.goto_calls >= 1 for p in ctx.pages)
+
+
 def test_goto_humble_library_retries_on_new_page() -> None:
     class Ctx:
         def __init__(self) -> None:
@@ -467,6 +521,88 @@ def test_goto_humble_library_retries_on_new_page() -> None:
     assert page is not first
     assert page.url == LIBRARY_URL
     assert page.goto_calls == 1
+
+
+def test_fetch_library_close_bounded_passes_profile(tmp_path, monkeypatch) -> None:
+    import fetchers.fetch_humble as fetch_mod
+
+    profile = tmp_path / "humble-profile"
+    profile.mkdir()
+    monkeypatch.setattr("fetchers.fetch_humble.profile_dir", lambda _p: profile)
+    closed: list = []
+
+    def _close(_ctx, *, profile=None, **kwargs):  # noqa: ARG001
+        closed.append(profile)
+
+    class BarePage(_FakePage):
+        def on(self, _event: str, _handler) -> None:
+            return None
+
+    class BareCtx:
+        pages: list = []
+
+        def __init__(self) -> None:
+            self.request = _FakeRequest({"status": "authenticated"})
+
+        def new_page(self):
+            return BarePage(LIBRARY_URL)
+
+    monkeypatch.setattr("auth.cdp_browser.close_browser_bounded", _close)
+    monkeypatch.setattr(
+        "auth.cdp_browser.launch_persistent_profile",
+        lambda *_a, **_k: BareCtx(),
+    )
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("stop after open")
+
+    monkeypatch.setattr(fetch_mod, "_goto_humble_library", _boom)
+
+    with pytest.raises(RuntimeError, match="stop after open"):
+        fetch_mod.fetch_library_items()
+
+    assert closed == [profile]
+
+
+def test_main_auth_failure_signed_out_exit_4(monkeypatch) -> None:
+    import fetchers.fetch_humble as fetch_mod
+
+    msg = fetch_mod._session_expired_message(
+        _FakePage("https://auth.humblebundle.com/login?flow=x")
+    )
+    marked: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        fetch_mod,
+        "run_with_heartbeat",
+        lambda fn, _label: (_ for _ in ()).throw(RuntimeError(msg)),
+    )
+    monkeypatch.setattr(
+        fetch_mod,
+        "mark_invalid",
+        lambda provider, *, error="": marked.append((provider, error)),
+    )
+    monkeypatch.setattr(sys, "argv", ["fetch_humble"])
+    assert fetch_mod.main() == EXIT_CODE_AUTH
+    assert marked and marked[0][0] == "humble"
+    assert "session expired" in marked[0][1].lower()
+
+
+def test_main_chrome_stuck_remains_exit_1(monkeypatch) -> None:
+    import fetchers.fetch_humble as fetch_mod
+
+    monkeypatch.setattr(
+        fetch_mod,
+        "run_with_heartbeat",
+        lambda fn, _label: (_ for _ in ()).throw(RuntimeError(_CHROME_STUCK_MSG)),
+    )
+    monkeypatch.setattr(
+        fetch_mod,
+        "mark_invalid",
+        lambda *_a, **_k: pytest.fail("mark_invalid must not run for chrome stuck"),
+    )
+    monkeypatch.setattr(sys, "argv", ["fetch_humble"])
+    assert fetch_mod.main() == 1
 
 
 def test_extract_filter_user_library_payload_plain_json() -> None:

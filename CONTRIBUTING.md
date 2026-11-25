@@ -2,7 +2,10 @@
 
 Thanks for your interest. BAKLOG is a local-first cross-store game backlog
 dashboard: the app, fetchers, auth, and dashboard are MIT-licensed and live in
-this repo. Your library JSON and credentials never leave your machine.
+this repo. Credentials never leave your machine. Catalog JSON stays local by
+default; optional Pro Cloud sync may upload an allowlisted catalog subset only
+after the signed-in Pro user opts in (see [ARCHITECTURE.md](ARCHITECTURE.md)
+and [SECURITY.md](SECURITY.md)).
 
 This guide covers how to set up, make a change, and open a pull request.
 
@@ -81,14 +84,15 @@ Releases are immutable and built by CI, not hand-uploaded. To cut one:
 2. Commit, then tag and push:
 
    ```bash
-   git tag v0.8.17
-   git push origin v0.8.17
+   git tag -a vX.Y.Z
+   git push origin vX.Y.Z
    ```
 
-The `release` workflow builds the Windows bundle on a clean runner, attaches a
-SHA-256 and a signed build-provenance attestation, and publishes the GitHub
-Release. The build refuses to run if the tag does not match the version in
-`pyproject.toml`.
+Full release gates (clean tree, green CI, local frozen smoke, draft NUC path)
+live in [`.cursor/rules/release.mdc`](.cursor/rules/release.mdc). The `release`
+workflow builds the Windows bundle on a clean runner, attaches a SHA-256 and a
+signed build-provenance attestation, and publishes the GitHub Release. The build
+refuses to run if the tag does not match the version in `pyproject.toml`.
 
 Never move or re-point a published tag. Cut a new patch tag instead.
 
@@ -110,7 +114,8 @@ Do not open a public issue for security reports. See
   boundaries, Pro licensing, and why `server.py` is still large.
 - **Telemetry** - no telemetry by default; opt-in aggregate metrics only (`shareAnonStats`).
 - **Hosted feeds** - public `sponsors.json` / `free-claims.json` on baklog.app when
-  online; library data is not uploaded.
+  online. Credentials never upload; catalog JSON uploads only on opt-in Pro Cloud
+  sync (allowlisted artifacts).
 - **Store ToS** - several fetchers replay your web session; see [SECURITY.md](SECURITY.md).
 - **CI scope** - default pytest skips `@integration` and `@release_smoke`; run
   `pytest -m integration` locally for CDP/browser flows.

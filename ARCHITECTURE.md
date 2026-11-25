@@ -80,6 +80,16 @@ well under that after extraction). New work moves into `shared/`
 (`update_api.py`, `server_internal_routes.py`, `run_manager.py`, auth helpers).
 Further splits are incremental, not a rewrite.
 
+## Headless, Connect, and keyring
+
+- The server **binds to `127.0.0.1` only** by default (not LAN).
+- **Connect** uses a **headed** Chrome/Edge CDP window so you can complete
+  store sign-in yourself. After credentials are stored, many library fetches
+  can run without a visible browser (session replay / API clients).
+- Secrets prefer the OS **keyring**. If keyring is unavailable, BAKLOG falls
+  back to a local `.master_key` file (weaker; see [SECURITY.md](SECURITY.md)).
+- Per-store Connect and CLI notes: [guide/connecting-stores.md](guide/connecting-stores.md).
+
 ## Store access and ToS
 
 Fetchers use a mix of official APIs, OAuth, and **replaying your own web

@@ -1,6 +1,6 @@
 # BAKLOG — agent brief
 
-**BAKLOG** is a local-only cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine by default. The public marketing site (`web/` on Vercel) also hosts an **opt-in** Pro mirror viewer at baklog.app/mirror (`web/mirror/`): catalogs appear there only after the signed-in Pro user enables Cloud sync. Credentials never sync.
+**BAKLOG** is a local-first cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine by default. The public marketing site (`web/` on Vercel) also hosts an **opt-in** Pro mirror viewer at baklog.app/mirror (`web/mirror/`): catalogs appear there only after the signed-in Pro user enables Cloud sync. Credentials never sync.
 
 ## Architecture (one screen)
 
@@ -8,7 +8,7 @@
 |-------|-------|-------|
 | **Server** | `server.py` | stdlib `ThreadingHTTPServer` on `127.0.0.1:8765`; serves static app + `/api/*` JSON + SSE streams |
 | **Auth** | `auth/` | AES-GCM secrets + OS keyring; CDP browser sign-in (`cdp_browser.py`, `runner.py`) |
-| **Fetchers** | `fetch_*.py`, `fetchers/manifest.json` | Whitelisted subprocess scripts → profile-scoped `games_*.json` |
+| **Fetchers** | `fetchers/fetch_*.py`, `enrichers/`, `fetchers/manifest.json` | Whitelisted subprocess scripts → profile-scoped `games_*.json` |
 | **Frontend** | `index.html`, `js/app.js` | Vanilla ESM modules; optional esbuild `dist/` build |
 | **Web** | `web/` | Marketing site + Vercel serverless (`api/subscribe.js`, `api/report.js`, `api/mirror.js`). Pro viewer under `web/mirror/`. Attended SEO playbook: `.cursor/rules/seo-operator.mdc` |
 | **Profiles** | `profiles/<id>/` | Per-profile catalogs, `data/personal.json`, `cache/auth/` |
@@ -64,10 +64,10 @@ Refresh bundle budget after intentional growth: `npm run build && node scripts/c
 | `testing-build.mdc` | Tests, CI scripts, optional frontend build |
 | `release.mdc` | Clean tree + green CI before tag/publish |
 | `changelog.mdc` | Public CHANGELOG voice (user facts only) |
-| `internal-workflow.mdc` | Git worktrees, backups, tracker handoff |
-| `internal-admin.mdc` | Local admin console (when present) |
-| `internal-marketing.mdc` | Marketing deck / ads (when present) |
-| `seo-operator.mdc` | Attended OpenSEO / GSC / GA playbook |
+| `internal-workflow.mdc` | Git worktrees, backups, tracker handoff (private baklog-internal only) |
+| `internal-admin.mdc` | Local admin console (private baklog-internal only; when present) |
+| `internal-marketing.mdc` | Marketing deck / ads (private baklog-internal only; when present) |
+| `seo-operator.mdc` | Attended OpenSEO / GSC / GA playbook (private baklog-internal only) |
 | `powershell-workaround.mdc` | PowerShell `;` not `&&`; paging tips |
 
 ## Quality as code
@@ -153,7 +153,7 @@ The helpers enforce the branch-naming scheme and junction `.venv` + `node_module
 
 ## Progress tracker
 
-Canonical progress lives in **`..\baklog-internal\tracker.html`** (private sibling clone, gitignored in public). On completing a meaningful task, update the relevant `PHASES` / findings entry with `[DONE]` or `[RESOLVED]` and a dated note, then push via `sync-internal-repo.ps1 -Push`. If the internal clone is unavailable or editing is blocked, write `.cursor/tracker-pending-<slug>.md` and run `/apply-tracker-pending` later — do not create a separate `PROGRESS.md`. See `docs/WORKFLOW.md` and `.cursor/rules/internal-workflow.mdc`.
+Canonical progress lives in **`..\baklog-internal\tracker.html`** (private sibling clone, gitignored in public). On completing a meaningful task, update the relevant `PHASES` / findings entry with `[DONE]` or `[RESOLVED]` and a dated note, then push via `sync-internal-repo.ps1 -Push`. If the internal clone is unavailable or editing is blocked, write `.cursor/tracker-pending-<slug>.md` and run `/apply-tracker-pending` later - do not create a separate `PROGRESS.md`. Public fallbacks: [`.cursor/tracker-pending-*.md`](.cursor/) + [`docs/adr/`](docs/adr/README.md). Maintainer workflow detail lives in private `baklog-internal` (`.cursor/rules/internal-workflow.mdc`); it is not in the public GitHub tree.
 
 ## Maintainer docs (private repo)
 

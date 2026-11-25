@@ -18,7 +18,7 @@ Each profile keeps its own library, connections, and personal data under `profil
 **CLI fetchers** respect `BAKLOG_PROFILE=<id>` or the active entry in `profiles/index.json`:
 
 ```powershell
-$env:BAKLOG_PROFILE='work'; python fetch_games.py
+$env:BAKLOG_PROFILE='work'; python fetchers/fetch_games.py
 ```
 
 The dev server **auto-ignores** `BAKLOG_PROFILE` in its own shell at startup so the menu always owns the active profile. Per-run fetchers from the UI still pin the correct profile.

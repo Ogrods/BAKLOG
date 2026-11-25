@@ -1,6 +1,6 @@
 # BAKLOG
 
-> Local-only cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine.
+> Local-first cross-store game backlog dashboard. Library JSON, credentials, and personal data stay on the user's machine by default.
 
 ## Canonical links
 
@@ -28,7 +28,7 @@ baklog.app is the marketing site, open-beta signup, hosted auth pages, and publi
 ## Product facts
 
 - Runs on Windows, macOS, and Linux on the user's PC.
-- Imports 12 store libraries and 8 wishlists (Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA App; plus wishlist sources). Humble wishlist may be paused while their site upgrade finishes; Humble library still works.
+- Imports 12 store libraries and 8 wishlists (Steam, Epic, GOG, PlayStation, Xbox, Amazon, Battle.net, Ubisoft, Nintendo, itch.io, Humble, EA App; plus wishlist sources). Manifest also includes 2 price/claim jobs (`itad`, `claims`) and 5 enrichers (HLTB, Steam reviews/covers/tags, ProtonDB) - 27 jobs total. Humble wishlist may be paused while their site upgrade finishes; Humble library still works.
 - Free forever to import. Optional Pro: $5/mo or $50/yr (Polar).
 - Open beta packaged builds; anyone can also clone and run from source.
 - Desktop app: no telemetry by default; optional opt-in anonymous aggregate metrics in Settings.

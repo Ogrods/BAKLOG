@@ -6,7 +6,6 @@ import {
 } from "./api-client.js";
 import {
   getAccessToken,
-  getAccountProfileId,
   isAccountAuthMode,
   proFeaturesUnlocked,
   refreshAccountPlan,
@@ -23,13 +22,11 @@ import { FETCHER_AUTH_PROVIDER } from "./fetcher-registry.js";
 import { startMetrics, stopMetrics } from "./anon-metrics.js";
 import { savePrefs } from "./prefs.js";
 import { state } from "./state.js";
-import { storeLogoHtml } from "./store-logos.js";
-import { STORE_BRAND_COLORS } from "./store-brand-colors.js";
-import { formatPlatformList } from "./platform-labels.js";
-import { activeProfileId } from "./profiles.js";
+import { buildCardHtml } from "./connections-card-html.js";
 import {
-  lastRunErrorForProvider,
-} from "./fetcher-health-shared.js";
+  wireMasterPasswordSave,
+  wireSecretsBundle,
+} from "./connections-secrets-ui.js";
 import {
   authStatusLoaded,
   connectedProviderCount,
@@ -41,29 +38,26 @@ import {
   providerStatus,
 } from "./connections-status.js";
 import {
-  STATUS_CLASS,
-  STATUS_LABEL,
-  STATUS_NOTE,
   PROVIDER_GROUPS,
-  connStoreKey,
-  contentFacetLabel,
   displayStatus,
   groupConnectNote,
   groupRepFor,
   railEntries,
   renderConnRailHtml,
-  sourceFacet,
   syncConnRailSelection,
 } from "./connections-rail.js";
 import {
-  describeImportScope,
-  fetchMirrorSnapshot,
-  formatLastUploadedBy,
-  labelMirrorSourceProfile,
-  listImportableArtifactPaths,
-  preferMirrorSourceProfile,
-  summarizeLocalUploadState,
-} from "./cloud-mirror-status.js";
+  bindCloudMirrorUi,
+  handleCloudMirrorClear,
+  handleCloudMirrorImport,
+  handleCloudMirrorSyncNow,
+  handleCloudMirrorToggle,
+  refreshCloudMirrorUploadStatus,
+  renderCloudMirrorPrefsDom,
+} from "./connections-cloud-mirror.js";
+
+export { openCloudMirrorImportDialog } from "./connections-cloud-mirror.js";
+export { localProviderFooterCopy } from "./connections-card-html.js";
 
 export { FETCHER_AUTH_PROVIDER };
 export {
@@ -85,36 +79,6 @@ export {
 
 let _chromiumAvailable = true;
 let _serverFrozen = false;
-
-const LOCAL_PROVIDER_FOOTER = {
-  amazon: {
-    connected:
-      "Auto-detected from Amazon Games launcher. Open the app and sync, then run the Amazon fetcher for new games.",
-    disconnected:
-      "Disconnected - cached library stays visible. Connect to refresh, or use Prime web",
-  },
-  gog_galaxy: {
-    connected: "Auto-detected from GOG Galaxy on this PC",
-    disconnected:
-      "Disconnected - cached library stays visible. Connect to refresh, or use GOG (web)",
-  },
-  itch_local: {
-    connected: "Auto-detected from the itch desktop app",
-    disconnected:
-      "Disconnected - cached library stays visible. Connect to refresh, or use an API key",
-  },
-};
-
-/** Footer copy for local provider cards (exported for tests). */
-export function localProviderFooterCopy(providerKey, connected) {
-  const copy = LOCAL_PROVIDER_FOOTER[providerKey];
-  if (!copy) {
-    return connected
-      ? "Auto-detected locally on this PC"
-      : "Local source hidden - Connect to use it again";
-  }
-  return connected ? copy.connected : copy.disconnected;
-}
 
 let _connPopoverRelease = null;
 
@@ -165,45 +129,6 @@ let chromeWired = false;
 let _selectedKey = "steam";
 
 let _secretsCorrupt = false;
-
-const CONN_HELP_LINKS = {
-  steam: {
-    url: "https://steamcommunity.com/dev/apikey",
-    before: "Register for a Steam Web API key ",
-    linkText: "here",
-    after: " first, then sign in to connect.",
-  },
-};
-
-const PROVIDER_BRAND = {
-  steam: { color: STORE_BRAND_COLORS.steam, initial: "S" },
-  gog: { color: STORE_BRAND_COLORS.gog, initial: "G" },
-  gog_galaxy: { color: STORE_BRAND_COLORS.gog, initial: "G" },
-  psn: { color: STORE_BRAND_COLORS.psn, initial: "P" },
-  epic: { color: STORE_BRAND_COLORS.epic, initial: "E" },
-  epic_wishlist: { color: STORE_BRAND_COLORS.epic, initial: "E" },
-  amazon: { color: STORE_BRAND_COLORS.amazon, initial: "A" },
-  amazon_web: { color: STORE_BRAND_COLORS.amazon, initial: "A" },
-  xbox: { color: STORE_BRAND_COLORS.xbox, initial: "X" },
-  xbox_wishlist: { color: STORE_BRAND_COLORS.xbox, initial: "X" },
-  battlenet: { color: STORE_BRAND_COLORS.battlenet, initial: "B" },
-  nintendo: { color: STORE_BRAND_COLORS.nintendo, initial: "N" },
-  nintendo_wishlist: { color: STORE_BRAND_COLORS.nintendo, initial: "N" },
-  ubisoft: { color: STORE_BRAND_COLORS.ubisoft, initial: "U" },
-  humble: { color: STORE_BRAND_COLORS.humble, initial: "H" },
-  ea: { color: STORE_BRAND_COLORS.ea, initial: "EA" },
-  itch: { color: STORE_BRAND_COLORS.itch, initial: "I" },
-  itch_local: { color: STORE_BRAND_COLORS.itch, initial: "I" },
-  itad: { color: "#22d3ee", initial: "I" },
-};
-
-function primaryLabel(st) {
-  if (st === "connected" || st === "expired") return "Reconnect";
-
-  if (st === "unverified") return "Verify";
-
-  return "Connect";
-}
 
 function ensureSelectedKey() {
   if (getAuthStatusSnapshot().some((p) => p.key === _selectedKey)) return;
@@ -277,258 +202,6 @@ function renderOnboard() {
     </div>`;
 }
 
-function buildFormFields(p) {
-  return (p.form_fields || [])
-    .map(
-      (f) => `
-
-    <label>${escapeHtml(f.label)}
-
-      <input type="${f.secret ? "password" : "text"}" data-field="${escapeAttr(f.key)}" placeholder="${escapeAttr(f.placeholder || "")}" autocomplete="off" />
-
-    </label>`,
-    )
-    .join("");
-}
-
-function buildFormPanel(p) {
-  return `
-
-    <div class="conn-paste-panel">
-
-      ${buildFormFields(p)}
-
-      <div class="conn-paste-actions">
-
-        <button type="button" class="conn-paste-clip" data-paste-clipboard>Paste</button>
-
-        <button type="button" class="conn-save-btn conn-save" data-provider="${escapeAttr(p.key)}">Save key</button>
-
-      </div>
-
-    </div>`;
-}
-
-/**
- * Browser providers connect via the primary button; their form field is only a
- * manual fallback. Fold it into a collapsed drawer so it doesn't look like a
- * required step.
- */
-function buildFallbackPanel(p) {
-  const epicBrowser =
-    p.key === "epic"
-      ? `<button type="button" class="conn-open-url" data-epic-oauth data-provider="epic" title="Epic library OAuth in browser">Sign in with your browser instead</button>`
-      : "";
-  return `
-    <details class="conn-fallback">
-      <summary class="conn-fallback-summary">
-        <span class="conn-fallback-chevron" aria-hidden="true">&rsaquo;</span>
-        <span>Trouble connecting? Enter a code manually</span>
-      </summary>
-      <div class="conn-fallback-body">
-        ${epicBrowser}
-        ${buildFormPanel(p)}
-      </div>
-    </details>`;
-}
-
-function disconnectBtnHtml(p, st) {
-  const show =
-    st !== "disconnected" && st !== "unverified" && p.kind !== "local";
-  return show
-    ? `<button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
-    : "";
-}
-
-function buildCardFooter(p, st) {
-  if (p.available === false) {
-    const plats = formatPlatformList(p.platforms);
-    return `
-      <div class="conn-card-footer">
-        <span class="conn-local-label">${escapeHtml(`Available on ${plats} only`)}</span>
-      </div>`;
-  }
-
-  if (p.kind === "local") {
-    const connected = st === "connected";
-    const label = localProviderFooterCopy(p.key, connected);
-    return `
-      <div class="conn-card-footer">
-        ${
-          connected
-            ? `<span class="conn-local-label">${escapeHtml(label)}</span>
-             <button type="button" class="conn-disconnect" data-disconnect-quick data-provider="${escapeAttr(p.key)}" title="Disconnect ${escapeAttr(p.label)} (credentials removed locally)">Disconnect</button>`
-            : `<span class="conn-local-label">${escapeHtml(label)}</span>
-             <button type="button" class="conn-primary" data-enable-local data-provider="${escapeAttr(p.key)}" title="Enable ${escapeAttr(p.label)} from local launcher data">Connect</button>`
-        }
-      </div>`;
-  }
-
-  if (p.kind === "manual") {
-    return `
-
-      <div class="conn-card-footer">
-
-        <button type="button" class="conn-open-url" data-open-url data-provider="${escapeAttr(p.key)}" title="Open ${escapeAttr(p.label)} sign-in page in browser">Open sign-in page</button>
-
-        ${disconnectBtnHtml(p, st)}
-
-      </div>`;
-  }
-
-  const label = primaryLabel(st);
-
-  return `
-
-    <div class="conn-card-footer">
-
-      <button type="button" class="conn-primary" data-primary="browser" data-provider="${escapeAttr(p.key)}">${label}</button>
-
-      ${disconnectBtnHtml(p, st)}
-
-    </div>`;
-}
-
-async function pasteFromClipboard(card) {
-  const log = card?.querySelector(".conn-log");
-
-  const input = card?.querySelector(".conn-paste-panel [data-field]");
-
-  if (!input) return;
-
-  try {
-    const text = await navigator.clipboard.readText();
-
-    input.value = (text || "").trim();
-
-    if (log) {
-      log.classList.remove("hidden");
-
-      log.textContent = "Pasted from clipboard.";
-    }
-  } catch {
-    if (log) {
-      log.classList.remove("hidden");
-
-      log.textContent =
-        "Could not read clipboard - paste into the field manually (Ctrl+V).";
-    }
-  }
-}
-
-function buildConnHelpLink(key) {
-  const help = CONN_HELP_LINKS[key];
-  if (!help || !isSafeHttpUrl(help.url)) return "";
-  return `<p class="conn-help">${escapeHtml(help.before)}<a class="conn-help-link" href="${escapeAttr(help.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(help.linkText)}</a>${escapeHtml(help.after)}</p>`;
-}
-
-function buildCardHtml(p) {
-  const st = p.status || "disconnected";
-
-  const pillSt = displayStatus(st);
-
-  const storeKey = connStoreKey(p);
-
-  const expiry = p.expiry_days
-    ? `<p class="conn-meta">Typical session ~${p.expiry_days}d</p>`
-    : "";
-
-  const note = STATUS_NOTE[st]
-    ? `<p class="conn-note">${escapeHtml(STATUS_NOTE[st])}</p>`
-    : "";
-
-  const helpLink = buildConnHelpLink(p.key);
-
-  const err = p.last_error
-    ? `<p class="conn-error">${escapeHtml(p.last_error)}</p>`
-    : "";
-
-  // Sticky last-run failure from fetcher health (rate-limit / empty / network)
-  // while Connections status may still read Connected.
-  const lastFetch = lastRunErrorForProvider(p.key, providerForFetcher);
-  const lastFetchErr = lastFetch?.message
-    ? `<p class="conn-error conn-error--fetch" title="Last fetcher run failed while this connection stayed connected">Last fetch failed: ${escapeHtml(lastFetch.message)}</p>`
-    : "";
-
-  const tips = (p.tips || []).length
-    ? `<ul class="conn-tips">${p.tips.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
-    : "";
-
-  const hasFormFields = (p.form_fields || []).length > 0;
-
-  const showFormPanel =
-    hasFormFields &&
-    (p.kind === "form" || p.kind === "manual" || p.kind === "browser");
-
-  const facets = `
-    <div class="conn-facets" aria-label="Pull type and credential source">
-      <span class="conn-facet conn-facet--content" title="What this connection syncs (library, wishlist, prices)">${escapeHtml(contentFacetLabel(p.key))}</span>
-      <span class="conn-facet conn-facet--source" title="Where credentials are stored">${escapeHtml(sourceFacet(p))}</span>
-    </div>`;
-
-  const noteVal = (state.prefs?.connectionNotes || {})[p.key] || "";
-  const notesHtml = `
-    <div class="conn-notes">
-      <label class="conn-notes-label" for="conn-note-${escapeAttr(p.key)}">Notes</label>
-      <textarea id="conn-note-${escapeAttr(p.key)}" class="conn-note-input"
-        data-note-provider="${escapeAttr(p.key)}" rows="2"
-        placeholder="Private notes for this connection (saved to this profile)">${escapeHtml(noteVal)}</textarea>
-    </div>`;
-
-  return `
-
-    <article class="conn-card${p.kind === "manual" ? " conn-card--manual" : ""}" data-provider="${escapeAttr(p.key)}">
-
-      <div class="conn-card-stripe"></div>
-
-      <div class="conn-card-head">
-
-        ${storeLogoHtml(storeKey, { size: "lg", title: p.label, className: "conn-card-badge" })}
-
-        <div class="conn-head-actions">
-
-          <span class="${STATUS_CLASS[pillSt] || STATUS_CLASS.disconnected}" title="Connection status">${STATUS_LABEL[pillSt] || pillSt}</span>
-
-        </div>
-
-      </div>
-
-      <div class="conn-card-body">
-
-        <div class="conn-card-body-main">
-
-          <h3>${escapeHtml(p.label)}</h3>
-
-          ${facets}
-
-          <p class="conn-desc">${escapeHtml(p.description || "")}</p>
-
-          ${helpLink}
-
-          ${tips}
-
-          ${note}
-
-          ${err}
-
-          ${lastFetchErr}
-
-          ${expiry}
-
-          <p class="conn-log hidden" aria-live="polite"></p>
-
-        </div>
-
-        ${notesHtml}
-
-      </div>
-
-      ${showFormPanel ? (p.kind === "browser" ? buildFallbackPanel(p) : buildFormPanel(p)) : ""}
-
-      ${buildCardFooter(p, st)}
-
-    </article>`;
-}
 
 function captureConnNoteFocus() {
   const active = document.activeElement;
@@ -562,35 +235,7 @@ function renderConnPrefs() {
   if (stale24h) stale24h.checked = state.prefs.autoFetchStale24h === true;
   if (shareStats) shareStats.checked = state.prefs.shareAnonStats === true;
 
-  const cloudStrip = document.getElementById("connCloudPrefs");
-  const cloudWrap = document.getElementById("cloudMirrorToggleWrap");
-  const cloudToggle = document.getElementById("cloudMirrorEnabledToggle");
-  const syncBtn = document.getElementById("cloudMirrorSyncBtn");
-  const importBtn = document.getElementById("cloudMirrorImportBtn");
-  const clearBtn = document.getElementById("cloudMirrorClearBtn");
-  const showCloudMirror =
-    proFeaturesUnlocked() &&
-    isAccountAuthMode() &&
-    !!getAccessToken() &&
-    capabilityStatus("cloud_sync_mirror") === "live";
-  if (cloudStrip) cloudStrip.hidden = !showCloudMirror;
-  if (cloudWrap) cloudWrap.hidden = !showCloudMirror;
-  if (syncBtn) {
-    syncBtn.classList.toggle("hidden", !showCloudMirror);
-    syncBtn.hidden = !showCloudMirror;
-    syncBtn.disabled = !showCloudMirror || getProSettings().cloudMirrorEnabled !== true;
-  }
-  if (importBtn) {
-    importBtn.classList.toggle("hidden", !showCloudMirror);
-    importBtn.hidden = !showCloudMirror;
-  }
-  if (clearBtn) {
-    clearBtn.classList.toggle("hidden", !showCloudMirror);
-    clearBtn.hidden = !showCloudMirror;
-  }
-  if (cloudToggle && showCloudMirror) {
-    cloudToggle.checked = getProSettings().cloudMirrorEnabled === true;
-  }
+  renderCloudMirrorPrefsDom();
 
   const alertStrip = document.getElementById("connDealAlertPrefs");
   const alertToggle = document.getElementById("dealAlertsEnabledToggle");
@@ -620,61 +265,6 @@ function renderConnPrefs() {
   void refreshCloudMirrorUploadStatus();
 }
 
-let _cloudMirrorStatusRequest = 0;
-const CLOUD_MIRROR_STATUS_HOLD_MS = 8000;
-/** One-shot result line (e.g. after Clear) that the periodic status refresh must not blank. */
-let _cloudMirrorStatusHold = null;
-
-function holdCloudMirrorStatus(text, isError) {
-  _cloudMirrorStatusHold = { text, isError, until: Date.now() + CLOUD_MIRROR_STATUS_HOLD_MS };
-  ++_cloudMirrorStatusRequest;
-}
-
-async function refreshCloudMirrorUploadStatus() {
-  const el = document.getElementById("cloudMirrorUploadStatus");
-  if (!el) return;
-  const showCloudMirror =
-    proFeaturesUnlocked() &&
-    isAccountAuthMode() &&
-    !!getAccessToken() &&
-    capabilityStatus("cloud_sync_mirror") === "live";
-  const hold = _cloudMirrorStatusHold;
-  if (hold && Date.now() >= hold.until) _cloudMirrorStatusHold = null;
-  if (showCloudMirror && _cloudMirrorStatusHold) {
-    el.hidden = false;
-    el.textContent = hold.text;
-    el.classList.toggle("conn-prefs-note--error", hold.isError);
-    return;
-  }
-  const enabled = getProSettings().cloudMirrorEnabled === true;
-  if (!showCloudMirror || !enabled) {
-    ++_cloudMirrorStatusRequest;
-    el.hidden = true;
-    el.textContent = "";
-    el.classList.remove("conn-prefs-note--error");
-    return;
-  }
-  const reqId = ++_cloudMirrorStatusRequest;
-  try {
-    const snap = await fetchMirrorSnapshot();
-    if (reqId !== _cloudMirrorStatusRequest) return;
-    const summary = summarizeLocalUploadState(snap.localUploadState);
-    const by = formatLastUploadedBy(snap.localUploadState);
-    el.hidden = false;
-    el.textContent = by ? `${summary.line} ${by}` : summary.line;
-    el.classList.toggle("conn-prefs-note--error", summary.kind === "error");
-  } catch {
-    if (reqId !== _cloudMirrorStatusRequest) return;
-    el.hidden = false;
-    el.textContent = "Could not read mirror upload status.";
-    el.classList.remove("conn-prefs-note--error");
-  }
-}
-
-function saveCloudMirrorEnabled(enabled) {
-  return saveProSetting("cloudMirrorEnabled", enabled);
-}
-
 async function saveProSetting(key, enabled) {
   const res = await baklogFetch("/api/pro/settings", {
     method: "PUT",
@@ -695,100 +285,6 @@ async function saveProSetting(key, enabled) {
   return data;
 }
 
-async function handleCloudMirrorSyncNow() {
-  const btn = document.getElementById("cloudMirrorSyncBtn");
-  const statusEl = document.getElementById("cloudMirrorUploadStatus");
-  _cloudMirrorStatusHold = null;
-  if (btn) btn.disabled = true;
-  try {
-    const res = await baklogFetch("/api/mirror/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      data = {};
-    }
-    if (!res.ok) {
-      throw new Error(data.error || `Sync failed (${res.status})`);
-    }
-    const errors = Array.isArray(data.errors) ? data.errors : [];
-    const uploaded = data.uploaded && typeof data.uploaded === "object" ? data.uploaded : {};
-    const statuses = Object.values(uploaded);
-    const okCount = statuses.filter((s) => s === "ok").length;
-    const failCount = statuses.filter((s) => s !== "ok").length;
-    const tooLargeCount = statuses.filter((s) => s === "too_large").length;
-    if (statusEl) {
-      statusEl.hidden = false;
-      if (errors.length || failCount) {
-        const first = errors[0]
-          ? String(errors[0])
-          : tooLargeCount
-            ? `${tooLargeCount} file(s) over the size limit`
-            : `${failCount} file(s) failed`;
-        statusEl.textContent = `Mirror sync: ${okCount} ok, ${failCount || errors.length} failed. ${first}`;
-        statusEl.classList.add("conn-prefs-note--error");
-      } else if (!okCount && !(data.scheduled || []).length) {
-        statusEl.textContent = "Nothing to sync yet - connect a store and fetch first.";
-        statusEl.classList.remove("conn-prefs-note--error");
-      } else {
-        statusEl.textContent = `Mirror sync: ${okCount} file${okCount === 1 ? "" : "s"} uploaded.`;
-        statusEl.classList.remove("conn-prefs-note--error");
-      }
-    }
-    void refreshCloudMirrorUploadStatus();
-  } catch (err) {
-    if (statusEl) {
-      statusEl.hidden = false;
-      statusEl.textContent = err?.message || "Mirror sync failed.";
-      statusEl.classList.add("conn-prefs-note--error");
-    } else {
-      window.alert(err?.message || "Mirror sync failed.");
-    }
-  } finally {
-    renderConnPrefs();
-  }
-}
-
-async function handleCloudMirrorToggle(ev) {
-  const toggle = ev.target;
-  const prev = !toggle.checked;
-  try {
-    toggle.disabled = true;
-    if (toggle.checked) {
-      const confirmed = window.confirm(
-        [
-          "Enable Cloud sync?",
-          "",
-          "This copies your library catalogs and personal statuses/notes from this PC into your BAKLOG account cloud storage.",
-          "Anyone signed into your account can read that data on baklog.app/mirror.",
-          "Store passwords, cookies, and secrets stay on this PC and are never uploaded.",
-          "",
-          "You can turn Cloud sync off later. New uploads stop, but existing cloud files remain until you use Clear cloud library (or delete them in account storage).",
-          "",
-          "Only continue if you understand you are exposing backlog data beyond this machine.",
-        ].join("\n"),
-      );
-      if (!confirmed) {
-        toggle.checked = false;
-        return;
-      }
-    }
-    await saveCloudMirrorEnabled(toggle.checked);
-    _cloudMirrorStatusHold = null;
-    renderConnPrefs();
-    void refreshCloudMirrorUploadStatus();
-  } catch (err) {
-    toggle.checked = prev;
-    window.alert(err?.message || "Could not save cloud sync setting.");
-  } finally {
-    toggle.disabled = false;
-  }
-}
-
 async function handleDealAlertsToggle(ev) {
   const toggle = ev.target;
   const prev = !toggle.checked;
@@ -804,217 +300,6 @@ async function handleDealAlertsToggle(ev) {
   }
 }
 
-async function handleCloudMirrorClear() {
-  const btn = document.getElementById("cloudMirrorClearBtn");
-  const statusEl = document.getElementById("cloudMirrorUploadStatus");
-  const confirmed = window.confirm(
-    [
-      "Clear cloud library?",
-      "",
-      "This permanently deletes synced catalog and personal files from your BAKLOG account cloud storage for the current profile folder.",
-      "Local library files on this PC are not deleted. Store passwords, cookies, and secrets stay on this PC.",
-      "baklog.app/mirror will show an empty library until you Sync now again.",
-      "",
-      "This cannot be undone from BAKLOG.",
-    ].join("\n"),
-  );
-  if (!confirmed) return;
-  try {
-    if (btn) btn.disabled = true;
-    const res = await baklogFetch("/api/mirror/clear", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      data = {};
-    }
-    if (!res.ok) {
-      throw new Error(data.error || `Clear failed (${res.status})`);
-    }
-    const count = Number(data.count || 0);
-    holdCloudMirrorStatus(
-      count > 0
-        ? `Cloud library cleared (${count} file${count === 1 ? "" : "s"} deleted). Credentials stayed local.`
-        : "Cloud library already empty.",
-      false,
-    );
-  } catch (err) {
-    if (statusEl) {
-      holdCloudMirrorStatus(err?.message || "Could not clear cloud library.", true);
-    } else {
-      window.alert(err?.message || "Could not clear cloud library.");
-    }
-  } finally {
-    if (btn) btn.disabled = false;
-    renderConnPrefs();
-  }
-}
-
-export async function openCloudMirrorImportDialog(initialSnap) {
-  const dialog = document.getElementById("cloudMirrorImportDialog");
-  const listEl = document.getElementById("cloudMirrorImportArtifactList");
-  const personalToggle = document.getElementById("cloudMirrorImportPersonal");
-  const intro = document.getElementById("cloudMirrorImportIntro");
-  const sourceWrap = document.getElementById("cloudMirrorImportSourceWrap");
-  const sourceSelect = document.getElementById("cloudMirrorImportSourceProfile");
-  const modeOverwrite = document.getElementById("cloudMirrorImportModeOverwrite");
-  const modeMerge = document.getElementById("cloudMirrorImportModeMerge");
-  if (!dialog || !listEl || !personalToggle) return null;
-
-  const accountId = getAccountProfileId() || "";
-  const profiles = Array.isArray(initialSnap?.profiles) ? initialSnap.profiles : [];
-  let sourceProfile =
-    preferMirrorSourceProfile(profiles, {
-      activeId: activeProfileId(),
-      accountId,
-    }) ||
-    initialSnap?.profile ||
-    activeProfileId();
-  let importableCount = 0;
-  let lastScope = [];
-
-  const selectedMode = () =>
-    modeMerge?.checked ? "merge" : "overwrite";
-
-  const updateIntro = () => {
-    if (!intro) return;
-    const sourceLabel = labelMirrorSourceProfile(sourceProfile, { accountId });
-    const scopeText = lastScope.length ? ` (${lastScope.join(", ")})` : "";
-    if (selectedMode() === "merge") {
-      intro.textContent =
-        `Merges cloud folder "${sourceLabel}" into the current local profile${scopeText}. ` +
-        "Remote wins on overlapping game/status keys; local-only rows stay. " +
-        "Store credentials are not copied - reconnect stores afterward.";
-    } else {
-      intro.textContent =
-        `Replaces matching files in the current local profile from cloud folder "${sourceLabel}"${scopeText}. ` +
-        "Store credentials are not copied - reconnect stores afterward.";
-    }
-  };
-
-  const fillPaths = (artifacts) => {
-    const paths = listImportableArtifactPaths(artifacts);
-    importableCount = paths.length;
-    lastScope = describeImportScope(paths);
-    updateIntro();
-    listEl.innerHTML = paths.length
-      ? paths.map((path) => `<li>${escapeHtml(path)}</li>`).join("")
-      : "<li>No importable files in this cloud profile.</li>";
-    personalToggle.checked = paths.includes("data/personal.json");
-    personalToggle.disabled = !paths.includes("data/personal.json");
-    return paths;
-  };
-
-  let artifacts = initialSnap?.artifacts || [];
-  if (sourceProfile && String(initialSnap?.profile || "") !== sourceProfile) {
-    try {
-      const preferred = await fetchMirrorSnapshot(sourceProfile);
-      artifacts = preferred.artifacts;
-    } catch {
-      artifacts = [];
-    }
-  }
-  fillPaths(artifacts);
-  if (!importableCount && profiles.length <= 1) return null;
-
-  if (modeOverwrite) modeOverwrite.onchange = updateIntro;
-  if (modeMerge) modeMerge.onchange = updateIntro;
-
-  if (sourceWrap && sourceSelect) {
-    if (profiles.length > 1) {
-      sourceSelect.innerHTML = profiles
-        .map((pid) => {
-          const label = labelMirrorSourceProfile(pid, { accountId });
-          const selected = pid === sourceProfile ? " selected" : "";
-          return `<option value="${escapeAttr(pid)}"${selected}>${escapeHtml(label)}</option>`;
-        })
-        .join("");
-      sourceWrap.hidden = false;
-      sourceWrap.classList.remove("hidden");
-      sourceSelect.onchange = async () => {
-        sourceProfile = sourceSelect.value;
-        try {
-          const next = await fetchMirrorSnapshot(sourceProfile);
-          fillPaths(next.artifacts);
-        } catch (err) {
-          importableCount = 0;
-          listEl.innerHTML = `<li>${escapeHtml(err?.message || "Could not list this cloud profile.")}</li>`;
-          personalToggle.checked = false;
-          personalToggle.disabled = true;
-        }
-      };
-    } else {
-      sourceWrap.hidden = true;
-      sourceWrap.classList.add("hidden");
-      sourceSelect.onchange = null;
-    }
-  }
-
-  if (!importableCount && profiles.length <= 1) return null;
-
-  // Default mode is overwrite each open (canceling with Merge selected must not stick).
-  if (modeOverwrite) {
-    modeOverwrite.checked = true;
-    modeOverwrite.onchange = updateIntro;
-  }
-  if (modeMerge) {
-    modeMerge.checked = false;
-    modeMerge.onchange = updateIntro;
-  }
-  updateIntro();
-
-  dialog.returnValue = "cancel";
-  dialog.showModal();
-  return new Promise((resolve) => {
-    dialog.addEventListener(
-      "close",
-      () => {
-        if (sourceSelect) sourceSelect.onchange = null;
-        if (modeOverwrite) modeOverwrite.onchange = null;
-        if (modeMerge) modeMerge.onchange = null;
-        resolve({
-          confirmed: dialog.returnValue === "confirm" && importableCount > 0,
-          includePersonal: personalToggle.checked,
-          sourceProfile,
-          mode: selectedMode(),
-        });
-      },
-      { once: true },
-    );
-  });
-}
-
-async function handleCloudMirrorImport() {
-  const btn = document.getElementById("cloudMirrorImportBtn");
-  try {
-    if (btn) btn.disabled = true;
-    const snap = await fetchMirrorSnapshot();
-    const choice = await openCloudMirrorImportDialog(snap);
-    if (!choice?.confirmed) return;
-
-    const { importFromCloudMirror } = await import("./cloud-mirror-import.js");
-    const result = await importFromCloudMirror({
-      includePersonal: choice.includePersonal,
-      sourceProfile: choice.sourceProfile || undefined,
-      mode: choice.mode === "merge" ? "merge" : "overwrite",
-    });
-    const count = result?.count ?? 0;
-    const imported = Array.isArray(result?.imported) ? result.imported.join(", ") : "";
-    const modeLabel = result?.mode === "merge" ? "Merge" : "Replace";
-    window.alert(
-      `Cloud sync import complete (${modeLabel}, ${count} file${count === 1 ? "" : "s"}).${imported ? `\n\n${imported}` : ""}\n\nThe app will reload.`,
-    );
-    window.location.reload();
-  } catch (err) {
-    window.alert(err?.message || "Cloud mirror import failed.");
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
 
 function connAuthFingerprint() {
   return JSON.stringify(
@@ -1118,6 +403,26 @@ function renderConnections() {
   }
 
   restoreConnNoteFocus(noteFocus, pane);
+}
+
+async function pasteFromClipboard(card) {
+  const log = card?.querySelector(".conn-log");
+  const input = card?.querySelector(".conn-paste-panel [data-field]");
+  if (!input) return;
+  try {
+    const text = await navigator.clipboard.readText();
+    input.value = (text || "").trim();
+    if (log) {
+      log.classList.remove("hidden");
+      log.textContent = "Pasted from clipboard.";
+    }
+  } catch {
+    if (log) {
+      log.classList.remove("hidden");
+      log.textContent =
+        "Could not read clipboard - paste into the field manually (Ctrl+V).";
+    }
+  }
 }
 
 function handleLayoutClick(ev) {
@@ -1448,224 +753,6 @@ function toggleKebabMenu(force) {
   btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
-function wireMasterPasswordSave() {
-  const btn = document.getElementById("masterPasswordSave");
-
-  if (!btn || btn.dataset.bound === "1") return;
-
-  btn.dataset.bound = "1";
-
-  btn.addEventListener("click", async () => {
-    const pw = document.getElementById("masterPasswordInput")?.value || "";
-
-    try {
-      const res = await baklogFetch("/api/auth/master-password", {
-        method: "POST",
-
-        headers: { "Content-Type": "application/json" },
-
-        body: JSON.stringify({ password: pw || null }),
-      });
-
-      const hint = document.getElementById("masterPasswordHint");
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-
-        if (hint)
-          hint.textContent = data.error || `Save failed (${res.status})`;
-
-        return;
-      }
-
-      if (hint)
-        hint.textContent = pw
-          ? "Master password set (portable encryption)."
-          : "Using OS keychain.";
-    } catch (_) {
-      const hint = document.getElementById("masterPasswordHint");
-
-      if (hint) hint.textContent = "Could not reach the local server.";
-    }
-  });
-}
-
-function setSecretsBundleHint(text, isError = false) {
-  const hint = document.getElementById("secretsBundleHint");
-  if (!hint) return;
-  hint.textContent = text || "";
-  hint.classList.toggle("text-red-400", !!isError);
-  hint.classList.toggle("text-slate-400", !isError);
-}
-
-function promptSecretsBundlePassphrase({ mode = "export" } = {}) {
-  return new Promise((resolve) => {
-    const dialog = document.getElementById("secretsBundleDialog");
-    const form = document.getElementById("secretsBundleDialogForm");
-    const title = document.getElementById("secretsBundleDialogTitle");
-    const help = document.getElementById("secretsBundleDialogHelp");
-    const pw = document.getElementById("secretsBundlePassphrase");
-    const confirmWrap = document.getElementById("secretsBundleConfirmWrap");
-    const confirmPw = document.getElementById("secretsBundlePassphraseConfirm");
-    const cancelBtn = document.getElementById("secretsBundleCancel");
-    if (!dialog || !form || !pw) {
-      resolve(null);
-      return;
-    }
-    const isExport = mode === "export";
-    if (title)
-      title.textContent = isExport
-        ? "Export bundle passphrase"
-        : "Import bundle passphrase";
-    if (help) {
-      help.textContent = isExport
-        ? "Choose a passphrase for this backup file. You will need it to import on another machine."
-        : "Enter the passphrase you used when exporting this bundle.";
-    }
-    pw.value = "";
-    if (confirmPw) confirmPw.value = "";
-    if (confirmWrap) confirmWrap.classList.toggle("hidden", !isExport);
-    const cleanup = () => {
-      form.removeEventListener("submit", onSubmit);
-      cancelBtn?.removeEventListener("click", onCancel);
-      dialog.removeEventListener("close", onClose);
-    };
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (dialog.open) dialog.close();
-      resolve(value);
-    };
-    const onCancel = (ev) => {
-      ev.preventDefault();
-      finish(null);
-    };
-    const onClose = () => {
-      finish(null);
-    };
-    const onSubmit = (ev) => {
-      ev.preventDefault();
-      const value = pw.value || "";
-      if (value.length < 8) {
-        setSecretsBundleHint("Passphrase must be at least 8 characters.", true);
-        return;
-      }
-      if (isExport && confirmPw && value !== confirmPw.value) {
-        setSecretsBundleHint("Passphrases do not match.", true);
-        return;
-      }
-      finish(value);
-    };
-    form.addEventListener("submit", onSubmit);
-    cancelBtn?.addEventListener("click", onCancel);
-    dialog.addEventListener("close", onClose);
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.removeAttribute("hidden");
-    pw.focus();
-  });
-}
-
-async function exportSecretsBundle() {
-  const passphrase = await promptSecretsBundlePassphrase({ mode: "export" });
-  if (!passphrase) return;
-  setSecretsBundleHint("Exporting bundle…");
-  try {
-    const resp = await baklogFetch("/api/auth/secrets/export", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passphrase, include_profiles: true }),
-    });
-    if (!resp.ok) {
-      let msg = `Export failed (${resp.status})`;
-      try {
-        const err = await resp.json();
-        if (err?.error) msg = err.error;
-      } catch (_) {
-        /* binary or empty */
-      }
-      setSecretsBundleHint(msg, true);
-      return;
-    }
-    const blob = await resp.blob();
-    const cd = resp.headers.get("Content-Disposition") || "";
-    const match = cd.match(/filename="([^"]+)"/);
-    const filename = match?.[1] || "baklog-secrets.bundle";
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setSecretsBundleHint(
-      "Bundle downloaded. Store it somewhere safe - we cannot recover the passphrase.",
-    );
-  } catch (err) {
-    setSecretsBundleHint(err?.message || "Export failed.", true);
-  }
-}
-
-async function importSecretsBundle(file) {
-  if (!file) return;
-  const passphrase = await promptSecretsBundlePassphrase({ mode: "import" });
-  if (!passphrase) return;
-  setSecretsBundleHint("Importing bundle…");
-  try {
-    const buf = await file.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let binary = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-    }
-    const blobB64 = btoa(binary);
-    const resp = await baklogFetch("/api/auth/secrets/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passphrase, blob: blobB64 }),
-    });
-    const payload = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      setSecretsBundleHint(
-        payload?.error || `Import failed (${resp.status})`,
-        true,
-      );
-      return;
-    }
-    const nProv = (payload.providers_imported || []).length;
-    const nProf = (payload.profiles_imported || []).length;
-    setSecretsBundleHint(
-      `Imported ${nProv} provider(s) and ${nProf} profile(s). Reloading…`,
-    );
-    window.setTimeout(() => window.location.reload(), 1200);
-  } catch (err) {
-    setSecretsBundleHint(err?.message || "Import failed.", true);
-  }
-}
-
-function wireSecretsBundle() {
-  const exportBtn = document.getElementById("secretsExportBtn");
-  const importBtn = document.getElementById("secretsImportBtn");
-  const importFile = document.getElementById("secretsImportFile");
-  if (!exportBtn || !importBtn || !importFile) return;
-  if (exportBtn.dataset.bound === "1") return;
-  exportBtn.dataset.bound = "1";
-  importBtn.dataset.bound = "1";
-  exportBtn.addEventListener("click", () => {
-    exportSecretsBundle();
-  });
-  importBtn.addEventListener("click", () => {
-    importFile.value = "";
-    importFile.click();
-  });
-  importFile.addEventListener("change", () => {
-    const file = importFile.files?.[0];
-    if (file) importSecretsBundle(file);
-  });
-}
 
 function wireChromeEvents() {
   if (chromeWired) return;
@@ -2630,6 +1717,8 @@ export function stopConnectionsPolling() {
 
   pollTimer = null;
 }
+
+bindCloudMirrorUi({ renderConnPrefs });
 
 export function wireConnectionsUi() {
   wireGridEvents();

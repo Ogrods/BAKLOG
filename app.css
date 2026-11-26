@@ -7229,19 +7229,25 @@ html[data-theme="ember"] .brand-logo-pills {
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
   transition: opacity var(--spotlight-fade) ease;
-  /* Blur stays full-bleed; do not inherit the landscape hero left-fade. */
-  -webkit-mask-image: none;
-  mask-image: none;
+  /* Soft L/R feather (not the hero left-only mask) so tall/square posters sit
+     on a landscape-like faded field instead of a hard blur rectangle. */
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 18%,
+    #000 82%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 18%,
+    #000 82%,
+    transparent 100%
+  );
 }
 .dash-spotlight-art-bg.is-loaded {
   opacity: 1;
-}
-/* Midnight (OLED) only: portrait / non-hero spotlight covers sit on pure black -
-   drop the blurred backdrop layer. */
-html[data-theme="dark"]
-  .dash-spotlight.has-portrait-art
-  .dash-spotlight-art-bg {
-  display: none;
 }
 .dash-spotlight-art {
   position: absolute;
@@ -7624,49 +7630,43 @@ html[data-theme="dark"]
     opacity: 0;
   }
 }
-/* Mild rotateY; art has no overflow:hidden so edge titles are not self-clipped. */
+/* Idle float is translateY only - rotateY foreshortens full-bleed contain posters
+   into .dash-spotlight { overflow:hidden } and clips edge-to-edge title logos.
+   Hover tilt still uses mild rotateY with a compensatory scale in JS. */
 @keyframes spotlightFloat1 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(-2deg) rotateX(0.8deg) translateY(0)
-      translateZ(0);
+    transform: translateY(0) translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(2deg) rotateX(-0.8deg)
-      translateY(-1.5px) translateZ(0);
+    transform: translateY(-1.5px) translateZ(0);
   }
 }
 @keyframes spotlightFloat2 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(2deg) rotateX(-0.8deg) translateY(0)
-      translateZ(0);
+    transform: translateY(0) translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(-2deg) rotateX(0.8deg)
-      translateY(-1.5px) translateZ(0);
+    transform: translateY(-1.5px) translateZ(0);
   }
 }
 @keyframes spotlightFloat3 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(-2.5deg) rotateX(1deg) translateY(0)
-      translateZ(0);
+    transform: translateY(0) translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(2.5deg) rotateX(-1deg)
-      translateY(-1.5px) translateZ(0);
+    transform: translateY(-1.5px) translateZ(0);
   }
 }
 @keyframes spotlightFloat4 {
   0%,
   100% {
-    transform: perspective(900px) rotateY(1.8deg) rotateX(-0.6deg) translateY(0)
-      translateZ(0);
+    transform: translateY(0) translateZ(0);
   }
   50% {
-    transform: perspective(900px) rotateY(-1.8deg) rotateX(0.6deg)
-      translateY(-1px) translateZ(0);
+    transform: translateY(-1px) translateZ(0);
   }
 }
 .dash-spotlight-sheen {

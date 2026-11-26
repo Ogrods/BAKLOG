@@ -1672,7 +1672,9 @@ function wireSpotlightHover(el) {
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   const MAX_YAW = 12;
   const MAX_PITCH = 7;
-  const HOVER_SCALE = 1.03;
+  // Shrink slightly while tilting so rotateY foreshortening stays inside
+  // .dash-spotlight { overflow:hidden } (idle float is translateY-only).
+  const HOVER_SCALE = 0.96;
   const EASE = 0.14;
   const BG_BASE_SCALE = 1.08;
   // Keep a sliver of the portrait's left edge interactive; detach in the faded
@@ -1693,15 +1695,13 @@ function wireSpotlightHover(el) {
       : null;
 
   // Resting pose of the CSS float keyframes (the 0%/100% frame of each
-  // spotlightFloatN). On release we ease to this pose so that when `is-tilting`
-  // is removed and the keyframe animation resumes at 0%, the handoff is seamless
-  // instead of snapping from a flat (0deg) rest pose.
-  // Match milder spotlightFloatN resting poses (keeps capsule titles inside clip).
+  // spotlightFloatN). Idle float is translateY-only (no rotate), so release
+  // eases to flat 0deg before the bob resumes.
   const FLOAT_ANCHORS = {
-    "portrait-anim-1": { ry: -2, rx: 0.8 },
-    "portrait-anim-2": { ry: 2, rx: -0.8 },
-    "portrait-anim-3": { ry: -2.5, rx: 1 },
-    "portrait-anim-4": { ry: 1.8, rx: -0.6 },
+    "portrait-anim-1": { ry: 0, rx: 0 },
+    "portrait-anim-2": { ry: 0, rx: 0 },
+    "portrait-anim-3": { ry: 0, rx: 0 },
+    "portrait-anim-4": { ry: 0, rx: 0 },
   };
   const floatAnchor = () => {
     for (const cls in FLOAT_ANCHORS) {

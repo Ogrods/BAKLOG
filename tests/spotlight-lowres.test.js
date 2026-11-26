@@ -145,7 +145,22 @@ describe("spotlight portrait CSS contract", () => {
     const portraitBg = css.match(
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art-bg \{[\s\S]*?\n\}/,
     )?.[0];
-    expect(portraitBg).toMatch(/mask-image:\s*none/);
+    expect(portraitBg).toMatch(/display:\s*block/);
+    // Soft L/R feather (not hero left-only; not hard none).
+    expect(portraitBg).toMatch(/mask-image:\s*linear-gradient/);
+    expect(portraitBg).not.toMatch(/mask-image:\s*none/);
+    // Midnight must not kill portrait/square blur backdrop.
+    expect(css).not.toMatch(
+      /html\[data-theme=["']dark["']\][\s\S]{0,120}\.has-portrait-art[\s\S]{0,80}art-bg[\s\S]{0,40}display:\s*none/,
+    );
+
+    const floatStart = css.indexOf("@keyframes spotlightFloat1");
+    const floatEnd = css.indexOf(".dash-spotlight-sheen {", floatStart);
+    expect(floatStart).toBeGreaterThanOrEqual(0);
+    expect(floatEnd).toBeGreaterThan(floatStart);
+    const floatBlock = css.slice(floatStart, floatEnd);
+    expect(floatBlock).not.toMatch(/rotateY/);
+    expect(floatBlock).toMatch(/translateY/);
 
     const sheen = css.match(
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-sheen \{[\s\S]*?\n\}/,

@@ -47,11 +47,42 @@ def _check(proc: subprocess.CompletedProcess, what: str) -> None:
         raise ClaimsSyncError(f"{what} failed: {tail}")
 
 
+def _resolve_upstream(runner: Runner, internal: Path) -> tuple[str, str]:
+    """Return ``(remote, branch)`` for a single-onto rebase.
+
+    Never consults FETCH_HEAD: a multi-ref fetch there is what makes bare
+    ``git pull --rebase`` die with "Cannot rebase onto multiple branches".
+    """
+    head = _git(runner, internal, "rev-parse", "--abbrev-ref", "HEAD")
+    _check(head, "git rev-parse HEAD")
+    branch = head.stdout.strip()
+    if not branch or branch == "HEAD":
+        raise ClaimsSyncError(
+            "baklog-internal is detached HEAD; check out master/main before sync"
+        )
+
+    upstream = _git(runner, internal, "rev-parse", "--abbrev-ref", "@{upstream}")
+    if upstream.returncode == 0:
+        ref = upstream.stdout.strip()
+        if "/" in ref:
+            remote, _, tracked = ref.partition("/")
+            if remote and tracked:
+                return remote, tracked
+
+    return "origin", branch
+
+
 def _pull_rebase(runner: Runner, internal: Path) -> None:
-    pull = _git(runner, internal, "pull", "-q", "--rebase", "--autostash")
-    if pull.returncode != 0:
+    """Fetch one upstream ref, then rebase --autostash onto it (never ``git pull``)."""
+    remote, branch = _resolve_upstream(runner, internal)
+    onto = f"{remote}/{branch}"
+    fetch = _git(runner, internal, "fetch", "-q", remote, branch)
+    if fetch.returncode != 0:
+        _check(fetch, "git fetch")
+    rebase = _git(runner, internal, "rebase", "--autostash", onto)
+    if rebase.returncode != 0:
         _git(runner, internal, "rebase", "--abort")
-        _check(pull, "git pull --rebase")
+        _check(rebase, "git rebase")
 
 
 def _share_newer_local_scrape(repo_root: Path, internal: Path) -> bool:

@@ -37,6 +37,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.33] - 2026-11-26
+
+### Fixed
+
+- Wishlist Deals pick tab only shows on the Wishlist view
+- ITAD deal chip recovers after sign-in when prices were wiped at boot
+
 ## [0.9.32] - 2026-11-26
 
 ### Fixed

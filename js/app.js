@@ -89,6 +89,7 @@ import {
   reloadAfterFetcher,
   finishEmptyLibraryLoad,
   repairBulkFirstSeenStamps,
+  loadItadPrices,
 } from "./library-load.js";
 import { initLibraryWatches } from "./library-watch.js";
 import {
@@ -255,7 +256,7 @@ async function bootstrap() {
     });
   }
   document.addEventListener("baklog:auth-status", () => {
-    syncItadDealSurfaces();
+    void syncItadDealSurfaces();
   });
   wireProView();
   onPlanChange(() => {
@@ -307,7 +308,7 @@ async function bootstrap() {
   syncFilterDomFromState();
   updateCleanupBtnState();
   updateViewChrome();
-  syncItadDealSurfaces({ rerender: false });
+  await syncItadDealSurfaces({ rerender: false });
   if (
     state.activeView === "library" &&
     state.prefs.picksTab === "wishlistDeals"
@@ -426,6 +427,10 @@ async function bootstrap() {
     await Promise.all([reloadPromise, fetcherPromise]);
     bootPerfMark(bootPerf, "library:done");
     bootPerfMark(bootPerf, "fetcher:done");
+    // Belt-and-suspenders: heal ITAD meta if library load raced ahead of auth.
+    if (isItadDealsAvailable()) {
+      await loadItadPrices().catch(() => {});
+    }
   } finally {
     suppressChartStaggerForBoot();
     bootPerfMark(bootPerf, "curtain:lift");

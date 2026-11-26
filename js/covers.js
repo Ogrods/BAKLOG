@@ -174,8 +174,8 @@ window.applySpotlightArtFit = function (img) {
 
   if (crop.portrait && bg) {
     img.style.objectFit = crop.fit;
-    // Poster card is sized in CSS (2:3 or 1:1 for square); keep focal center.
-    // Stacked park is also CSS (right tuck) - do not stamp landscape 66%.
+    // Tall portrait: full-bleed contain; square: CSS 1:1 card. Keep focal center
+    // (do not stamp landscape 66% - stacked park is CSS for sheen / square tuck).
     img.style.objectPosition = "center";
     img.style.setProperty("mask-image", "none");
     img.style.setProperty("-webkit-mask-image", "none");
@@ -185,8 +185,15 @@ window.applySpotlightArtFit = function (img) {
     spot.classList.remove("is-lowres-art");
     assignPortraitAnimClass(spot);
     bg.classList.add("is-loaded");
-    // Sheen shares the CSS poster box; clear any prior inline width.
-    if (sheen) sheen.style.width = "";
+    if (sheen) {
+      if (crop.square) {
+        // Square sheen shares the CSS 1:1 poster box.
+        sheen.style.width = "";
+      } else {
+        // Era B: size sheen to the contained poster width.
+        sheen.style.width = `${Math.min(spot.clientWidth, spot.clientHeight * ratio)}px`;
+      }
+    }
   } else {
     spot.classList.remove("has-portrait-art", "has-square-art");
     clearPortraitAnimClasses(spot);

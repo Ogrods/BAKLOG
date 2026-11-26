@@ -76,9 +76,12 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
-    // Poster geometry is CSS; JS must not leave an inline sheen width.
-    expect(sheen.style.width).toBe("");
-    // Clear hero left-fade so capsule titles are not clipped (CSS also sets
+    // Era B: sheen width matches contained poster (min(slotW, slotH * ratio)).
+    expect(parseFloat(sheen.style.width)).toBeCloseTo(
+      Math.min(800, 400 * (300 / 450)),
+      4,
+    );
+    // Clear hero left-fade so titles are not soft-masked (CSS also sets
     // -webkit-mask-image; happy-dom only reliably keeps the standard property).
     expect(img.style.getPropertyValue("mask-image")).toBe("none");
   });
@@ -86,6 +89,7 @@ describe("spotlight low-res art", () => {
   it("flags near-square art as square capsule (still portrait path)", () => {
     const spot = mountSpotlight();
     const img = stubArtDimensions(spot, 400, 400);
+    const sheen = spot.querySelector(".dash-spotlight-sheen");
 
     expect(spot.classList.contains("has-portrait-art")).toBe(true);
     expect(spot.classList.contains("has-square-art")).toBe(true);
@@ -93,6 +97,8 @@ describe("spotlight low-res art", () => {
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
     expect(img.style.getPropertyValue("mask-image")).toBe("none");
+    // Square sheen geometry is CSS 1:1; clear any prior tall-portrait width.
+    expect(sheen.style.width).toBe("");
   });
 
   it("keeps low-res and portrait focal center when stacked (CSS parks the card)", () => {
@@ -118,7 +124,7 @@ describe("spotlight low-res art", () => {
 });
 
 describe("spotlight portrait CSS contract", () => {
-  it("clears hero mask and sizes a 2:3 poster for has-portrait-art", async () => {
+  it("uses full-bleed contain for tall portrait; 1:1 card for square", async () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const css = await fs.readFile(
@@ -129,10 +135,11 @@ describe("spotlight portrait CSS contract", () => {
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art \{[\s\S]*?\n\}/,
     )?.[0];
     expect(portraitArt).toBeTruthy();
-    expect(portraitArt).toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
+    // Tall portrait is Era B full-bleed - not a 2:3 capsule.
+    expect(portraitArt).not.toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
+    expect(portraitArt).toMatch(/padding:\s*10px\s+0/);
     expect(portraitArt).toMatch(/object-fit:\s*contain/);
     expect(portraitArt).toMatch(/mask-image:\s*none/);
-    // Float lives on this node; overflow:hidden would self-clip edge titles.
     expect(portraitArt).not.toMatch(/overflow:\s*hidden/);
 
     const portraitBg = css.match(
@@ -143,7 +150,9 @@ describe("spotlight portrait CSS contract", () => {
     const sheen = css.match(
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-sheen \{[\s\S]*?\n\}/,
     )?.[0];
-    expect(sheen).toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
+    expect(sheen).toMatch(/left:\s*50%/);
+    expect(sheen).toMatch(/transform:\s*translateX\(-50%\)/);
+    expect(sheen).not.toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
 
     const squareArt = css.match(
       /\.dash-spotlight\.has-portrait-art\.has-square-art \.dash-spotlight-art \{[\s\S]*?\n\}/,

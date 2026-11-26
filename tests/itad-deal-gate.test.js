@@ -97,11 +97,15 @@ describe('syncItadDealSurfaces', () => {
     expect(document.getElementById('wishlistItadCta').classList.contains('hidden')).toBe(true);
   });
 
-  it('keeps Wishlist Deals pick tab hidden on library and itch even when ITAD is connected', () => {
+  it('keeps Wishlist Deals pick tab hidden on library and itch even when ITAD is connected', async () => {
     setAuthStatusSnapshot([{ key: 'itad', status: 'connected' }]);
+    vi.spyOn(apiClient, 'dataFetch').mockResolvedValue({
+      ok: false,
+      json: async () => null,
+    });
     for (const view of ['library', 'itch']) {
       state.activeView = view;
-      syncItadDealSurfaces({ rerender: false });
+      await syncItadDealSurfaces({ rerender: false });
       expect(document.querySelector('[data-tab="wishlistDeals"]').classList.contains('hidden')).toBe(true);
     }
   });

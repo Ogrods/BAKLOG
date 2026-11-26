@@ -256,7 +256,7 @@ async function bootstrap() {
     });
   }
   document.addEventListener("baklog:auth-status", () => {
-    syncItadDealSurfaces();
+    void syncItadDealSurfaces();
   });
   wireProView();
   onPlanChange(() => {
@@ -308,7 +308,7 @@ async function bootstrap() {
   syncFilterDomFromState();
   updateCleanupBtnState();
   updateViewChrome();
-  syncItadDealSurfaces({ rerender: false });
+  await syncItadDealSurfaces({ rerender: false });
   if (
     state.activeView === "library" &&
     state.prefs.picksTab === "wishlistDeals"

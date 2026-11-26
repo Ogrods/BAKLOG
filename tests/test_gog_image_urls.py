@@ -28,16 +28,16 @@ def test_protocol_relative_hash() -> None:
     assert library == f"{BASE}.jpg"
 
 
-def test_pick_cover_prefers_cover_before_background() -> None:
+def test_pick_cover_prefers_background_before_vertical() -> None:
     url = _pick_cover_url(
         {
             "background": "https://images.gog.com/bg_padding.webp",
             "cover": "https://images.gog.com/cover_vertical.jpg",
         }
     )
+    assert url == "https://images.gog.com/bg_padding.webp"
+
+
+def test_pick_cover_falls_back_to_cover() -> None:
+    url = _pick_cover_url({"cover": "https://images.gog.com/cover_vertical.jpg"})
     assert url == "https://images.gog.com/cover_vertical.jpg"
-
-
-def test_pick_cover_falls_back_to_background() -> None:
-    url = _pick_cover_url({"background": "https://images.gog.com/bg.webp"})
-    assert url == "https://images.gog.com/bg.webp"

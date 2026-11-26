@@ -81,7 +81,7 @@ describe("spotlight low-res art", () => {
       Math.min(800, (400 - 20) * (300 / 450)),
       4,
     );
-    // Soft L/R feather is CSS-only; JS must not stamp mask-image:none.
+    // FG mask is CSS (none); JS must not stamp an inline override.
     expect(img.style.getPropertyValue("mask-image")).toBe("");
   });
 
@@ -140,17 +140,22 @@ describe("spotlight portrait CSS contract", () => {
     expect(portraitArt).toMatch(/left:\s*50%/);
     expect(portraitArt).toMatch(/height:\s*calc\(100%\s*-\s*20px\)/);
     expect(portraitArt).toMatch(/object-fit:\s*contain/);
-    expect(portraitArt).toMatch(/mask-image:\s*linear-gradient/);
-    expect(portraitArt).not.toMatch(/mask-image:\s*none/);
+    // Hard FG edges - left fade lives on art-bg (same as low-res).
+    expect(portraitArt).toMatch(/mask-image:\s*none/);
     expect(portraitArt).not.toMatch(/overflow:\s*hidden/);
 
     const portraitBg = css.match(
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art-bg \{[\s\S]*?\n\}/,
     )?.[0];
     expect(portraitBg).toMatch(/display:\s*block/);
-    // Soft L/R feather (not hero left-only; not hard none).
-    expect(portraitBg).toMatch(/mask-image:\s*linear-gradient/);
-    expect(portraitBg).not.toMatch(/mask-image:\s*none/);
+    // No balanced L/R override - inherit base left-edge art-bg fade.
+    expect(portraitBg).not.toMatch(/mask-image:/);
+    // Anchor on the full-bleed art-bg rule (blur + left fade), not reduced-motion stubs.
+    const baseBgIdx = css.indexOf("filter: blur(18px) brightness(0.5)");
+    expect(baseBgIdx).toBeGreaterThan(0);
+    const baseBg = css.slice(baseBgIdx, baseBgIdx + 450);
+    expect(baseBg).toMatch(/mask-image:\s*linear-gradient/);
+    expect(baseBg).toMatch(/transparent 12%/);
     // Midnight must not kill portrait/square blur backdrop.
     expect(css).not.toMatch(
       /html\[data-theme=["']dark["']\][\s\S]{0,120}\.has-portrait-art[\s\S]{0,80}art-bg[\s\S]{0,40}display:\s*none/,

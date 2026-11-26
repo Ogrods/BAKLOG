@@ -12,6 +12,7 @@ wishlist, so you can deal-radar across stores in one place.
 
 import argparse
 import json
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,16 +49,29 @@ GOG_PRODUCT_DELAY_SEC = 0.4
 HLTB_DELAY_SEC = 1.0
 
 
+_GOG_HASH_RE = re.compile(
+    r"(https?://images\.gog\.com/)([0-9a-f]{64})",
+    re.IGNORECASE,
+)
+
+
 def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
     """Mirror fetch_gog.py: turn a bare GOG image hash into header + cover URLs."""
     if not raw:
         return None, None
-    url = raw
+    url = raw.strip()
     if url.startswith("//"):
         url = "https:" + url
     if not url.startswith("http"):
         return None, None
-    if url.endswith(".jpg") or url.endswith(".png"):
+
+    m = _GOG_HASH_RE.search(url)
+    if m:
+        base = f"{m.group(1)}{m.group(2).lower()}"
+        return f"{base}.jpg", f"{base}_glx_vertical_cover.jpg"
+
+    path = url.split("?", 1)[0]
+    if path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
         return url, url
     return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
 

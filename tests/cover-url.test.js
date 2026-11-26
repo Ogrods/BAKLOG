@@ -27,6 +27,21 @@ describe("sanitizeCoverUrl", () => {
       "https://atum-img-lp1.cdn.nintendo.net/i/c/abc_256",
     );
   });
+
+  it("rewrites mangled GOG glx_bg_top_padding URLs to vertical cover", () => {
+    const hash = "11b5d020144f3ef465bc36c4d375e579fa65e2858b4f58cdd5540a049b9a6982";
+    const mangled =
+      `https://images.gog.com/${hash}_glx_bg_top_padding_7.webp?namespace=gamesdb_glx_vertical_cover.jpg`;
+    expect(sanitizeCoverUrl(mangled)).toBe(
+      `https://images.gog.com/${hash}_glx_vertical_cover.jpg`,
+    );
+  });
+
+  it("leaves clean GOG vertical covers unchanged", () => {
+    const hash = "11b5d020144f3ef465bc36c4d375e579fa65e2858b4f58cdd5540a049b9a6982";
+    const ok = `https://images.gog.com/${hash}_glx_vertical_cover.jpg`;
+    expect(sanitizeCoverUrl(ok)).toBe(ok);
+  });
 });
 
 describe("libraryCoverFor", () => {

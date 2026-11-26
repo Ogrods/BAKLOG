@@ -308,6 +308,8 @@
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg {
   display: block;
   transition: opacity 0.45s ease;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
 }
 .dash-spotlight-art-bg.is-loaded { opacity: 1; }
 .dash-spotlight-art {
@@ -408,10 +410,11 @@
 @keyframes spotlightSheen2 { 0%,18%{transform:translateX(150%) skewX(12deg);opacity:0} 26%,46%{opacity:.08} 56%,100%{transform:translateX(-150%) skewX(12deg);opacity:0} }
 @keyframes spotlightSheen3 { 0%,16%{transform:translateX(-150%) skewX(-14deg);opacity:0} 24%,44%{opacity:.08} 54%,100%{transform:translateX(150%) skewX(-14deg);opacity:0} }
 @keyframes spotlightSheen4 { 0%,20%{transform:translateX(150%) skewX(10deg);opacity:0} 28%,48%{opacity:.08} 58%,100%{transform:translateX(-150%) skewX(10deg);opacity:0} }
-@keyframes spotlightFloat1 { 0%,100%{transform:perspective(900px) rotateY(-3deg) rotateX(1deg) translateY(0) translateZ(0)} 50%{transform:perspective(900px) rotateY(3deg) rotateX(-1deg) translateY(-1.5px) translateZ(0)} }
-@keyframes spotlightFloat2 { 0%,100%{transform:perspective(900px) rotateY(3deg) rotateX(-1deg) translateY(0) translateZ(0)} 50%{transform:perspective(900px) rotateY(-3deg) rotateX(1deg) translateY(-1.5px) translateZ(0)} }
-@keyframes spotlightFloat3 { 0%,100%{transform:perspective(900px) rotateY(-4deg) rotateX(1.2deg) translateY(0) translateZ(0)} 50%{transform:perspective(900px) rotateY(4deg) rotateX(-1.2deg) translateY(-1.5px) translateZ(0)} }
-@keyframes spotlightFloat4 { 0%,100%{transform:perspective(900px) rotateY(2.5deg) rotateX(-0.8deg) translateY(0) translateZ(0)} 50%{transform:perspective(900px) rotateY(-2.5deg) rotateX(0.8deg) translateY(-1px) translateZ(0)} }
+/* Idle float translateY-only (parity with app.css - avoid rotateY clip). */
+@keyframes spotlightFloat1 { 0%,100%{transform:translateY(0) translateZ(0)} 50%{transform:translateY(-1.5px) translateZ(0)} }
+@keyframes spotlightFloat2 { 0%,100%{transform:translateY(0) translateZ(0)} 50%{transform:translateY(-1.5px) translateZ(0)} }
+@keyframes spotlightFloat3 { 0%,100%{transform:translateY(0) translateZ(0)} 50%{transform:translateY(-1.5px) translateZ(0)} }
+@keyframes spotlightFloat4 { 0%,100%{transform:translateY(0) translateZ(0)} 50%{transform:translateY(-1px) translateZ(0)} }
 .dash-spotlight-gradient {
   position: absolute;
   inset: 0;

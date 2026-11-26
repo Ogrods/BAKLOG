@@ -37,6 +37,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Tall portrait spotlight titles stay fully visible while the cover floats; portrait and square covers keep a soft blurred backdrop on Midnight
+
 ## [0.9.27] - 2026-11-26
 
 ### Fixed

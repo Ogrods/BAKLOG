@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.29] - 2026-11-26
+
 ### Fixed
 
 - Tall portrait spotlight covers show the full capsule (centered card) instead of a zoomed center crop; soft left/right edges blend into the blur

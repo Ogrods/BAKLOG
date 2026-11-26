@@ -28,18 +28,16 @@ describe("sanitizeCoverUrl", () => {
     );
   });
 
-  it("rewrites mangled GOG glx_bg_top_padding URLs to vertical cover", () => {
+  it("rewrites mangled GOG glx_bg_top_padding URLs to landscape .jpg", () => {
     const hash = "11b5d020144f3ef465bc36c4d375e579fa65e2858b4f58cdd5540a049b9a6982";
     const mangled =
       `https://images.gog.com/${hash}_glx_bg_top_padding_7.webp?namespace=gamesdb_glx_vertical_cover.jpg`;
-    expect(sanitizeCoverUrl(mangled)).toBe(
-      `https://images.gog.com/${hash}_glx_vertical_cover.jpg`,
-    );
+    expect(sanitizeCoverUrl(mangled)).toBe(`https://images.gog.com/${hash}.jpg`);
   });
 
-  it("leaves clean GOG vertical covers unchanged", () => {
+  it("leaves clean GOG .jpg banners unchanged", () => {
     const hash = "11b5d020144f3ef465bc36c4d375e579fa65e2858b4f58cdd5540a049b9a6982";
-    const ok = `https://images.gog.com/${hash}_glx_vertical_cover.jpg`;
+    const ok = `https://images.gog.com/${hash}.jpg`;
     expect(sanitizeCoverUrl(ok)).toBe(ok);
   });
 });
@@ -101,15 +99,15 @@ describe("spotlight art (A+B)", () => {
     })).toBe("413150");
   });
 
-  it("spotlightCropForAspect picks cover vs portrait/square contain", () => {
+  it("spotlightCropForAspect always contain; wide is not portrait", () => {
     expect(spotlightCropForAspect(2.5)).toEqual({
-      fit: "cover", pos: "58% 40%", portrait: false, square: false,
+      fit: "contain", pos: "center", portrait: false, square: false,
     });
     expect(spotlightCropForAspect(1.6)).toEqual({
-      fit: "cover", pos: "35% center", portrait: false, square: false,
+      fit: "contain", pos: "center", portrait: false, square: false,
     });
     expect(spotlightCropForAspect(1.3)).toEqual({
-      fit: "cover", pos: "35% center", portrait: false, square: false,
+      fit: "contain", pos: "center", portrait: false, square: false,
     });
     expect(spotlightCropForAspect(1.0)).toEqual({
       fit: "contain", pos: "center", portrait: true, square: true,

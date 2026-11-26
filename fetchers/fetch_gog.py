@@ -70,13 +70,11 @@ def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
     """Turn GOG's bare image hash into usable (header, library_cover) URLs.
 
     GOG's CDN serves the hash without a file extension; the bare path 404s.
-    Append `.jpg` for the original (landscape banner) and `_glx_vertical_cover.jpg`
-    for the portrait cover used by Galaxy. The HTML img onerror handler falls
-    back to the header if the vertical cover doesn't exist for older titles.
-
-    Galaxy often hands us landscape ``_glx_bg_top_padding_*.webp?namespace=…``
-    URLs. Strip query + suffix and rebuild from the 64-hex hash so library never
-    stays on the 1600×650 padding asset mislabeled as vertical.
+    Rebuild to ``{hash}.jpg`` (landscape banner). Do not prefer
+    ``_glx_vertical_cover.jpg`` - those are often face crops without title art.
+    Galaxy ``_glx_bg_top_padding_*.webp?namespace=…`` URLs are rewritten from
+    the 64-hex hash the same way. Steam enrich ``--upgrade-lowres`` can replace
+    with library_600x900 when a match exists.
     """
     if not raw:
         return None, None
@@ -88,14 +86,16 @@ def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
 
     m = _GOG_HASH_RE.search(url)
     if m:
+        # Prefer landscape .jpg for both slots. Vertical Galaxy covers are often
+        # face crops without the title plate; Steam enrich upgrades when possible.
         base = f"{m.group(1)}{m.group(2).lower()}"
-        return f"{base}.jpg", f"{base}_glx_vertical_cover.jpg"
+        return f"{base}.jpg", f"{base}.jpg"
 
     # Already a concrete image path (non-hash CDN) - use as both.
     path = url.split("?", 1)[0]
     if path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
         return url, url
-    return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
+    return f"{url}.jpg", f"{url}.jpg"
 
 
 def _normalize_gog_store_url(product: dict, gog_id: int) -> str:

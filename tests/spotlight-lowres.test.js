@@ -57,13 +57,22 @@ describe("spotlight low-res art", () => {
     expect(spot.querySelector(".dash-spotlight-art-bg").classList.contains("is-loaded")).toBe(true);
   });
 
-  it("uses cover for sharp landscape hero art", () => {
+  it("uses contain wide card for sharp landscape hero art (never cover)", () => {
     const spot = mountSpotlight();
     const img = stubArtDimensions(spot, 1920, 620);
 
-    expect(spot.classList.contains("is-lowres-art")).toBe(false);
-    expect(img.style.objectFit).toBe("cover");
-    expect(spot.querySelector(".dash-spotlight-art-bg").classList.contains("is-loaded")).toBe(false);
+    expect(spot.classList.contains("is-lowres-art")).toBe(true);
+    expect(spot.classList.contains("has-portrait-art")).toBe(false);
+    expect(img.style.objectFit).toBe("contain");
+    expect(img.style.objectPosition).toBe("center");
+    expect(spot.querySelector(".dash-spotlight-art-bg").classList.contains("is-loaded")).toBe(true);
+  });
+
+  it("spotlight HTML omits forced width/height attrs", () => {
+    const spot = mountSpotlight();
+    const img = spot.querySelector(".dash-spotlight-art");
+    expect(img.getAttribute("width")).toBeNull();
+    expect(img.getAttribute("height")).toBeNull();
   });
 
   it("prefers portrait treatment over low-res for tall art", () => {
@@ -185,6 +194,19 @@ describe("spotlight portrait CSS contract", () => {
       /\.dash-spotlight\.has-portrait-art\.has-square-art \.dash-spotlight-sheen \{[\s\S]*?\n\}/,
     )?.[0];
     expect(squareSheen).toMatch(/aspect-ratio:\s*1\s*\/\s*1/);
+  });
+
+  it("FG base CSS never forces cover or 2/3 capsule", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const css = await fs.readFile(path.join(process.cwd(), "app.css"), "utf8");
+    const start = css.indexOf("\n.dash-spotlight-art {");
+    expect(start).toBeGreaterThan(0);
+    const block = css.slice(start, start + 500);
+    expect(block).toMatch(/object-fit:\s*contain/);
+    expect(block).not.toMatch(/object-fit:\s*cover/);
+    expect(block).not.toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
+    expect(block).toMatch(/mask-image:\s*none/);
   });
 
   it("insets low-res art as a wide cover card with vertical margins", async () => {

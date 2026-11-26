@@ -121,22 +121,8 @@ function assignPortraitAnimClass(spot) {
   clearPortraitAnimClasses(spot);
   spot.classList.add(`portrait-anim-${1 + Math.floor(Math.random() * PORTRAIT_ANIM_COUNT)}`);
 }
-const LOWRES_FACTOR = 0.7;
-/* Match app.css stacked-spotlight ladder (max-width: 1023.98px). Inline
-   object-position from this helper beats stylesheet rules, so stacked cover
-   offset must be stamped here (portrait/low-res stay center; CSS parks the card). */
+/* Re-fit when the stacked ladder crosses (card geometry changes). */
 const SPOTLIGHT_STACK_MQ = "(max-width: 1023.98px)";
-const SPOTLIGHT_STACK_ART_POS = "66% 40%";
-
-function spotlightStackedArtPos() {
-  try {
-    return window.matchMedia?.(SPOTLIGHT_STACK_MQ)?.matches
-      ? SPOTLIGHT_STACK_ART_POS
-      : "";
-  } catch {
-    return "";
-  }
-}
 
 function reapplyAllSpotlightArtFits() {
   document
@@ -164,21 +150,20 @@ window.applySpotlightArtFit = function (img) {
   wireSpotlightStackArtPos();
   const ratio = img.naturalWidth / img.naturalHeight;
   const crop = spotlightCropForAspect(ratio);
-  const stackPos = spotlightStackedArtPos();
-  img.style.objectPosition = stackPos || crop.pos;
   const spot = img.closest(".dash-spotlight");
   if (!spot) return;
   const bg = spot.querySelector(".dash-spotlight-art-bg");
   const sheen = spot.querySelector(".dash-spotlight-sheen");
   const src = img.currentSrc || img.src;
 
+  // Never cover FG; always contain + center (ignore stacked 66% park).
+  img.style.objectFit = "contain";
+  img.style.objectPosition = "center";
+  img.style.removeProperty("mask-image");
+  img.style.removeProperty("-webkit-mask-image");
+
   if (crop.portrait && bg) {
-    img.style.objectFit = crop.fit;
-    // Tall/square: intrinsic centered card (CSS). Keep focal center; FG mask
-    // is CSS none (left fade is on art-bg). Clear any stale inline mask.
-    img.style.objectPosition = "center";
-    img.style.removeProperty("mask-image");
-    img.style.removeProperty("-webkit-mask-image");
+    // Tall/square: intrinsic centered card (CSS). Left fade is on art-bg.
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
     spot.classList.toggle("has-square-art", !!crop.square);
@@ -187,36 +172,23 @@ window.applySpotlightArtFit = function (img) {
     bg.classList.add("is-loaded");
     if (sheen) {
       if (crop.square) {
-        // Square sheen shares the CSS 1:1 poster box.
         sheen.style.width = "";
       } else {
-        // Match height-driven card: (slotH - 20px pad) * ratio, capped to slotW.
         const cardH = Math.max(0, (spot.clientHeight || 0) - 20);
         sheen.style.width = `${Math.min(spot.clientWidth || 0, cardH * ratio)}px`;
       }
     }
   } else {
+    // Wide art: same centered contain card as low-res (never full-bleed cover).
     spot.classList.remove("has-portrait-art", "has-square-art");
     clearPortraitAnimClasses(spot);
     if (sheen) sheen.style.width = "";
-    img.style.removeProperty("mask-image");
-    img.style.removeProperty("-webkit-mask-image");
-
-    const slotW = (spot.clientWidth || 0) * (window.devicePixelRatio || 1);
-    const lowRes = img.naturalWidth > 0 && slotW > 0
-      && img.naturalWidth < slotW * LOWRES_FACTOR;
-
-    if (lowRes && bg) {
-      img.style.objectFit = "contain";
-      // Wide cover card is centered in CSS; keep focal center.
-      img.style.objectPosition = "center";
+    if (bg) {
       if (src && bg.src !== src) bg.src = src;
       spot.classList.add("is-lowres-art");
       bg.classList.add("is-loaded");
     } else {
-      img.style.objectFit = crop.fit;
       spot.classList.remove("is-lowres-art");
-      bg?.classList.remove("is-loaded");
     }
   }
   spot._spotlightSyncHover?.();

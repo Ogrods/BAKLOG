@@ -7527,30 +7527,53 @@ html[data-theme="ember"] .brand-logo-pills {
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg.is-loaded {
   animation: spotlightPortraitBgDrift 14s ease-in-out infinite;
 }
-/* Tall portrait: Era B full-bleed contain (pre-#538 capsule). Slot-filling art
-   with vertical pad; JS stamps object-fit:contain. Clear landscape left-fade so
-   titles are not soft-masked. Square covers override below to a 1:1 card. */
+/* Tall portrait: intrinsic centered card (same pattern as square/low-res).
+   Height-driven width:auto so the element box matches the capsule ratio and
+   cannot center-crop edge logos. Soft L/R feather kills the hard cut into blur. */
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
   transition:
     opacity var(--spotlight-fade) ease,
     transform 0.35s ease,
     filter 0.35s ease;
   box-sizing: border-box;
-  padding: 10px 0;
+  inset: auto;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  right: auto;
+  translate: -50% 0;
+  width: auto;
+  height: calc(100% - 20px);
+  max-width: 100%;
+  padding: 0;
   filter: brightness(1.32);
   object-fit: contain;
   object-position: center;
-  -webkit-mask-image: none;
-  mask-image: none;
+  border-radius: 4px;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 3.5%,
+    #000 96.5%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 3.5%,
+    #000 96.5%,
+    transparent 100%
+  );
 }
 /* Near-square covers use a 1:1 poster card so they fill nearly the full height. */
 .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-art {
   inset: auto;
   top: 10px;
   bottom: 10px;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
+  left: 50%;
+  right: auto;
+  translate: -50% 0;
+  margin-inline: 0;
   width: auto;
   height: calc(100% - 20px);
   max-width: 100%;
@@ -8272,6 +8295,23 @@ html.ui-resizing
     -webkit-mask-image: none;
     mask-image: none;
   }
+  /* Re-apply soft L/R feather on portrait/square FG after the stack mask clear. */
+  .dash-spotlight.has-portrait-art .dash-spotlight-art {
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      #000 3.5%,
+      #000 96.5%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      #000 3.5%,
+      #000 96.5%,
+      transparent 100%
+    );
+  }
   /* Park cover ~2/3 across (right of center). Inline object-position from
      js/covers.js applySpotlightArtFit also stamps 66% on this ladder. */
   .dash-spotlight-art {
@@ -8295,6 +8335,7 @@ html.ui-resizing
   .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-art {
     left: auto;
     right: 14px;
+    translate: none;
     margin-inline: 0;
     object-position: center;
   }

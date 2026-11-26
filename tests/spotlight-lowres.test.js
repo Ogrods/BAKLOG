@@ -76,14 +76,13 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
-    // Era B: sheen width matches contained poster (min(slotW, slotH * ratio)).
+    // Sheen matches height-driven card: min(slotW, (slotH - 20) * ratio).
     expect(parseFloat(sheen.style.width)).toBeCloseTo(
-      Math.min(800, 400 * (300 / 450)),
+      Math.min(800, (400 - 20) * (300 / 450)),
       4,
     );
-    // Clear hero left-fade so titles are not soft-masked (CSS also sets
-    // -webkit-mask-image; happy-dom only reliably keeps the standard property).
-    expect(img.style.getPropertyValue("mask-image")).toBe("none");
+    // Soft L/R feather is CSS-only; JS must not stamp mask-image:none.
+    expect(img.style.getPropertyValue("mask-image")).toBe("");
   });
 
   it("flags near-square art as square capsule (still portrait path)", () => {
@@ -96,7 +95,7 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
-    expect(img.style.getPropertyValue("mask-image")).toBe("none");
+    expect(img.style.getPropertyValue("mask-image")).toBe("");
     // Square sheen geometry is CSS 1:1; clear any prior tall-portrait width.
     expect(sheen.style.width).toBe("");
   });
@@ -124,7 +123,7 @@ describe("spotlight low-res art", () => {
 });
 
 describe("spotlight portrait CSS contract", () => {
-  it("uses full-bleed contain for tall portrait; 1:1 card for square", async () => {
+  it("uses intrinsic centered card for tall portrait; 1:1 card for square", async () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const css = await fs.readFile(
@@ -135,11 +134,14 @@ describe("spotlight portrait CSS contract", () => {
       /\.dash-spotlight\.has-portrait-art \.dash-spotlight-art \{[\s\S]*?\n\}/,
     )?.[0];
     expect(portraitArt).toBeTruthy();
-    // Tall portrait is Era B full-bleed - not a 2:3 capsule.
+    // Tall portrait is an intrinsic centered card - not a 2:3 capsule.
     expect(portraitArt).not.toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
-    expect(portraitArt).toMatch(/padding:\s*10px\s+0/);
+    expect(portraitArt).toMatch(/width:\s*auto/);
+    expect(portraitArt).toMatch(/left:\s*50%/);
+    expect(portraitArt).toMatch(/height:\s*calc\(100%\s*-\s*20px\)/);
     expect(portraitArt).toMatch(/object-fit:\s*contain/);
-    expect(portraitArt).toMatch(/mask-image:\s*none/);
+    expect(portraitArt).toMatch(/mask-image:\s*linear-gradient/);
+    expect(portraitArt).not.toMatch(/mask-image:\s*none/);
     expect(portraitArt).not.toMatch(/overflow:\s*hidden/);
 
     const portraitBg = css.match(

@@ -384,20 +384,20 @@ export function landscapeArtCandidates(g) {
   return dedupeArtUrls(urls);
 }
 
-/** Spotlight art URLs, best-first: hero → 600×900 portrait → header/square → other covers. */
+/** Spotlight art URLs, best-first: 600×900 capsule → library → hero → header. */
 export function spotlightArtCandidates(g) {
   const ng = normalizeGame(g);
   const urls = [];
   const appId = steamAppIdFromGame(ng);
   if (appId) {
-    urls.push(steamLibraryHeroUrl(appId));
     urls.push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
     urls.push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
   }
   urls.push(ng.library_image);
-  urls.push(ng.header_image);
   const lib = libraryCoverFor(ng);
   if (lib) urls.push(lib);
+  if (appId) urls.push(steamLibraryHeroUrl(appId));
+  urls.push(ng.header_image);
   return dedupeArtUrls(urls);
 }
 

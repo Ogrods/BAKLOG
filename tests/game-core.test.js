@@ -691,9 +691,10 @@ describe('coverArtCandidates / landscapeArtCandidates', () => {
     expect(urls.some((u) => u.includes('header.jpg'))).toBe(true);
   });
 
-  it('spotlightArtCandidates still leads with hero', () => {
+  it('spotlightArtCandidates prefers capsule before hero', () => {
     const urls = spotlightArtCandidates(steamGame);
-    expect(urls[0]).toBe(steamLibraryHeroUrl('12345'));
+    expect(urls[0]).toMatch(/library_600x900/);
+    expect(urls.indexOf(steamLibraryHeroUrl('12345'))).toBeGreaterThan(0);
   });
 });
 

@@ -1,19 +1,29 @@
 {
-  "generated_at": "2026-11-23T06:30:44.721849+00:00",
+  "generated_at": "2026-11-26T18:24:45.331951+00:00",
   "items": [
     {
-      "id": "epic-mark-of-the-deep-f7dc08",
+      "id": "epic-firestone-online-idle-rpg-bfd04b",
       "store": "epic",
-      "title": "Mark of the Deep",
-      "claim_url": "https://store.epicgames.com/en-US/p/mark-of-the-deep-f7dc08",
-      "header_image": "https://cdn1.epicgames.com/spt-assets/83a240506a884c10ad8fb99694e57a0d/mark-of-the-deep-w1ygr.png",
+      "title": "Firestone – Idle Clicker Online RPG",
+      "claim_url": "https://store.epicgames.com/en-US/p/firestone-online-idle-rpg-bfd04b",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/69576a28f7154fe9a0dce97508da5163/firestone-online-idle-rpg-1inmf.jpg",
       "genres": [],
       "blurb": null,
-      "ends_at": "2026-11-26T16:00:00Z",
-      "steam_appid": 1933370,
-      "review_percent": 72,
+      "ends_at": "2026-12-03T16:00:00Z",
       "source": "epic",
-      "first_seen": "2026-11-19T18:54:18Z"
+      "first_seen": "2026-11-26T18:23:45Z"
+    },
+    {
+      "id": "epic-bread-and-fred-1db362",
+      "store": "epic",
+      "title": "Bread and Fred",
+      "claim_url": "https://store.epicgames.com/en-US/p/bread-and-fred-1db362",
+      "header_image": "https://cdn1.epicgames.com/spt-assets/545b4dd8bb364c12b719268198a93ef3/bread-and-fred-3jnwn.jpg",
+      "genres": [],
+      "blurb": null,
+      "ends_at": "2026-12-03T16:00:00Z",
+      "source": "epic",
+      "first_seen": "2026-11-26T18:23:45Z"
     },
     {
       "id": "gamerpower-3852",
@@ -110,6 +120,20 @@
       "review_percent": 84,
       "source": "gamerpower",
       "first_seen": "2026-09-07T21:47:23Z"
+    },
+    {
+      "id": "itad-cf744cc354ac",
+      "store": "epic",
+      "title": "A Tiny Sticker Tale",
+      "claim_url": "https://isthereanydeal.com/giveaways/16829/",
+      "header_image": "https://cdn.akamai.steamstatic.com/steam/apps/2322180/library_600x900_2x.jpg",
+      "genres": [],
+      "blurb": "A Tiny Sticker Tale",
+      "ends_at": "2026-12-10T18:23:45Z",
+      "steam_appid": 2322180,
+      "review_percent": 97,
+      "source": "itad",
+      "first_seen": "2026-11-26T18:23:45Z"
     }
   ],
   "attribution": [

@@ -7507,13 +7507,14 @@ html[data-theme="ember"] .brand-logo-pills {
     filter 0.35s ease;
   box-sizing: border-box;
   inset: auto;
-  top: 10px;
-  bottom: 10px;
+  /* Extra inset so Steam 600x900 edge logos stay inside the spotlight clip. */
+  top: 16px;
+  bottom: 16px;
   left: 50%;
   right: auto;
   translate: -50% 0;
   width: auto;
-  height: calc(100% - 20px);
+  height: calc(100% - 32px);
   max-width: 100%;
   padding: 0;
   filter: brightness(1.32);

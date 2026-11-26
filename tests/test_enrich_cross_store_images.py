@@ -64,6 +64,83 @@ def test_should_process_upgrade_only_when_flag_set() -> None:
     assert enrich.should_process(g, upgrade_lowres=True) is True
 
 
+def test_should_process_gog_soft_cover_without_upgrade_flag() -> None:
+    hash_ = "dc8ff9435bfaf80d377f9fc6811157eb2e342836c032c390ad09acc720639b58"
+    g = {
+        "id": "1207659013",
+        "header_image": f"https://images.gog.com/{hash_}_glx_bg_top_padding_7.webp?namespace=gamesdb.jpg",
+        "library_image": (
+            f"https://images.gog.com/{hash_}_glx_bg_top_padding_7.webp"
+            "?namespace=gamesdb_glx_vertical_cover.jpg"
+        ),
+    }
+    assert enrich.row_has_gog_soft_cover(g) is True
+    assert enrich.should_process(g, upgrade_lowres=False) is True
+
+
+def test_gog_soft_cover_upgrades_using_review_map(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hash_ = "dc8ff9435bfaf80d377f9fc6811157eb2e342836c032c390ad09acc720639b58"
+    gog_path = tmp_path / "games_gog.json"
+    gog_path.write_text(
+        json.dumps(
+            {
+                "games": [
+                    {
+                        "id": "1207659013",
+                        "name": "Treasure Adventure Game",
+                        "header_image": (
+                            f"https://images.gog.com/{hash_}_glx_bg_top_padding_7.webp"
+                            "?namespace=gamesdb.jpg"
+                        ),
+                        "library_image": (
+                            f"https://images.gog.com/{hash_}_glx_bg_top_padding_7.webp"
+                            "?namespace=gamesdb_glx_vertical_cover.jpg"
+                        ),
+                    }
+                ]
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    meta_path = tmp_path / "cross_store_images_meta.json"
+    review_map_path = tmp_path / "steam_review_map.json"
+    review_map_path.write_text(
+        json.dumps({"gog:1207659013": 863940}, indent=2),
+        encoding="utf-8",
+    )
+    searches: list[str] = []
+
+    def fake_catalog(rel: Path) -> Path:
+        if rel.name == "games_gog.json":
+            return gog_path
+        return tmp_path / f"missing-{rel.name}"
+
+    monkeypatch.setattr(enrich, "catalog_file", fake_catalog)
+    monkeypatch.setattr(
+        enrich, "write_catalog_text", lambda rel, text: gog_path.write_text(text, encoding="utf-8")
+    )
+    monkeypatch.setattr(enrich, "meta_file", lambda: meta_path)
+    monkeypatch.setattr(enrich, "load_steam_review_map", lambda: {"gog:1207659013": 863940})
+    monkeypatch.setattr(
+        enrich, "steam_search_appid", lambda name: searches.append(name) or None
+    )
+    monkeypatch.setattr(enrich, "image_url_ok", lambda _url: True)
+    monkeypatch.setattr(enrich.time, "sleep", lambda _: None)
+    monkeypatch.setattr(sys, "argv", ["enrichers.enrich_cross_store_images.py"])
+
+    enrich.main()
+
+    assert searches == []
+    row = json.loads(gog_path.read_text(encoding="utf-8"))["games"][0]
+    assert row["steam_appid"] == 863940
+    assert "863940" in row["library_image"]
+    assert "steamstatic.com" in row["library_image"]
+    assert row["image_source"] == "steam_search_upgrade"
+
+
 def test_normalize_strips_trademark_symbols() -> None:
     assert normalize_title("Armatus™") == "armatus"
 

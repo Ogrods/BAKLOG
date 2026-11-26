@@ -129,7 +129,17 @@ def is_steamstatic_url(url: str) -> bool:
 def is_gog_padding_or_soft_cover(url: str) -> bool:
     """GOG Galaxy padding / soft banner URLs that benefit from Steam capsules."""
     u = url or ""
-    return "glx_bg_top_padding" in u or "namespace=gamesdb_glx_vertical_cover" in u
+    return (
+        "glx_bg_top_padding" in u
+        or "namespace=gamesdb_glx_vertical_cover" in u
+        or "_glx_vertical_cover" in u
+    )
+
+
+def row_has_gog_soft_cover(g: dict) -> bool:
+    lib = g.get("library_image") or ""
+    hdr = g.get("header_image") or ""
+    return is_gog_padding_or_soft_cover(lib) or is_gog_padding_or_soft_cover(hdr)
 
 
 def needs_lowres_upgrade(g: dict) -> bool:
@@ -145,9 +155,40 @@ def needs_lowres_upgrade(g: dict) -> bool:
     if is_steamstatic_url(lib) or is_steamstatic_url(hdr):
         return False
     # Explicit: mangled GOG padding always qualifies (also covered by non-steam above).
-    if is_gog_padding_or_soft_cover(lib) or is_gog_padding_or_soft_cover(hdr):
+    if row_has_gog_soft_cover(g):
         return True
     return True
+
+
+def load_steam_review_map() -> dict:
+    """Appid map from enrich_steam_reviews (gog:id -> appid)."""
+    path = cache_json_path("steam_review_map.json")
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def mapped_steam_appid(store: str, g: dict, review_map: dict) -> int | None:
+    raw = g.get("steam_appid")
+    if raw is not None and raw != "":
+        try:
+            n = int(raw)
+            if n > 0:
+                return n
+        except (TypeError, ValueError):
+            pass
+    key = f"{store}:{g.get('id')}"
+    cached = review_map.get(key)
+    if cached and cached != 0:
+        try:
+            return int(cached)
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def is_steam_search_steamstatic(g: dict) -> bool:
@@ -165,6 +206,12 @@ def is_steam_search_steamstatic(g: dict) -> bool:
 
 def should_process(g: dict, *, upgrade_lowres: bool) -> bool:
     if needs_images(g):
+        return True
+    # GOG soft/padding/vertical covers always try Steam capsules (no flag needed).
+    if row_has_gog_soft_cover(g) and g.get("image_source") not in (
+        "steam_search",
+        "steam_search_upgrade",
+    ):
         return True
     if upgrade_lowres and needs_lowres_upgrade(g):
         return True
@@ -219,11 +266,16 @@ def main() -> int:
         lowres_checked.clear()
         print(f"--retry-misses: clearing {len(steam_validated)} cached cover validations", flush=True)
         steam_validated.clear()
+    review_map = load_steam_review_map()
     cache_lock = Lock()
 
     def process(g: dict, store: str) -> dict | None:
         missing = needs_images(g)
-        upgrading = args.upgrade_lowres and needs_lowres_upgrade(g)
+        gog_soft = row_has_gog_soft_cover(g) and g.get("image_source") not in (
+            "steam_search",
+            "steam_search_upgrade",
+        )
+        upgrading = gog_soft or (args.upgrade_lowres and needs_lowres_upgrade(g))
         revalidating = not missing and not upgrading and is_steam_search_steamstatic(g)
         if not missing and not upgrading and not revalidating:
             return None
@@ -254,7 +306,7 @@ def main() -> int:
                 no_steam_match.add(key)
             return cleared
 
-        appid = g.get("steam_appid")
+        appid = mapped_steam_appid(store, g, review_map)
         if not appid:
             appid = steam_search_appid(g.get("name", ""))
         if not appid:
@@ -299,8 +351,10 @@ def main() -> int:
             1 for g in todo
             if f"{store}:{g.get('id')}" in no_steam_match
             or (
-                args.upgrade_lowres
-                and needs_lowres_upgrade(g)
+                (
+                    row_has_gog_soft_cover(g)
+                    or (args.upgrade_lowres and needs_lowres_upgrade(g))
+                )
                 and f"{store}:{g.get('id')}" in lowres_checked
             )
         )

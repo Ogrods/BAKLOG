@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
+from dotenv import load_dotenv
 
 from auth import resolve_env
 from clients.itch_game import itch_is_videogame as _itch_is_videogame
@@ -114,8 +115,6 @@ def steam_appids_by_id() -> set[int]:
 def main() -> int:
     import argparse
 
-    from dotenv import load_dotenv
-
     parser = argparse.ArgumentParser(description="Backfill Steam review fields on non-Steam library JSON.")
     parser.add_argument(
         "--stores",
@@ -176,9 +175,19 @@ def main() -> int:
             hb.tick_progress(i, len(games), f"reviews {filename}", f"{updated} updated")
             if row_filter is not None and not row_filter(g):
                 continue
-            if g.get("steam_review_percent") is not None:
-                continue
             key = f"{store}:{g['id']}"
+            # Rows that already have reviews still need steam_appid for Steam capsules.
+            if g.get("steam_review_percent") is not None:
+                if not g.get("steam_appid"):
+                    cached = mapping.get(key)
+                    if cached and cached != 0:
+                        try:
+                            g["steam_appid"] = int(cached)
+                            updated += 1
+                            stats.ok += 1
+                        except (TypeError, ValueError):
+                            pass
+                continue
             cached_appid = mapping.get(key)
 
             if cached_appid == 0 and not args.retry_misses:
@@ -219,6 +228,7 @@ def main() -> int:
                 continue
             if not reviews or reviews.get("percent_positive") is None:
                 continue
+            g["steam_appid"] = int(appid)
             g["steam_review_percent"] = reviews["percent_positive"]
             g["steam_review_count"] = reviews.get("total_reviews")
             g["steam_review_desc"] = reviews.get("review_score_desc")

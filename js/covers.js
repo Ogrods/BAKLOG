@@ -174,7 +174,7 @@ window.applySpotlightArtFit = function (img) {
       if (crop.square) {
         sheen.style.width = "";
       } else {
-        const cardH = Math.max(0, (spot.clientHeight || 0) - 20);
+        const cardH = Math.max(0, (spot.clientHeight || 0) - 32);
         sheen.style.width = `${Math.min(spot.clientWidth || 0, cardH * ratio)}px`;
       }
     }

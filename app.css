@@ -7521,11 +7521,24 @@ html[data-theme="dark"]
 .dash-spotlight.has-portrait-art .dash-spotlight-art-bg.is-loaded {
   animation: spotlightPortraitBgDrift 14s ease-in-out infinite;
 }
-/* Portrait capsule: real 2:3 poster card (not full-bleed hero). Center with
-   left/right + margin so float keyframes can own `transform`. Show the whole
-   cover (contain); clear the landscape left-fade so titles are not clipped.
-   No overflow:hidden on the art - that self-clips edge titles under rotateY. */
+/* Tall portrait: Era B full-bleed contain (pre-#538 capsule). Slot-filling art
+   with vertical pad; JS stamps object-fit:contain. Clear landscape left-fade so
+   titles are not soft-masked. Square covers override below to a 1:1 card. */
 .dash-spotlight.has-portrait-art .dash-spotlight-art {
+  transition:
+    opacity var(--spotlight-fade) ease,
+    transform 0.35s ease,
+    filter 0.35s ease;
+  box-sizing: border-box;
+  padding: 10px 0;
+  filter: brightness(1.32);
+  object-fit: contain;
+  object-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+/* Near-square covers use a 1:1 poster card so they fill nearly the full height. */
+.dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-art {
   inset: auto;
   top: 10px;
   bottom: 10px;
@@ -7535,24 +7548,9 @@ html[data-theme="dark"]
   width: auto;
   height: calc(100% - 20px);
   max-width: 100%;
-  aspect-ratio: 2 / 3;
-  object-fit: contain;
-  object-position: center;
-  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
   padding: 0;
   border-radius: 4px;
-  filter: brightness(1.32);
-  -webkit-mask-image: none;
-  mask-image: none;
-  transition:
-    opacity var(--spotlight-fade) ease,
-    transform 0.35s ease,
-    filter 0.35s ease;
-}
-/* Near-square covers share the capsule path but use a 1:1 poster so they fill
-   nearly the full spotlight height. */
-.dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-art {
-  aspect-ratio: 1 / 1;
 }
 @keyframes spotlightSheen1 {
   0%,
@@ -7674,21 +7672,14 @@ html[data-theme="dark"]
 .dash-spotlight-sheen {
   display: none;
 }
-/* Same 2:3 poster box as the foreground art (margin-centered, no translate). */
+/* Tall portrait sheen: Era B centered strip; width set inline from covers.js. */
 .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
   display: block;
   position: absolute;
-  inset: auto;
-  top: 10px;
-  bottom: 10px;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  width: auto;
-  height: calc(100% - 20px);
-  max-width: 100%;
-  aspect-ratio: 2 / 3;
-  transform: none;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1;
   pointer-events: none;
   overflow: hidden;
@@ -7710,12 +7701,18 @@ html[data-theme="dark"]
     transparent 100%
   );
 }
-/* Square sheen: height-driven 1:1 width (left+right stretch would ignore aspect-ratio). */
+/* Square sheen: height-driven 1:1 poster matching the square art card. */
 .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-sheen {
-  aspect-ratio: 1 / 1;
+  inset: auto;
+  top: 10px;
+  bottom: 10px;
   left: 50%;
   right: auto;
   margin-inline: 0;
+  width: auto;
+  height: calc(100% - 20px);
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
   transform: translateX(-50%);
 }
 .dash-spotlight.has-portrait-art .dash-spotlight-sheen::before {
@@ -8290,18 +8287,16 @@ html.ui-resizing
     max-width: min(88%, 560px);
     object-position: center;
   }
-  /* Portrait poster: tuck to the right (same visual park as before) without
-     translateX so float keyframes keep sole ownership of transform. */
-  .dash-spotlight.has-portrait-art .dash-spotlight-art {
+  /* Tall portrait sheen: Era B stack park at ~2/3 (JS still centers object-position).
+     Square card right-tucks art + sheen. */
+  .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
+    left: 66%;
+  }
+  .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-art {
     left: auto;
     right: 14px;
     margin-inline: 0;
     object-position: center;
-  }
-  .dash-spotlight.has-portrait-art .dash-spotlight-sheen {
-    left: auto;
-    right: 14px;
-    margin-inline: 0;
   }
   .dash-spotlight.has-portrait-art.has-square-art .dash-spotlight-sheen {
     left: auto;

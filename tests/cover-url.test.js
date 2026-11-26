@@ -58,7 +58,7 @@ describe("spotlight art (A+B)", () => {
     );
   });
 
-  it("spotlightArtCandidates prefers hero then 600x900 then header for Steam", () => {
+  it("spotlightArtCandidates prefers 600x900 capsule before hero for Steam", () => {
     const g = {
       store: "steam",
       id: 367520,
@@ -66,15 +66,16 @@ describe("spotlight art (A+B)", () => {
       library_image: "https://cdn.akamai.steamstatic.com/steam/apps/367520/library_600x900.jpg",
     };
     const c = spotlightArtCandidates(g);
-    expect(c[0]).toBe(steamLibraryHeroUrl(367520));
-    expect(c[1]).toBe(
+    expect(c[0]).toBe(
       "https://cdn.akamai.steamstatic.com/steam/apps/367520/library_600x900_2x.jpg",
     );
-    expect(c[2]).toBe(g.library_image);
+    expect(c[1]).toBe(g.library_image);
+    const heroIdx = c.indexOf(steamLibraryHeroUrl(367520));
+    const portraitIdx = c.indexOf(g.library_image);
+    expect(heroIdx).toBeGreaterThan(portraitIdx);
     expect(c).toContain(g.header_image);
     const headerIdx = c.indexOf(g.header_image);
-    const portraitIdx = c.indexOf(g.library_image);
-    expect(headerIdx).toBeGreaterThan(portraitIdx);
+    expect(headerIdx).toBeGreaterThan(heroIdx);
   });
 
   it("steamAppIdFromGame parses app id from steamstatic URLs", () => {

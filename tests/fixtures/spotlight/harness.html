@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Spotlight uncropped harness</title>
+  <link rel="stylesheet" href="/app.css" />
+  <style>
+    :root { --bg: #0e1014; --spotlight-fade: 0ms; }
+    html, body { margin: 0; background: #0e1014; }
+    #slot {
+      position: relative;
+      width: 1200px;
+      height: 400px;
+      overflow: hidden;
+      background: #12141a;
+    }
+    /* Kill float so pixel probes are stable. */
+    .dash-spotlight.has-portrait-art .dash-spotlight-art {
+      animation: none !important;
+      transform: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="slot">
+    <div class="dash-spotlight has-portrait-art" id="spot">
+      <img
+        class="dash-spotlight-art-bg is-loaded"
+        id="artBg"
+        alt=""
+        aria-hidden="true"
+        src="/tests/fixtures/spotlight/portrait-600x900.png"
+      />
+      <img
+        class="dash-spotlight-art is-loaded"
+        id="art"
+        alt=""
+        width="600"
+        height="900"
+        src="/tests/fixtures/spotlight/portrait-600x900.png"
+      />
+      <div class="dash-spotlight-sheen" aria-hidden="true"></div>
+    </div>
+  </div>
+  <script type="module">
+    // Stamp the same portrait fit the app applies after load (covers.js).
+    const img = document.getElementById("art");
+    await img.decode();
+    const spot = document.getElementById("spot");
+    const ratio = img.naturalWidth / img.naturalHeight;
+    img.style.objectFit = "contain";
+    img.style.objectPosition = "center";
+    const cardH = Math.max(0, (spot.clientHeight || 0) - 20);
+    const sheen = spot.querySelector(".dash-spotlight-sheen");
+    if (sheen) {
+      sheen.style.width = `${Math.min(spot.clientWidth || 0, cardH * ratio)}px`;
+    }
+    window.__harnessReady = true;
+  </script>
+</body>
+</html>

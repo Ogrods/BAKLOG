@@ -174,11 +174,11 @@ window.applySpotlightArtFit = function (img) {
 
   if (crop.portrait && bg) {
     img.style.objectFit = crop.fit;
-    // Tall portrait: full-bleed contain; square: CSS 1:1 card. Keep focal center
-    // (do not stamp landscape 66% - stacked park is CSS for sheen / square tuck).
+    // Tall/square: intrinsic centered card (CSS). Keep focal center; soft L/R
+    // feather lives in CSS - do not clear mask-image inline.
     img.style.objectPosition = "center";
-    img.style.setProperty("mask-image", "none");
-    img.style.setProperty("-webkit-mask-image", "none");
+    img.style.removeProperty("mask-image");
+    img.style.removeProperty("-webkit-mask-image");
     if (src && bg.src !== src) bg.src = src;
     spot.classList.add("has-portrait-art");
     spot.classList.toggle("has-square-art", !!crop.square);
@@ -190,8 +190,9 @@ window.applySpotlightArtFit = function (img) {
         // Square sheen shares the CSS 1:1 poster box.
         sheen.style.width = "";
       } else {
-        // Era B: size sheen to the contained poster width.
-        sheen.style.width = `${Math.min(spot.clientWidth, spot.clientHeight * ratio)}px`;
+        // Match height-driven card: (slotH - 20px pad) * ratio, capped to slotW.
+        const cardH = Math.max(0, (spot.clientHeight || 0) - 20);
+        sheen.style.width = `${Math.min(spot.clientWidth || 0, cardH * ratio)}px`;
       }
     }
   } else {

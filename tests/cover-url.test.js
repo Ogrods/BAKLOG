@@ -99,6 +99,44 @@ describe("spotlight art (A+B)", () => {
     })).toBe("413150");
   });
 
+  it("steamAppIdFromGame reads steam_appid on non-Steam rows", () => {
+    expect(steamAppIdFromGame({
+      store: "gog",
+      id: "1207659013",
+      steam_appid: 863940,
+      library_image: "https://images.gog.com/deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef.jpg",
+    })).toBe("863940");
+  });
+
+  it("spotlightArtCandidates prefers Steam capsule for GOG row with steam_appid", () => {
+    const hash = "dc8ff9435bfaf80d377f9fc6811157eb2e342836c032c390ad09acc720639b58";
+    const g = {
+      store: "gog",
+      id: "1207659013",
+      steam_appid: 863940,
+      library_image: `https://images.gog.com/${hash}_glx_bg_top_padding_7.webp?namespace=gamesdb_glx_vertical_cover.jpg`,
+      header_image: `https://images.gog.com/${hash}_glx_bg_top_padding_7.webp?namespace=gamesdb.jpg`,
+    };
+    const c = spotlightArtCandidates(g);
+    expect(c[0]).toBe(
+      "https://cdn.akamai.steamstatic.com/steam/apps/863940/library_600x900_2x.jpg",
+    );
+    expect(c).toContain(`https://images.gog.com/${hash}.jpg`);
+    expect(c.every((u) => !/_glx_vertical_cover/i.test(u))).toBe(true);
+  });
+
+  it("spotlightArtCandidates heals soft GOG URL without promoting vertical cover", () => {
+    const hash = "dc8ff9435bfaf80d377f9fc6811157eb2e342836c032c390ad09acc720639b58";
+    const g = {
+      store: "gog",
+      id: "1207659013",
+      library_image: `https://images.gog.com/${hash}_glx_bg_top_padding_7.webp?namespace=gamesdb_glx_vertical_cover.jpg`,
+    };
+    const c = spotlightArtCandidates(g);
+    expect(c[0]).toBe(`https://images.gog.com/${hash}.jpg`);
+    expect(c.some((u) => /_glx_vertical_cover\.jpg$/i.test(u))).toBe(false);
+  });
+
   it("spotlightCropForAspect always contain; wide is not portrait", () => {
     expect(spotlightCropForAspect(2.5)).toEqual({
       fit: "contain", pos: "center", portrait: false, square: false,

@@ -85,9 +85,9 @@ describe("spotlight low-res art", () => {
     expect(spot.classList.contains("is-lowres-art")).toBe(false);
     expect(img.style.objectFit).toBe("contain");
     expect(img.style.objectPosition).toBe("center");
-    // Sheen matches height-driven card: min(slotW, (slotH - 20) * ratio).
+    // Sheen matches height-driven card: min(slotW, (slotH - 32) * ratio).
     expect(parseFloat(sheen.style.width)).toBeCloseTo(
-      Math.min(800, (400 - 20) * (300 / 450)),
+      Math.min(800, (400 - 32) * (300 / 450)),
       4,
     );
     // FG mask is CSS (none); JS must not stamp an inline override.
@@ -147,7 +147,8 @@ describe("spotlight portrait CSS contract", () => {
     expect(portraitArt).not.toMatch(/aspect-ratio:\s*2\s*\/\s*3/);
     expect(portraitArt).toMatch(/width:\s*auto/);
     expect(portraitArt).toMatch(/left:\s*50%/);
-    expect(portraitArt).toMatch(/height:\s*calc\(100%\s*-\s*20px\)/);
+    expect(portraitArt).toMatch(/height:\s*calc\(100%\s*-\s*32px\)/);
+    expect(portraitArt).toMatch(/top:\s*16px/);
     expect(portraitArt).toMatch(/object-fit:\s*contain/);
     // Hard FG edges - left fade lives on art-bg (same as low-res).
     expect(portraitArt).toMatch(/mask-image:\s*none/);

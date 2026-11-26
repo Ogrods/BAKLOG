@@ -349,9 +349,14 @@ export function libraryCoverFor(g) {
 
 const STEAM_CDN = "https://cdn.akamai.steamstatic.com/steam/apps";
 
-/** Steam app id from store/id or from a steamstatic image URL on the row. */
+/** Steam app id from explicit field, Steam store id, or a steamstatic image URL. */
 export function steamAppIdFromGame(g) {
   const ng = normalizeGame(g);
+  const linked = ng.steam_appid ?? ng.steam_app_id;
+  if (linked != null && linked !== "") {
+    const n = Number(linked);
+    if (Number.isFinite(n) && n > 0) return String(Math.trunc(n));
+  }
   if (ng.store === "steam" && ng.id != null && ng.id !== "") return String(ng.id);
   for (const url of [ng.header_image, ng.library_image]) {
     const u = sanitizeCoverUrl(url);
@@ -360,6 +365,11 @@ export function steamAppIdFromGame(g) {
     if (m) return m[1];
   }
   return null;
+}
+
+/** Galaxy vertical boxart - demote for spotlight (often face crop / soft). */
+export function isGogVerticalCoverUrl(url) {
+  return /_glx_vertical_cover/i.test(String(url || ""));
 }
 
 export function steamLibraryHeroUrl(appId) {
@@ -406,7 +416,8 @@ export function landscapeArtCandidates(g) {
   return dedupeArtUrls(urls);
 }
 
-/** Spotlight art URLs, best-first: 600×900 capsule → library → hero → header. */
+/** Spotlight art URLs, best-first: Steam capsule → healed GOG landscape → hero.
+ *  Galaxy `_glx_vertical_cover` is last-resort only (never ahead of Steam/landscape). */
 export function spotlightArtCandidates(g) {
   const ng = normalizeGame(g);
   const urls = [];
@@ -415,11 +426,15 @@ export function spotlightArtCandidates(g) {
     urls.push(`${STEAM_CDN}/${appId}/library_600x900_2x.jpg`);
     urls.push(`${STEAM_CDN}/${appId}/library_600x900.jpg`);
   }
-  urls.push(ng.library_image);
+  const libRaw = ng.library_image;
+  const hdrRaw = ng.header_image;
+  if (libRaw && !isGogVerticalCoverUrl(libRaw)) urls.push(libRaw);
   const lib = libraryCoverFor(ng);
-  if (lib) urls.push(lib);
+  if (lib && !isGogVerticalCoverUrl(lib)) urls.push(lib);
   if (appId) urls.push(steamLibraryHeroUrl(appId));
-  urls.push(ng.header_image);
+  if (hdrRaw && !isGogVerticalCoverUrl(hdrRaw)) urls.push(hdrRaw);
+  if (libRaw && isGogVerticalCoverUrl(libRaw)) urls.push(libRaw);
+  if (hdrRaw && isGogVerticalCoverUrl(hdrRaw)) urls.push(hdrRaw);
   return dedupeArtUrls(urls);
 }
 

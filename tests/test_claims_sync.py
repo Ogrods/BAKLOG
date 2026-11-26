@@ -98,18 +98,63 @@ def test_sync_aborts_rebase_on_pull_failure(tmp_path: Path, monkeypatch: pytest.
 
     def fake(cmd, **kwargs):
         calls.append(cmd[3:])
-        sub = cmd[3]
+        args = cmd[3:]
+        sub = args[0]
         if sub == "diff":
             return subprocess.CompletedProcess(cmd, 1, "", "")
-        if sub == "pull":
+        if sub == "rev-parse" and "@{upstream}" in args:
+            return subprocess.CompletedProcess(cmd, 0, "origin/main\n", "")
+        if sub == "rev-parse":
+            return subprocess.CompletedProcess(cmd, 0, "main\n", "")
+        if sub == "fetch":
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if sub == "rebase" and "--abort" in args:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if sub == "rebase":
             return subprocess.CompletedProcess(cmd, 1, "", "CONFLICT (content)")
         return subprocess.CompletedProcess(cmd, 0, "abc123\n", "")
 
     with pytest.raises(ClaimsSyncError, match="CONFLICT"):
         sync_claims_decisions(repo, runner=fake)
-    subs = [c[0] for c in calls]
-    assert subs == ["pull", "rebase"]
+    assert "pull" not in [c[0] for c in calls]
+    assert calls[0][:3] == ["rev-parse", "--abbrev-ref", "HEAD"]
+    assert calls[1][:3] == ["rev-parse", "--abbrev-ref", "@{upstream}"]
+    assert calls[2] == ["fetch", "-q", "origin", "main"]
+    assert calls[3] == ["rebase", "--autostash", "origin/main"]
     assert calls[-1] == ["rebase", "--abort"]
+
+
+def test_sync_survives_multi_ref_fetch_head(internal_clone, tmp_path: Path) -> None:
+    """Bare multi-ref pull --rebase fails; sync still uses a single onto."""
+    repo, internal, origin = internal_clone
+    other = tmp_path / "other-work"
+    _git(tmp_path, "clone", "-q", str(origin), str(other))
+    for key, val in (("user.email", "ci@example.invalid"), ("user.name", "ci")):
+        _git(other, "config", key, val)
+    _git(other, "checkout", "-q", "-b", "other")
+    (other / "claims" / "side.txt").write_text("side\n", encoding="utf-8")
+    _git(other, "add", ".")
+    _git(other, "commit", "-q", "-m", "other branch")
+    _git(other, "push", "-q", "-u", "origin", "other")
+
+    poisoned = subprocess.run(
+        ["git", "-C", str(internal), "pull", "--rebase", "origin", "main", "other"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert poisoned.returncode != 0
+    assert "Cannot rebase onto multiple branches" in (poisoned.stderr or "")
+
+    _git(internal, "fetch", "origin", "main", "other")
+    (internal / "claims" / "free_claims.approved.json").write_text(
+        '{"ids": ["epic-multi"]}\n', encoding="utf-8"
+    )
+    result = sync_claims_decisions(repo)
+    assert result["pushed"] is True
+    assert result["changed"] is True
+    files = _git(origin, "show", "--name-only", "--format=", "main").splitlines()
+    assert files == ["claims/free_claims.approved.json"]
 
 
 def _scrape(path: Path, fetched_at: str, ids: list[str]) -> None:

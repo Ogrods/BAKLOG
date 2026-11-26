@@ -169,6 +169,9 @@ describe("spotlight portrait CSS contract", () => {
     expect(lowresArt).toBeTruthy();
     expect(lowresArt).toMatch(/top:\s*16%/);
     expect(lowresArt).toMatch(/height:\s*68%/);
+    expect(lowresArt).toMatch(/left:\s*50%/);
+    expect(lowresArt).toMatch(/translate:\s*-50%\s+0/);
+    expect(lowresArt).not.toMatch(/right:\s*14px/);
     expect(lowresArt).toMatch(/mask-image:\s*none/);
     expect(lowresArt).toMatch(/object-fit:\s*contain/);
   });

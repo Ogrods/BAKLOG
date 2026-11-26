@@ -7307,13 +7307,15 @@ html[data-theme="dark"]
   transition: opacity var(--spotlight-fade) ease;
 }
 /* Low-res: wide cover card with vertical breathing room (not a failed full hero).
-   Use explicit height (not top+bottom) so the img height attr cannot stretch the box. */
+   Use explicit height (not top+bottom) so the img height attr cannot stretch the box.
+   Center with `translate` (not transform) so the soft scale keyframes stay intact. */
 .dash-spotlight.is-lowres-art .dash-spotlight-art {
   inset: auto;
   top: 16%;
   bottom: auto;
-  left: auto;
-  right: 14px;
+  left: 50%;
+  right: auto;
+  translate: -50% 0;
   width: auto;
   height: 68%;
   max-width: min(92%, 720px);
@@ -8281,7 +8283,9 @@ html.ui-resizing
   .dash-spotlight.is-lowres-art .dash-spotlight-art {
     top: 12%;
     bottom: auto;
-    right: 14px;
+    left: 50%;
+    right: auto;
+    translate: -50% 0;
     height: 76%;
     max-width: min(88%, 560px);
     object-position: center;

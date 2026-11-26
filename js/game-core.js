@@ -303,6 +303,20 @@ export function gameNumericId(g) {
   return gameId(g);
 }
 
+const GOG_HASH_RE = /^(https?:\/\/images\.gog\.com\/)([0-9a-f]{64})/i;
+
+/** Heal Galaxy/catalog mangled padding URLs into real vertical covers. */
+export function rewriteGogVerticalCoverUrl(url) {
+  const u = String(url || "").trim();
+  if (!u || !/images\.gog\.com/i.test(u)) return "";
+  if (!/glx_bg_top_padding/i.test(u) && !/namespace=gamesdb_glx_vertical_cover/i.test(u)) {
+    return "";
+  }
+  const m = u.match(GOG_HASH_RE);
+  if (!m) return "";
+  return `${m[1]}${m[2].toLowerCase()}_glx_vertical_cover.jpg`;
+}
+
 export function sanitizeCoverUrl(url) {
   if (!url) return "";
   let u = String(url).trim();
@@ -310,6 +324,8 @@ export function sanitizeCoverUrl(url) {
   if (u.includes("${size}") && /cdn\.nintendo\.net/i.test(u)) {
     u = u.replace(/\$\{size\}/g, "256");
   }
+  const gogVertical = rewriteGogVerticalCoverUrl(u);
+  if (gogVertical) return gogVertical;
   return u;
 }
 

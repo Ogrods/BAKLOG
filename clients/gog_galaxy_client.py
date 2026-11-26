@@ -88,13 +88,15 @@ def _pick_cover_url(images_val: object) -> str | None:
         return images_val
     if not isinstance(images_val, dict):
         return None
+    # Prefer vertical/cover keys before landscape `background` (glx_bg_top_padding).
     for key in (
-        "background",
+        "cover",
+        "verticalCover",
         "squareIcon",
         "squareIconGray",
         "logo",
         "icon",
-        "cover",
+        "background",
     ):
         url = images_val.get(key)
         if isinstance(url, str) and url.startswith("http"):

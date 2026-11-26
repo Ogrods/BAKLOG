@@ -60,6 +60,12 @@ def _needs_product_details(args, cached_row: dict | None) -> bool:
     return not (cached_row.get("genres") or [])
 
 
+_GOG_HASH_RE = re.compile(
+    r"(https?://images\.gog\.com/)([0-9a-f]{64})",
+    re.IGNORECASE,
+)
+
+
 def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
     """Turn GOG's bare image hash into usable (header, library_cover) URLs.
 
@@ -67,15 +73,27 @@ def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
     Append `.jpg` for the original (landscape banner) and `_glx_vertical_cover.jpg`
     for the portrait cover used by Galaxy. The HTML img onerror handler falls
     back to the header if the vertical cover doesn't exist for older titles.
+
+    Galaxy often hands us landscape ``_glx_bg_top_padding_*.webp?namespace=…``
+    URLs. Strip query + suffix and rebuild from the 64-hex hash so library never
+    stays on the 1600×650 padding asset mislabeled as vertical.
     """
     if not raw:
         return None, None
-    url = raw
+    url = raw.strip()
     if url.startswith("//"):
         url = "https:" + url
     if not url.startswith("http"):
         return None, None
-    if url.endswith(".jpg") or url.endswith(".png"):
+
+    m = _GOG_HASH_RE.search(url)
+    if m:
+        base = f"{m.group(1)}{m.group(2).lower()}"
+        return f"{base}.jpg", f"{base}_glx_vertical_cover.jpg"
+
+    # Already a concrete image path (non-hash CDN) - use as both.
+    path = url.split("?", 1)[0]
+    if path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
         return url, url
     return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
 

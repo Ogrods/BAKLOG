@@ -37,6 +37,11 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- GOG portrait covers (Fallout 3, Alone in the Dark, and similar) use the real vertical Galaxy art instead of a landscape padding crop
+- Portrait spotlight blur fades on the left like soft landscape covers; floating box art keeps hard edges
+
 ## [0.9.29] - 2026-11-26
 
 ### Fixed

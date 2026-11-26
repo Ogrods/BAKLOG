@@ -174,8 +174,8 @@ window.applySpotlightArtFit = function (img) {
 
   if (crop.portrait && bg) {
     img.style.objectFit = crop.fit;
-    // Tall/square: intrinsic centered card (CSS). Keep focal center; soft L/R
-    // feather lives in CSS - do not clear mask-image inline.
+    // Tall/square: intrinsic centered card (CSS). Keep focal center; FG mask
+    // is CSS none (left fade is on art-bg). Clear any stale inline mask.
     img.style.objectPosition = "center";
     img.style.removeProperty("mask-image");
     img.style.removeProperty("-webkit-mask-image");

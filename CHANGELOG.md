@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.30] - 2026-11-26
+
 ### Fixed
 
 - GOG portrait covers (Fallout 3, Alone in the Dark, and similar) use the real vertical Galaxy art instead of a landscape padding crop

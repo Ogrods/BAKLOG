@@ -305,8 +305,9 @@ export function gameNumericId(g) {
 
 const GOG_HASH_RE = /^(https?:\/\/images\.gog\.com\/)([0-9a-f]{64})/i;
 
-/** Heal Galaxy/catalog mangled padding URLs into real vertical covers. */
-export function rewriteGogVerticalCoverUrl(url) {
+/** Heal Galaxy padding / mangled vertical-namespace URLs to the landscape .jpg banner.
+ *  Do not promote `_glx_vertical_cover.jpg` (often a face crop without the title plate). */
+export function rewriteGogPaddingCoverUrl(url) {
   const u = String(url || "").trim();
   if (!u || !/images\.gog\.com/i.test(u)) return "";
   if (!/glx_bg_top_padding/i.test(u) && !/namespace=gamesdb_glx_vertical_cover/i.test(u)) {
@@ -314,7 +315,12 @@ export function rewriteGogVerticalCoverUrl(url) {
   }
   const m = u.match(GOG_HASH_RE);
   if (!m) return "";
-  return `${m[1]}${m[2].toLowerCase()}_glx_vertical_cover.jpg`;
+  return `${m[1]}${m[2].toLowerCase()}.jpg`;
+}
+
+/** @deprecated Use rewriteGogPaddingCoverUrl - alias for older imports/tests. */
+export function rewriteGogVerticalCoverUrl(url) {
+  return rewriteGogPaddingCoverUrl(url);
 }
 
 export function sanitizeCoverUrl(url) {
@@ -324,8 +330,8 @@ export function sanitizeCoverUrl(url) {
   if (u.includes("${size}") && /cdn\.nintendo\.net/i.test(u)) {
     u = u.replace(/\$\{size\}/g, "256");
   }
-  const gogVertical = rewriteGogVerticalCoverUrl(u);
-  if (gogVertical) return gogVertical;
+  const gogBanner = rewriteGogPaddingCoverUrl(u);
+  if (gogBanner) return gogBanner;
   return u;
 }
 
@@ -423,15 +429,18 @@ export function spotlightArtUrl(g) {
 }
 
 /** object-fit / object-position for dashboard spotlight from loaded aspect ratio.
- *  Near-square (0.9–1.25) stays on the portrait capsule path but flags `square`
- *  so CSS can use a 1:1 poster instead of the tall 2:3 card. */
+ *  Never cover: FG always contain + center. Tall/square use portrait card CSS;
+ *  wide art uses the centered wide-card path (is-lowres-art). */
 export function spotlightCropForAspect(ratio) {
   if (!Number.isFinite(ratio) || ratio <= 0) {
-    return { fit: "cover", pos: "35% center", portrait: false, square: false };
+    return { fit: "contain", pos: "center", portrait: false, square: false };
   }
-  if (ratio >= 2) return { fit: "cover", pos: "58% 40%", portrait: false, square: false };
-  if (ratio >= 1.25) return { fit: "cover", pos: "35% center", portrait: false, square: false };
-  if (ratio >= 0.9) return { fit: "contain", pos: "center", portrait: true, square: true };
+  if (ratio >= 1.25) {
+    return { fit: "contain", pos: "center", portrait: false, square: false };
+  }
+  if (ratio >= 0.9) {
+    return { fit: "contain", pos: "center", portrait: true, square: true };
+  }
   return { fit: "contain", pos: "center", portrait: true, square: false };
 }
 

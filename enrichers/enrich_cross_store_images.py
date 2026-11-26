@@ -126,7 +126,14 @@ def is_steamstatic_url(url: str) -> bool:
     return "steamstatic.com" in (url or "")
 
 
+def is_gog_padding_or_soft_cover(url: str) -> bool:
+    """GOG Galaxy padding / soft banner URLs that benefit from Steam capsules."""
+    u = url or ""
+    return "glx_bg_top_padding" in u or "namespace=gamesdb_glx_vertical_cover" in u
+
+
 def needs_lowres_upgrade(g: dict) -> bool:
+    """Non-steamstatic covers (incl. GOG padding banners) should try Steam CDN."""
     if g.get("image_source") in ("steam_search", "steam_search_upgrade"):
         return False
     lib = g.get("library_image") or ""
@@ -137,6 +144,9 @@ def needs_lowres_upgrade(g: dict) -> bool:
         return False
     if is_steamstatic_url(lib) or is_steamstatic_url(hdr):
         return False
+    # Explicit: mangled GOG padding always qualifies (also covered by non-steam above).
+    if is_gog_padding_or_soft_cover(lib) or is_gog_padding_or_soft_cover(hdr):
+        return True
     return True
 
 

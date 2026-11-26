@@ -37,6 +37,10 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+### Fixed
+
+- Spotlight cover art is never cropped (always contain); wide GOG banners show as full cards and prefer Steam capsules when enrich upgrades
+
 ## [0.9.30] - 2026-11-26
 
 ### Fixed

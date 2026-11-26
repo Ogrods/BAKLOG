@@ -1467,7 +1467,7 @@ export function spotlightInnerHtml(g) {
   // rather than dismissible, so no close affordance either.
   return `
     <img class="dash-spotlight-art-bg" alt="" aria-hidden="true" />
-    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="eager" fetchpriority="high" decoding="async" width="600" height="900" data-name="${escapeAttr(g.name)}" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
+    <img class="dash-spotlight-art" src="${escapeAttr(art)}" alt="" loading="eager" fetchpriority="high" decoding="async" data-name="${escapeAttr(g.name)}" data-spotlight-candidates="${candidateAttr}" data-spotlight-idx="0" onload="this.classList.add('is-loaded');window.applySpotlightArtFit(this)" onerror="window.spotlightArtFallback(this)" />
     <div class="dash-spotlight-sheen" aria-hidden="true"></div>
     <div class="dash-spotlight-gradient" aria-hidden="true"></div>
     <div class="dash-spotlight-body">

@@ -68,12 +68,12 @@ def _gog_image_urls(raw: str | None) -> tuple[str | None, str | None]:
     m = _GOG_HASH_RE.search(url)
     if m:
         base = f"{m.group(1)}{m.group(2).lower()}"
-        return f"{base}.jpg", f"{base}_glx_vertical_cover.jpg"
+        return f"{base}.jpg", f"{base}.jpg"
 
     path = url.split("?", 1)[0]
     if path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
         return url, url
-    return f"{url}.jpg", f"{url}_glx_vertical_cover.jpg"
+    return f"{url}.jpg", f"{url}.jpg"
 
 
 def _fetch_wishlist_ids(gog: GogClient, refresh: bool) -> list[int]:

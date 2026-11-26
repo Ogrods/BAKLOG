@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.27] - 2026-11-26
+
 ### Fixed
 
 - Portrait spotlight covers show full title art again (full-bleed contain; square and soft landscape cards unchanged)

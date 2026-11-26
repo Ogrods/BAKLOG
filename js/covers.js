@@ -200,7 +200,7 @@ window.applySpotlightArtFit = function (img) {
 
     if (lowRes && bg) {
       img.style.objectFit = "contain";
-      // Wide cover card is parked in CSS (right tuck / stacked inset); keep focal center.
+      // Wide cover card is centered in CSS; keep focal center.
       img.style.objectPosition = "center";
       if (src && bg.src !== src) bg.src = src;
       spot.classList.add("is-lowres-art");

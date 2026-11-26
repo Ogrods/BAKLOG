@@ -63,7 +63,10 @@ export function syncItadDealSurfaces(options = {}) {
   if (typeof document !== 'undefined') {
     document.documentElement.dataset.itadDeals = available ? '1' : '0';
     document.getElementById('dashboardWishlistStats')?.classList.toggle('hidden', !available);
-    document.querySelector('[data-tab="wishlistDeals"]')?.classList.toggle('hidden', !available);
+    // Wishlist Deals is a wishlist-only pick tab. Never unhide it on library/itch
+    // (updateViewChrome awaits this after updatePickTabsVisibility).
+    const showWishlistDeals = available && state.activeView === 'wishlist';
+    document.querySelector('[data-tab="wishlistDeals"]')?.classList.toggle('hidden', !showWishlistDeals);
     document.getElementById('wishlistItadCta')?.classList.toggle('hidden', available);
   }
 

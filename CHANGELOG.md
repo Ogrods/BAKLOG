@@ -37,6 +37,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.26] - 2026-11-25
+
+### Fixed
+
+- Soft landscape spotlight covers (low-res store art) sit centered in the card instead of tucked to the right
+
 ## [0.9.25] - 2026-11-25
 
 ### Fixed

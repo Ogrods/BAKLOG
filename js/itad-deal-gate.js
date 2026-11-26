@@ -10,6 +10,11 @@ export { isItadDealsAvailable };
 
 let _lastItadAvailable = null;
 
+/** Reset connect-edge tracking (Vitest). */
+export function _resetItadDealGateForTests() {
+  _lastItadAvailable = null;
+}
+
 /** Clear deal filters/sort prefs that only apply when ITAD pricing is active. */
 export function clearItadDealPrefs() {
   let changed = false;
@@ -53,9 +58,11 @@ export function isWishlistPriceColumnAvailable() {
 
 /**
  * Reconcile DOM + prefs when ITAD connect state changes.
+ * Reloads itad_prices.json when ITAD becomes connected (or meta is still null)
+ * so a boot race that wiped libraryMeta.itad before auth arrived can heal.
  * @param {{ rerender?: boolean }} [options]
  */
-export function syncItadDealSurfaces(options = {}) {
+export async function syncItadDealSurfaces(options = {}) {
   const available = isItadDealsAvailable();
   const prev = _lastItadAvailable;
   _lastItadAvailable = available;
@@ -76,9 +83,33 @@ export function syncItadDealSurfaces(options = {}) {
 
   applyColumnVisibility(state.activeView);
 
-  if (options.rerender === false) return;
+  // Boot races reloadGames (loadItadPrices) with initConnections. If library
+  // load wins while ITAD is still disconnected, meta is wiped; auth-status
+  // must reload prices (stubItadConnected already did this explicitly).
+  const needsPriceReload = available && (prev !== true || !state.libraryMeta?.itad);
+  const priceReload = needsPriceReload
+    ? import('./library-load.js')
+      .then((m) => m.loadItadPrices())
+      .then(() => {
+        if (typeof document === 'undefined') return;
+        return import('./fetcher/render/dashboard.js')
+          .then((m) => {
+            try { m.renderDashboardFetcherHealth?.(); } catch (_) { /* not mounted */ }
+          })
+          .catch(() => {});
+      })
+      .catch(() => {})
+    : Promise.resolve();
 
-  if (typeof document === 'undefined') return;
+  if (options.rerender === false) {
+    await priceReload;
+    return;
+  }
+
+  if (typeof document === 'undefined') {
+    await priceReload;
+    return;
+  }
 
   if (state.activeView === 'wishlist') {
     void import('./filters-ui.js').then((m) => {
@@ -91,4 +122,6 @@ export function syncItadDealSurfaces(options = {}) {
   } else if (state.activeView === 'dashboard') {
     void import('./dashboard.js').then((m) => m.scheduleDashboardRender?.());
   }
+
+  await priceReload;
 }

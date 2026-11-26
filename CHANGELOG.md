@@ -37,6 +37,8 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.32] - 2026-11-26
+
 ### Fixed
 
 - GOG spotlight titles use matched Steam capsules when available (no soft GOG padding banners)

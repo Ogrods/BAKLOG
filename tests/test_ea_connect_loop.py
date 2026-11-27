@@ -91,10 +91,104 @@ def test_extract_ea_does_not_return_on_remid_only(monkeypatch) -> None:
     monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
     monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 0.05)
     monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+    # Keep unauth fail slower than SUCCESS_WAIT so this still hits the deadline path.
+    monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 30.0)
 
     page = FakePage(start_url=EA_DEALS_URL)
     with pytest.raises(RuntimeError, match="EA session not confirmed"):
         _extract_ea(page, FakeContext())
+
+
+def test_extract_ea_unauth_only_drains_fast_fail(tmp_path, monkeypatch) -> None:
+    """Sustained deals-page UNAUTHENTICATED + remid must raise EaAuthError quickly."""
+    import time
+
+    from auth.connect_log import reset_connect_log_for_tests
+    from clients.ea_client import EaAuthError
+
+    reset_connect_log_for_tests()
+    monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "clients.ea_session.drain_ea_graphql_hook",
+        lambda _p: (
+            False,
+            [],
+            {"hook_unauthenticated": True, "hook_entries": 2, "hook_authenticated": False},
+        ),
+    )
+    monkeypatch.setattr("clients.ea_session.install_ea_graphql_hook", lambda _c: None)
+    monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
+    monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 5.0)
+    monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 0.05)
+    monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+    # Bypass connect_log rate limit so poll + unauth-fail both land in one run.
+    monkeypatch.setattr("auth.connect_log._LOG_INTERVAL_SEC", 0.0)
+
+    class DealsPage(FakePage):
+        """Stay on deals so signed-in → nudge runs (login URL blocks signed_in)."""
+
+        def goto(self, url: str, **_k) -> None:
+            self.nav_log.append(url)
+            self.url = EA_DEALS_URL
+
+    t0 = time.time()
+    with pytest.raises(EaAuthError, match="session expired"):
+        _extract_ea(DealsPage(start_url=EA_DEALS_URL), FakeContext())
+    assert (time.time() - t0) < 2.0
+
+    log_path = tmp_path / "connect-ea.log"
+    assert log_path.is_file()
+    text = log_path.read_text(encoding="utf-8")
+    assert "connect poll start" in text
+    assert "poll url=" in text
+    assert "unauth fail" in text
+    assert "hook_unauth=True" in text
+
+
+def test_extract_ea_one_unauth_then_empty_drains_does_not_fast_fail(
+    tmp_path, monkeypatch
+) -> None:
+    """One rejection then empty drains must not keep unauth_since through EA_UNAUTH_FAIL_SEC."""
+    import time
+
+    from auth.connect_log import reset_connect_log_for_tests
+
+    reset_connect_log_for_tests()
+    monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
+    poll = {"n": 0}
+
+    def fake_drain(_page):
+        poll["n"] += 1
+        if poll["n"] == 1:
+            return (
+                False,
+                [],
+                {
+                    "hook_unauthenticated": True,
+                    "hook_entries": 1,
+                    "hook_authenticated": False,
+                },
+            )
+        return False, [], {"hook_entries": 0}
+
+    monkeypatch.setattr("clients.ea_session.drain_ea_graphql_hook", fake_drain)
+    monkeypatch.setattr("clients.ea_session.install_ea_graphql_hook", lambda _c: None)
+    monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
+    monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 0.2)
+    monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 0.05)
+    monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+
+    class DealsPage(FakePage):
+        def goto(self, url: str, **_k) -> None:
+            self.nav_log.append(url)
+            self.url = EA_DEALS_URL
+
+    t0 = time.time()
+    with pytest.raises(RuntimeError, match="EA session not confirmed"):
+        _extract_ea(DealsPage(start_url=EA_DEALS_URL), FakeContext())
+    # Hit the normal deadline, not the fast EaAuthError path.
+    assert (time.time() - t0) >= 0.15
+    assert poll["n"] >= 2
 
 
 def test_extract_ea_returns_after_sustained_hook_auth(monkeypatch) -> None:

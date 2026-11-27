@@ -37,6 +37,12 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.35] - 2026-11-26
+
+### Fixed
+
+- EA Connect fails sooner when the deals page stays silent with a session cookie but no GraphQL traffic
+
 ## [0.9.34] - 2026-11-26
 
 ### Fixed

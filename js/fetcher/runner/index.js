@@ -292,6 +292,23 @@ export const fetcherRunner = (() => {
     inFlightPollTimer = null;
   }
 
+  // Force /api/runs reconcile so coalesced snapshots cannot leave lane latches stuck.
+  function reconcileServerInFlightAfterIdle({ renderHealth = false } = {}) {
+    void fetchRunsSnapshot({ force: true }).then((snap) => {
+      if (snap) applyServerSnapshotInFlight(snap);
+      else clearServerInFlightLatch();
+      updateCancelButton();
+      if (renderHealth) renderDashboardFetcherHealth();
+      if (lastServerInFlight || sourcesByRunId.size > 0 || runStateByKey.size > 0) ensureInFlightPolling();
+      else stopInFlightPolling();
+    }).catch(() => {
+      clearServerInFlightLatch();
+      updateCancelButton();
+      if (renderHealth) renderDashboardFetcherHealth();
+      else if (sourcesByRunId.size === 0 && runStateByKey.size === 0) stopInFlightPolling();
+    });
+  }
+
   function closeAllStreams() {
     for (const timer of reconnectTimers.values()) clearTimeout(timer);
     reconnectTimers.clear();
@@ -967,27 +984,8 @@ export const fetcherRunner = (() => {
       updateCancelButton();
     } else if (runStateByKey.size === 0) {
       revertFetcherLayoutIfIdle();
-      // Force a fresh snapshot so a coalesced in-flight /api/runs response
-      // (common for short enrichers like Covers) cannot re-latch Cancel after
-      // the client chip already cleared. Keep polling until server is idle.
-      void fetchRunsSnapshot({ force: true })
-        .then((snap) => {
-          if (snap) applyServerSnapshotInFlight(snap);
-          else clearServerInFlightLatch();
-          updateCancelButton();
-          if (lastServerInFlight || sourcesByRunId.size > 0 || runStateByKey.size > 0) {
-            ensureInFlightPolling();
-          } else {
-            stopInFlightPolling();
-          }
-        })
-        .catch(() => {
-          clearServerInFlightLatch();
-          updateCancelButton();
-          if (sourcesByRunId.size === 0 && runStateByKey.size === 0) {
-            stopInFlightPolling();
-          }
-        });
+      // Coalesced short-enricher snapshots can re-latch Cancel after chip clear.
+      reconcileServerInFlightAfterIdle();
     } else {
       updateCancelButton();
     }
@@ -1376,26 +1374,8 @@ export const fetcherRunner = (() => {
           updateCancelButton();
         }
         revertFetcherLayoutIfIdle();
-        // Belt-and-suspenders with markChipState(null): force idle reconcile so a
-        // coalesced /api/runs snapshot cannot leave last*LaneInFlight stuck and
-        // paint every other chip as queue-blocked after this run finished.
-        void fetchRunsSnapshot({ force: true })
-          .then((snap) => {
-            if (snap) applyServerSnapshotInFlight(snap);
-            else clearServerInFlightLatch();
-            updateCancelButton();
-            renderDashboardFetcherHealth();
-            if (lastServerInFlight || sourcesByRunId.size > 0 || runStateByKey.size > 0) {
-              ensureInFlightPolling();
-            } else {
-              stopInFlightPolling();
-            }
-          })
-          .catch(() => {
-            clearServerInFlightLatch();
-            updateCancelButton();
-            renderDashboardFetcherHealth();
-          });
+        // Belt-and-suspenders: clear stuck lane latches so chips do not stay queue-blocked.
+        reconcileServerInFlightAfterIdle({ renderHealth: true });
       }
     });
 

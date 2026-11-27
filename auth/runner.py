@@ -1645,6 +1645,8 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                 unauth_since = time.time()
         else:
             consecutive_auth = 0
+            # Empty drain: do not keep a prior rejection alive through silence.
+            unauth_since = None
 
         hook_entries = int(hook_stats.get("hook_entries") or 0)
         deals_burst_ok = (

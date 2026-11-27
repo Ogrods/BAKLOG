@@ -145,6 +145,52 @@ def test_extract_ea_unauth_only_drains_fast_fail(tmp_path, monkeypatch) -> None:
     assert "hook_unauth=True" in text
 
 
+def test_extract_ea_one_unauth_then_empty_drains_does_not_fast_fail(
+    tmp_path, monkeypatch
+) -> None:
+    """One rejection then empty drains must not keep unauth_since through EA_UNAUTH_FAIL_SEC."""
+    import time
+
+    from auth.connect_log import reset_connect_log_for_tests
+
+    reset_connect_log_for_tests()
+    monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
+    poll = {"n": 0}
+
+    def fake_drain(_page):
+        poll["n"] += 1
+        if poll["n"] == 1:
+            return (
+                False,
+                [],
+                {
+                    "hook_unauthenticated": True,
+                    "hook_entries": 1,
+                    "hook_authenticated": False,
+                },
+            )
+        return False, [], {"hook_entries": 0}
+
+    monkeypatch.setattr("clients.ea_session.drain_ea_graphql_hook", fake_drain)
+    monkeypatch.setattr("clients.ea_session.install_ea_graphql_hook", lambda _c: None)
+    monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
+    monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 0.2)
+    monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 0.05)
+    monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+
+    class DealsPage(FakePage):
+        def goto(self, url: str, **_k) -> None:
+            self.nav_log.append(url)
+            self.url = EA_DEALS_URL
+
+    t0 = time.time()
+    with pytest.raises(RuntimeError, match="EA session not confirmed"):
+        _extract_ea(DealsPage(start_url=EA_DEALS_URL), FakeContext())
+    # Hit the normal deadline, not the fast EaAuthError path.
+    assert (time.time() - t0) >= 0.15
+    assert poll["n"] >= 2
+
+
 def test_extract_ea_returns_after_sustained_hook_auth(monkeypatch) -> None:
     poll = {"n": 0}
     snapshots: list[list] = []

@@ -34,6 +34,8 @@ from auth.url_hosts import host_matches
 
 SUCCESS_WAIT_SEC = 300
 POLL_SEC = 0.5
+# After deals nudge: sustained Juno UNAUTHENTICATED + remid must not spin to 300s.
+EA_UNAUTH_FAIL_SEC = 20.0
 PSN_STORE_URL = "https://store.playstation.com/en-us/"
 
 
@@ -1567,6 +1569,8 @@ def _extract_ubisoft(page, context, session: AuthSession | None = None) -> dict[
 
 def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, str]:
     """Confirm ea.com login via in-browser Juno GraphQL (and legacy Bearer when present)."""
+    from auth.connect_log import connect_log
+    from clients.ea_client import EaAuthError
     from clients.ea_session import (
         EA_COOKIE_SESSION,
         EA_DEALS_URL,
@@ -1578,6 +1582,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
         ensure_ea_graphql_hook,
         fetch_owned_games_inpage,
         fetch_owned_games_playwright_request,
+        has_ea_session_cookie,
         install_ea_graphql_hook,
         is_ea_session_expired_page,
         normalize_bearer,
@@ -1587,6 +1592,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
 
     install_ea_graphql_hook(context)
     ensure_ea_graphql_hook(page)
+    connect_log("ea", "connect poll start", key="enter")
 
     saw_token: dict[str, Any] = {"ok": False, "value": ""}
 
@@ -1615,6 +1621,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
     owned_accum: list[dict] = []
     owned_seen: set[str] = set()
     last_poll_log = 0.0
+    unauth_since: float | None = None
 
     def _login_witnessed() -> bool:
         return saw_signin or not require_signin
@@ -1628,17 +1635,16 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
         _merge_owned_items(owned_accum, owned_seen, owned_batch)
 
         # Mixed deals-page traffic often includes both authenticated `me` rows and
-        # unauthenticated errors in one drain ΓÇö prefer auth_ok for this poll.
+        # unauthenticated errors in one drain — prefer auth_ok for this poll.
         if auth_ok:
             consecutive_auth += 1
+            unauth_since = None
         elif hook_stats.get("hook_unauthenticated"):
             consecutive_auth = 0
+            if nudged and unauth_since is None:
+                unauth_since = time.time()
         else:
             consecutive_auth = 0
-
-        now = time.time()
-        if now - last_poll_log >= 2.0:
-            last_poll_log = now
 
         hook_entries = int(hook_stats.get("hook_entries") or 0)
         deals_burst_ok = (
@@ -1696,6 +1702,11 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                 browser_auth_ok=True,
                 cookies=cookie_jar,
             )
+            connect_log(
+                "ea",
+                f"session ready owned={len(owned_accum)} consecutive_auth={consecutive_auth}",
+                key="ready",
+            )
             return {
                 "EA_PROFILE": "ready",
                 "EA_BEARER_TOKEN": EA_COOKIE_SESSION,
@@ -1703,9 +1714,10 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
 
         if saw_token["ok"] and saw_token["value"] and _login_witnessed():
             probe = probe_ea_token(saw_token["value"], cookies)
-            # APQ-owned-games miss falls back to subscription probe only ΓÇö that
+            # APQ-owned-games miss falls back to subscription probe only — that
             # bearer still fails fetch_ea; wait for sustained cookie handoff.
             if probe.get("ok") and not probe.get("library_via_browser"):
+                connect_log("ea", "session ready via sniffed bearer", key="ready-bearer")
                 return {
                     "EA_PROFILE": "ready",
                     "EA_BEARER_TOKEN": saw_token["value"],
@@ -1732,6 +1744,8 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                     pass
             else:
                 nudged = True
+                # Deals nav starts a fresh auth window — ignore pre-nudge unauth.
+                unauth_since = None
                 if session:
                     session.emit("signed_in", _signed_in_payload(page.url or EA_LOGIN_URL))
                 try:
@@ -1746,6 +1760,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                     pass
         elif expired_page and not redirected_expired:
             redirected_expired = True
+            unauth_since = None
             ensure_ea_graphql_hook(page)
             try:
                 page.goto(EA_LOGIN_URL, wait_until="commit", timeout=25_000)
@@ -1755,6 +1770,40 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             ensure_ea_graphql_hook(page)
 
         now = time.time()
+        if now - last_poll_log >= 2.0:
+            last_poll_log = now
+            connect_log(
+                "ea",
+                (
+                    f"poll url={_safe_connect_log_url(page.url or '')!r} nudged={nudged} "
+                    f"auth_ok={auth_ok} consecutive_auth={consecutive_auth} "
+                    f"hook_entries={hook_entries} "
+                    f"hook_unauth={bool(hook_stats.get('hook_unauthenticated'))} "
+                    f"owned={len(owned_accum)}"
+                ),
+                key="poll",
+            )
+
+        if (
+            nudged
+            and unauth_since is not None
+            and (now - unauth_since) >= EA_UNAUTH_FAIL_SEC
+            and has_ea_session_cookie(cookies)
+            and not auth_ok
+        ):
+            connect_log(
+                "ea",
+                (
+                    f"unauth fail after {EA_UNAUTH_FAIL_SEC:.0f}s "
+                    f"url={_safe_connect_log_url(page.url or '')!r} "
+                    f"hook_entries={hook_entries}"
+                ),
+                key="unauth-fail",
+            )
+            raise EaAuthError(
+                "EA session expired — open Connections → EA App → Reconnect and sign in at ea.com."
+            )
+
         # Deals handoff needs denser SSE so the Connect UI does not look frozen
         # while GraphQL cookies settle (EA-only; no cross-provider commit-sooner).
         hint_interval = 3.0 if (signed_in and nudged and not expired_page) else 10.0
@@ -1790,6 +1839,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
 
         page.wait_for_timeout(int(POLL_SEC * 1000))
 
+    connect_log("ea", "session not confirmed before deadline", key="timeout")
     raise RuntimeError(
         "EA session not confirmed - sign in at ea.com and wait for the deals page "
         "to finish loading before the window closes."

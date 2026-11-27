@@ -152,6 +152,7 @@ def test_extract_ea_zero_hook_silence_fail_with_remid(tmp_path, monkeypatch) -> 
     import time
 
     from auth.connect_log import reset_connect_log_for_tests
+    from auth.url_hosts import host_matches
     from clients.ea_client import EaAuthError
     from clients.ea_session import EA_HOME_URL
 
@@ -181,7 +182,7 @@ def test_extract_ea_zero_hook_silence_fail_with_remid(tmp_path, monkeypatch) -> 
     with pytest.raises(EaAuthError, match="session expired"):
         _extract_ea(page, FakeContext())
     assert (time.time() - t0) < 2.0
-    assert any(EA_HOME_URL in u or u.rstrip("/").endswith("ea.com") for u in page.nav_log)
+    assert any(u == EA_HOME_URL or host_matches(u, "ea.com") for u in page.nav_log)
 
     text = (tmp_path / "connect-ea.log").read_text(encoding="utf-8")
     assert "deals silence retry" in text

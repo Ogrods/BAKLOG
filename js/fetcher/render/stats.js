@@ -126,6 +126,7 @@ const FH_CHIP_MODIFIER_CLASSES = new Set([
   'fh-chip-reconnect-required',
   'fh-chip-disconnected',
   'fh-chip-unavailable',
+  'fh-chip-queue-blocked',
 ]);
 
 function patchFetcherChipEl(btn, patch) {

@@ -6537,6 +6537,14 @@ html[data-theme="ember"] .brand-logo-pills {
 .fh-chip-queued:disabled {
   cursor: progress;
 }
+/* Lane busy elsewhere: clickable so run() can log queue-full (not :disabled). */
+.fh-chip-queue-blocked:not(:disabled) {
+  opacity: 0.72;
+  border-style: dashed;
+}
+.fh-chip-queue-blocked:not(:disabled):hover {
+  opacity: 0.9;
+}
 .fh-chip-dot {
   width: 8px;
   height: 8px;

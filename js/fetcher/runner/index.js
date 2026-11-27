@@ -1081,8 +1081,8 @@ export const fetcherRunner = (() => {
       return false;
     }
     // Hard cap mirrors server-side enforcement (max 1 active run, no queuing).
-    // Without this guard a fast double-click could land two POSTs before the
-    // server's lock saw the first one as pending.
+    // Chips stay clickable when the lane is busy elsewhere so this path can
+    // explain the owner in the console (queue-full is not a disabled attribute).
     if (isQueueFullForKey(key)) {
       if (!auto) {
         ensurePanel(src);
@@ -1376,6 +1376,26 @@ export const fetcherRunner = (() => {
           updateCancelButton();
         }
         revertFetcherLayoutIfIdle();
+        // Belt-and-suspenders with markChipState(null): force idle reconcile so a
+        // coalesced /api/runs snapshot cannot leave last*LaneInFlight stuck and
+        // paint every other chip as queue-blocked after this run finished.
+        void fetchRunsSnapshot({ force: true })
+          .then((snap) => {
+            if (snap) applyServerSnapshotInFlight(snap);
+            else clearServerInFlightLatch();
+            updateCancelButton();
+            renderDashboardFetcherHealth();
+            if (lastServerInFlight || sourcesByRunId.size > 0 || runStateByKey.size > 0) {
+              ensureInFlightPolling();
+            } else {
+              stopInFlightPolling();
+            }
+          })
+          .catch(() => {
+            clearServerInFlightLatch();
+            updateCancelButton();
+            renderDashboardFetcherHealth();
+          });
       }
     });
 

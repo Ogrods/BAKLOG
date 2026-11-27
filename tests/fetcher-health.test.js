@@ -1213,6 +1213,116 @@ describe('lane-aware queue slots', () => {
   });
 });
 
+describe('queue-full chips stay clickable', () => {
+  const stubFetchers = () => {
+    vi.stubGlobal('fetch', vi.fn(async (url, init) => {
+      const u = String(url);
+      if (u.includes('/api/runs') && !(init?.method || 'GET').toUpperCase().includes('POST')) {
+        return { ok: true, json: async () => ({ active: null, queue: [], history: [] }) };
+      }
+      if (u.includes('/api/fetchers')) {
+        return {
+          ok: true,
+          json: async () => ({
+            fetchers: [
+              { key: 'steam', label: 'Steam', group: 'library', metaKey: 'steam', color: '#1b2838', cmd: 'fetch_steam.py', available: true },
+              { key: 'humble', label: 'Humble', group: 'library', metaKey: 'humble', color: '#cc2929', cmd: 'fetch_humble.py', available: true },
+              { key: 'hltb', label: 'HLTB', group: 'enrich', metaKey: 'hltb', color: '#5a9', cmd: 'enrich_hltb.py', available: true },
+              { key: 'steamReviews', label: 'Reviews', group: 'enrich', metaKey: 'steam_reviews', color: '#66c', cmd: 'enrich_steam_reviews.py', available: true },
+            ],
+          }),
+        };
+      }
+      if (u.includes('/api/run/')) {
+        return { ok: false, status: 500, text: async () => 'should not submit' };
+      }
+      return { ok: false };
+    }));
+  };
+
+  beforeEach(async () => {
+    stubFetchers();
+    document.body.innerHTML = `
+      <div id="dashboardFetcherHealth"></div>
+      <div id="fetcherRunLog">
+        <div class="fh-log-body" data-role="body"></div>
+      </div>
+      <div id="fetcherPopover" class="hidden"></div>
+      <div id="fetcherPopoverBackdrop" class="hidden"></div>
+    `;
+    connMock.loaded = true;
+    connMock.statuses = { steam: 'connected', humble: 'connected' };
+    isProviderConnected.mockImplementation(() => true);
+    fetcherRunner.invalidateApiProbe();
+    await fetcherRunner.probeApi(true);
+    fetcherRunner.applyServerSnapshotInFlight({});
+    fetcherRunner.markChipStateForTest('steam', null);
+    fetcherRunner.markChipStateForTest('humble', null);
+    fetcherRunner.markChipStateForTest('hltb', null);
+    fetcherRunner.markChipStateForTest('steamReviews', null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    isProviderConnected.mockImplementation(() => false);
+    fetcherRunner.markChipStateForTest('steam', null);
+    fetcherRunner.markChipStateForTest('humble', null);
+    fetcherRunner.markChipStateForTest('hltb', null);
+    fetcherRunner.markChipStateForTest('steamReviews', null);
+    fetcherRunner.applyServerSnapshotInFlight({});
+    document.body.innerHTML = '';
+  });
+
+  it('fetcher-lane busy: other library chip enabled + queue-blocked; run() logs owner', async () => {
+    // Client-side running state (lane-scoped) — survives /api/runs idle polls.
+    fetcherRunner.markChipStateForTest('steam', 'running', 'r1');
+    renderDashboardFetcherHealth();
+    const chip = document.querySelector('.fh-chip[data-fetcher-key="humble"]');
+    expect(chip).not.toBeNull();
+    expect(chip.disabled).toBe(false);
+    expect(chip.classList.contains('fh-chip-queue-blocked')).toBe(true);
+    expect(chip.title).toMatch(/Queue full/i);
+
+    const ok = await fetcherRunner.run('humble');
+    expect(ok).toBe(false);
+    fetcherRunner.flushLinesNow();
+    const logText = document.querySelector('[data-role="body"]')?.textContent
+      || document.querySelector('.fh-log-body')?.textContent
+      || '';
+    expect(logText).toMatch(/Queue full/i);
+    expect(logText).toMatch(/Steam/i);
+  });
+
+  it('enrich-lane busy: other enrich chip enabled + queue-blocked; run() logs owner', async () => {
+    fetcherRunner.markChipStateForTest('hltb', 'running', 'r2');
+    renderDashboardFetcherHealth();
+    const chip = document.querySelector('.fh-chip[data-fetcher-key="steamReviews"]');
+    expect(chip).not.toBeNull();
+    expect(chip.disabled).toBe(false);
+    expect(chip.classList.contains('fh-chip-queue-blocked')).toBe(true);
+
+    const ok = await fetcherRunner.run('steamReviews');
+    expect(ok).toBe(false);
+    fetcherRunner.flushLinesNow();
+    const logText = document.querySelector('[data-role="body"]')?.textContent
+      || document.querySelector('.fh-log-body')?.textContent
+      || '';
+    expect(logText).toMatch(/Queue full/i);
+    expect(logText).toMatch(/HLTB/i);
+  });
+
+  it('click on queue-blocked chip reaches run()', async () => {
+    const { bindFetcherHealthEvents } = await import('../js/bind-events-fetcher.js');
+    fetcherRunner.markChipStateForTest('steam', 'running', 'r1');
+    renderDashboardFetcherHealth();
+    bindFetcherHealthEvents();
+    const runSpy = vi.spyOn(fetcherRunner, 'run').mockResolvedValue(false);
+    document.querySelector('.fh-chip[data-fetcher-key="humble"]').click();
+    expect(runSpy).toHaveBeenCalledWith('humble', expect.objectContaining({ refresh: false }));
+  });
+});
+
 describe('cancel enrich lane', () => {
   beforeEach(async () => {
     vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
@@ -2407,6 +2517,7 @@ describe('tryPatchFetcherHealthDashboard', () => {
           'fh-chip-reconnect-required': false,
           'fh-chip-disconnected': false,
           'fh-chip-unavailable': false,
+          'fh-chip-queue-blocked': false,
         },
       }],
       staleCount: 0,

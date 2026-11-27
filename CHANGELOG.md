@@ -37,6 +37,13 @@ version is `pyproject.toml` (mirrored into `package.json` and the
 
 ## [Unreleased]
 
+## [0.9.34] - 2026-11-26
+
+### Fixed
+
+- EA Connect fails sooner when the deals page keeps returning unauthenticated session errors
+- Fetcher chips stay clickable when another store is already running, and show why the queue is full
+
 ## [0.9.33] - 2026-11-26
 
 ### Fixed

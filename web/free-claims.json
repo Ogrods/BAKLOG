@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-26T18:24:45.331951+00:00",
+  "generated_at": "2026-11-27T15:32:55.361001+00:00",
   "items": [
     {
       "id": "epic-firestone-online-idle-rpg-bfd04b",
@@ -24,6 +24,50 @@
       "ends_at": "2026-12-03T16:00:00Z",
       "source": "epic",
       "first_seen": "2026-11-26T18:23:45Z"
+    },
+    {
+      "id": "gamerpower-3334",
+      "store": "indiegala",
+      "title": "Mysterious House (IndieGala) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/mysterious-house-pc-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1848150/header.jpg?t=1724594622",
+      "genres": [],
+      "blurb": "Mysterious House is free this week on Indiegala! Mysterious House is a indie 2d platformer filled with challenging puzzles and obstacles.",
+      "ends_at": null,
+      "steam_appid": 1848150,
+      "review_percent": 78,
+      "source": "gamerpower",
+      "first_seen": "2026-11-27T15:30:34Z",
+      "premium_only": true
+    },
+    {
+      "id": "gamerpower-3860",
+      "store": "gog",
+      "title": "Dead Age 2 (GOG) Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/dead-age-2-gog-giveaway",
+      "header_image": "https://www.gamerpower.com/offers/1b/6b0969de22e37.jpg",
+      "genres": [],
+      "blurb": "Download Dead Age 2 for free via GOG! Dead Age 2 is a fun indie survival RPG with rogue-like features, fast-paced turn-based combat and survival all in one.",
+      "ends_at": "2026-11-30T14:40:09Z",
+      "source": "gamerpower",
+      "first_seen": "2026-11-27T15:30:34Z"
+    },
+    {
+      "id": "gamerpower-3859",
+      "store": "steam",
+      "title": "Vertical Drop Heroes HD Steam Key Giveaway",
+      "claim_url": "https://www.gamerpower.com/open/vertical-drop-heroes-hd-steam-key-giveaway",
+      "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/311480/b1e29d86fd2a282575c562eb5e3eb87d93bc7ce8/header.jpg?t=1765805926",
+      "genres": [
+        "Action",
+        "RPG"
+      ],
+      "blurb": "Claim your free Vertical Drop Heroes HD Steam key via Fanatical and keep this Steam game forever! Vertical Drop Heroes is a 2d procedural platformer RPG with roguelike elements. Don´t miss it!",
+      "ends_at": "2026-11-28T23:59:00Z",
+      "steam_appid": 311480,
+      "review_percent": 80,
+      "source": "gamerpower",
+      "first_seen": "2026-11-27T15:30:34Z"
     },
     {
       "id": "gamerpower-3852",
@@ -92,20 +136,6 @@
       "review_percent": 70,
       "source": "gamerpower",
       "first_seen": "2026-10-03T20:18:44Z"
-    },
-    {
-      "id": "gamerpower-3322",
-      "store": "indiegala",
-      "title": "Sausage Hunter (Indiegala) Giveaway",
-      "claim_url": "https://www.gamerpower.com/open/sausage-hunter-pc-giveaway",
-      "header_image": "https://www.gamerpower.com/offers/1b/68eadb2d6f0c4.jpg",
-      "genres": [],
-      "blurb": "The hunt for the magic sausage starts now! Download Sausage Hunter for free on IndieGala. Sausage Hunter is a 2D platformer with hand-drawn graphics and intriguing puzzles... plus a kitten and sausages, for some reason.",
-      "ends_at": null,
-      "steam_appid": 1296880,
-      "review_percent": 80,
-      "source": "gamerpower",
-      "first_seen": "2026-09-24T18:07:35Z"
     },
     {
       "id": "gamerpower-3324",

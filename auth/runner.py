@@ -36,6 +36,10 @@ SUCCESS_WAIT_SEC = 300
 POLL_SEC = 0.5
 # After deals nudge: sustained Juno UNAUTHENTICATED + remid must not spin to 300s.
 EA_UNAUTH_FAIL_SEC = 20.0
+# After deals nudge: remid + zero GraphQL hooks (capture's remid+0 gql rule) — match
+# capture_ea_browser_session timeout_s=45 with one mid-budget deals→home recovery.
+EA_DEALS_SILENCE_FAIL_SEC = 45.0
+EA_DEALS_SILENCE_RETRY_SEC = 15.0
 PSN_STORE_URL = "https://store.playstation.com/en-us/"
 
 
@@ -1575,6 +1579,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
         EA_COOKIE_SESSION,
         EA_DEALS_URL,
         EA_GRAPHQL_HOST,
+        EA_HOME_URL,
         EA_LOGIN_URL,
         _ensure_ea_deals_ready,
         _merge_owned_items,
@@ -1622,6 +1627,9 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
     owned_seen: set[str] = set()
     last_poll_log = 0.0
     unauth_since: float | None = None
+    deals_since: float | None = None
+    saw_any_hook = False
+    silence_retry_done = False
 
     def _login_witnessed() -> bool:
         return saw_signin or not require_signin
@@ -1649,6 +1657,8 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             unauth_since = None
 
         hook_entries = int(hook_stats.get("hook_entries") or 0)
+        if hook_entries > 0:
+            saw_any_hook = True
         deals_burst_ok = (
             nudged
             and hook_entries >= 1
@@ -1748,6 +1758,8 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                 nudged = True
                 # Deals nav starts a fresh auth window — ignore pre-nudge unauth.
                 unauth_since = None
+                deals_since = time.time()
+                silence_retry_done = False
                 if session:
                     session.emit("signed_in", _signed_in_payload(page.url or EA_LOGIN_URL))
                 try:
@@ -1763,6 +1775,8 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
         elif expired_page and not redirected_expired:
             redirected_expired = True
             unauth_since = None
+            deals_since = None
+            silence_retry_done = False
             ensure_ea_graphql_hook(page)
             try:
                 page.goto(EA_LOGIN_URL, wait_until="commit", timeout=25_000)
@@ -1781,7 +1795,7 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
                     f"auth_ok={auth_ok} consecutive_auth={consecutive_auth} "
                     f"hook_entries={hook_entries} "
                     f"hook_unauth={bool(hook_stats.get('hook_unauthenticated'))} "
-                    f"owned={len(owned_accum)}"
+                    f"owned={len(owned_accum)} saw_hook={saw_any_hook}"
                 ),
                 key="poll",
             )
@@ -1805,6 +1819,49 @@ def _extract_ea(page, context, session: AuthSession | None = None) -> dict[str, 
             raise EaAuthError(
                 "EA session expired — open Connections → EA App → Reconnect and sign in at ea.com."
             )
+
+        # remid + zero Juno traffic after deals nudge (capture's remid+0 gql rule).
+        if (
+            nudged
+            and deals_since is not None
+            and not auth_ok
+            and not saw_any_hook
+            and has_ea_session_cookie(cookies)
+        ):
+            silence_elapsed = now - deals_since
+            if not silence_retry_done and silence_elapsed >= EA_DEALS_SILENCE_RETRY_SEC:
+                silence_retry_done = True
+                connect_log(
+                    "ea",
+                    (
+                        f"deals silence retry after {EA_DEALS_SILENCE_RETRY_SEC:.0f}s "
+                        f"url={_safe_connect_log_url(page.url or '')!r}"
+                    ),
+                    key="deals-silence-retry",
+                )
+                try:
+                    ensure_ea_graphql_hook(page)
+                    page.goto(EA_DEALS_URL, wait_until="commit", timeout=25_000)
+                    ensure_ea_graphql_hook(page)
+                    page.wait_for_timeout(800)
+                    page.goto(EA_HOME_URL, wait_until="commit", timeout=25_000)
+                    ensure_ea_graphql_hook(page)
+                    page.wait_for_timeout(800)
+                except Exception:  # noqa: BLE001
+                    pass
+            if silence_elapsed >= EA_DEALS_SILENCE_FAIL_SEC:
+                connect_log(
+                    "ea",
+                    (
+                        f"silence fail after {EA_DEALS_SILENCE_FAIL_SEC:.0f}s "
+                        f"url={_safe_connect_log_url(page.url or '')!r} "
+                        f"remid=1 saw_hook=0"
+                    ),
+                    key="silence-fail",
+                )
+                raise EaAuthError(
+                    "EA session expired — open Connections → EA App → Reconnect and sign in at ea.com."
+                )
 
         # Deals handoff needs denser SSE so the Connect UI does not look frozen
         # while GraphQL cookies settle (EA-only; no cross-provider commit-sooner).

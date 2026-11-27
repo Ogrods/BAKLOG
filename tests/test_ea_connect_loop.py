@@ -91,8 +91,9 @@ def test_extract_ea_does_not_return_on_remid_only(monkeypatch) -> None:
     monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
     monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 0.05)
     monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
-    # Keep unauth fail slower than SUCCESS_WAIT so this still hits the deadline path.
+    # Keep unauth/silence fail slower than SUCCESS_WAIT so this still hits the deadline path.
     monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 30.0)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_FAIL_SEC", 30.0)
 
     page = FakePage(start_url=EA_DEALS_URL)
     with pytest.raises(RuntimeError, match="EA session not confirmed"):
@@ -120,6 +121,7 @@ def test_extract_ea_unauth_only_drains_fast_fail(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
     monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 5.0)
     monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 0.05)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_FAIL_SEC", 30.0)
     monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
     # Bypass connect_log rate limit so poll + unauth-fail both land in one run.
     monkeypatch.setattr("auth.connect_log._LOG_INTERVAL_SEC", 0.0)
@@ -143,6 +145,74 @@ def test_extract_ea_unauth_only_drains_fast_fail(tmp_path, monkeypatch) -> None:
     assert "poll url=" in text
     assert "unauth fail" in text
     assert "hook_unauth=True" in text
+
+
+def test_extract_ea_zero_hook_silence_fail_with_remid(tmp_path, monkeypatch) -> None:
+    """remid + zero GraphQL after deals nudge must raise EaAuthError (capture remid+0 gql)."""
+    import time
+
+    from auth.connect_log import reset_connect_log_for_tests
+    from clients.ea_client import EaAuthError
+    from clients.ea_session import EA_HOME_URL
+
+    reset_connect_log_for_tests()
+    monkeypatch.setattr("shared.install_paths.data_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "clients.ea_session.drain_ea_graphql_hook",
+        lambda _p: (False, [], {"hook_entries": 0}),
+    )
+    monkeypatch.setattr("clients.ea_session.install_ea_graphql_hook", lambda _c: None)
+    monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
+    monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 5.0)
+    monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 30.0)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_RETRY_SEC", 0.02)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_FAIL_SEC", 0.08)
+    monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+    monkeypatch.setattr("auth.connect_log._LOG_INTERVAL_SEC", 0.0)
+
+    class DealsPage(FakePage):
+        def goto(self, url: str, **_k) -> None:
+            self.nav_log.append(url)
+            # Stay signed-in for deals/home recovery navigations.
+            self.url = url if "signin" not in url and "/login" not in url else EA_DEALS_URL
+
+    t0 = time.time()
+    page = DealsPage(start_url=EA_DEALS_URL)
+    with pytest.raises(EaAuthError, match="session expired"):
+        _extract_ea(page, FakeContext())
+    assert (time.time() - t0) < 2.0
+    assert any(EA_HOME_URL in u or u.rstrip("/").endswith("ea.com") for u in page.nav_log)
+
+    text = (tmp_path / "connect-ea.log").read_text(encoding="utf-8")
+    assert "deals silence retry" in text
+    assert "silence fail" in text
+    assert "saw_hook=0" in text or "saw_hook=False" in text
+
+
+def test_extract_ea_zero_hook_without_remid_does_not_silence_fail(monkeypatch) -> None:
+    """Silence fail requires remid — no cookie must hit the normal deadline instead."""
+    monkeypatch.setattr(
+        "clients.ea_session.drain_ea_graphql_hook",
+        lambda _p: (False, [], {"hook_entries": 0}),
+    )
+    monkeypatch.setattr("clients.ea_session.install_ea_graphql_hook", lambda _c: None)
+    monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
+    monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 0.12)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_RETRY_SEC", 0.02)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_FAIL_SEC", 0.05)
+    monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
+
+    class NoRemidCtx(FakeContext):
+        def cookies(self) -> list:
+            return []
+
+    class DealsPage(FakePage):
+        def goto(self, url: str, **_k) -> None:
+            self.nav_log.append(url)
+            self.url = EA_DEALS_URL
+
+    with pytest.raises(RuntimeError, match="EA session not confirmed"):
+        _extract_ea(DealsPage(start_url=EA_DEALS_URL), NoRemidCtx())
 
 
 def test_extract_ea_one_unauth_then_empty_drains_does_not_fast_fail(
@@ -176,6 +246,7 @@ def test_extract_ea_one_unauth_then_empty_drains_does_not_fast_fail(
     monkeypatch.setattr("clients.ea_session.ensure_ea_graphql_hook", lambda _p: None)
     monkeypatch.setattr("auth.runner.SUCCESS_WAIT_SEC", 0.2)
     monkeypatch.setattr("auth.runner.EA_UNAUTH_FAIL_SEC", 0.05)
+    monkeypatch.setattr("auth.runner.EA_DEALS_SILENCE_FAIL_SEC", 30.0)
     monkeypatch.setattr("auth.runner.POLL_SEC", 0.01)
 
     class DealsPage(FakePage):
